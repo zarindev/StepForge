@@ -163,6 +163,14 @@ export function describeStep(step: AnyStep): string {
     case 'api.request':
       s = `Send ${String(p.method ?? 'GET')} ${String(p.url ?? '')}`;
       break;
+    case 'api.extract':
+      s =
+        p.from === 'status'
+          ? 'Read the response status'
+          : p.from === 'header'
+            ? `Read the ${String(p.name ?? '')} header of the response`
+            : `Read ${String(p.path ?? '$')} from the response`;
+      break;
     case 'api.graphql':
       s = `Send a GraphQL query to ${String(p.url ?? '')}`;
       break;

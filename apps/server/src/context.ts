@@ -6,6 +6,7 @@ import type { SpecService } from './api/specs.ts';
 import type { DatabaseService } from './database/service.ts';
 import type { EmailService } from './email/service.ts';
 import type { PerfService } from './perf/service.ts';
+import type { DiagnosisService } from './diagnosis/service.ts';
 import type { RecorderManager } from './recorder/manager.ts';
 import type { RunManager } from './runner/manager.ts';
 
@@ -31,5 +32,6 @@ export type AppContext = {
   database: DatabaseService;
   email: EmailService;
   perf: PerfService;
+  diagnosis: DiagnosisService;
   startedAt: Date;
 };

@@ -1,5 +1,7 @@
 # Architecture
 
+_By Md Zarin Tasnim · part of the StepForge documentation_
+
 StepForge is a single Node.js process (Fastify) that serves a React dashboard and a JSON/WebSocket API on
 `127.0.0.1`. All state lives in one SQLite file plus an artifacts folder under `data/`.
 
@@ -28,6 +30,8 @@ flowchart TB
 | `@stepforge/executor-email` | Email steps (wait, assert, extract, open link) |
 | `@stepforge/perf` | Load engine (autocannon), k6 export/bridge, Web Vitals, Lighthouse |
 | `@stepforge/executor-perf` | Performance steps (page metrics, Lighthouse, load test, query plan) |
+| `@stepforge/diagnosis` | Rule engine, YAML rules, last-green diff |
+| `@stepforge/reports` | Bug and run report rendering: HTML, PDF (Chromium), XLSX, CSV, Markdown |
 | `@stepforge/executor-util` | Variables, generated data, sandboxed scripts |
 | `@stepforge/recorder` | Recording browser, injected toolbar, network capture |
 | `@stepforge/importers` | OpenAPI/Swagger, Postman, cURL and HAR → scenarios |

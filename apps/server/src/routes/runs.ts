@@ -86,7 +86,17 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
       .orderBy(schema.stepResults.position)
       .all();
     const artifacts = db.select().from(schema.artifacts).where(eq(schema.artifacts.runItemId, item.id)).all();
-    return { ...item, steps, artifacts };
+    const bug = db
+      .select({
+        id: schema.bugs.id,
+        code: schema.bugs.code,
+        status: schema.bugs.status,
+        occurrences: schema.bugs.occurrences,
+      })
+      .from(schema.bugs)
+      .where(eq(schema.bugs.runItemId, item.id))
+      .get();
+    return { ...item, steps, artifacts, bug: bug ?? null };
   });
 
   app.post<P<'id'>>('/api/runs/:id/cancel', async (req) => runs.cancel(req.params.id));

@@ -1,5 +1,7 @@
 # Known Issues
 
+_By Md Zarin Tasnim · part of the StepForge documentation_
+
 | # | Area | Issue | Status / workaround |
 |---|---|---|---|
 | 1 | Scripts | `setup.bat` and `start.bat` have not yet been executed on a real Windows machine (built on macOS). CI on `windows-latest` runs the same npm commands but not the `.bat` wrappers. | To verify in Phase 13 fresh-clone test. |
@@ -39,3 +41,8 @@
 | 35 | Performance | Every UI test page gets the web-vitals script and a hidden `__stepforgeVitals` property. | Needed for page metrics; negligible overhead. |
 | 36 | Performance | Query plans for SQL Server and MongoDB are not implemented (timing works). | Possible later. |
 | 37 | Tests | Load-test unit tests target endpoints with a small artificial delay; unbounded load against a local server saturated the CPU and made parallel UI tests time out. | By design. |
+| 38 | Dependencies | `npm audit` reports advisories inside Lighthouse 12's optional parts: OpenTelemetry (via its Sentry error reporting, which StepForge never enables) and `extract-zip` (via Puppeteer's browser downloader, never used — StepForge passes Playwright's Chromium). Lighthouse 13 fixes them but requires Node 22.19+, while StepForge supports Node 20+. `basic-ftp` and `uuid` are pinned to patched versions with npm `overrides`/a direct dependency. | Move to Lighthouse 13 when Node 20 support ends. |
+| 39 | Diagnosis | Diagnoses are rule-based: a likely cause with a confidence, not proof. Unusual failures fall back to generic rules; add your own rules in `data/rules/*.yaml`. | By design. |
+| 40 | Diagnosis | Locator suggestions compare the old locator's words with the page's test ids, accessible names, labels and text; renamed elements with completely different wording are not found. | Record the step again. |
+| 41 | Bugs | Bugs are filed for every failed or broken test, including test-owned ones (e.g. locator changed); filter by "Whose issue" on the Bugs page. | By design. |
+| 42 | Reports | PDF and HTML exports embed the failure screenshot; videos and traces stay in StepForge (linked from the bug's run). | By design (file size). |

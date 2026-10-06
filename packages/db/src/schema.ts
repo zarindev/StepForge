@@ -428,6 +428,12 @@ export const bugs = sqliteTable(
     ownerHint: text('owner_hint', { enum: ['test', 'app', 'environment', 'data'] }),
     fingerprint: text('fingerprint').notNull(),
     occurrences: integer('occurrences').notNull().default(1),
+    /** Kept even when the run that found it is deleted. */
+    scenarioId: fk('scenario_id', () => scenarios.id, 'set null'),
+    testCaseId: fk('test_case_id', () => testCases.id, 'set null'),
+    failedStepId: text('failed_step_id'),
+    category: text('category'),
+    lastSeenAt: text('last_seen_at'),
     ...timestamps,
   },
   (t) => [

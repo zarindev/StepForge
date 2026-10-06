@@ -1,6 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
+import { Download, FileCode2, FileText, Sheet } from 'lucide-react';
+import { Menu } from '@/components/ui/menu';
 import { ResultsGrid } from '@/components/database/results-grid';
 import { EmailPreview } from '@/components/email/email-preview';
+import { DiagnosisPanel } from '@/components/diagnosis/diagnosis-panel';
 import { PerfPanel, type StepPerf } from '@/components/perf/perf-panel';
 import { Link, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Ban, Bandage, ChevronRight, FolderTree, Play, RotateCw, Terminal } from 'lucide-react';
@@ -14,7 +17,7 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/states';
 import { toastError } from '@/components/ui/toast';
-import { api, artifactUrl } from '@/lib/api';
+import { api, download, artifactUrl } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
 import { useLiveEvent, type LiveEvent } from '@/lib/live';
 import { useRun, useRunItem } from '@/lib/queries';
@@ -171,6 +174,32 @@ export function RunDetailPage() {
               >
                 <Play className="h-4 w-4" /> Run again
               </Button>
+            )}
+            {!isLive && (
+              <Menu
+                trigger={(open) => (
+                  <Button variant="outline" onClick={open}>
+                    <Download className="h-4 w-4" /> Export
+                  </Button>
+                )}
+                items={[
+                  {
+                    label: 'HTML report (self-contained)',
+                    icon: FileCode2,
+                    onSelect: () => download(`/api/runs/${r.id}/report?format=html`),
+                  },
+                  {
+                    label: 'PDF report',
+                    icon: FileText,
+                    onSelect: () => download(`/api/runs/${r.id}/report?format=pdf`),
+                  },
+                  {
+                    label: 'Excel (XLSX)',
+                    icon: Sheet,
+                    onSelect: () => download(`/api/runs/${r.id}/report?format=xlsx`),
+                  },
+                ]}
+              />
             )}
           </div>
         </div>
@@ -331,6 +360,7 @@ function ItemPanel({
             {d.errorMessage}
           </div>
         )}
+        {d.diagnosisJson && (d.status === 'failed' || d.status === 'broken') && <DiagnosisPanel item={d} />}
         {running && latestShot && (
           <div className="mb-4">
             <p className="mb-1.5 text-xs text-muted">Live view</p>

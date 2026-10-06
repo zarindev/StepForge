@@ -55,6 +55,8 @@ export type StepOutcome = {
   email?: unknown;
   /** A performance report (load test, Lighthouse, page metrics, query plan) shown in results. */
   perf?: unknown;
+  /** Facts collected at failure time for the diagnosis (e.g. element state, locator candidates). */
+  diagnostics?: unknown;
   screenshotPath?: string;
   /** Set when the first-ranked locator failed and a lower-ranked one matched (self-healing). */
   healedLocator?: { from: Locator; to: Locator };
@@ -82,6 +84,7 @@ export type StepResult = {
   query?: unknown;
   email?: unknown;
   perf?: unknown;
+  diagnostics?: unknown;
   screenshotPath?: string;
   healedLocator?: StepOutcome['healedLocator'];
   metrics?: StepOutcome['metrics'];

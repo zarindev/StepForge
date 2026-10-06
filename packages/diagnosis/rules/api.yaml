@@ -1,0 +1,207 @@
+# API failures. Facts: status, statusText, expectedStatus, request.method/url, responseMessage, schemaErrorList…
+# Higher priority wins; see docs/DIAGNOSIS.md for the rule format.
+
+- id: api-network-unreachable
+  category: network_unreachable
+  priority: 95
+  confidence: 0.9
+  owner: environment
+  when: { layer: api, networkFailure: { exists: true } }
+  title: 'The API server could not be reached ({{networkFailure}})'
+  explanation: '{{request.method}} {{request.url}} never got a response: {{message}}. The service is down, the URL or port is wrong, or the network is offline.'
+  fix: 'Check that the application is running and that the environment base URL is correct.'
+  evidence: { Request: '{{request.method}} {{request.url}}', Error: '{{message}}' }
+
+- id: api-missing-auth-check
+  category: missing_auth
+  priority: 90
+  confidence: 0.85
+  owner: app
+  when: { layer: api, expectedStatus: [401, 403], status: { gte: 200, lt: 300 } }
+  title: 'The API accepted a request it should have rejected ({{status}} instead of {{expectedStatus}})'
+  explanation: '{{request.method}} {{request.url}} answered {{status}} {{statusText}} although the test expected {{expectedStatus}} {{expectedStatusText}}. The endpoint does not check authentication or permissions.'
+  fix: 'Add the authentication/authorization check to this endpoint so unauthorized callers get {{expectedStatus}}.'
+  evidence:
+    {
+      Request: '{{request.method}} {{request.url}}',
+      Expected: '{{expectedStatus}} {{expectedStatusText}}',
+      Actual: '{{status}} {{statusText}}',
+    }
+
+- id: api-duplicate-accepted
+  category: validation_missing
+  priority: 88
+  confidence: 0.8
+  owner: app
+  when: { layer: api, expectedStatus: 409, status: { gte: 200, lt: 300 } }
+  title: 'The API accepted a duplicate ({{status}} instead of 409 Conflict)'
+  explanation: '{{request.method}} {{request.url}} created a record that already exists. The application does not check for duplicates.'
+  fix: 'Check for an existing record (and add a unique constraint) and answer 409 Conflict.'
+  evidence:
+    {
+      Request: '{{request.method}} {{request.url}}',
+      Expected: '409 Conflict',
+      Actual: '{{status}} {{statusText}}',
+    }
+
+- id: api-not-found-ignored
+  category: wrong_status
+  priority: 88
+  confidence: 0.8
+  owner: app
+  when: { layer: api, expectedStatus: 404, status: { gte: 200, lt: 300 } }
+  title: 'The API answered {{status}} {{statusText}} for something that does not exist'
+  explanation: '{{request.method}} {{request.url}} should answer 404 Not Found for an unknown id, but answered {{status}} {{statusText}}. Clients cannot tell a failed operation from a successful one.'
+  fix: 'Return 404 when the record is not found.'
+  evidence:
+    {
+      Request: '{{request.method}} {{request.url}}',
+      Expected: '404 Not Found',
+      Actual: '{{status}} {{statusText}}',
+    }
+
+- id: api-invalid-input-accepted
+  category: validation_missing
+  priority: 86
+  confidence: 0.8
+  owner: app
+  when: { layer: api, expectedStatus: [400, 422], status: { gte: 200, lt: 300 } }
+  title: 'The API accepted invalid input ({{status}} instead of {{expectedStatus}})'
+  explanation: '{{request.method}} {{request.url}} should have rejected the request body, but answered {{status}} {{statusText}}.'
+  fix: 'Validate the request (required fields, types, allowed values) and answer {{expectedStatus}}.'
+  evidence:
+    {
+      Request: '{{request.method}} {{request.url}}',
+      Expected: '{{expectedStatus}} {{expectedStatusText}}',
+      Actual: '{{status}} {{statusText}}',
+    }
+
+- id: api-schema-mismatch
+  category: schema_mismatch
+  priority: 85
+  confidence: 0.85
+  owner: app
+  when: { layer: api, schemaErrorCount: { gte: 1 } }
+  title: 'The response does not match its schema: {{schemaErrorList}}'
+  explanation: '{{request.method}} {{request.url}} returned {{status}} with {{schemaErrorCount}} schema problem(s): {{schemaErrorList}}. Clients that rely on the documented types can break.'
+  fix: 'Return the documented types and fields (or update the API spec if the change is intended).'
+  evidence: { Request: '{{request.method}} {{request.url}}', 'Schema errors': '{{schemaErrorList}}' }
+
+- id: api-unexpected-status
+  category: wrong_status
+  priority: 76
+  confidence: 0.7
+  owner: app
+  when: { layer: api, expectedStatus: { exists: true }, status: { exists: true } }
+  title: 'Expected {{expectedStatus}} {{expectedStatusText}} but the API answered {{status}} {{statusText}}'
+  explanation: '{{request.method}} {{request.url}} answered {{status}} {{statusText}}{{responseMessage}}.'
+  fix: 'Compare the endpoint behaviour with its specification; if the new status is intended, update the test.'
+  evidence: { Request: '{{request.method}} {{request.url}}', 'Server message': '{{responseMessage}}' }
+
+- id: api-http-500
+  category: server_error
+  priority: 75
+  confidence: 0.85
+  owner: app
+  when: { layer: api, status: 500 }
+  title: 'The server crashed handling {{request.method}} {{request.url}} (500)'
+  explanation: 'The API answered 500 Internal Server Error{{responseMessage}}. This is an unhandled error on the server.'
+  fix: 'Check the server logs at the time of the run for the stack trace.'
+  evidence: { Request: '{{request.method}} {{request.url}}', 'Server message': '{{responseMessage}}' }
+
+- id: api-http-gateway
+  category: service_unavailable
+  priority: 80
+  confidence: 0.85
+  owner: environment
+  when: { layer: api, status: [502, 503, 504] }
+  title: 'The service was unavailable ({{status}} {{statusText}})'
+  explanation: 'A proxy or load balancer answered {{status}} for {{request.method}} {{request.url}}: the service behind it was down, restarting or overloaded.'
+  fix: 'Check the deployment and health of the service, then re-run.'
+  evidence: { Request: '{{request.method}} {{request.url}}' }
+
+- id: api-http-429
+  category: rate_limited
+  priority: 80
+  confidence: 0.85
+  owner: environment
+  when: { layer: api, status: 429 }
+  title: 'The API rate-limited the test (429 Too Many Requests)'
+  explanation: 'Too many requests reached {{request.url}} in a short time.'
+  fix: 'Run fewer workers, add a pause, or raise the rate limit for test environments.'
+
+- id: api-http-401
+  category: auth_required
+  priority: 70
+  confidence: 0.8
+  owner: test
+  when: { layer: api, status: 401 }
+  title: 'The API rejected the request as unauthenticated (401)'
+  explanation: '{{request.method}} {{request.url}} needs a valid login. The token is missing, expired or for another environment{{responseMessage}}.'
+  fix: 'Check the login step or Authenticate block and the secrets of this environment.'
+
+- id: api-http-403
+  category: forbidden
+  priority: 70
+  confidence: 0.75
+  owner: test
+  when: { layer: api, status: 403 }
+  title: 'The user is not allowed to do this (403 Forbidden)'
+  explanation: '{{request.method}} {{request.url}} was refused for the logged-in user{{responseMessage}}.'
+  fix: 'Log in as a user with the required role, or check the role setup in this environment.'
+
+- id: api-http-404
+  category: not_found
+  priority: 70
+  confidence: 0.7
+  owner: data
+  when: { layer: api, status: 404 }
+  title: 'The resource was not found (404): {{request.url}}'
+  explanation: 'The URL is wrong or the record the test relies on does not exist in this environment{{responseMessage}}.'
+  fix: 'Check the URL and that the test data exists (or create it in a setup step).'
+
+- id: api-http-409
+  category: test_data_collision
+  priority: 70
+  confidence: 0.75
+  owner: data
+  when: { layer: api, status: 409 }
+  title: 'The data already exists (409 Conflict)'
+  explanation: '{{request.method}} {{request.url}} conflicts with existing data{{responseMessage}}, typically because an earlier run created the same record.'
+  fix: 'Use generated unique data (random.email or util.generateData) or reset the test data before the run.'
+
+- id: api-http-4xx-invalid
+  category: invalid_request
+  priority: 70
+  confidence: 0.75
+  owner: test
+  when: { layer: api, status: [400, 422] }
+  title: 'The API rejected the request as invalid ({{status}})'
+  explanation: '{{request.method}} {{request.url}} answered {{status}} {{statusText}}{{responseMessage}}.'
+  fix: 'Check the request body and the test data against the API specification.'
+
+- id: api-timeout
+  category: slow_api
+  priority: 74
+  confidence: 0.7
+  owner: app
+  when: { layer: api, errorKind: timeout }
+  title: 'The API did not answer in time'
+  explanation: '{{request.method}} {{request.url}} took longer than the step timeout ({{timeoutMs}} ms).'
+  fix: 'Investigate the slow endpoint (profiling, query plans), or raise the timeout if this duration is acceptable.'
+
+- id: api-value-mismatch
+  category: assertion_mismatch
+  priority: 30
+  confidence: 0.6
+  owner: app
+  when: { layer: api, errorKind: assertion, assertion: { exists: true } }
+  title: 'The response has {{assertion.actual}} where the test expects {{assertion.expected}}'
+  explanation: '{{assertion.message}} (response {{status}} from {{request.method}} {{request.url}}).'
+  fix: 'If the API is wrong, fix it; if the expectation changed, update the assertion.'
+  evidence:
+    {
+      Check: '{{assertion.target}} {{assertion.operator}} {{assertion.expected}}',
+      Actual: '{{assertion.actual}}',
+      Difference: '{{deltaText}}',
+    }

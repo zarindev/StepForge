@@ -1,0 +1,65 @@
+# Rules for any layer, and the catch-all.
+
+- id: test-configuration
+  category: test_configuration
+  priority: 90
+  confidence: 0.9
+  owner: test
+  when: { errorKind: [invalid_params, variable, unsupported, script] }
+  title: 'The test itself needs fixing: {{message}}'
+  explanation: 'This failure comes from the scenario (a missing value, an unknown variable, a script error or an unsupported step), not from the application.'
+  fix: 'Edit the step "{{stepLabel}}".'
+
+- id: flaky-timing
+  category: flaky_timing
+  priority: 65
+  confidence: 0.6
+  owner: test
+  when:
+    errorKind: [timeout, element_not_found]
+    any:
+      - { flakyHistory: true }
+      - { itemStatus: flaky }
+  title: 'Flaky timing: this test sometimes passes and sometimes times out'
+  explanation: 'In its last {{historyCount}} runs it passed {{passedRecently}} times and failed {{failedRecently}} times. Timing-dependent steps (waits, animations, slow responses) are the usual cause.'
+  fix: 'Wait for a condition (ui.waitFor, an assertion) instead of fixed delays, and check for slow responses.'
+
+- id: duration-regression
+  category: slow_down
+  priority: 35
+  confidence: 0.5
+  owner: app
+  when: { errorKind: timeout, durationRatio: { gte: 2 } }
+  title: 'The test ran {{durationRatio}}× slower than when it last passed'
+  explanation: 'It took {{lastGreenDurationMs}} ms in the last passing run; this time a step timed out.'
+  fix: 'Look for a slow page or API call in the network log.'
+
+- id: generic-timeout
+  category: timeout
+  priority: 20
+  confidence: 0.4
+  owner: app
+  when: { errorKind: timeout }
+  title: 'The step timed out: {{message}}'
+  explanation: 'Nothing happened within {{timeoutMs}} ms.'
+  fix: 'Check the screenshot and trace; raise the timeout only if the wait is legitimate.'
+
+- id: generic-assertion
+  category: assertion_mismatch
+  priority: 10
+  confidence: 0.4
+  owner: app
+  when: { errorKind: assertion }
+  title: '{{message}}'
+  explanation: '{{message}}'
+  fix: 'If the application is wrong, fix it; if the expectation changed, update the test.'
+
+- id: catch-all
+  category: unknown
+  priority: 0
+  confidence: 0.2
+  owner: test
+  when: {}
+  title: 'The step failed: {{message}}'
+  explanation: '{{message}}'
+  fix: 'Open the step evidence (screenshot, trace, logs) to investigate.'

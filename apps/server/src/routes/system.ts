@@ -16,6 +16,12 @@ export const SETTINGS_SCHEMAS = {
   retention: z.object({ keepFailures: z.boolean(), prunePassesAfterDays: z.number().int().min(1).max(3650) }),
   ollama: z.object({ url: z.url(), model: z.string() }),
   k6Path: z.string(),
+  /** Shown on every generated report and bug export. */
+  reportBranding: z.object({
+    author: z.string().trim().min(1).max(120),
+    company: z.string().max(120),
+    accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  }),
 } as const;
 type SettingKey = keyof typeof SETTINGS_SCHEMAS;
 
@@ -29,6 +35,7 @@ export const SETTINGS_DEFAULTS: { [K in SettingKey]: z.infer<(typeof SETTINGS_SC
   retention: { keepFailures: true, prunePassesAfterDays: 14 },
   ollama: { url: 'http://localhost:11434', model: 'llama3.1' },
   k6Path: '',
+  reportBranding: { author: 'Md Zarin Tasnim', company: '', accent: '#F97316' },
 };
 
 export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): void {

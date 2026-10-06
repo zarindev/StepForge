@@ -78,4 +78,18 @@ export type Settings = {
   retention: { keepFailures: boolean; prunePassesAfterDays: number };
   ollama: { url: string; model: string };
   k6Path: string;
+  reportBranding: { author: string; company: string; accent: string };
 };
+
+/**
+ * Downloads a generated file (report, export). A plain link with the session token in the query string lets the
+ * browser handle large files natively.
+ */
+export function download(path: string): void {
+  const a = document.createElement('a');
+  a.href = `${path}${path.includes('?') ? '&' : '?'}token=${encodeURIComponent(sessionToken())}`;
+  a.rel = 'noopener';
+  document.body.append(a);
+  a.click();
+  a.remove();
+}

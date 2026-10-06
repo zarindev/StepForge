@@ -1,5 +1,7 @@
 # Data Model
 
+_By Md Zarin Tasnim · part of the StepForge documentation_
+
 StepForge stores its own data in `data/stepforge.db` (SQLite, WAL mode). The schema is defined in
 [`packages/db/src/schema.ts`](../packages/db/src/schema.ts); migrations live in `packages/db/migrations` and run
 automatically on start (an existing database is backed up to `data/backups/` first).
@@ -54,3 +56,8 @@ connection, its environment or its application. Connection names are unique per 
 Mail inboxes (`mail_inboxes`) have a `name` unique per application (`mail_inboxes_app_name_uq`); email steps refer
 to them by name. An IMAP password is stored the same way as a connection password (`secrets` row without an
 environment, key `mail-inbox:<id>`) and is deleted with the inbox or its application.
+
+Bugs (`bugs`) keep `scenario_id`, `test_case_id`, `failed_step_id` and `category` so they stay linked after the run
+that found them is deleted; `fingerprint` = hash of scenario + failing step + diagnosis category (deduplication);
+`last_seen_at` is updated on each occurrence. The diagnosis of a failed run item is stored in
+`run_items.diagnosis_json`.

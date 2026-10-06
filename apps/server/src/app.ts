@@ -23,7 +23,10 @@ import { DatabaseService } from './database/service.ts';
 import { EmailService } from './email/service.ts';
 import { registerEmailRoutes } from './routes/email.ts';
 import { PerfService } from './perf/service.ts';
+import { DiagnosisService } from './diagnosis/service.ts';
 import { registerPerfRoutes } from './routes/perf.ts';
+import { registerBugRoutes } from './routes/bugs.ts';
+import { closePdfBrowser } from '@stepforge/reports';
 import { RunManager } from './runner/manager.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
 
@@ -69,6 +72,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     config.dbFile === ':memory:' ? undefined : config.dbFile,
   );
   const email = new EmailService(db, masterKey, config.dataDir, config.binDir, config.mailpit);
+  const diagnosis = new DiagnosisService(db, config.artifactsDir, join(config.dataDir, 'rules'));
   const perf = new PerfService(db, masterKey, bus, config.binDir, config.artifactsDir);
   const ctx: AppContext = {
     config,
@@ -89,12 +93,14 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
       database,
       email,
       perf,
+      diagnosis,
     ),
     recorder: new RecorderManager(db, masterKey, bus),
     specs,
     database,
     email,
     perf,
+    diagnosis,
     startedAt: new Date(),
   };
 
@@ -127,6 +133,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerDatabaseRoutes(app, ctx);
   registerEmailRoutes(app, ctx);
   registerPerfRoutes(app, ctx);
+  registerBugRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal.
@@ -136,6 +143,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   app.addHook('onClose', async () => {
     await ctx.runs.shutdown();
     await email.mailpit.stop();
+    await closePdfBrowser();
     ctx.recorder.discard();
     sqlite.close();
   });

@@ -27,6 +27,7 @@ import type { SpecService } from '../api/specs.ts';
 import type { DatabaseService } from '../database/service.ts';
 import type { EmailService } from '../email/service.ts';
 import type { PerfService } from '../perf/service.ts';
+import type { DiagnosisService } from '../diagnosis/service.ts';
 import { expandScope, testCaseData, unfinishedItems } from './scope.ts';
 
 type Run = typeof schema.runs.$inferSelect;
@@ -62,6 +63,7 @@ export class RunManager {
     private readonly database?: DatabaseService,
     private readonly email?: EmailService,
     private readonly perf?: PerfService,
+    private readonly diagnosis?: DiagnosisService,
   ) {}
 
   /** Path relative to the artifacts root with forward slashes (used in URLs). */
@@ -285,6 +287,7 @@ export class RunManager {
           executors,
           signal: abort.signal,
           retries: opts.retries,
+          browserVersion: () => pool.versionOf(options.browser),
         });
         if (opts.stopOnFirstFailure && (status === 'failed' || status === 'broken')) stop = true;
       }
@@ -320,6 +323,7 @@ export class RunManager {
       executors: Parameters<typeof runTestCase>[0]['executors'];
       signal: AbortSignal;
       retries: number;
+      browserVersion?: () => string | undefined;
     },
   ): Promise<string> {
     if (!item.scenarioId) {
@@ -412,6 +416,34 @@ export class RunManager {
       errorMessage: r.error ?? (status === 'skipped' ? 'Run cancelled' : null),
       failedStepId: r.failedStepId ?? null,
     });
+    if ((status === 'failed' || status === 'broken') && this.diagnosis) {
+      // Diagnosis and bug filing must never break the run itself.
+      try {
+        const filed = this.diagnosis.fileBug(item.id, { browserVersion: ctx.browserVersion?.() });
+        if (filed) {
+          this.bus.publish({
+            type: 'item.diagnosed',
+            runId: run.id,
+            itemId: item.id,
+            diagnosis: filed.diagnosis,
+          });
+          this.bus.publish({
+            type: 'bug.updated',
+            applicationId: run.applicationId,
+            bugId: filed.bug.id,
+            created: filed.created,
+          });
+        }
+      } catch (err) {
+        this.bus.publish({
+          type: 'run.log',
+          runId: run.id,
+          itemId: item.id,
+          level: 'warn',
+          message: `Diagnosis failed: ${(err as Error).message}`,
+        });
+      }
+    }
     this.publishRun(run.id);
     return status;
   }
@@ -448,6 +480,7 @@ export class RunManager {
               healedLocator: s.healedLocator,
               ...(s.email ? { email: s.email } : {}),
               ...(s.perf ? { perf: s.perf } : {}),
+              ...(s.diagnostics ? { diagnostics: s.diagnostics } : {}),
             },
             queryJson: s.query ?? null,
             screenshotPath: s.screenshotPath ? this.rel(s.screenshotPath) : null,

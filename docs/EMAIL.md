@@ -1,5 +1,7 @@
 # Email testing
 
+_By Md Zarin Tasnim · part of the StepForge documentation_
+
 StepForge tests flows that send email (sign-up verification, one-time login codes, password resets, receipts)
 by reading the email the application really sent, then extracting the code or link and continuing the test.
 

@@ -7,3 +7,4 @@ export * from './scenarios.ts';
 export * from './blocks.ts';
 export * from './connections.ts';
 export * from './inboxes.ts';
+export * from './bugs.ts';
