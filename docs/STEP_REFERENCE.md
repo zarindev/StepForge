@@ -126,4 +126,31 @@ Column-style operators: `noNulls`, `unique`, `inRange` (`expected`: `{"min":0,"m
 `broken` (the test needs fixing). Constraint violations and failed assertions make it `failed` (the data or app is
 wrong). A connection that cannot be reached is a `failed` network error.
 
-Email and performance steps are documented as their phases land.
+## Email steps (`email.*`) — available since Phase 7
+
+Email steps read an **inbox**: StepForge's local Mailpit (Settings → Email) or an inbox configured on the
+application's *Inboxes* tab (Mailpit or IMAP). See [EMAIL.md](EMAIL.md).
+
+| type | params | notes |
+|---|---|---|
+| `waitForEmail` | `to`, `from`, `subject`, `contains` (body), `timeoutMs`, `inbox` (name; empty = first inbox or local Mailpit), `since` (`testStart` default / `any`), `pollMs` | Text matches are case-insensitive "contains". Only emails received after the test started count. `timeoutMs` is also the step timeout. output = `{ id, from, to, subject, date, text, links, attachments }` |
+| `assertEmail` | `subjectContains`, `bodyContains`, `from`, `hasLink` (`true` or text the link contains), `hasAttachment` (`true` or part of the file name) | Checks the email from the last `waitForEmail`; one assertion line per check |
+| `extractFromEmail` | `kind`: `otp` (default; `minLength` 4, `maxLength` 8), `link` (`contains`, `index`), `regex` (`pattern`, `flags`; first capture group is kept) | Use `captureAs` (e.g. `otp`) and type `{{vars.otp}}` later |
+| `openEmailLink` | `contains`, `index`, or `url` | Opens the link in the test's browser when a UI step already opened one (following UI steps continue there); otherwise requests it over HTTP. Targets: `status`, `url`, `text` (HTTP only) |
+
+**OTP extraction** finds 4–8 digit codes (`482913`, `551 204`, `551-204`), preferring numbers near words like
+*code, OTP, one-time, passcode, PIN, verification, security, login*. Dates, times, prices, phone numbers and order
+numbers (`#20261005`) are skipped. If an email has several unlabelled numbers it refuses to guess — use `regex`.
+
+**Assertion targets** on an email: `subject`, `from`, `fromName`, `to`, `cc`, `text`/`body`, `html`, `links`,
+`linkCount`, `attachments` (file names), `attachmentCount`, `date`, and `waitMs` on `waitForEmail`.
+
+**Unique addresses per run:** `{"type":"util.setVariable","params":{"name":"email","value":"qa+{{run.id}}@example.test"}}`,
+then use `{{vars.email}}` in the sign-up form and in `waitForEmail.to`. With Gmail, plus-addressing
+(`you+{{run.id}}@gmail.com`) delivers to your normal inbox.
+
+**Outcomes:** an email that does not arrive is a `failed` timeout ("No email to … arrived within 20 s after the test
+started"); a missing code or link is `failed`; an unknown inbox or an email step without an earlier `waitForEmail`
+is `broken`; an unreachable inbox is a `failed` network error.
+
+Performance steps are documented when their phase lands.

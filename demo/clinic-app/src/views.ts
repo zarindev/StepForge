@@ -46,5 +46,6 @@ ${error ? `<div class="error" role="alert" data-testid="login-error">${esc(error
   <label for="password">Password</label><input id="password" name="password" type="password" data-testid="password" autocomplete="current-password">
   <p><button type="submit" data-testid="login-submit">Sign in</button></p>
 </form>
+<p class="muted">New here? <a href="/signup">Create an account</a></p>
 <p class="muted">Demo accounts: admin@careclinic.test / Admin123! · reception@careclinic.test / Reception123!</p></div>`;
 }

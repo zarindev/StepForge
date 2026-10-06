@@ -2,7 +2,17 @@
 export type FieldSpec = {
   key: string;
   label: string;
-  kind: 'text' | 'number' | 'select' | 'checkbox' | 'json' | 'code' | 'scenario' | 'block' | 'connection';
+  kind:
+    | 'text'
+    | 'number'
+    | 'select'
+    | 'checkbox'
+    | 'json'
+    | 'code'
+    | 'scenario'
+    | 'block'
+    | 'connection'
+    | 'inbox';
   options?: string[];
   language?: 'json' | 'sql' | 'javascript';
   placeholder?: string;
@@ -220,9 +230,49 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
     },
   ],
   'email.waitForEmail': [
-    { key: 'to', label: 'To', kind: 'text' },
+    {
+      key: 'to',
+      label: 'To',
+      kind: 'text',
+      placeholder: '{{vars.email}}',
+      hint: 'Plus-addressing keeps sign-ups unique: qa+{{run.id}}@…',
+    },
     { key: 'subject', label: 'Subject contains', kind: 'text' },
-    { key: 'timeoutMs', label: 'Timeout (ms)', kind: 'number' },
+    { key: 'from', label: 'From contains', kind: 'text' },
+    { key: 'contains', label: 'Body contains', kind: 'text' },
+    { key: 'timeoutMs', label: 'Wait up to (ms)', kind: 'number', hint: 'Default: the step timeout' },
+    { key: 'inbox', label: 'Inbox', kind: 'inbox' },
+    {
+      key: 'since',
+      label: 'Received',
+      kind: 'select',
+      options: ['testStart', 'any'],
+      hint: 'testStart ignores older emails',
+    },
+  ],
+  'email.assertEmail': [
+    { key: 'subjectContains', label: 'Subject contains', kind: 'text' },
+    { key: 'bodyContains', label: 'Body contains', kind: 'text' },
+    { key: 'from', label: 'Sender contains', kind: 'text' },
+    { key: 'hasLink', label: 'Has a link containing', kind: 'text', placeholder: '/verify' },
+    { key: 'hasAttachment', label: 'Has an attachment named', kind: 'text', placeholder: 'invoice' },
+  ],
+  'email.extractFromEmail': [
+    { key: 'kind', label: 'Extract', kind: 'select', options: ['otp', 'link', 'regex'] },
+    { key: 'contains', label: 'Link containing (link)', kind: 'text', placeholder: '/verify' },
+    { key: 'pattern', label: 'Regex (first group is kept)', kind: 'text', placeholder: 'Ref: (\\w+)' },
+    { key: 'minLength', label: 'OTP min digits', kind: 'number' },
+    { key: 'maxLength', label: 'OTP max digits', kind: 'number' },
+  ],
+  'email.openEmailLink': [
+    {
+      key: 'contains',
+      label: 'Link containing',
+      kind: 'text',
+      placeholder: '/verify',
+      hint: 'Opens in the test browser when one is open',
+    },
+    { key: 'index', label: 'Or link number (0 = first)', kind: 'number' },
   ],
   'util.setVariable': [
     { key: 'name', label: 'Variable name', kind: 'text' },

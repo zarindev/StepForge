@@ -8,14 +8,36 @@
 | 4 | Recorder, Scenario Editor (list/flow/plain-English) | ✅ Done |
 | 5 | API module, API Client, importers, contract check | ✅ Done |
 | 6 | Database module, SQL Workbench, data-quality audit, rollback | ✅ Done |
-| 7 | Email (Mailpit + IMAP), OTP/link extraction | ⏳ Next |
-| 8 | Performance (metrics, Lighthouse, load, k6, query plans) | — |
+| 7 | Email (Mailpit + IMAP), OTP/link extraction | ✅ Done |
+| 8 | Performance (metrics, Lighthouse, load, k6, query plans) | ⏳ Next |
 | 9 | Diagnosis engine, bug reports, report exports | — |
 | 10 | Analytics, quality gates, run comparison, flaky detection | — |
 | 11 | Scheduler, CLI, notifications, JUnit/HTML | — |
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 7 — Email testing (2026-10-06)
+
+**Delivered**
+- **`@stepforge/email`**: one `Mailbox` interface with a **Mailpit** adapter (REST API) and an **IMAP** adapter (`imapflow` + `mailparser`, any provider, TLS, app passwords); `waitForEmail` polling with recipient/sender/subject/body criteria and a "received after the test started" window; **OTP extractor** (4–8 digits, prefers numbers near "code/OTP/verification/PIN…", joins `123 456`, skips dates, times, prices, phone and order numbers, refuses to guess between unlabelled numbers), **link extractor** (HTML hrefs + text, entities decoded, de-duplicated), custom regex; **Mailpit installer** (pinned v1.31.4 from GitHub releases for Windows/macOS/Linux, extracted with the system `tar`) and **process manager** (127.0.0.1 only, reuses a Mailpit already running).
+- **Email executor** (`@stepforge/executor-email`): `email.waitForEmail`, `email.assertEmail`, `email.extractFromEmail` (otp/link/regex), `email.openEmailLink` (in the test's browser when one is open, otherwise HTTP). The received email is kept on the step (preview) and saved as evidence (`emails/`, artifact kind `email`). Clear failures: not received in time (`timeout`), no code/link (`failed`), unknown inbox / no earlier email (`broken`).
+- **Engine:** a step's `params.timeoutMs` now sets its timeout (so a 60 s email wait is not cut at the 15 s default); tests know when they started; step results carry `email`, masked like other payloads.
+- **Inboxes per application** (migration `0003_mail_inbox_names`): name unique per application, IMAP password encrypted outside environment secrets, purged with the inbox/application. Steps name an inbox; without one they use the application's first inbox or the local Mailpit.
+- **Server:** Mailpit status/install/start/stop/autostart (started with StepForge when enabled, stopped on shutdown), inbox CRUD + test (drafts too), inbox viewer API (list, message, clear), runner wiring.
+- **Dashboard:** **Settings → Email** (install, start/stop, SMTP address to point apps at, autostart, open inbox); application **Inboxes** tab (Mailpit/IMAP dialog with Test, Gmail plus-addressing tip, open/clear); **inbox viewer** (auto-refresh, recipient filter, HTML in a fully sandboxed iframe, text, links, attachments); **email preview** in run results; typed forms for the four email steps with an inbox picker; plain-English descriptions.
+- **Setup/CI:** `npm run mailpit:install` (run by `setup.sh`/`setup.bat`, non-fatal offline) and in CI before tests.
+- **CareClinic (only what the done-when needs):** `/signup` with email verification — a 6-digit code and link mailed via SMTP (Mailpit), `/verify`, unverified accounts cannot sign in.
+- `docs/EMAIL.md` (Mailpit vs IMAP, Gmail app passwords, plus-addressing, sign-up example, troubleshooting); STEP_REFERENCE email section.
+- Housekeeping: the build spec was moved out of the repository; the author name is **Md Zarin Tasnim** in LICENSE, README and package.json.
+
+**Verified**
+- `npm test`: 196 tests (18 skipped: the external database servers). New: extractor cases (labelled codes, emphasis, split codes, dates/times/prices/phones/order numbers, ambiguity), links/regex/HTML-to-text, Mailpit asset names; **real Mailpit v1.31.4** started by the tests (old and other-recipient emails ignored, full parse with attachment, timeout message, unreachable message); **IMAP** against an in-process server (plus-addressed email after the test start, three-day-old one ignored, failed login message); 4 executor tests (full flow incl. opening the link, timeout, missing code, broken configuration); 4 server tests (Mailpit control, inbox CRUD without password leaks, draft test errors, done-when run, viewer + clear, not-received failure).
+- **Done-when check:** a scenario signs up on CareClinic in the browser with a per-run plus-address, waits for the verification email in Mailpit, checks sender/body/link, extracts the 6-digit code, types it, sees "Email verified" and signs in as the new user — **passes**, with the email preview and evidence stored.
+- `npm run test:e2e`: 13 tests. The Phase 7 E2E starts Mailpit in Settings, runs the sign-up scenario from the Explorer, opens the email preview in the results (sandboxed HTML, extracted code), browses and clears the inbox from the Inboxes tab, adds an IMAP inbox whose test reports the unreachable host, and stops Mailpit.
+- The app started on the existing `data/` folder and applied the new migration after a backup.
 
 ---
 

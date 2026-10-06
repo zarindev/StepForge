@@ -38,6 +38,21 @@ describe('plain English', () => {
     ],
     [s('api.request', { method: 'POST', url: '/api/patients' }), 'Send POST /api/patients'],
     [s('util.loop', { count: 3 }), 'Repeat 3 times'],
+    [
+      s('email.waitForEmail', { to: '{{vars.email}}', subject: 'Verify' }),
+      'Wait for an email to {{vars.email}} with subject "Verify"',
+    ],
+    [
+      s('email.assertEmail', { subjectContains: 'Verify', hasLink: '/verify' }),
+      'Check that the subject contains "Verify" and it has a link containing "/verify"',
+    ],
+    [s('email.extractFromEmail', { kind: 'otp' }), 'Read the one-time code from the email'],
+    [
+      s('email.extractFromEmail', { kind: 'link', contains: 'reset' }),
+      'Read the "reset" link from the email',
+    ],
+    [s('email.openEmailLink', { contains: '/verify' }), 'Open the "/verify" link in the email'],
+    [s('db.query', { sql: 'SELECT 1', connection: 'main' }), 'Run the SQL query "SELECT 1" on main'],
   ])('%#', (step, text) => {
     expect(describeStep(step)).toBe(text);
   });

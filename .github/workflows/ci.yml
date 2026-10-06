@@ -20,6 +20,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run mailpit:install
       - run: npm run check:secrets
       - run: npm run lint
       - run: npm run typecheck

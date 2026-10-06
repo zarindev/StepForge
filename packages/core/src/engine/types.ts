@@ -51,6 +51,8 @@ export type StepOutcome = {
   request?: unknown;
   response?: unknown;
   query?: unknown;
+  /** The email a step received or worked on (shown as a preview in results). */
+  email?: unknown;
   screenshotPath?: string;
   /** Set when the first-ranked locator failed and a lower-ranked one matched (self-healing). */
   healedLocator?: { from: Locator; to: Locator };
@@ -76,6 +78,7 @@ export type StepResult = {
   request?: unknown;
   response?: unknown;
   query?: unknown;
+  email?: unknown;
   screenshotPath?: string;
   healedLocator?: StepOutcome['healedLocator'];
   metrics?: StepOutcome['metrics'];
@@ -114,6 +117,8 @@ export type TestContext = {
   signal: AbortSignal;
   /** Cross-executor shared state, e.g. the UI executor publishes its `page`. */
   shared: Map<string, unknown>;
+  /** When the test case started (epoch ms), e.g. to ignore emails that arrived before it. */
+  startedAt: number;
   log: (level: 'info' | 'warn' | 'error', message: string) => void;
 };
 

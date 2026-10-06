@@ -6,6 +6,7 @@ import { useLiveEvent, type LiveEvent } from './live';
 import type {
   Application,
   DbConnection,
+  Inbox,
   Environment,
   RunDetail,
   RunItemDetail,
@@ -32,7 +33,16 @@ export const qk = {
   lastResults: (appId: string) => ['last-results', appId] as const,
   connections: (appId: string) => ['connections', appId] as const,
   dbSchema: (connectionId: string) => ['db-schema', connectionId] as const,
+  inboxes: (appId: string) => ['inboxes', appId] as const,
+  mailpit: ['mailpit'] as const,
 };
+
+export const useInboxes = (appId: string | null | undefined) =>
+  useQuery({
+    queryKey: qk.inboxes(appId ?? ''),
+    queryFn: () => api<Inbox[]>(`/api/applications/${appId}/inboxes`),
+    enabled: !!appId,
+  });
 
 export const useConnections = (appId: string | null | undefined) =>
   useQuery({

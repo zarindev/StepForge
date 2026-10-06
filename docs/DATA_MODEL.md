@@ -50,3 +50,7 @@ A database connection's password is a `secrets` row with no environment (`enviro
 `db-connection:<id>`), so it does not appear in the environment's secret list; it is deleted together with the
 connection, its environment or its application. Connection names are unique per environment
 (`db_connections_env_name_uq`) because steps refer to connections by name.
+
+Mail inboxes (`mail_inboxes`) have a `name` unique per application (`mail_inboxes_app_name_uq`); email steps refer
+to them by name. An IMAP password is stored the same way as a connection password (`secrets` row without an
+environment, key `mail-inbox:<id>`) and is deleted with the inbox or its application.

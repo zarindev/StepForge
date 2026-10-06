@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Moon, Sun } from 'lucide-react';
+import { MailpitCard } from '@/components/email/mailpit-card';
 import { PageHeader } from '@/components/shell/layout';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -86,10 +87,11 @@ export function SettingsPage() {
                 </div>
               ))}
             <p className="col-span-2 text-xs text-muted">
-              Editable runner, retention, Mailpit, k6 and Ollama settings arrive with their phases.
+              Editable runner, retention, k6 and Ollama settings arrive with their phases.
             </p>
           </CardBody>
         </Card>
+        <MailpitCard />
       </div>
     </>
   );

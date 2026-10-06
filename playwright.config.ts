@@ -32,7 +32,7 @@ export default defineConfig({
       url: 'http://127.0.0.1:8191/api/health',
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { CLINIC_PORT: '8191', CLINIC_DB },
+      env: { CLINIC_PORT: '8191', CLINIC_DB, CLINIC_SMTP_PORT: '1196' },
     },
     {
       command: 'npm start',
@@ -46,6 +46,10 @@ export default defineConfig({
         STEPFORGE_LOG_LEVEL: 'warn',
         STEPFORGE_RECORDER_HEADLESS: '1',
         STEPFORGE_RECORDER_CDP_PORT: '9333',
+        // Mailpit installed by `npm run mailpit:install`, on ports that do not clash with a dev instance.
+        STEPFORGE_BIN_DIR: 'data/bin',
+        STEPFORGE_MAILPIT_PORT: '8196',
+        STEPFORGE_MAILPIT_SMTP_PORT: '1196',
       },
     },
   ],

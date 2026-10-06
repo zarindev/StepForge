@@ -191,11 +191,28 @@ export function describeStep(step: AnyStep): string {
     case 'email.waitForEmail':
       s = `Wait for an email${p.to ? ` to ${String(p.to)}` : ''}${p.subject ? ` with subject ${q(p.subject)}` : ''}`;
       break;
+    case 'email.assertEmail': {
+      const checks = [
+        p.subjectContains && `the subject contains ${q(p.subjectContains)}`,
+        p.bodyContains && `the body contains ${q(p.bodyContains)}`,
+        p.from && `it comes from ${String(p.from)}`,
+        p.hasLink && (p.hasLink === true ? 'it has a link' : `it has a link containing ${q(p.hasLink)}`),
+        p.hasAttachment &&
+          (p.hasAttachment === true ? 'it has an attachment' : `it has the attachment ${q(p.hasAttachment)}`),
+      ].filter(Boolean);
+      s = checks.length ? `Check that ${checks.join(' and ')}` : 'Check the email';
+      break;
+    }
     case 'email.extractFromEmail':
-      s = `Read ${p.pattern === 'otp' || p.otp ? 'the one-time code' : 'a value'} from the email`;
+      s =
+        (p.kind ?? 'otp') === 'otp'
+          ? 'Read the one-time code from the email'
+          : p.kind === 'link'
+            ? `Read the ${p.contains ? `${q(p.contains)} ` : ''}link from the email`
+            : `Read ${q(p.pattern)} from the email`;
       break;
     case 'email.openEmailLink':
-      s = 'Open the link in the email';
+      s = `Open the ${p.contains ? `${q(p.contains)} ` : ''}link in the email`;
       break;
     case 'perf.pageMetrics':
       s = 'Measure page performance (LCP, CLS, TTFB)';

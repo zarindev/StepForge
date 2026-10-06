@@ -5,6 +5,7 @@ import type { StepForgeDb } from '../index.ts';
 import { applications, bugs, environments, modules, runs, scenarios, testCases } from '../schema.ts';
 import { listEnvironments, purgeConnectionSecrets } from './environments.ts';
 import { mapUnique, notFound, now } from './errors.ts';
+import { purgeInboxSecrets } from './inboxes.ts';
 
 export type Application = typeof applications.$inferSelect;
 export type ApplicationSummary = Application & {
@@ -125,6 +126,7 @@ export function deleteApplication(db: StepForgeDb, id: string): void {
       db,
       listEnvironments(db, id).map((e) => e.id),
     );
+    purgeInboxSecrets(db, id);
     db.delete(modules).where(eq(modules.applicationId, id)).run();
     db.delete(applications).where(eq(applications.id, id)).run();
   });

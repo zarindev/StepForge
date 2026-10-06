@@ -62,7 +62,7 @@ test('SQL Workbench: connect, browse, query, guard writes, audit and save a DB t
   await expect(dialog.getByRole('switch', { name: 'Read-only' })).toHaveAttribute('aria-checked', 'true');
   await expect(dialog.getByRole('switch', { name: 'Rollback mode' })).toHaveAttribute('aria-checked', 'true');
   await dialog.getByRole('button', { name: 'Test connection' }).click();
-  await expect(dialog.getByRole('status')).toContainText('Connected to the SQLite file — 5 tables');
+  await expect(dialog.getByRole('status')).toContainText('Connected to the SQLite file — 6 tables');
   await shot(page, 'db-connection');
   await dialog.getByRole('button', { name: 'Save connection' }).click();
   await expect(page.getByText('read-only', { exact: true })).toBeVisible();

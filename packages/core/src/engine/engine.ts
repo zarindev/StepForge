@@ -127,6 +127,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
     options: input.options,
     signal,
     shared: new Map(),
+    startedAt: started,
     log: (level, message) => emit({ type: 'log', level, message: resolver.mask(message) }),
   };
 
@@ -210,7 +211,11 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
   ): Promise<StepResult> => {
     const stepStarted = Date.now();
     const maxAttempts = step.retries + 1;
-    const timeoutMs = step.timeoutMs ?? input.options.defaultTimeoutMs;
+    // A step that waits on purpose (e.g. email.waitForEmail) declares its own timeout in params.timeoutMs.
+    const paramTimeout = Number((step.params as { timeoutMs?: unknown }).timeoutMs);
+    const timeoutMs =
+      step.timeoutMs ??
+      (Number.isFinite(paramTimeout) && paramTimeout > 0 ? paramTimeout : input.options.defaultTimeoutMs);
     let result: StepResult | undefined;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const stepCtx: StepContext = { ...ctx, timeoutMs, stepIndex: step.position };
@@ -247,6 +252,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
           request: maskDeep(outcome.request),
           response: maskDeep(outcome.response),
           query: maskDeep(outcome.query),
+          email: maskDeep(outcome.email),
           screenshotPath: outcome.screenshotPath,
           healedLocator: outcome.healedLocator,
           metrics: outcome.metrics,
@@ -279,6 +285,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
           request: maskDeep(outcome?.request ?? evidence.request),
           response: maskDeep(outcome?.response ?? evidence.response),
           query: maskDeep(outcome?.query),
+          email: maskDeep(outcome?.email),
           healedLocator: outcome?.healedLocator,
           metrics: outcome?.metrics,
         };

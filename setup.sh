@@ -21,6 +21,9 @@ npm install
 echo "==> Installing Playwright Chromium"
 npx playwright install chromium
 
+echo "==> Installing Mailpit (local email catcher)"
+npm run mailpit:install || echo "    Mailpit could not be installed now; retry from Settings → Email."
+
 echo "==> Building the dashboard"
 npm run build
 

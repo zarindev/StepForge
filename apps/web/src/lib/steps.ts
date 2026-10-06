@@ -55,6 +55,10 @@ export function defaultParams(type: string): Record<string, unknown> {
       return { connection: '', maxIssues: 0 };
     case 'email.waitForEmail':
       return { to: '', subject: '', timeoutMs: 30000 };
+    case 'email.extractFromEmail':
+      return { kind: 'otp' };
+    case 'email.openEmailLink':
+      return { contains: '' };
     case 'util.setVariable':
       return { name: '', value: '' };
     case 'util.wait':

@@ -13,6 +13,7 @@ import { schema, type StepForgeDb } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
 import { createApiExecutor } from '@stepforge/executor-api';
 import { createDbExecutor } from '@stepforge/executor-db';
+import { createEmailExecutor } from '@stepforge/executor-email';
 import { createUiExecutor, BrowserPool } from '@stepforge/executor-ui';
 import { utilExecutor } from '@stepforge/executor-util';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -22,6 +23,7 @@ import type { z } from 'zod';
 import type { EventBus } from '../context.ts';
 import type { SpecService } from '../api/specs.ts';
 import type { DatabaseService } from '../database/service.ts';
+import type { EmailService } from '../email/service.ts';
 import { expandScope, testCaseData, unfinishedItems } from './scope.ts';
 
 type Run = typeof schema.runs.$inferSelect;
@@ -55,6 +57,7 @@ export class RunManager {
     private readonly defaults: () => { timeoutMs: number },
     private readonly specs?: SpecService,
     private readonly database?: DatabaseService,
+    private readonly email?: EmailService,
   ) {}
 
   /** Path relative to the artifacts root with forward slashes (used in URLs). */
@@ -239,6 +242,7 @@ export class RunManager {
           : undefined,
       }),
       ...(this.database ? [createDbExecutor({ resolve: this.database.resolverFor(env.id) })] : []),
+      ...(this.email ? [createEmailExecutor({ resolve: this.email.resolverFor(run.applicationId) })] : []),
       utilExecutor,
     ];
     const startedAt = run.startedAt ?? now();
@@ -421,6 +425,7 @@ export class RunManager {
               depth: s.depth,
               errorKind: s.errorKind,
               healedLocator: s.healedLocator,
+              ...(s.email ? { email: s.email } : {}),
             },
             queryJson: s.query ?? null,
             screenshotPath: s.screenshotPath ? this.rel(s.screenshotPath) : null,

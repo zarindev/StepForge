@@ -25,6 +25,10 @@ export type ServerConfig = {
   webDist: string;
   logLevel: string;
   openBrowser: boolean;
+  /** StepForge's local Mailpit (web/API and SMTP ports, always on 127.0.0.1). */
+  mailpit: { httpPort: number; smtpPort: number };
+  /** Downloaded tools (Mailpit, later k6). */
+  binDir: string;
 };
 
 export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
@@ -42,6 +46,13 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     webDist: join(REPO_ROOT, 'apps/web/dist'),
     logLevel: process.env.STEPFORGE_LOG_LEVEL ?? 'info',
     openBrowser: (process.env.STEPFORGE_OPEN_BROWSER ?? '1') !== '0',
+    binDir: process.env.STEPFORGE_BIN_DIR
+      ? resolve(REPO_ROOT, process.env.STEPFORGE_BIN_DIR)
+      : join(overrides.dataDir ?? dataDir, 'bin'),
+    mailpit: {
+      httpPort: Number(process.env.STEPFORGE_MAILPIT_PORT ?? 8025),
+      smtpPort: Number(process.env.STEPFORGE_MAILPIT_SMTP_PORT ?? 1025),
+    },
     ...overrides,
   };
 }
