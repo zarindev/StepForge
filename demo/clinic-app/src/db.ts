@@ -14,8 +14,9 @@ CREATE TABLE IF NOT EXISTS patients (
   id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, full_name TEXT NOT NULL, dob TEXT NOT NULL, phone TEXT NOT NULL,
   email TEXT, insurance TEXT, created_at TEXT NOT NULL
 );
+-- PLANTED BUG CC-DB-01 (see demo/manifests/planted_bugs.json): patient_id has no foreign key.
 CREATE TABLE IF NOT EXISTS appointments (
-  id INTEGER PRIMARY KEY, patient_id INTEGER NOT NULL REFERENCES patients(id), doctor_id INTEGER NOT NULL REFERENCES doctors(id),
+  id INTEGER PRIMARY KEY, patient_id INTEGER NOT NULL, doctor_id INTEGER NOT NULL REFERENCES doctors(id),
   date TEXT NOT NULL, time TEXT NOT NULL, reason TEXT, status TEXT NOT NULL DEFAULT 'booked', created_at TEXT NOT NULL
 );
 `;
@@ -37,11 +38,21 @@ const PATIENTS = [
   ['David Okafor', '1960-11-22', '+1-555-201-0004', 'd.okafor@example.test', 'Medicare'],
 ] as const;
 
+/** Bumped when SCHEMA changes; older demo databases are rebuilt from scratch (it is demo data). */
+const SCHEMA_VERSION = 2;
+
 export function openClinicDb(file: string): Database.Database {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
   const db = new Database(file);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  if ((db.pragma('user_version', { simple: true }) as number) < SCHEMA_VERSION) {
+    db.exec(
+      'DROP TABLE IF EXISTS sessions; DROP TABLE IF EXISTS appointments; DROP TABLE IF EXISTS patients;',
+    );
+    db.exec('DROP TABLE IF EXISTS doctors; DROP TABLE IF EXISTS users;');
+    db.pragma(`user_version = ${SCHEMA_VERSION}`);
+  }
   db.exec(SCHEMA);
   if ((db.prepare('SELECT COUNT(*) n FROM users').get() as { n: number }).n === 0) seed(db);
   return db;

@@ -1,9 +1,9 @@
 import { decrypt, encrypt } from '@stepforge/crypto';
 import { EnvironmentInput, EnvironmentUpdate, newId, SecretInput } from '@stepforge/core';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { StepForgeDb } from '../index.ts';
-import { applications, environments, secrets } from '../schema.ts';
+import { applications, dbConnections, environments, secrets } from '../schema.ts';
 import { notFound, now } from './errors.ts';
 
 export type Environment = typeof environments.$inferSelect;
@@ -74,7 +74,25 @@ export function updateEnvironment(
 
 export function deleteEnvironment(db: StepForgeDb, id: string): void {
   getEnvironment(db, id);
-  db.delete(environments).where(eq(environments.id, id)).run();
+  db.transaction(() => {
+    purgeConnectionSecrets(db, [id]);
+    db.delete(environments).where(eq(environments.id, id)).run();
+  });
+}
+
+/**
+ * Connection passwords are stored outside any environment, so deleting environments (and with them their
+ * connections) must remove those secrets explicitly.
+ */
+export function purgeConnectionSecrets(db: StepForgeDb, environmentIds: string[]): void {
+  if (environmentIds.length === 0) return;
+  const ids = db
+    .select({ id: dbConnections.secretId })
+    .from(dbConnections)
+    .where(and(inArray(dbConnections.environmentId, environmentIds), isNotNull(dbConnections.secretId)))
+    .all()
+    .map((r) => r.id!);
+  if (ids.length) db.delete(secrets).where(inArray(secrets.id, ids)).run();
 }
 
 // ─── Secrets ───────────────────────────────────────────────────────────────

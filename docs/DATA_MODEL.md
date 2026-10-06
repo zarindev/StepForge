@@ -45,3 +45,8 @@ erDiagram
 Deleting an application cascades to everything it owns. Deleting a test case keeps historic `run_items`
 (`test_case_id` becomes NULL) so analytics stay accurate. Secrets referenced by connections/inboxes/channels are
 detached (`SET NULL`), never silently reused.
+
+A database connection's password is a `secrets` row with no environment (`environment_id` NULL, key
+`db-connection:<id>`), so it does not appear in the environment's secret list; it is deleted together with the
+connection, its environment or its application. Connection names are unique per environment
+(`db_connections_env_name_uq`) because steps refer to connections by name.

@@ -171,7 +171,22 @@ export function describeStep(step: AnyStep): string {
         String(p.sql ?? '')
           .replace(/\s+/g, ' ')
           .slice(0, 80),
-      )}`;
+      )}${p.connection ? ` on ${String(p.connection)}` : ''}`;
+      break;
+    case 'db.mongoFind':
+      s = `Find documents in ${String(p.collection ?? 'a collection')}${p.connection ? ` on ${String(p.connection)}` : ''}`;
+      break;
+    case 'db.runScript':
+      s = `Run a SQL script${p.connection ? ` on ${String(p.connection)}` : ''}`;
+      break;
+    case 'db.callProcedure':
+      s = `Call the procedure ${String(p.procedure ?? '')}`;
+      break;
+    case 'db.extract':
+      s = `Read ${String(p.path ?? 'value')} from the query result`;
+      break;
+    case 'db.dataQualityCheck':
+      s = `Check data quality${p.tables ? ` of ${Array.isArray(p.tables) ? p.tables.join(', ') : String(p.tables)}` : ''}${p.connection ? ` on ${String(p.connection)}` : ''}`;
       break;
     case 'email.waitForEmail':
       s = `Wait for an email${p.to ? ` to ${String(p.to)}` : ''}${p.subject ? ` with subject ${q(p.subject)}` : ''}`;

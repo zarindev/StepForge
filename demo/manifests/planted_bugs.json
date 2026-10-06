@@ -33,6 +33,28 @@
       "expected": "404 for an id that does not exist",
       "actual": "204 No Content",
       "introducedInPhase": 5
+    },
+    {
+      "id": "CC-DB-01",
+      "app": "careclinic",
+      "layer": "db",
+      "category": "orphan_rows",
+      "title": "Deleting a patient leaves their appointments behind",
+      "location": "DELETE /api/patients/{id} · appointments.patient_id",
+      "expected": "The patient's appointments are deleted with the patient (documented in the OpenAPI description)",
+      "actual": "Appointments keep pointing at the deleted patient id; appointments.patient_id has no foreign key",
+      "introducedInPhase": 6
+    },
+    {
+      "id": "CC-DB-02",
+      "app": "careclinic",
+      "layer": "db",
+      "category": "duplicate_rows",
+      "title": "The same patient can be registered twice",
+      "location": "POST /api/patients and /patients/new · patients",
+      "expected": "409 when a patient with the same full name and date of birth exists",
+      "actual": "A second patients row is created with a new code",
+      "introducedInPhase": 6
     }
   ]
 }

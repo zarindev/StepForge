@@ -73,21 +73,26 @@ export const secrets = sqliteTable(
   (t) => [uniqueIndex('secrets_env_key_uq').on(t.environmentId, t.key)],
 );
 
-export const dbConnections = sqliteTable('db_connections', {
-  id: id(),
-  environmentId: fk('environment_id', () => environments.id).notNull(),
-  name: text('name').notNull(),
-  engine: text('engine', { enum: ['pg', 'mysql', 'mssql', 'sqlite', 'mongo'] }).notNull(),
-  host: text('host').notNull().default(''),
-  port: integer('port'),
-  database: text('database').notNull().default(''),
-  username: text('username').notNull().default(''),
-  secretId: fk('secret_id', () => secrets.id, 'set null'),
-  optionsJson: json<Record<string, unknown>>('options_json').notNull().default({}),
-  readOnly: bool('read_only').notNull().default(true),
-  rollbackMode: bool('rollback_mode').notNull().default(true),
-  ...timestamps,
-});
+export const dbConnections = sqliteTable(
+  'db_connections',
+  {
+    id: id(),
+    environmentId: fk('environment_id', () => environments.id).notNull(),
+    name: text('name').notNull(),
+    engine: text('engine', { enum: ['pg', 'mysql', 'mssql', 'sqlite', 'mongo'] }).notNull(),
+    host: text('host').notNull().default(''),
+    port: integer('port'),
+    database: text('database').notNull().default(''),
+    username: text('username').notNull().default(''),
+    secretId: fk('secret_id', () => secrets.id, 'set null'),
+    optionsJson: json<Record<string, unknown>>('options_json').notNull().default({}),
+    readOnly: bool('read_only').notNull().default(true),
+    rollbackMode: bool('rollback_mode').notNull().default(true),
+    ...timestamps,
+  },
+  // Steps refer to connections by name, so a name is unique within its environment.
+  (t) => [uniqueIndex('db_connections_env_name_uq').on(t.environmentId, t.name)],
+);
 
 export const mailInboxes = sqliteTable('mail_inboxes', {
   id: id(),

@@ -220,6 +220,7 @@ export type StepResultRow = {
   message: string | null;
   screenshotPath: string | null;
   requestJson?: unknown;
+  queryJson?: unknown;
   responseJson: {
     assertions?: AssertionResult[];
     attempts?: number;
@@ -234,3 +235,71 @@ export type StepResultRow = {
 };
 export type Artifact = { id: string; kind: string; path: string; size: number };
 export type RunItemDetail = RunItem & { steps: StepResultRow[]; artifacts: Artifact[] };
+
+// ─── Databases (mirrors @stepforge/executor-db; kept local so the web bundle has no Node types) ─────────
+export type DbEngine = 'sqlite' | 'pg' | 'mysql' | 'mssql' | 'mongo';
+export type DbConnection = {
+  id: string;
+  environmentId: string;
+  environmentName: string;
+  isProduction: boolean;
+  name: string;
+  engine: DbEngine;
+  host: string;
+  port: number | null;
+  database: string;
+  username: string;
+  hasPassword: boolean;
+  optionsJson: Record<string, unknown>;
+  readOnly: boolean;
+  rollbackMode: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type DbColumn = {
+  name: string;
+  type: string;
+  nullable: boolean;
+  primaryKey: boolean;
+  default?: string | null;
+};
+export type DbTable = {
+  name: string;
+  schema?: string;
+  kind: 'table' | 'view' | 'collection';
+  columns: DbColumn[];
+  foreignKeys: { column: string; refTable: string; refColumn: string }[];
+  indexes: { name: string; columns: string[]; unique: boolean }[];
+};
+export type DbSchema = { engine: DbEngine; database: string; tables: DbTable[] };
+export type QueryResult = {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  affected?: number;
+  durationMs: number;
+  truncated?: boolean;
+  write: boolean;
+  rolledBack: boolean;
+};
+export type AuditCheck = 'orphans' | 'duplicates' | 'nulls' | 'formats' | 'negatives';
+export type AuditFinding = {
+  check: AuditCheck;
+  table: string;
+  columns: string[];
+  count: number;
+  severity: 'high' | 'medium' | 'low';
+  message: string;
+  sample: Record<string, unknown>[];
+  sql?: string;
+};
+export type AuditReport = {
+  engine: string;
+  database: string;
+  tables: string[];
+  checks: AuditCheck[];
+  findings: AuditFinding[];
+  coverage: { check: AuditCheck; table: string; columns: string[] }[];
+  notes: string[];
+  durationMs: number;
+};

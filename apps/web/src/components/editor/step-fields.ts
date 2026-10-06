@@ -2,7 +2,7 @@
 export type FieldSpec = {
   key: string;
   label: string;
-  kind: 'text' | 'number' | 'select' | 'checkbox' | 'json' | 'code' | 'scenario' | 'block';
+  kind: 'text' | 'number' | 'select' | 'checkbox' | 'json' | 'code' | 'scenario' | 'block' | 'connection';
   options?: string[];
   language?: 'json' | 'sql' | 'javascript';
   placeholder?: string;
@@ -159,8 +159,65 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
     { key: 'name', label: 'Header name', kind: 'text' },
   ],
   'db.query': [
-    { key: 'connection', label: 'Connection', kind: 'text', hint: 'Database connections arrive in Phase 6' },
-    { key: 'sql', label: 'SQL', kind: 'code', language: 'sql', wide: true },
+    { key: 'connection', label: 'Connection', kind: 'connection' },
+    {
+      key: 'sql',
+      label: 'SQL (or a MongoDB command as JSON)',
+      kind: 'code',
+      language: 'sql',
+      wide: true,
+      hint: 'Use ? / $1 / @p1 placeholders with Parameters instead of pasting {{data.x}} into the SQL',
+    },
+    { key: 'params', label: 'Parameters (JSON array)', kind: 'code', language: 'json', wide: true },
+    { key: 'maxRows', label: 'Max rows kept', kind: 'number' },
+    { key: 'confirmProduction', label: 'Confirm writes on production (type the app name)', kind: 'text' },
+  ],
+  'db.mongoFind': [
+    { key: 'connection', label: 'Connection', kind: 'connection' },
+    { key: 'collection', label: 'Collection', kind: 'text' },
+    { key: 'limit', label: 'Limit', kind: 'number' },
+    { key: 'filter', label: 'Filter (JSON)', kind: 'code', language: 'json', wide: true },
+    { key: 'projection', label: 'Projection (JSON)', kind: 'code', language: 'json', wide: true },
+    { key: 'sort', label: 'Sort (JSON)', kind: 'code', language: 'json', wide: true },
+  ],
+  'db.runScript': [
+    { key: 'connection', label: 'Connection', kind: 'connection' },
+    {
+      key: 'script',
+      label: 'SQL script (statements separated by ;)',
+      kind: 'code',
+      language: 'sql',
+      wide: true,
+    },
+    { key: 'confirmProduction', label: 'Confirm writes on production (type the app name)', kind: 'text' },
+  ],
+  'db.callProcedure': [
+    { key: 'connection', label: 'Connection', kind: 'connection' },
+    { key: 'procedure', label: 'Procedure name', kind: 'text', placeholder: 'refresh_totals' },
+    { key: 'args', label: 'Arguments (JSON array)', kind: 'code', language: 'json', wide: true },
+    { key: 'confirmProduction', label: 'Confirm on production (type the app name)', kind: 'text' },
+  ],
+  'db.extract': [
+    {
+      key: 'path',
+      label: 'From the last result',
+      kind: 'text',
+      placeholder: 'value · rowCount · email · rows[0].id · column:id · $[0].id',
+      wide: true,
+    },
+  ],
+  'db.dataQualityCheck': [
+    { key: 'connection', label: 'Connection', kind: 'connection' },
+    { key: 'tables', label: 'Tables (comma-separated, empty = all)', kind: 'text', wide: true },
+    { key: 'maxIssues', label: 'Issues allowed', kind: 'number', hint: 'The step fails above this' },
+    {
+      key: 'checks',
+      label: 'Checks (JSON array)',
+      kind: 'code',
+      language: 'json',
+      wide: true,
+      hint: '["orphans","duplicates","nulls","formats","negatives"] — empty runs all',
+    },
   ],
   'email.waitForEmail': [
     { key: 'to', label: 'To', kind: 'text' },

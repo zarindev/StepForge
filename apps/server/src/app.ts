@@ -18,6 +18,8 @@ import { SpecService } from './api/specs.ts';
 import { RecorderManager } from './recorder/manager.ts';
 import { registerApiRoutes } from './routes/api.ts';
 import { registerRecorderRoutes } from './routes/recorder.ts';
+import { registerDatabaseRoutes } from './routes/database.ts';
+import { DatabaseService } from './database/service.ts';
 import { RunManager } from './runner/manager.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
 
@@ -57,6 +59,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   const masterKey = loadOrCreateKey(config.keyFile);
   const specs = new SpecService(db, join(config.dataDir, 'specs'));
   const bus = new EventBus();
+  const database = new DatabaseService(
+    db,
+    masterKey,
+    config.dbFile === ':memory:' ? undefined : config.dbFile,
+  );
   const ctx: AppContext = {
     config,
     db,
@@ -73,9 +80,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
         timeoutMs: getSetting(db, 'defaultTimeoutMs', 15_000),
       }),
       specs,
+      database,
     ),
     recorder: new RecorderManager(db, masterKey, bus),
     specs,
+    database,
     startedAt: new Date(),
   };
 
@@ -105,6 +114,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   await registerRunRoutes(app, ctx);
   registerRecorderRoutes(app, ctx);
   registerApiRoutes(app, ctx);
+  registerDatabaseRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   app.addHook('onClose', async () => {

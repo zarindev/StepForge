@@ -1,4 +1,20 @@
 import { z } from 'zod';
+
+/**
+ * Like `.partial()`, but without the input schema's defaults: zod applies `.default()` even inside a
+ * partial, so a PATCH that omits a field would silently reset it to its default.
+ */
+export function patchOf<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  const shape = Object.fromEntries(
+    Object.entries(schema.shape).map(([k, v]) => [
+      k,
+      (v instanceof z.ZodDefault ? (v.unwrap() as z.ZodType) : (v as z.ZodType)).optional(),
+    ]),
+  );
+  return z.object(shape) as unknown as z.ZodObject<{
+    [K in keyof T]: z.ZodOptional<T[K] extends z.ZodDefault<infer I extends z.ZodType> ? I : T[K]>;
+  }>;
+}
 import { HexColor, Priority, Slug } from './common.ts';
 
 /** Input schemas for creating/updating entities through the API. Shared by server, UI and CLI. */
@@ -55,6 +71,11 @@ export const DbConnectionInput = z.object({
   readOnly: z.boolean().default(true),
   rollbackMode: z.boolean().default(true),
 });
+export type DbConnectionInput = z.infer<typeof DbConnectionInput>;
+/** `password: null` clears the stored password; omitting it keeps the current one. */
+export const DbConnectionUpdate = patchOf(DbConnectionInput).extend({
+  password: z.string().nullable().optional(),
+});
 
 export const ModuleInput = z.object({
   name: z.string().min(1).max(120),
@@ -99,21 +120,21 @@ export const RunTrigger = z.enum(['manual', 'schedule', 'cli', 'retry']);
 
 // ─── Update / action schemas (Phase 2) ─────────────────────────────────────
 
-export const ApplicationUpdate = ApplicationInput.partial().extend({ archived: z.boolean().optional() });
-export const EnvironmentUpdate = EnvironmentInput.partial();
+export const ApplicationUpdate = patchOf(ApplicationInput).extend({ archived: z.boolean().optional() });
+export const EnvironmentUpdate = patchOf(EnvironmentInput);
 export const ModuleUpdate = z.object({
   name: z.string().min(1).max(120).optional(),
   description: z.string().max(2000).optional(),
   parentId: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
-export const ScenarioUpdate = ScenarioInput.partial().extend({ moduleId: z.string().optional() });
-export const TestCaseUpdate = TestCaseInput.partial();
+export const ScenarioUpdate = patchOf(ScenarioInput).extend({ moduleId: z.string().optional() });
+export const TestCaseUpdate = patchOf(TestCaseInput);
 export const TagInput = z.object({
   name: z.string().min(1).max(40),
   color: HexColor.default('#6366F1'),
 });
-export const TagUpdate = TagInput.partial();
+export const TagUpdate = patchOf(TagInput);
 
 export const BulkScenarioAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('delete'), ids: z.array(z.string()).min(1) }),

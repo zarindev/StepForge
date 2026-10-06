@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { ResultsGrid } from '@/components/database/results-grid';
 import { Link, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Ban, Bandage, ChevronRight, FolderTree, Play, RotateCw, Terminal } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -349,11 +350,13 @@ function ItemPanel({
               | undefined;
             const httpRes = (extra as { body?: { status?: number; body?: unknown; timeMs?: number } } | null)
               ?.body;
+            const dbq = (row.queryJson ?? (s as { query?: unknown }).query) as DbStepQuery | null | undefined;
             const expandable = !!(
               extra?.assertions?.length ||
               extra?.healedLocator ||
               s.screenshotPath ||
-              http
+              http ||
+              dbq
             );
             const live = s as LiveStep;
             const depth = live.depth ?? extra?.depth ?? 0;
@@ -450,6 +453,7 @@ function ItemPanel({
                         </div>
                       </div>
                     )}
+                    {dbq && <DbQueryPanel q={dbq} />}
                     {extra?.assertions?.map((a, i) => (
                       <p key={i} className={a.passed ? 'text-pass' : 'text-fail'}>
                         {a.passed ? '✓' : '✗'} {a.message}
@@ -498,5 +502,54 @@ function ItemPanel({
       )}
       <Lightbox src={shot} onClose={() => setShot(null)} />
     </>
+  );
+}
+
+type DbStepQuery = {
+  connection?: string;
+  engine?: string;
+  sql?: string;
+  params?: unknown[];
+  columns?: string[];
+  rows?: Record<string, unknown>[];
+  rowCount?: number;
+  affected?: number;
+  truncated?: boolean;
+  rollbackMode?: boolean;
+  readOnly?: boolean;
+  audit?: { findings: { message: string }[]; coverage: unknown[] };
+};
+
+/** The SQL a database step ran, its parameters (secrets already masked) and the rows it returned. */
+function DbQueryPanel({ q }: { q: DbStepQuery }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="font-medium text-muted">
+        {q.connection} · {q.engine}
+        {q.readOnly && ' · read-only'}
+        {q.rollbackMode && ' · rollback mode'}
+      </p>
+      {q.sql && (
+        <pre className="max-h-40 overflow-auto rounded border border-border bg-bg p-2 font-mono text-[11px] whitespace-pre-wrap">
+          {q.sql}
+          {q.params?.length ? `\n-- params: ${JSON.stringify(q.params)}` : ''}
+        </pre>
+      )}
+      {q.columns && q.columns.length > 0 && q.rows && (
+        <>
+          <ResultsGrid columns={q.columns} rows={q.rows} maxHeight={220} />
+          {q.truncated && (
+            <p className="text-muted">
+              Showing the first {q.rows.length} of {q.rowCount} rows.
+            </p>
+          )}
+        </>
+      )}
+      {q.audit && (
+        <p className="text-muted">
+          {q.audit.findings.length} issue(s) from {q.audit.coverage.length} checks
+        </p>
+      )}
+    </div>
   );
 }

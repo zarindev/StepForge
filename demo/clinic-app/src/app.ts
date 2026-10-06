@@ -82,6 +82,8 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
     if (b.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email as string)) return 'Email address is invalid';
     return undefined;
   };
+  // PLANTED BUG CC-DB-02: no duplicate check — the same person (name + date of birth) can be registered
+  // twice, through the UI and the API (the spec documents a 409).
   const createPatient = (b: Record<string, string | undefined>): Patient => {
     const info = db
       .prepare(
@@ -354,10 +356,8 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
     if (u.role !== 'admin')
       return reply.code(403).send({ error: 'forbidden', message: 'Only admins can delete patients' });
     // PLANTED BUG CC-API-03: deleting an unknown patient returns 204 instead of the documented 404.
-    db.transaction(() => {
-      db.prepare('DELETE FROM appointments WHERE patient_id = ?').run(req.params.id);
-      db.prepare('DELETE FROM patients WHERE id = ?').run(req.params.id);
-    })();
+    // PLANTED BUG CC-DB-01: the patient's appointments are not deleted, leaving orphan rows.
+    db.prepare('DELETE FROM patients WHERE id = ?').run(req.params.id);
     return reply.code(204).send();
   });
   app.get('/api/appointments', async () =>

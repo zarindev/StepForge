@@ -2,7 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+- PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
+
 ### Added
+- Phase 6 database testing: DB executor for SQLite, PostgreSQL, MySQL, SQL Server and MongoDB (query, Mongo find,
+  scripts, procedures, extract, data-quality check), read-only guard with driver-level read-only sessions, rollback
+  mode, typed confirmation for production writes, encrypted connection passwords, SQL Workbench with schema
+  browser, autocomplete, CSV export and "Save as DB test", data-quality audit (orphans incl. inferred
+  relationships, duplicates, missing values, formats, negatives), CareClinic planted DB bugs.
 - Phase 5 API testing: API executor (REST, GraphQL, auth incl. OAuth2, cookies, JSONPath, JSON Schema, contract
   checks), OpenAPI/Swagger, Postman, cURL and HAR importers with generated negative tests, API Client with
   contract validation, CareClinic OpenAPI spec and planted API bugs.

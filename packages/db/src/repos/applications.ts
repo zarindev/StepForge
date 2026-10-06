@@ -3,6 +3,7 @@ import { and, count, eq, inArray } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { StepForgeDb } from '../index.ts';
 import { applications, bugs, environments, modules, runs, scenarios, testCases } from '../schema.ts';
+import { listEnvironments, purgeConnectionSecrets } from './environments.ts';
 import { mapUnique, notFound, now } from './errors.ts';
 
 export type Application = typeof applications.$inferSelect;
@@ -120,6 +121,10 @@ export function updateApplication(
 export function deleteApplication(db: StepForgeDb, id: string): void {
   getApplication(db, id);
   db.transaction(() => {
+    purgeConnectionSecrets(
+      db,
+      listEnvironments(db, id).map((e) => e.id),
+    );
     db.delete(modules).where(eq(modules.applicationId, id)).run();
     db.delete(applications).where(eq(applications.id, id)).run();
   });
