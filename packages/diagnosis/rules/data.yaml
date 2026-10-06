@@ -1,0 +1,181 @@
+# Database, email and performance failures.
+
+# ─── Database ─────────────────────────────────────────────────────────────
+- id: db-connection-refused
+  category: db_unreachable
+  priority: 95
+  confidence: 0.9
+  owner: environment
+  when: { layer: [db, perf], errorKind: network }
+  title: 'The database could not be reached'
+  explanation: '{{message}}'
+  fix: 'Check the database is running and the connection "{{connection}}" (host, port, credentials) for this environment.'
+
+- id: db-write-blocked
+  category: db_write_blocked
+  priority: 92
+  confidence: 0.9
+  owner: test
+  when: { layer: db, message: { matches: 'read-only|rollback mode|Type the application name' } }
+  title: "The write was blocked by the connection's safety settings"
+  explanation: '{{message}}'
+  fix: 'Use a read query, or change the connection settings if writing is intended.'
+
+- id: db-sql-error
+  category: test_configuration
+  priority: 85
+  confidence: 0.85
+  owner: test
+  when:
+    {
+      layer: db,
+      errorKind: invalid_params,
+      message: { matches: 'syntax|no such|does not exist|unknown column|invalid object|invalid column' },
+    }
+  title: 'The SQL of this step is invalid: {{message}}'
+  explanation: 'The query refers to something that does not exist or has a syntax error. The schema may have changed.'
+  fix: 'Fix the SQL (the SQL Workbench shows the current schema).'
+
+- id: db-constraint
+  category: db_constraint
+  priority: 85
+  confidence: 0.85
+  owner: data
+  when:
+    {
+      layer: db,
+      message: { matches: 'UNIQUE|FOREIGN KEY|constraint|duplicate key|violates|Duplicate entry|NOT NULL' },
+    }
+  title: 'A database constraint rejected the change: {{message}}'
+  explanation: 'The statement conflicts with existing data (a duplicate, a missing parent row or a required value).'
+  fix: 'Use unique generated data, create the parent rows first, or reset the data.'
+
+- id: db-quality-issues
+  category: data_quality
+  priority: 60
+  confidence: 0.8
+  owner: app
+  when: { stepType: db.dataQualityCheck, errorKind: assertion }
+  title: 'The data-quality audit found problems: {{message}}'
+  explanation: 'Bad data (orphans, duplicates, missing or invalid values) usually comes from missing constraints or validation in the application.'
+  fix: 'Fix the cause in the application (validation, cascading deletes, unique constraints), then clean the existing rows.'
+
+- id: db-empty-result
+  category: empty_result
+  priority: 70
+  confidence: 0.7
+  owner: data
+  when:
+    { layer: db, errorKind: assertion, rowCount: 0, assertion.target: { notIn: [value, scalar, affected] } }
+  title: 'The query returned no rows'
+  explanation: '{{sql}} returned nothing on "{{connection}}". The data the test relies on does not exist in this environment, or the application did not write it.'
+  fix: 'Check that the earlier steps created the data and that the query filters are right.'
+
+- id: db-data-mismatch
+  category: data_integrity
+  priority: 40
+  confidence: 0.65
+  owner: app
+  when: { layer: db, errorKind: assertion, assertion: { exists: true } }
+  title: 'The database holds {{assertion.actual}} where {{assertion.expected}} was expected'
+  explanation: '{{assertion.message}}. Query on "{{connection}}": {{sql}}. The application stored something different from what it should have (difference {{deltaText}}).'
+  fix: 'Check what the application wrote (or failed to delete/update) for this record.'
+  evidence:
+    {
+      Query: '{{sql}}',
+      Expected: '{{assertion.expected}}',
+      Actual: '{{assertion.actual}}',
+      Difference: '{{deltaText}}',
+    }
+
+# ─── Email ────────────────────────────────────────────────────────────────
+- id: email-inbox-unreachable
+  category: inbox_unreachable
+  priority: 90
+  confidence: 0.85
+  owner: environment
+  when: { layer: email, errorKind: network }
+  title: 'The inbox could not be read'
+  explanation: '{{message}}'
+  fix: 'Start Mailpit (Settings → Email) or check the IMAP settings of the inbox.'
+
+- id: email-not-received
+  category: email_not_received
+  priority: 80
+  confidence: 0.8
+  owner: app
+  when: { stepType: email.waitForEmail, errorKind: timeout }
+  title: 'The email never arrived'
+  explanation: '{{message}}. The application did not send it, sent it to another address, or its SMTP settings point elsewhere.'
+  fix: "Check the application's SMTP settings (Mailpit: 127.0.0.1:1025) and the recipient; look at the inbox for emails sent to other addresses."
+
+- id: email-otp-not-found
+  category: otp_not_found
+  priority: 80
+  confidence: 0.75
+  owner: test
+  when: { stepType: email.extractFromEmail, message: { contains: 'one-time code' } }
+  title: 'No one-time code was found in the email'
+  explanation: '{{message}}. The email has no 4–8 digit code near words like "code" or "OTP", or it has several unlabelled numbers.'
+  fix: 'Open the email preview; use a regex extraction (e.g. code:\s*(\w+)) if the code has another format.'
+
+- id: email-link-missing
+  category: email_link_missing
+  priority: 75
+  confidence: 0.75
+  owner: app
+  when: { layer: email, message: { matches: 'has no link|Expected a link' } }
+  title: 'The email does not contain the expected link'
+  explanation: '{{message}}'
+  fix: 'Check the email template, or the text the step looks for in the link.'
+
+- id: email-content-mismatch
+  category: assertion_mismatch
+  priority: 40
+  confidence: 0.6
+  owner: app
+  when: { layer: email, errorKind: assertion }
+  title: 'The email is not what the test expects: {{message}}'
+  explanation: '{{message}}'
+  fix: 'Compare the email preview with the expectation.'
+
+# ─── Performance ──────────────────────────────────────────────────────────
+- id: perf-load-not-authorized
+  category: test_configuration
+  priority: 92
+  confidence: 0.9
+  owner: test
+  when: { stepType: perf.loadTest, message: { matches: 'authorized to test|confirmProduction' } }
+  title: 'The load test was not allowed to start'
+  explanation: '{{message}}'
+  fix: 'Confirm authorization on the Performance page (and the application name for production).'
+
+- id: perf-full-scan
+  category: missing_index
+  priority: 80
+  confidence: 0.8
+  owner: app
+  when: { stepType: perf.queryPlan, message: { contains: 'Full table scan' } }
+  title: '{{message}}'
+  explanation: 'The query reads every row of the table. It gets slower as the table grows.'
+  fix: 'Add an index on the filtered/joined columns (see the query plan).'
+
+- id: perf-threshold-baseline
+  category: perf_regression
+  priority: 76
+  confidence: 0.85
+  owner: app
+  when: { layer: perf, errorKind: assertion, perfBaselineP95: { exists: true } }
+  title: '{{assertion.message}}'
+  explanation: 'The last passing run had a p95 of {{perfBaselineP95}} ms, so this is a regression since then.'
+  fix: 'Look at what changed since the last passing run (code, data volume, environment).'
+
+- id: perf-threshold
+  category: perf_threshold
+  priority: 75
+  confidence: 0.8
+  owner: app
+  when: { layer: perf, errorKind: assertion }
+  title: '{{assertion.message}}'
+  explanation: 'The measured {{assertion.target}} was {{assertion.actual}} against a limit of {{assertion.expected}}.'
+  fix: 'Profile the slow part (query plans, server timings); if the limit is too strict, adjust the threshold.'

@@ -239,7 +239,71 @@ export type StepResultRow = {
   } | null;
 };
 export type Artifact = { id: string; kind: string; path: string; size: number };
-export type RunItemDetail = RunItem & { steps: StepResultRow[]; artifacts: Artifact[] };
+export type RunItemDetail = RunItem & {
+  steps: StepResultRow[];
+  artifacts: Artifact[];
+  diagnosisJson: Diagnosis | null;
+  bug: { id: string; code: string; status: string; occurrences: number } | null;
+};
+
+// ─── Diagnosis and bugs (mirror @stepforge/diagnosis and the bugs table) ───────
+export type Owner = 'test' | 'app' | 'environment' | 'data';
+export type Diagnosis = {
+  ruleId: string;
+  category: string;
+  title: string;
+  explanation: string;
+  owner: Owner;
+  fix: string;
+  confidence: number;
+  where: { step: string; path?: string; type: string };
+  evidence: { label: string; value: string }[];
+  suggestedLocator?: { strategy: string; value: string; name?: string };
+  lastGreen?: { runId: string; at: string; changes: { what: string; before: string; after: string }[] };
+  alternatives: { ruleId: string; category: string; title: string; confidence: number }[];
+};
+export type BugSeverity = 'critical' | 'major' | 'minor' | 'trivial';
+export type BugStatus = 'open' | 'in_progress' | 'fixed' | 'wont_fix' | 'duplicate';
+export type Bug = {
+  id: string;
+  applicationId: string;
+  runItemId: string | null;
+  code: string;
+  title: string;
+  summary: string;
+  severity: BugSeverity;
+  priority: Priority;
+  status: BugStatus;
+  environmentJson: {
+    name?: string;
+    url?: string;
+    browser?: string;
+    viewport?: string;
+    os?: string;
+    at?: string;
+    testCase?: string;
+  };
+  preconditions: string;
+  stepsToReproduceJson: string[];
+  expected: string;
+  actual: string;
+  diagnosisJson: Diagnosis | null;
+  ownerHint: Owner | null;
+  occurrences: number;
+  scenarioId: string | null;
+  testCaseId: string | null;
+  failedStepId: string | null;
+  category: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type BugDetail = Bug & {
+  runId?: string;
+  scenario?: { id: string; name: string };
+  artifacts: Artifact[];
+  failedStep?: StepResultRow;
+};
 
 // ─── Databases (mirrors @stepforge/executor-db; kept local so the web bundle has no Node types) ─────────
 export type DbEngine = 'sqlite' | 'pg' | 'mysql' | 'mssql' | 'mongo';

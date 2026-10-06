@@ -1,0 +1,157 @@
+# Browser (UI) failures. Facts: locator, matchCount, visible, candidate, candidateText, pageError, corsError,
+# failedRequest, slowRequest, slowRatio, networkFailure, assertion…
+
+- id: ui-network-unreachable
+  category: network_unreachable
+  priority: 95
+  confidence: 0.9
+  owner: environment
+  when: { layer: ui, networkFailure: { exists: true } }
+  title: 'The site could not be reached ({{networkFailure}})'
+  explanation: 'The browser could not connect: the application is down, the base URL is wrong, or there is no network.'
+  fix: 'Check the application is running and the environment base URL.'
+
+- id: ui-cors
+  category: cors
+  priority: 82
+  confidence: 0.8
+  owner: environment
+  when: { layer: ui, corsError: { exists: true } }
+  title: 'A request was blocked by the browser (CORS)'
+  explanation: 'The page called an API on another origin that did not allow it: {{corsError}}'
+  fix: "Allow this origin in the API's CORS settings for the test environment."
+
+- id: ui-element-covered
+  category: element_covered
+  priority: 85
+  confidence: 0.8
+  owner: test
+  when:
+    { layer: ui, message: { matches: 'intercepts pointer events|is covered|not receiving pointer events' } }
+  title: 'Another element covers {{locator}}'
+  explanation: 'The element exists but something on top of it (a dialog, banner, overlay or spinner) receives the click: {{message}}'
+  fix: "Close or wait for the overlay first (e.g. a ui.waitFor hidden step), or click the overlay's button."
+
+- id: ui-element-hidden
+  category: element_hidden
+  priority: 84
+  confidence: 0.75
+  owner: app
+  when:
+    layer: ui
+    any:
+      - { visible: false, matchCount: { gte: 1 } }
+      - { message: { matches: 'is not visible|element is outside of the viewport|hidden' } }
+  title: 'The element is on the page but hidden: {{locator}}'
+  explanation: '{{matchCount}} element(s) match {{locator}} but none is visible, so the user could not use it either.'
+  fix: 'Check why the element is hidden (layout, screen size, a missing state); if hiding is intended, add the step that reveals it.'
+
+- id: ui-locator-changed
+  category: locator_changed
+  priority: 80
+  confidence: 0.85
+  owner: test
+  when:
+    {
+      layer: ui,
+      errorKind: [element_not_found, timeout],
+      candidateCount: { gte: 1 },
+      matchCount: { not: { gte: 1 } },
+    }
+  title: 'The element changed: {{locator}} matches nothing, but {{candidate}} looks like it'
+  explanation: 'No element matches the recorded locator any more. A similar element exists now ({{candidate}}{{candidateText}}), so the page was probably redesigned or renamed.'
+  fix: 'Accept the suggested locator {{candidate}} (one click in the diagnosis), or record the step again.'
+  evidence: { 'Old locator': '{{locator}}', 'Suggested locator': '{{candidate}}' }
+
+- id: ui-slow-api-timeout
+  category: slow_api
+  priority: 78
+  confidence: 0.75
+  owner: app
+  when: { layer: ui, errorKind: [timeout, element_not_found], slowRatio: { gte: 0.5 } }
+  title: 'A slow API call made the page time out ({{slowRequest.durationMs}} ms)'
+  explanation: 'While waiting, {{slowRequest.method}} {{slowRequest.url}} took {{slowRequest.durationMs}} ms — most of the {{timeoutMs}} ms step timeout — so the page was not ready in time.'
+  fix: 'Speed up that endpoint, or wait for it explicitly / raise the step timeout if the duration is acceptable.'
+  evidence: { 'Slow request': '{{slowRequest.method}} {{slowRequest.url}} ({{slowRequest.durationMs}} ms)' }
+
+- id: ui-navigation-timeout
+  category: navigation_timeout
+  priority: 75
+  confidence: 0.75
+  owner: environment
+  when: { stepType: ui.navigate, errorKind: [timeout, navigation] }
+  title: 'The page did not load in time'
+  explanation: '{{message}}'
+  fix: 'Check that the application is up and responsive; raise the timeout for slow environments.'
+
+- id: ui-server-error-behind-page
+  category: server_error
+  priority: 72
+  confidence: 0.7
+  owner: app
+  when: { layer: ui, failedRequest.status: { gte: 500 } }
+  title: "The page's API call failed with {{failedRequest.status}}: {{failedRequest.method}} {{failedRequest.url}}"
+  explanation: 'The page depends on {{failedRequest.url}}, which answered {{failedRequest.status}}, so the expected content never appeared.'
+  fix: 'Fix the server error (check the server log for this request).'
+
+- id: ui-js-exception
+  category: js_exception
+  priority: 74
+  confidence: 0.7
+  owner: app
+  when: { layer: ui, pageError: { exists: true } }
+  title: 'A JavaScript error broke the page: {{pageError.text}}'
+  explanation: 'The page threw an uncaught exception at {{pageError.location}}; the interaction after it probably did nothing.'
+  fix: 'Fix the script error at {{pageError.location}}.'
+  evidence: { Exception: '{{pageError.text}}', Location: '{{pageError.location}}' }
+
+- id: ui-request-rejected
+  category: request_rejected
+  priority: 60
+  confidence: 0.55
+  owner: app
+  when: { layer: ui, failedRequest.status: { gte: 400, lt: 500 } }
+  title: "The page's request was rejected ({{failedRequest.status}}): {{failedRequest.method}} {{failedRequest.url}}"
+  explanation: 'An API call made by the page answered {{failedRequest.status}}; the page probably showed an error instead of the expected result.'
+  fix: "Check the data entered by the test and the API's validation."
+
+- id: ui-element-not-found-was-green
+  category: element_not_found
+  priority: 45
+  confidence: 0.55
+  owner: test
+  when: { layer: ui, errorKind: element_not_found, lastGreen: { exists: true } }
+  title: 'The element {{locator}} was not found (it was in the last passing run)'
+  explanation: 'The step found it on {{lastGreen.at}}. Either the page changed, or the page was not in the expected state (an earlier step did something else).'
+  fix: 'Look at the failure screenshot: if the page changed, update the locator; otherwise check the previous steps.'
+
+- id: ui-element-not-found
+  category: element_not_found
+  priority: 40
+  confidence: 0.5
+  owner: test
+  when: { layer: ui, errorKind: element_not_found }
+  title: 'The element {{locator}} was not found'
+  explanation: '{{message}}'
+  fix: 'Check the failure screenshot; update the locator or add a wait for the right page state.'
+
+- id: ui-value-mismatch
+  category: assertion_mismatch
+  priority: 30
+  confidence: 0.55
+  owner: app
+  when: { layer: ui, errorKind: assertion, assertion: { exists: true } }
+  title: 'The page shows {{assertion.actual}} where the test expects {{assertion.expected}}'
+  explanation: '{{assertion.message}}'
+  fix: 'If the page is wrong, it is an application bug; if the text changed on purpose, update the expected value.'
+  evidence: { Expected: '{{assertion.expected}}', Actual: '{{assertion.actual}}' }
+
+- id: ui-check-failed
+  category: assertion_mismatch
+  priority: 25
+  confidence: 0.5
+  owner: app
+  when: { layer: ui, errorKind: assertion }
+  title: 'The page did not meet the check: {{message}}'
+  explanation: '{{message}}'
+  fix: 'Compare the failure screenshot with the expectation.'

@@ -58,6 +58,7 @@ describe('plain English', () => {
       'Load test /api/products with 50 users (stress)',
     ],
     [s('perf.lighthouse', { url: '/checkout' }), 'Run Lighthouse on /checkout'],
+    [s('api.extract', { path: '$.token' }), 'Read $.token from the response'],
   ])('%#', (step, text) => {
     expect(describeStep(step)).toBe(text);
   });

@@ -116,6 +116,11 @@ test('API client, OpenAPI import and the generated suite against CareClinic (Pha
     .getByRole('list', { name: 'Step timeline' })
     .getByRole('button', { name: /api\.request/ })
     .click();
-  await expect(page.getByText('Request', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Step timeline' }).getByText('Request', { exact: true }),
+  ).toBeVisible();
+  // The failure is also diagnosed as a schema mismatch owned by the application.
+  await expect(page.getByTestId('diagnosis')).toContainText('Application bug');
+  await expect(page.getByTestId('diagnosis')).toContainText('fee should be number');
   await shot(page, 'api-run');
 });

@@ -29,6 +29,13 @@
       "when": 1791290703421,
       "tag": "0003_mail_inbox_names",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791296756163,
+      "tag": "0004_bug_links",
+      "breakpoints": true
     }
   ]
 }

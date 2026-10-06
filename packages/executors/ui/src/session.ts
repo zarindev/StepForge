@@ -10,6 +10,7 @@ import {
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Browser, BrowserContext, Dialog, Locator, Page } from 'playwright';
+import { highlight, inspectFailure } from './inspect.ts';
 import { buildLocator, resolveLocator, type Resolved, type Scope } from './locators.ts';
 import { checkPageMetrics, collectPageMetrics, WEB_VITALS_INIT_SCRIPT } from '@stepforge/perf';
 
@@ -540,8 +541,24 @@ export class UiSession implements ExecutorSession {
 
   async onStepFailed(step: RunnableStep): Promise<Partial<StepOutcome>> {
     const out: Partial<StepOutcome> = {};
+    // For the diagnosis: does the element exist (hidden?) or what looks like it now (locator changed?).
+    let unhighlight: (() => Promise<void>) | undefined;
+    if (step.locators.length) {
+      try {
+        const { diagnostics, target } = await inspectFailure(
+          this.scope,
+          step.type.split('.')[1]!,
+          step.locators,
+        );
+        out.diagnostics = diagnostics;
+        if (target) unhighlight = await highlight(target).catch(() => undefined);
+      } catch {
+        // the page may be gone; the failure itself is what matters
+      }
+    }
     if (this.ctx.options.screenshots !== 'off')
       out.screenshotPath = await this.snap(step.position, 'png', '-failed');
+    await unhighlight?.();
     try {
       const path = join(this.ctx.artifactsDir, `dom-step-${pad(step.position)}.html`);
       writeFileSync(path, await this.page.content());

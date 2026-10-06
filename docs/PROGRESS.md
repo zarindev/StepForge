@@ -1,5 +1,7 @@
 # StepForge — Build Progress
 
+_By Md Zarin Tasnim · part of the StepForge documentation_
+
 | # | Phase | Status |
 |---|---|---|
 | 1 | Foundation: monorepo, core, db, crypto, server, web shell, scripts, CI | ✅ Done |
@@ -10,12 +12,34 @@
 | 6 | Database module, SQL Workbench, data-quality audit, rollback | ✅ Done |
 | 7 | Email (Mailpit + IMAP), OTP/link extraction | ✅ Done |
 | 8 | Performance (metrics, Lighthouse, load, k6, query plans) | ✅ Done |
-| 9 | Diagnosis engine, bug reports, report exports | ⏳ Next |
-| 10 | Analytics, quality gates, run comparison, flaky detection | — |
+| 9 | Diagnosis engine, bug reports, report exports | ✅ Done |
+| 10 | Analytics, quality gates, run comparison, flaky detection | ⏳ Next |
 | 11 | Scheduler, CLI, notifications, JUnit/HTML | — |
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 9 — Diagnosis, bug reports and exports (2026-10-06)
+
+**Delivered**
+- **`@stepforge/diagnosis`**: rule engine over facts extracted from a failure (step, error, assertions with value differences, API request/response and schema/contract errors, DB results, email, perf reports, console exceptions and CORS, failed/slow network requests and DNS errors, element state and locator candidates, history, and the **last passing run**). **53 YAML rules** (`packages/diagnosis/rules/*.yaml`, user rules in `data/rules/`) covering every category of the spec, each with category, title and explanation templated with real values, owner (app/test/environment/data), fix and confidence; alternatives; **last-green diff** (step result, HTTP status, response field types, row counts, duration, healing, browser, base URL).
+- **UI failure evidence:** element existence/visibility, **locator candidates** (similarity on test ids, accessible names, labels, text; verified unique) and a **screenshot with the failing element outlined**.
+- **Bug reports** (migration `0004_bug_links`): filed automatically for every failed/broken test, deduplicated by scenario + step + category (occurrences, reopen on regression), BUG-001 codes, severity from priority and category, plain-English steps to reproduce with data filled in and secrets masked, expected/actual, environment with browser version and OS, diagnosis, evidence.
+- **`@stepforge/reports`**: bug PDF/HTML/Markdown (GitHub issue), bug list PDF/XLSX/Jira CSV/Trello CSV/Markdown, run report self-contained HTML/PDF/XLSX. PDFs printed by Playwright's Chromium (network blocked while rendering). **Every document says "Prepared by …" (Settings → Reports, default Md Zarin Tasnim) and carries the "StepForge by Md Zarin Tasnim" credit.**
+- **Dashboard:** diagnosis panel on failed tests (Where / Why / Whose issue / How to fix, evidence, last-green changes, alternatives, re-diagnose, **one-click "Use suggested locator"**, link to the bug, optional *Explain in plain English* when a local Ollama is detected); **Bugs** page (filters by status, severity, owner; detail with editable status/severity/priority, steps to reproduce, expected/actual, diagnosis, annotated screenshot, link to the run; exports); run export menu; Settings → Reports (author, company, accent) and Local AI (Ollama URL/model/status).
+- Plain-English wording for `api.extract` (bug reports read "Read $.token from the response").
+- Dependency hygiene: `basic-ftp` and `uuid` moved to patched versions; remaining Lighthouse-internal advisories documented (KNOWN_ISSUES #38).
+- `docs/DIAGNOSIS.md` (owners, categories, locator fix, rule format and facts, bugs, exports, Ollama); a byline with the author's name on every doc.
+
+**Verified**
+- `npm test`: 258 tests (18 skipped: external database servers). New: 36 diagnosis tests with fixture inputs (rule validation, matchers, one fixture per category including the shapes of all planted bugs, real-value explanations, last-green diff, perf regression vs baseline); 4 server tests.
+- **Done-when check:** running the generated OpenAPI suite and two DB scenarios against CareClinic, every planted bug gets the right diagnosis — CC-API-01 *schema_mismatch* ("…fee should be number"), CC-API-02 *missing_auth* ("The API accepted a request it should have rejected (200 instead of 401)"), CC-API-03 *wrong_status* ("…204 No Content for something that does not exist"), CC-DB-01 *data_integrity* ("The database holds 1 where 0 was expected"), CC-DB-02 *validation_missing* ("The API accepted a duplicate (201 instead of 409 Conflict)") — all owned by the application, each filed once as BUG-001…005; a repeat counts a second occurrence.
+- A UI test with a stale locator is diagnosed *locator_changed* with the suggestion `testId=save-patient`; accepting it makes the rerun pass.
+- Exports verified: PDFs start with `%PDF-`, XLSX re-opened with exceljs (author in properties and About sheet), Jira/Trello headers, HTML/Markdown carry "Prepared by Md Zarin Tasnim" and the credit; a custom author/company appears while the credit stays.
+- `npm run test:e2e`: 15 tests. The Phase 9 E2E runs a planted-bug scenario and a stale-locator scenario from the dashboard, checks the diagnosis panel, downloads the HTML run report (author present), accepts the suggested locator, opens the bug, edits its status, downloads its PDF and the Jira CSV, and checks the report author setting.
+- The app started on the existing `data/` folder and applied the new migration after a backup.
 
 ---
 

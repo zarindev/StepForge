@@ -14,6 +14,7 @@ import { RecorderPage } from '@/pages/recorder';
 import { SettingsPage } from '@/pages/settings';
 import { SqlWorkbenchPage } from '@/pages/sql-workbench';
 import { PerformancePage } from '@/pages/performance';
+import { BugsPage } from '@/pages/bugs';
 
 const rootRoute = createRootRoute({ component: Layout });
 
@@ -49,7 +50,6 @@ const navRoutes = [
   navRoute('/api-client'),
   navRoute('/performance'),
   navRoute('/runs'),
-  navRoute('/bugs'),
   navRoute('/schedules'),
   navRoute('/exports'),
   navRoute('/settings'),
@@ -60,6 +60,13 @@ const sqlRoute = createRoute({
   path: '/sql',
   validateSearch: (s) => z.object({ connection: z.string().optional() }).parse(s),
   component: SqlWorkbenchPage,
+});
+
+const bugsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/bugs',
+  validateSearch: (s) => z.object({ bug: z.string().optional() }).parse(s),
+  component: BugsPage,
 });
 
 const explorerRoute = createRoute({
@@ -85,6 +92,7 @@ export const router = createRouter({
   routeTree: rootRoute.addChildren([
     ...navRoutes,
     sqlRoute,
+    bugsRoute,
     explorerRoute,
     applicationDetailRoute,
     runDetailRoute,

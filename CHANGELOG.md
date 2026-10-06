@@ -6,6 +6,10 @@
 - PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
 
 ### Added
+- Phase 9 diagnosis and bug reports: rule-based diagnosis (53 YAML rules, user rules, last-green diff, locator
+  suggestions with one-click fix, annotated failure screenshots), automatic deduplicated bug reports, exports
+  (bug PDF/HTML/Markdown, bug list PDF/XLSX/Jira/Trello CSV, run report HTML/PDF/XLSX) with the report author
+  ("Prepared by Md Zarin Tasnim" by default), optional local Ollama explanations.
 - Phase 8 performance testing: built-in load engine (profiles, exact percentiles, live timeline, threshold
   verdicts), k6 export/install/bridge, Web Vitals page metrics, Lighthouse, query plans, Load Designer, load-test
   authorization per application.

@@ -1,5 +1,7 @@
 # StepForge — Implementation Plan
 
+_By Md Zarin Tasnim · part of the StepForge documentation_
+
 > Record once. Test every layer. Export anywhere.
 
 This plan is the working contract for building StepForge phase by phase. Progress is tracked
