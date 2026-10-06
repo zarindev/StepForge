@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { MailpitCard } from '@/components/email/mailpit-card';
 import { K6Card } from '@/components/perf/k6-card';
+import { NotificationsCard } from '@/components/settings/notifications-card';
 import { AiCard, ReportBrandingCard } from '@/components/settings/report-cards';
 import { PageHeader } from '@/components/shell/layout';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,6 +96,7 @@ export function SettingsPage() {
         </Card>
         <MailpitCard />
         <K6Card />
+        <NotificationsCard />
         <ReportBrandingCard settings={settings.data} />
         <AiCard settings={settings.data} />
       </div>

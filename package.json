@@ -18,6 +18,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "start": "npm run start -w @stepforge/server",
+    "stepforge": "node apps/cli/bin/stepforge.mjs",
     "build": "npm run build -w @stepforge/web",
     "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck -w @stepforge/web",
     "lint": "eslint .",

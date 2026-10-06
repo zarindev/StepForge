@@ -23,7 +23,10 @@ test.describe('dashboard shell', () => {
     await page.goto('/');
     await page.getByRole('link', { name: 'Schedules' }).click();
     await expect(page).toHaveURL(/\/schedules$/);
-    await expect(page.getByText('Schedules is coming in Phase 11')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Schedules', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Exports' }).click();
+    await expect(page).toHaveURL(/\/exports$/);
+    await expect(page.getByText('Exports is coming in Phase 12')).toBeVisible();
     // deep links work through the SPA fallback
     await page.goto('/bugs');
     await expect(page.getByRole('heading', { name: 'Bugs', exact: true })).toBeVisible();

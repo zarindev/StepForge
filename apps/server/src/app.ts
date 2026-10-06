@@ -27,6 +27,8 @@ import { DiagnosisService } from './diagnosis/service.ts';
 import { registerPerfRoutes } from './routes/perf.ts';
 import { registerBugRoutes } from './routes/bugs.ts';
 import { registerAnalyticsRoutes } from './routes/analytics.ts';
+import { registerScheduleRoutes } from './routes/schedules.ts';
+import { SchedulerService } from './scheduler/service.ts';
 import { rebuildDaily } from '@stepforge/analytics';
 import { closePdfBrowser } from '@stepforge/reports';
 import { RunManager } from './runner/manager.ts';
@@ -36,6 +38,12 @@ export type BuildOptions = {
   config?: Partial<ServerConfig>;
   token?: string;
   logger?: boolean | object;
+  /**
+   * Used by the CLI, which may run while the StepForge server is open on the same data folder:
+   * no in-app scheduler (the OS scheduler or CI starts the CLI) and no crash recovery, which would
+   * otherwise mark the server's active runs as interrupted.
+   */
+  embedded?: boolean;
 };
 
 export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyInstance; ctx: AppContext }> {
@@ -58,12 +66,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     app.log.info(`Applied ${applied} database migration(s)${backupPath ? ` (backup: ${backupPath})` : ''}`);
 
   // Runs left queued/running by a crash or restart are marked interrupted (Section 10).
-  const interrupted = db
-    .update(schema.runs)
-    .set({ status: 'interrupted', updatedAt: new Date().toISOString() })
-    .where(inArray(schema.runs.status, ['queued', 'running']))
-    .run();
-  if (interrupted.changes > 0) app.log.warn(`Marked ${interrupted.changes} unfinished run(s) as interrupted`);
+  if (!opts.embedded) {
+    const interrupted = db
+      .update(schema.runs)
+      .set({ status: 'interrupted', updatedAt: new Date().toISOString() })
+      .where(inArray(schema.runs.status, ['queued', 'running']))
+      .run();
+    if (interrupted.changes > 0)
+      app.log.warn(`Marked ${interrupted.changes} unfinished run(s) as interrupted`);
+  }
 
   // Analytics aggregates are derived data: fill them in once for databases from before Phase 10.
   if (
@@ -112,8 +123,10 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     email,
     perf,
     diagnosis,
+    scheduler: undefined as unknown as SchedulerService,
     startedAt: new Date(),
   };
+  ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof ZodError) {
@@ -146,13 +159,17 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerPerfRoutes(app, ctx);
   registerBugRoutes(app, ctx);
   registerAnalyticsRoutes(app, ctx);
+  registerScheduleRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal.
   if (getSetting(db, 'mailpitAutostart', false))
     email.mailpit.start().catch((err: Error) => app.log.warn(`Mailpit did not start: ${err.message}`));
 
+  if (!opts.embedded) ctx.scheduler.start();
+
   app.addHook('onClose', async () => {
+    ctx.scheduler.stop();
     await ctx.runs.shutdown();
     await email.mailpit.stop();
     await closePdfBrowser();

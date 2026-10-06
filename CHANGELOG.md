@@ -6,6 +6,11 @@
 - PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
 
 ### Added
+- Phase 11 automation: schedules (cron presets or expressions with next-run preview, run now, history, skipping a
+  time while the previous run is still going), Telegram and email notifications with failures, diagnoses, quality
+  gate and a link (secrets encrypted, "failures only" option, send test), the `stepforge` CLI (`run` with
+  tag/module/scenario filters, JUnit/HTML/PDF output, notifications and exit codes; `list`, `report`, `export`,
+  `import`, `secret set`), JUnit XML run reports, application export/import as JSON (no secret values).
 - Phase 10 analytics: Home dashboard (KPIs, trend, quality gates, recent runs), application analytics (breakdowns,
   failure categories, top failing/slowest/flaky tests with drill-down, performance trends, calendar), quality gates
   with block/warn rules, run comparison, daily aggregates refreshed after every run.
