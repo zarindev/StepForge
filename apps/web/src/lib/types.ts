@@ -222,6 +222,8 @@ export type StepResultRow = {
   responseJson: {
     assertions?: AssertionResult[];
     attempts?: number;
+    path?: string;
+    depth?: number;
     errorKind?: string;
     healedLocator?: {
       from: { strategy: string; value: string; name?: string };

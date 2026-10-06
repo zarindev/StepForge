@@ -44,7 +44,7 @@ export type ScenarioSnapshot = Pick<
 
 // ─── Mapping ───────────────────────────────────────────────────────────────
 
-const toStepRecord = (r: StepRow): StepRecord => ({
+export const toStepRecord = (r: Omit<StepRow, 'scenarioId'>): StepRecord => ({
   id: r.id,
   type: r.type,
   label: r.label || undefined,
@@ -105,15 +105,39 @@ function bumpVersion(db: StepForgeDb, id: string): void {
     .run();
 }
 
-function writeSteps(db: StepForgeDb, scenarioId: string, input: (StepInput & { id?: string })[]): void {
-  const parsed = input.map((raw, i) => {
+/** Validates the nested step lists of control-flow steps (`util.if` then/else, `util.loop`). */
+function validateNested(step: Step, where: string): void {
+  const p = step.params as Record<string, unknown>;
+  for (const key of ['steps', 'else'] as const) {
+    if (p[key] === undefined) continue;
+    if (!Array.isArray(p[key])) throw invalid(`${where}: "${key}" must be a list of steps`);
+    (p[key] as unknown[]).forEach((child, i) => {
+      const r = Step.safeParse(child);
+      const at = `${where}.${key === 'else' ? 'else.' : ''}${i + 1}`;
+      if (!r.success)
+        throw invalid(
+          `Step ${at}: ${r.error.issues.map((x) => `${x.path.join('.')} ${x.message}`).join('; ')}`,
+        );
+      validateNested(r.data, at);
+    });
+  }
+}
+
+/** Validates an ordered step list (including nested control flow) and assigns ids. */
+export function parseSteps(input: (StepInput & { id?: string })[]): (Step & { id: string })[] {
+  return input.map((raw, i) => {
     const r = Step.safeParse(raw);
     if (!r.success)
       throw invalid(
         `Step ${i + 1}: ${r.error.issues.map((x) => `${x.path.join('.')} ${x.message}`).join('; ')}`,
       );
+    validateNested(r.data, String(i + 1));
     return { ...r.data, id: raw.id && ULID_REGEX.test(raw.id) ? raw.id : newId() };
   });
+}
+
+function writeSteps(db: StepForgeDb, scenarioId: string, input: (StepInput & { id?: string })[]): void {
+  const parsed = parseSteps(input);
   const ids = parsed.map((p) => p.id);
   if (new Set(ids).size !== ids.length) throw invalid('Duplicate step ids');
   db.delete(steps).where(eq(steps.scenarioId, scenarioId)).run();

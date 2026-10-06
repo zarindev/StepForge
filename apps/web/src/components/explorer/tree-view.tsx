@@ -4,6 +4,7 @@ import {
   FilePlus2,
   Folder,
   FolderOpen,
+  FolderInput,
   FolderPlus,
   Layers,
   MoreHorizontal,
@@ -34,6 +35,7 @@ export type TreeActions = {
   onMoveModule: (id: string, parentId: string | null) => void;
   onMoveScenarios: (ids: string[], moduleId: string) => void;
   onRunModule: (m: ModuleTreeNode) => void;
+  onMoveModuleTo: (m: ModuleTreeNode) => void;
 };
 
 export function KindIcon({ kind, className }: { kind: string; className?: string }) {
@@ -212,6 +214,7 @@ function ModuleRow({ node, depth, ctx }: { node: ModuleTreeNode; depth: number; 
               { label: 'New scenario', icon: FilePlus2, onSelect: () => ctx.actions.onNewScenario(node.id) },
               { label: 'New sub-module', icon: FolderPlus, onSelect: () => ctx.actions.onNewModule(node.id) },
               { label: 'Rename', icon: Pencil, onSelect: () => ctx.actions.onRenameModule(node) },
+              { label: 'Move to…', icon: FolderInput, onSelect: () => ctx.actions.onMoveModuleTo(node) },
               {
                 label: 'Delete module',
                 icon: Trash2,

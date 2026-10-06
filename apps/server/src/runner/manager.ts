@@ -315,6 +315,17 @@ export class RunManager {
         options: ctx.options,
         artifactsDir: dir,
         signal: ctx.signal,
+        loadScenarioSteps: (id) => {
+          if (repo.applicationIdForScenario(this.db, id) !== run.applicationId)
+            throw new Error('scenario belongs to another application');
+          return repo.getScenario(this.db, id).steps.map((s) => ({ ...s, id: s.id }));
+        },
+        loadBlockSteps: (id) => {
+          const block = repo.getBlock(this.db, id);
+          if (block.applicationId !== run.applicationId)
+            throw new Error('block belongs to another application');
+          return block.steps.map((s) => ({ ...s, id: s.id }));
+        },
         onEvent: (e) => {
           if (e.type === 'step.started') this.bus.publish({ ...e, runId: run.id, itemId: item.id, attempt });
           else if (e.type === 'step.finished')
@@ -387,6 +398,8 @@ export class RunManager {
               ...(s.response ? { body: s.response } : {}),
               assertions: s.assertions,
               attempts: s.attempts,
+              path: s.path,
+              depth: s.depth,
               errorKind: s.errorKind,
               healedLocator: s.healedLocator,
             },

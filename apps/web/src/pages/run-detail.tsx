@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils';
 
 type LiveStep = {
   position: number;
+  path?: string;
+  depth?: number;
   type: string;
   label: string;
   status: string;
@@ -342,6 +344,9 @@ function ItemPanel({
             const row = s as StepResultRow;
             const extra = row.responseJson;
             const expandable = !!(extra?.assertions?.length || extra?.healedLocator || s.screenshotPath);
+            const live = s as LiveStep;
+            const depth = live.depth ?? extra?.depth ?? 0;
+            const num = live.path ?? extra?.path ?? String(s.position + 1);
             return (
               <li
                 key={s.position}
@@ -353,11 +358,12 @@ function ItemPanel({
               >
                 <button
                   className="flex w-full items-center gap-2.5 px-2.5 py-1.5 text-left text-sm"
+                  style={{ paddingLeft: 10 + depth * 22 }}
                   onClick={() => expandable && setOpen(open === s.position ? null : s.position)}
                   aria-expanded={open === s.position}
                 >
                   <StatusIcon status={s.status} />
-                  <span className="w-5 text-right font-mono text-xs text-muted">{s.position + 1}</span>
+                  <span className="min-w-5 text-right font-mono text-xs text-muted">{num}</span>
                   <L.icon className="h-3.5 w-3.5 shrink-0" style={{ color: L.color }} />
                   <span className="min-w-0 flex-1 truncate">
                     {s.label || s.type}

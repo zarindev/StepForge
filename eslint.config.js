@@ -26,7 +26,24 @@ export default tseslint.config(
     },
   },
   {
+    // Runs inside the recorded browser page, not in Node.
+    files: ['packages/recorder/src/injected.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        location: 'readonly',
+        CSS: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        Promise: 'readonly',
+      },
+    },
+  },
+  {
     files: ['**/*.{js,mjs}'],
-    languageOptions: { globals: { process: 'readonly', console: 'readonly', URL: 'readonly', setTimeout: 'readonly' } },
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly', URL: 'readonly', setTimeout: 'readonly' },
+    },
   },
 );

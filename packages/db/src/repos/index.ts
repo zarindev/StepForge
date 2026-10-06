@@ -4,3 +4,4 @@ export * from './environments.ts';
 export * from './modules.ts';
 export * from './tags.ts';
 export * from './scenarios.ts';
+export * from './blocks.ts';

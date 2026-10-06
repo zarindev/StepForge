@@ -68,11 +68,10 @@ describe('util executor', () => {
     expect(() => runSandboxed('while(true){}', { vars: {}, data: {}, env: {} }, 200)).toThrow(/timed out/);
   });
 
-  it('script errors make the test broken, control flow is reported as unsupported', async () => {
+  it('script errors make the test broken', async () => {
     expect(
       (await run(steps({ type: 'util.runScript', params: { code: 'throw new Error("boom")' } }))).errorKind,
     ).toBe('script');
-    expect((await run(steps({ type: 'util.loop' }))).errorKind).toBe('unsupported');
   });
 
   it('generators produce plausible values', () => {

@@ -161,7 +161,8 @@ class UtilSession implements ExecutorSession {
       case 'loop':
       case 'callScenario':
       case 'useBlock':
-        throw new StepError('unsupported', `util.${name} (control flow) arrives in Phase 4`);
+        // Control flow is interpreted by the engine and never reaches an executor.
+        throw new StepError('unsupported', `util.${name} must be run by the StepForge engine`);
       default:
         throw new StepError('unsupported', `Unknown utility step "${step.type}"`);
     }

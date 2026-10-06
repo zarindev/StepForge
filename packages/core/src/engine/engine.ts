@@ -1,4 +1,4 @@
-import { stepGroupOf, type Step, type StepGroup } from '../schemas/steps.ts';
+import { Step, stepGroupOf, type StepGroup } from '../schemas/steps.ts';
 import { VariableResolutionError, VariableResolver } from '../variables.ts';
 import { evaluateAssertion } from './assertions.ts';
 import {
@@ -18,9 +18,11 @@ import {
   type TestContext,
 } from './types.ts';
 
+type InputStep = Step & { id: string };
+
 export type RunTestCaseInput = {
   runId: string;
-  steps: (Step & { id: string })[];
+  steps: InputStep[];
   data?: Record<string, unknown>;
   env?: Record<string, unknown>;
   secrets?: Record<string, string>;
@@ -29,7 +31,16 @@ export type RunTestCaseInput = {
   artifactsDir: string;
   signal?: AbortSignal;
   onEvent?: (e: EngineEvent) => void;
+  /** Resolves `util.callScenario` targets. */
+  loadScenarioSteps?: (scenarioId: string) => InputStep[] | Promise<InputStep[]>;
+  /** Resolves `util.useBlock` targets. */
+  loadBlockSteps?: (blockId: string) => InputStep[] | Promise<InputStep[]>;
 };
+
+/** Control-flow steps are interpreted by the engine itself, not by an executor. */
+export const CONTROL_STEP_TYPES = new Set(['util.if', 'util.loop', 'util.callScenario', 'util.useBlock']);
+const MAX_LOOP_ITERATIONS = 1000;
+const MAX_CALL_DEPTH = 5;
 
 function classify(err: unknown): { kind: StepErrorKind; message: string } {
   if (err instanceof StepError || (err as { name?: string })?.name === 'StepError') {
@@ -58,11 +69,16 @@ function withTimeout<T>(p: Promise<T>, ms: number, signal: AbortSignal): Promise
   });
 }
 
-/** Resolves placeholders in everything an executor reads. */
+/** Resolves placeholders in everything an executor reads (nested step lists are resolved when they run). */
 function resolveStep(step: RunnableStep, r: VariableResolver): RunnableStep {
+  const { steps: nested, else: elseSteps, ...rest } = step.params as Record<string, unknown>;
   return {
     ...step,
-    params: r.resolve(step.params),
+    params: {
+      ...r.resolve(rest),
+      ...(nested !== undefined && { steps: nested }),
+      ...(elseSteps !== undefined && { else: elseSteps }),
+    },
     locators: step.locators.map((l) => ({
       ...l,
       value: String(r.resolve(l.value)),
@@ -72,9 +88,25 @@ function resolveStep(step: RunnableStep, r: VariableResolver): RunnableStep {
   };
 }
 
+/** Parses nested step lists from control-step params, giving each child a stable runtime id. */
+function childSteps(raw: unknown, parentId: string, key: string): InputStep[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((s, i) => {
+    const parsed = Step.safeParse(s);
+    if (!parsed.success) {
+      throw new StepError(
+        'invalid_params',
+        `Nested step ${i + 1}: ${parsed.error.issues.map((x) => x.message).join('; ')}`,
+      );
+    }
+    return { ...parsed.data, id: (s as { id?: string }).id ?? `${parentId}:${key}${i}` };
+  });
+}
+
 /**
- * Runs one test case: every step in order, with per-step retries and timeouts, assertions,
- * `captureAs`, soft failures (`continueOnFail`) and secret masking. Shared by the server and the CLI.
+ * Runs one test case: every step in order (including nested control flow), with per-step retries and
+ * timeouts, assertions, `captureAs`, soft failures (`continueOnFail`) and secret masking.
+ * Shared by the server and the CLI.
  */
 export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResult> {
   const started = Date.now();
@@ -110,39 +142,73 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
   };
 
   const results: StepResult[] = [];
+  let counter = 0;
   let firstFailure: { stepId: string; kind: StepErrorKind; message: string } | undefined;
   let stopped = false;
 
-  for (const [position, raw] of input.steps.entries()) {
-    const step: RunnableStep = { ...raw, position };
-    const base = { stepId: step.id, position, type: step.type, label: step.label ?? '' };
-    if (!step.enabled || stopped || signal.aborted) {
-      const message = !step.enabled
-        ? 'Disabled'
-        : signal.aborted
-          ? 'Run cancelled'
-          : 'Skipped after an earlier failure';
-      const r: StepResult = {
-        ...base,
-        status: 'skipped',
-        attempts: 0,
-        durationMs: 0,
-        message,
-        assertions: [],
+  const record = (r: StepResult) => {
+    results.push(r);
+    emit({ type: 'step.finished', result: r });
+    if ((r.status === 'failed' || r.status === 'broken') && !CONTROL_STEP_TYPES.has(r.type)) {
+      firstFailure ??= {
+        stepId: r.stepId,
+        kind: (r.errorKind ?? 'unknown') as StepErrorKind,
+        message: r.message ?? '',
       };
-      results.push(r);
-      emit({ type: 'step.finished', result: r });
-      continue;
     }
+  };
 
-    emit({ type: 'step.started', stepId: step.id, position, stepType: step.type, label: base.label });
+  /** Runs a list of steps; returns false if a hard failure stopped execution. */
+  const runList = async (
+    list: InputStep[],
+    prefix: string,
+    depth: number,
+    callDepth: number,
+  ): Promise<boolean> => {
+    for (const [i, raw] of list.entries()) {
+      const path = prefix ? `${prefix}.${i + 1}` : String(i + 1);
+      const position = counter++;
+      const step: RunnableStep = { ...raw, position };
+      const base = { stepId: step.id, position, path, depth, type: step.type, label: step.label ?? '' };
+      if (!step.enabled || stopped || signal.aborted) {
+        const message = !step.enabled
+          ? 'Disabled'
+          : signal.aborted
+            ? 'Run cancelled'
+            : 'Skipped after an earlier failure';
+        record({ ...base, status: 'skipped', attempts: 0, durationMs: 0, message, assertions: [] });
+        continue;
+      }
+      emit({
+        type: 'step.started',
+        stepId: step.id,
+        position,
+        path,
+        depth,
+        stepType: step.type,
+        label: base.label,
+      });
+      const result = CONTROL_STEP_TYPES.has(step.type)
+        ? await runControl(step, base, callDepth)
+        : await runLeaf(step, base);
+      record(result);
+      if (result.status === 'failed' || result.status === 'broken') {
+        if (!step.continueOnFail) stopped = true;
+      }
+    }
+    return !stopped;
+  };
+
+  const runLeaf = async (
+    step: RunnableStep,
+    base: Omit<StepResult, 'status' | 'attempts' | 'durationMs' | 'assertions'>,
+  ): Promise<StepResult> => {
     const stepStarted = Date.now();
     const maxAttempts = step.retries + 1;
     const timeoutMs = step.timeoutMs ?? input.options.defaultTimeoutMs;
     let result: StepResult | undefined;
-
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const stepCtx: StepContext = { ...ctx, timeoutMs, stepIndex: position };
+      const stepCtx: StepContext = { ...ctx, timeoutMs, stepIndex: step.position };
       const assertions: AssertionResult[] = [];
       let session: ExecutorSession | undefined;
       let resolved: RunnableStep = step;
@@ -177,7 +243,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         const { kind, message } = classify(err);
         const retryable = attempt < maxAttempts && !BROKEN_KINDS.has(kind) && kind !== 'aborted';
         if (retryable) {
-          ctx.log('warn', `Step ${position + 1} failed (attempt ${attempt}/${maxAttempts}): ${message}`);
+          ctx.log('warn', `Step ${base.path} failed (attempt ${attempt}/${maxAttempts}): ${message}`);
           continue;
         }
         let evidence: Awaited<ReturnType<NonNullable<ExecutorSession['onStepFailed']>>> = {};
@@ -203,18 +269,118 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         break;
       }
     }
+    return result!;
+  };
 
-    results.push(result!);
-    emit({ type: 'step.finished', result: result! });
-    if (result!.status === 'failed' || result!.status === 'broken') {
-      firstFailure ??= {
-        stepId: step.id,
-        kind: (result!.errorKind ?? 'unknown') as StepErrorKind,
-        message: result!.message ?? '',
-      };
-      if (!step.continueOnFail) stopped = true;
+  const runControl = async (
+    step: RunnableStep,
+    base: Omit<StepResult, 'status' | 'attempts' | 'durationMs' | 'assertions'>,
+    callDepth: number,
+  ): Promise<StepResult> => {
+    const t0 = Date.now();
+    const done = (
+      status: StepResult['status'],
+      message: string,
+      errorKind?: StepErrorKind,
+      assertions: AssertionResult[] = [],
+    ): StepResult => ({
+      ...base,
+      status,
+      attempts: 1,
+      durationMs: Date.now() - t0,
+      message: resolver.mask(message),
+      errorKind,
+      assertions,
+    });
+    try {
+      const resolved = resolveStep(step, resolver);
+      const p = resolved.params as Record<string, unknown>;
+      const failedBefore = results.length;
+      const childFailed = () =>
+        results
+          .slice(failedBefore)
+          .some((r) => (r.status === 'failed' || r.status === 'broken') && !CONTROL_STEP_TYPES.has(r.type));
+
+      if (step.type === 'util.if') {
+        const c = (p.condition ?? {}) as { value?: unknown; operator?: string; expected?: unknown };
+        const check = evaluateAssertion(
+          { target: 'condition', operator: (c.operator ?? 'equals') as never, expected: c.expected },
+          c.value,
+        );
+        const branch = check.passed ? childSteps(p.steps, step.id, 't') : childSteps(p.else, step.id, 'e');
+        const which = check.passed ? 'then' : 'else';
+        await runList(branch, `${base.path}${check.passed ? '' : 'e'}`, base.depth + 1, callDepth);
+        const msg = `Condition ${check.passed ? 'true' : 'false'} → ${which} (${branch.length} step${branch.length === 1 ? '' : 's'})`;
+        return childFailed()
+          ? done('failed', `${msg}; a nested step failed`, 'assertion')
+          : done('passed', msg);
+      }
+
+      if (step.type === 'util.loop') {
+        const children = childSteps(p.steps, step.id, 'l');
+        const as = typeof p.as === 'string' && p.as ? p.as : 'item';
+        let items: unknown[];
+        if (p.over !== undefined) {
+          if (!Array.isArray(p.over))
+            throw new StepError('invalid_params', 'loop "over" must resolve to an array');
+          items = p.over;
+        } else {
+          const count = Number(p.count ?? 1);
+          if (!Number.isInteger(count) || count < 0)
+            throw new StepError('invalid_params', 'loop "count" must be a non-negative integer');
+          items = Array.from({ length: count }, (_, i) => i + 1);
+        }
+        if (items.length > MAX_LOOP_ITERATIONS)
+          throw new StepError('invalid_params', `loop is limited to ${MAX_LOOP_ITERATIONS} iterations`);
+        let ran = 0;
+        for (const [i, item] of items.entries()) {
+          if (stopped || signal.aborted) break;
+          resolver.setVar(as, item);
+          resolver.setVar('index', i);
+          await runList(children, `${base.path}[${i + 1}]`, base.depth + 1, callDepth);
+          ran++;
+        }
+        const msg = `Ran ${ran}/${items.length} iteration(s)`;
+        return childFailed()
+          ? done('failed', `${msg}; a nested step failed`, 'assertion')
+          : done('passed', msg);
+      }
+
+      // callScenario / useBlock
+      if (callDepth >= MAX_CALL_DEPTH)
+        throw new StepError(
+          'invalid_params',
+          `Calls nested deeper than ${MAX_CALL_DEPTH} levels (recursion?)`,
+        );
+      const isBlock = step.type === 'util.useBlock';
+      const targetId = String(isBlock ? (p.blockId ?? '') : (p.scenarioId ?? ''));
+      if (!targetId)
+        throw new StepError('invalid_params', `${step.type} needs "${isBlock ? 'blockId' : 'scenarioId'}"`);
+      const loader = isBlock ? input.loadBlockSteps : input.loadScenarioSteps;
+      if (!loader) throw new StepError('unsupported', `${step.type} is not available in this context`);
+      let target: InputStep[];
+      try {
+        target = (await loader(targetId)).map((s) => ({ ...s, id: `${step.id}>${s.id}` }));
+      } catch (err) {
+        throw new StepError(
+          'invalid_params',
+          `Cannot load ${isBlock ? 'block' : 'scenario'} "${targetId}": ${(err as Error).message}`,
+        );
+      }
+      await runList(target, base.path, base.depth + 1, callDepth + 1);
+      const msg = `Ran ${isBlock ? 'block' : 'scenario'} (${target.length} steps)`;
+      return childFailed()
+        ? done('failed', `${msg}; a nested step failed`, 'assertion')
+        : done('passed', msg);
+    } catch (err) {
+      const { kind, message } = classify(err);
+      const status = BROKEN_KINDS.has(kind) ? 'broken' : 'failed';
+      firstFailure ??= { stepId: step.id, kind, message };
+      return done(status, message, kind);
     }
-  }
+  };
+
+  await runList(input.steps, '', 0, 0);
 
   const failed = !!firstFailure;
   const artifacts: ArtifactRef[] = [];

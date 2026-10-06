@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- Phase 4 recorder and editor: Shadow-DOM recorder toolbar with assert/extract/mask/insert, ranked
+  locators, auto-masked secrets, tab/dialog/iframe handling and network capture → API steps; control flow
+  (if/loop/callScenario/useBlock) and reusable blocks; list/flow/plain-English views, typed step forms, locator
+  editor, Monaco; rule-based test case variants; move module.
 - Phase 3 execution: scenario engine, Playwright UI executor with self-healing locators, utility steps, persisted
   runner with workers/retries/flaky detection/cancel/resume, live run view, results with screenshots, video,
   embedded Trace Viewer, console and network logs; CareClinic demo app.
