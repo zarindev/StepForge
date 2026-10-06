@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  --color-brand: #f97316;
+  --color-brand-hover: #fb923c;
+  --color-indigo: #6366f1;
+  --color-pass: #22c55e;
+  --color-fail: #ef4444;
+  --color-warn: #eab308;
+  --color-skip: #64748b;
+
+  /* Semantic surfaces, swapped per theme below */
+  --color-bg: var(--sf-bg);
+  --color-surface: var(--sf-surface);
+  --color-elevated: var(--sf-elevated);
+  --color-border: var(--sf-border);
+  --color-fg: var(--sf-fg);
+  --color-muted: var(--sf-muted);
+
+  --radius-xl: 12px;
+}
+
+:root {
+  --sf-bg: #f7f7f9;
+  --sf-surface: #ffffff;
+  --sf-elevated: #ffffff;
+  --sf-border: rgb(15 23 42 / 0.09);
+  --sf-fg: #0f172a;
+  --sf-muted: #64748b;
+  color-scheme: light;
+}
+
+.dark {
+  --sf-bg: #0b0d12;
+  --sf-surface: #11141b;
+  --sf-elevated: #161a23;
+  --sf-border: rgb(255 255 255 / 0.07);
+  --sf-fg: #e7e9ee;
+  --sf-muted: #8b93a7;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--sf-bg);
+  color: var(--sf-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgb(249 115 22 / 0.35);
+}
+
+.glass {
+  background: color-mix(in srgb, var(--sf-elevated) 82%, transparent);
+  backdrop-filter: blur(14px);
+}
