@@ -83,7 +83,8 @@ export const TestTechnique = z.enum([
   'other',
 ]);
 export const TestCaseInput = z.object({
-  code: z.string().min(1).max(40),
+  /** Optional: generated as TC-<MODULE>-NNN when omitted. */
+  code: z.string().min(1).max(40).optional(),
   title: z.string().min(1).max(200),
   data: z.record(z.string(), z.unknown()).default({}),
   expectedResult: z.string().max(5000).default(''),
@@ -95,3 +96,48 @@ export const TestCaseInput = z.object({
 export const RunStatus = z.enum(['queued', 'running', 'passed', 'failed', 'interrupted', 'cancelled']);
 export const RunItemStatus = z.enum(['passed', 'failed', 'broken', 'skipped', 'flaky']);
 export const RunTrigger = z.enum(['manual', 'schedule', 'cli', 'retry']);
+
+// ─── Update / action schemas (Phase 2) ─────────────────────────────────────
+
+export const ApplicationUpdate = ApplicationInput.partial().extend({ archived: z.boolean().optional() });
+export const EnvironmentUpdate = EnvironmentInput.partial();
+export const ModuleUpdate = z.object({
+  name: z.string().min(1).max(120).optional(),
+  description: z.string().max(2000).optional(),
+  parentId: z.string().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+export const ScenarioUpdate = ScenarioInput.partial().extend({ moduleId: z.string().optional() });
+export const TestCaseUpdate = TestCaseInput.partial();
+export const TagInput = z.object({
+  name: z.string().min(1).max(40),
+  color: HexColor.default('#6366F1'),
+});
+export const TagUpdate = TagInput.partial();
+
+export const BulkScenarioAction = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('delete'), ids: z.array(z.string()).min(1) }),
+  z.object({ action: z.literal('duplicate'), ids: z.array(z.string()).min(1) }),
+  z.object({ action: z.literal('move'), ids: z.array(z.string()).min(1), moduleId: z.string() }),
+  z.object({ action: z.literal('addTag'), ids: z.array(z.string()).min(1), tagId: z.string() }),
+  z.object({ action: z.literal('removeTag'), ids: z.array(z.string()).min(1), tagId: z.string() }),
+  z.object({
+    action: z.literal('setStatus'),
+    ids: z.array(z.string()).min(1),
+    status: ScenarioStatus,
+  }),
+]);
+export type BulkScenarioAction = z.infer<typeof BulkScenarioAction>;
+
+/** Turns a display name into a URL-safe slug. */
+export function slugify(name: string): string {
+  return (
+    name
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 64) || 'app'
+  );
+}

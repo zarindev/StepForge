@@ -1,4 +1,10 @@
-import { randomInt, randomUUID } from 'node:crypto';
+// Web Crypto (Node 20+ and browsers) so this module also runs in the dashboard.
+const randomUUID = (): string => globalThis.crypto.randomUUID();
+const randomInt = (min: number, max: number): number => {
+  const buf = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(buf);
+  return min + ((buf[0] ?? 0) % (max - min));
+};
 
 /**
  * Variable resolution for `{{scope.path}}` placeholders (Section 5).

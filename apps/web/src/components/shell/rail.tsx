@@ -13,7 +13,8 @@ export function Rail() {
         <img src="/logo.svg" alt="" className="h-8 w-8 drop-shadow-[0_0_12px_rgb(249_115_22/0.45)]" />
       </Link>
       {NAV.map((item) => {
-        const active = item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
+        const active =
+          item.to === '/' ? pathname === '/' : pathname === item.to || pathname.startsWith(`${item.to}/`);
         const last = item.to === '/settings';
         return (
           <Link

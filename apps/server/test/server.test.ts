@@ -1,26 +1,12 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildApp } from '../src/app.ts';
+import type { buildApp } from '../src/app.ts';
 import { isAllowedHost, tokensMatch } from '../src/security.ts';
+import { H, TOKEN, testServer } from './helpers.ts';
 
-const TOKEN = 'test-token-123';
-const H = { host: '127.0.0.1:4400', 'x-stepforge-token': TOKEN };
 let app: Awaited<ReturnType<typeof buildApp>>['app'];
 
 beforeAll(async () => {
-  const dataDir = mkdtempSync(join(tmpdir(), 'sf-server-'));
-  ({ app } = await buildApp({
-    token: TOKEN,
-    config: {
-      dataDir,
-      dbFile: ':memory:',
-      artifactsDir: join(dataDir, 'a'),
-      keyFile: join(dataDir, '.key'),
-      webDist: join(dataDir, 'no-web'),
-    },
-  }));
+  ({ app } = await testServer());
 });
 afterAll(async () => app.close());
 
