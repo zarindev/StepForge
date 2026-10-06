@@ -14,6 +14,7 @@ import * as repo from '@stepforge/db/repos';
 import { createApiExecutor } from '@stepforge/executor-api';
 import { createDbExecutor } from '@stepforge/executor-db';
 import { createEmailExecutor } from '@stepforge/executor-email';
+import { applicationGates, refreshDaily } from '@stepforge/analytics';
 import { createPerfExecutor } from '@stepforge/executor-perf';
 import type { LoadReport } from '@stepforge/perf';
 import { createUiExecutor, BrowserPool } from '@stepforge/executor-ui';
@@ -585,6 +586,26 @@ export class RunManager {
       })
       .where(eq(schema.runs.id, runId))
       .run();
+    if (status !== 'cancelled') {
+      // Analytics: refresh the day's aggregates and record the quality-gate verdict for this run.
+      try {
+        refreshDaily(this.db, run.applicationId, finishedAt.slice(0, 10));
+        const gates = applicationGates(this.db, run.applicationId, runId);
+        this.db
+          .update(schema.runs)
+          .set({ qualityGateJson: gates.gates.length ? gates : null })
+          .where(eq(schema.runs.id, runId))
+          .run();
+        this.bus.publish({ type: 'analytics.updated', applicationId: run.applicationId, runId });
+      } catch (err) {
+        this.bus.publish({
+          type: 'run.log',
+          runId,
+          level: 'warn',
+          message: `Analytics update failed: ${(err as Error).message}`,
+        });
+      }
+    }
     this.publishRun(runId);
   }
 }

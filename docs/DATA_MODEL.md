@@ -61,3 +61,8 @@ Bugs (`bugs`) keep `scenario_id`, `test_case_id`, `failed_step_id` and `category
 that found them is deleted; `fingerprint` = hash of scenario + failing step + diagnosis category (deduplication);
 `last_seen_at` is updated on each occurrence. The diagnosis of a failed run item is stored in
 `run_items.diagnosis_json`.
+
+`analytics_daily` holds one row per application and UTC day (runs, results, passed, failed, flaky, average run
+duration, API p95), recomputed after every run; it is derived data and is rebuilt automatically if empty.
+`quality_gates.rules_json` stores the gate rules; each completed run stores its gate verdict in
+`runs.quality_gate_json`.

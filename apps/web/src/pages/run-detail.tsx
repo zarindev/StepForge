@@ -5,7 +5,7 @@ import { ResultsGrid } from '@/components/database/results-grid';
 import { EmailPreview } from '@/components/email/email-preview';
 import { DiagnosisPanel } from '@/components/diagnosis/diagnosis-panel';
 import { PerfPanel, type StepPerf } from '@/components/perf/perf-panel';
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, Ban, Bandage, ChevronRight, FolderTree, Play, RotateCw, Terminal } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { EvidencePanel, Lightbox } from '@/components/runs/evidence';
@@ -47,7 +47,8 @@ function itemTitle(i: RunItem) {
 export function RunDetailPage() {
   const { runId } = useParams({ from: '/runs/$runId' });
   const run = useRun(runId);
-  const [selected, setSelected] = useState<string | null>(null);
+  const { item: linkedItem } = useSearch({ from: '/runs/$runId' });
+  const [selected, setSelected] = useState<string | null>(linkedItem ?? null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
   const [live, setLive] = useState<Record<string, { steps: LiveStep[]; current?: LiveStep }>>({});
   const [logs, setLogs] = useState<LogLine[]>([]);

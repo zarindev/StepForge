@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { Archive, ArrowLeft, FolderTree, Pencil, ShieldAlert, Trash2 } from 'lucide-react';
+import { Archive, ArrowLeft, BarChart3, FolderTree, Pencil, ShieldAlert, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { AppAvatar, AppFormDialog, type AppFormValues } from '@/components/applications/app-form';
 import { BlocksTab } from '@/components/applications/blocks-tab';
@@ -92,6 +92,11 @@ export function ApplicationDetailPage() {
           <Button variant="outline" onClick={() => setEditing(true)}>
             <Pencil className="h-4 w-4" /> Edit
           </Button>
+          <Link to="/applications/$appId/analytics" params={{ appId: a.id }}>
+            <Button variant="outline">
+              <BarChart3 className="h-4 w-4" /> Analytics
+            </Button>
+          </Link>
           <Link to="/explorer" onClick={() => setCurrentAppId(a.id)}>
             <Button>
               <FolderTree className="h-4 w-4" /> Open test tree

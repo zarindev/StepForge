@@ -13,11 +13,29 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 7 | Email (Mailpit + IMAP), OTP/link extraction | ✅ Done |
 | 8 | Performance (metrics, Lighthouse, load, k6, query plans) | ✅ Done |
 | 9 | Diagnosis engine, bug reports, report exports | ✅ Done |
-| 10 | Analytics, quality gates, run comparison, flaky detection | ⏳ Next |
-| 11 | Scheduler, CLI, notifications, JUnit/HTML | — |
+| 10 | Analytics, quality gates, run comparison, flaky detection | ✅ Done |
+| 11 | Scheduler, CLI, notifications, JUnit/HTML | ⏳ Next |
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 10 — Analytics, quality gates and run comparison (2026-10-06)
+
+**Delivered**
+- **`@stepforge/analytics`**: daily aggregates (`analytics_daily`, refreshed after every run and rebuilt once for older databases), Home summary (KPIs, 30-day trend, gate status per application, recent runs), application analytics (by module, layer, tag, environment; failure categories from diagnoses; top failing tests with the latest failing result for drill-down; slowest tests; flaky tests; API response time and page LCP per day; load results; 12-month calendar), **flaky detection** (retry passes, or pass/fail flips across runs of the same scenario version), **quality gates** (pass rate overall / by priority / by tag, open bugs by severity, flaky rate, API p95, load p95, page LCP p75, run duration; block or warn; "no data" handling; recommended "Release readiness" gate) and **run comparison** (fixed, new failures, still failing, still passing, added/removed, performance deltas per test and metric).
+- **Runner:** every completed run refreshes the day's aggregates and stores its gate verdict (`runs.quality_gate_json`); live `analytics.updated` events refresh Home.
+- **Server:** `/api/analytics/home`, `/api/applications/:id/analytics`, quality-gate CRUD and status, `/api/runs/compare`.
+- **Dashboard:** new **Home** (8 KPIs, stacked daily results, quality gates with unmet rules, recent runs, upcoming schedules; welcome panel until the first run), **Analytics** page per application (period and environment filters, gate editor, breakdown bars, top failing / flaky / slowest with drill-down to the failing test, performance charts, calendar heatmap), **Compare runs** page; run results can open a specific test (`?item=`).
+- **Diagnosis tweak:** the generic "expected X, got Y" rule now ranks below specific HTTP status rules, so a 500 is reported as a server crash rather than a wrong status.
+- `docs/ANALYTICS.md`.
+- No demo-app changes.
+
+**Verified**
+- `npm test`: 267 tests (18 skipped: external database servers). New: 5 analytics unit tests on fixture histories (daily aggregates and rebuild, Home KPIs and trend, breakdowns, top failing, slowest, flaky detection incl. "edited, not flaky", gate statuses green/amber/red/unknown with real values, run comparison and perf deltas); 3 server tests.
+- **Done-when check:** four real runs against a local service (a stable endpoint, one that alternates 200/500, and one whose bug gets fixed) populate Home (4 runs, 66.7% pass rate, today's 8 passed / 4 failed, recent runs, the gate), application analytics (breakdowns by layer and tag, `server_error` failure category, top failing tests linked to their failing results, the alternating test detected as flaky with history passed/failed/passed/failed, the fixed test not flagged), quality gates (evaluated per run, edited, deleted) and run comparison (fixed: "Place an order", new failure: "Search results").
+- `npm run test:e2e`: 16 tests. The Phase 10 E2E runs two API scenarios twice against CareClinic, checks Home (trend, recent runs, KPIs, gates), opens application analytics from Home, adds the recommended gate (warning shown), drills down from top failing tests to the failing test's diagnosis, and compares the two runs.
 
 ---
 

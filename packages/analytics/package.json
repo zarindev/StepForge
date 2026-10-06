@@ -1,0 +1,15 @@
+{
+  "name": "@stepforge/analytics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@stepforge/core": "*",
+    "@stepforge/db": "*",
+    "drizzle-orm": "^0.45.3",
+    "zod": "^4.1.0"
+  }
+}

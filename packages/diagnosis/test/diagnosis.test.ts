@@ -126,7 +126,8 @@ describe('diagnoses (fixtures)', () => {
       'app',
     ],
     // Other categories from the spec:
-    ['500', input(api(500, 200)), 'wrong_status', 'app'],
+    ['500', input(api(500, 200)), 'server_error', 'app'],
+    ['unexpected 302', input(api(302, 200)), 'wrong_status', 'app'],
     [
       '401 without expectation',
       input(api(401, undefined, { errorKind: 'assertion', message: 'x' })),
