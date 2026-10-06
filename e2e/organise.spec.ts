@@ -161,13 +161,15 @@ test.describe.serial('organise a test tree (Phase 2)', () => {
 
     // delete application requires typing its name
     await page.goto('/applications');
-    await page.getByRole('link', { name: /CareClinic/ }).click();
+    const clinicCard = page.getByRole('link').filter({ has: page.getByText('careclinic', { exact: true }) });
+    await clinicCard.click();
     await page.getByRole('tab', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
     const confirm = page.getByRole('dialog', { name: 'Delete CareClinic?' });
     await expect(confirm.getByRole('button', { name: 'Delete' })).toBeDisabled();
     await confirm.getByLabel('Confirmation text').fill('CareClinic');
     await confirm.getByRole('button', { name: 'Delete' }).click();
-    await expect(page.getByText('No applications yet')).toBeVisible();
+    await expect(page).toHaveURL(/\/applications$/);
+    await expect(clinicCard).toHaveCount(0);
   });
 });

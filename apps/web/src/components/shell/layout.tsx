@@ -1,5 +1,6 @@
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
+import { RunDialogHost } from '@/components/runs/run-dialog';
 import { Toaster } from '@/components/ui/toast';
 import { NAV } from '@/lib/nav';
 import { useLiveInvalidation } from '@/lib/queries';
@@ -64,6 +65,7 @@ export function Layout() {
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
       <ShortcutsOverlay open={shortcuts} onClose={() => setShortcuts(false)} />
       <Toaster />
+      <RunDialogHost />
     </div>
   );
 }

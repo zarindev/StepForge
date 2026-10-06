@@ -18,9 +18,9 @@ test.describe('dashboard shell', () => {
 
   test('rail navigation and placeholder pages', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: 'Runs' }).click();
-    await expect(page).toHaveURL(/\/runs$/);
-    await expect(page.getByText('Runs is coming in Phase 3')).toBeVisible();
+    await page.getByRole('link', { name: 'Schedules' }).click();
+    await expect(page).toHaveURL(/\/schedules$/);
+    await expect(page.getByText('Schedules is coming in Phase 11')).toBeVisible();
     // deep links work through the SPA fallback
     await page.goto('/bugs');
     await expect(page.getByRole('heading', { name: 'Bugs', exact: true })).toBeVisible();

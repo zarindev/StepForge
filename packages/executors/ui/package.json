@@ -1,0 +1,16 @@
+{
+  "name": "@stepforge/executor-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@stepforge/core": "*",
+    "playwright": "1.63.0"
+  },
+  "devDependencies": {
+    "@stepforge/executor-util": "*"
+  }
+}

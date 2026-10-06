@@ -21,16 +21,25 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
   ],
-  webServer: {
-    command: 'npm start',
-    url: `http://127.0.0.1:${PORT}/api/health`,
-    reuseExistingServer: false,
-    timeout: 60_000,
-    env: {
-      STEPFORGE_PORT: String(PORT),
-      STEPFORGE_DATA_DIR: dataDir,
-      STEPFORGE_OPEN_BROWSER: '0',
-      STEPFORGE_LOG_LEVEL: 'warn',
+  webServer: [
+    {
+      command: 'npm run start -w @stepforge/demo-clinic',
+      url: 'http://127.0.0.1:8191/api/health',
+      reuseExistingServer: false,
+      timeout: 60_000,
+      env: { CLINIC_PORT: '8191', CLINIC_DB: ':memory:' },
     },
-  },
+    {
+      command: 'npm start',
+      url: `http://127.0.0.1:${PORT}/api/health`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+      env: {
+        STEPFORGE_PORT: String(PORT),
+        STEPFORGE_DATA_DIR: dataDir,
+        STEPFORGE_OPEN_BROWSER: '0',
+        STEPFORGE_LOG_LEVEL: 'warn',
+      },
+    },
+  ],
 });

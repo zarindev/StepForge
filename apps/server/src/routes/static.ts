@@ -30,10 +30,15 @@ export async function registerStaticRoutes(app: FastifyInstance, ctx: AppContext
   const sendIndex = (reply: FastifyReply) =>
     reply.header('cache-control', 'no-store').type('text/html').send(html);
 
-  await app.register(fastifyStatic, { root: ctx.config.webDist, index: false, wildcard: false });
+  await app.register(fastifyStatic, {
+    root: ctx.config.webDist,
+    index: false,
+    wildcard: false,
+    decorateReply: false,
+  });
   app.get('/', async (_req, reply) => sendIndex(reply));
   app.setNotFoundHandler(async (req, reply) => {
-    if (req.url.startsWith('/api/'))
+    if (req.url.startsWith('/api/') || req.url.startsWith('/trace-viewer/'))
       return reply.code(404).send({ error: 'not_found', message: 'No such endpoint' });
     // Static assets are served by @fastify/static; everything else is a client-side route.
     if (req.method === 'GET' && !/\.[a-z0-9]+$/i.test(req.url.split('?')[0] ?? '')) return sendIndex(reply);

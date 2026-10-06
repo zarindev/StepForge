@@ -1,5 +1,7 @@
 import { Play, Search } from 'lucide-react';
 import { AppSwitcher } from './app-switcher';
+import { openRunDialog } from '@/components/runs/run-dialog';
+import { useCurrentApp } from '@/lib/queries';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { useLiveConnected } from '@/lib/live';
@@ -7,6 +9,7 @@ import { cn } from '@/lib/utils';
 
 export function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const connected = useLiveConnected();
+  const { app } = useCurrentApp();
   return (
     <header className="glass sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border px-5">
       <AppSwitcher />
@@ -28,7 +31,12 @@ export function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
           <span className={cn('h-2 w-2 rounded-full', connected ? 'bg-pass' : 'animate-pulse bg-warn')} />
           {connected ? 'Local' : 'Offline'}
         </span>
-        <Button size="sm" disabled title="Runner arrives in Phase 3">
+        <Button
+          size="sm"
+          disabled={!app}
+          title={app ? `Run tests in ${app.name}` : 'Create an application first'}
+          onClick={() => app && openRunDialog({ applicationId: app.id, label: `Run tests in ${app.name}` })}
+        >
           <Play className="h-3.5 w-3.5 fill-current" /> Run
         </Button>
       </div>

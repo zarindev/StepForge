@@ -68,3 +68,20 @@ describe('database', () => {
     expect(readdirSync(dir)).not.toContain('backups');
   });
 });
+
+describe('migration 0001', () => {
+  it('keeps run history when a scenario is deleted (ON DELETE SET NULL)', async () => {
+    const { db } = openDatabase({ file: ':memory:' });
+    const appId = newId();
+    db.insert(schema.applications).values({ id: appId, name: 'A', slug: 'a' }).run();
+    const modId = newId();
+    db.insert(schema.modules).values({ id: modId, applicationId: appId, name: 'M' }).run();
+    const scId = newId();
+    db.insert(schema.scenarios).values({ id: scId, moduleId: modId, name: 'S' }).run();
+    const runId = newId();
+    db.insert(schema.runs).values({ id: runId, applicationId: appId }).run();
+    db.insert(schema.runItems).values({ id: newId(), runId, scenarioId: scId }).run();
+    db.delete(schema.scenarios).where(eq(schema.scenarios.id, scId)).run();
+    expect(db.select().from(schema.runItems).get()?.scenarioId).toBeNull();
+  });
+});

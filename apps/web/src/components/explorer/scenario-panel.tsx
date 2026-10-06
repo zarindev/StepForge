@@ -1,4 +1,5 @@
 import { Copy, Play, Trash2 } from 'lucide-react';
+import { openRunDialog } from '@/components/runs/run-dialog';
 import { Badge, PRIORITY_TONE, STATUS_TONE } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -73,7 +74,18 @@ export function ScenarioPanel({
           <Button variant="ghost" size="icon" aria-label="Delete scenario" title="Delete" onClick={onDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>
-          <Button size="sm" disabled title="The runner arrives in Phase 3">
+          <Button
+            size="sm"
+            disabled={s.steps.length === 0}
+            title={s.steps.length ? 'Run this scenario' : 'Add steps first'}
+            onClick={() =>
+              openRunDialog({
+                applicationId: s.applicationId,
+                scope: { type: 'scenarios', ids: [s.id] },
+                label: `Run "${s.name}" (${Math.max(1, s.testCases.filter((t) => t.status === 'active').length)} test case(s))`,
+              })
+            }
+          >
             <Play className="h-3.5 w-3.5 fill-current" /> Run
           </Button>
         </div>

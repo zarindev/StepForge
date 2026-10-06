@@ -1,0 +1,19 @@
+{
+  "name": "@stepforge/demo-clinic",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CareClinic: a demo clinic app used to prove StepForge works end to end.",
+  "exports": {
+    ".": "./src/app.ts"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@fastify/formbody": "^8.0.2",
+    "better-sqlite3": "^12.2.0",
+    "fastify": "^5.4.0",
+    "tsx": "^4.20.0"
+  }
+}

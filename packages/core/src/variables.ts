@@ -99,6 +99,11 @@ export class VariableResolver {
     this.scopes.vars[name] = value;
   }
 
+  /** Copy of captured variables with secret values masked. */
+  snapshotVars(): Record<string, unknown> {
+    return JSON.parse(this.mask(JSON.stringify(this.scopes.vars ?? {}))) as Record<string, unknown>;
+  }
+
   /** Replaces every known secret value in `text` with the mask. */
   mask(text: string): string {
     const secrets = new Set([...this.usedSecrets, ...Object.values(this.scopes.secret ?? {})]);

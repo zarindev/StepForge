@@ -141,3 +141,38 @@ export function slugify(name: string): string {
       .slice(0, 64) || 'app'
   );
 }
+
+// ─── Runs (Phase 3) ────────────────────────────────────────────────────────
+
+export const RunScope = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('application') }),
+  z.object({ type: z.literal('module'), id: z.string() }),
+  z.object({ type: z.literal('scenarios'), ids: z.array(z.string()).min(1) }),
+  z.object({ type: z.literal('testCases'), ids: z.array(z.string()).min(1) }),
+  z.object({ type: z.literal('tag'), id: z.string() }),
+]);
+export type RunScope = z.infer<typeof RunScope>;
+
+export const EvidenceModeSchema = z.enum(['off', 'onFailure', 'always']);
+export const RunOptionsInput = z.object({
+  browser: BrowserName.default('chromium'),
+  viewport: z.enum(['desktop', 'tablet', 'mobile']).default('desktop'),
+  headed: z.boolean().default(false),
+  workers: z.number().int().min(1).max(8).default(1),
+  retries: z.number().int().min(0).max(3).default(0),
+  stopOnFirstFailure: z.boolean().default(false),
+  video: EvidenceModeSchema.default('onFailure'),
+  trace: EvidenceModeSchema.default('onFailure'),
+  screenshots: z.enum(['off', 'onFailure', 'everyStep']).default('everyStep'),
+  timeoutMs: z.number().int().min(1000).max(600_000).optional(),
+});
+export type RunOptionsInput = z.infer<typeof RunOptionsInput>;
+
+export const CreateRunInput = z.object({
+  applicationId: z.string(),
+  environmentId: z.string(),
+  scope: RunScope,
+  options: RunOptionsInput.default(RunOptionsInput.parse({})),
+  trigger: RunTrigger.default('manual'),
+});
+export type CreateRunInput = z.infer<typeof CreateRunInput>;
