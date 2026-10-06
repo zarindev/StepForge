@@ -11,6 +11,7 @@ import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Browser, BrowserContext, Dialog, Locator, Page } from 'playwright';
 import { buildLocator, resolveLocator, type Resolved, type Scope } from './locators.ts';
+import { checkPageMetrics, collectPageMetrics, WEB_VITALS_INIT_SCRIPT } from '@stepforge/perf';
 
 type NetworkEntry = {
   method: string;
@@ -67,6 +68,8 @@ export class UiSession implements ExecutorSession {
       ignoreHTTPSErrors: true,
       ...(o.video !== 'off' && { recordVideo: { dir: this.videoDir, size: o.viewport } }),
     });
+    // Web Vitals for perf.pageMetrics and per-navigation metrics; scoped, adds no page globals besides a hidden store.
+    await this.context.addInitScript(WEB_VITALS_INIT_SCRIPT);
     if (o.trace !== 'off')
       await this.context.tracing.start({ screenshots: true, snapshots: true, sources: false });
     this.context.on('page', (p) => this.track(p));
@@ -156,6 +159,11 @@ export class UiSession implements ExecutorSession {
           };
           const status = res?.status();
           outcome.getTarget = (t) => (t === 'status' ? status : this.pageTarget(t));
+          if (this.ctx.options.pageMetrics) {
+            const m = await collectPageMetrics(this.page, { timeoutMs: timeout });
+            outcome.metrics = checkPageMetrics(m).rows;
+            outcome.perf = { kind: 'pageMetrics', metrics: m };
+          }
           break;
         }
         case 'click':

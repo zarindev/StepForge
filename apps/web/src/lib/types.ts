@@ -145,6 +145,8 @@ export type RunOptionsForm = {
   video: 'off' | 'onFailure' | 'always';
   trace: 'off' | 'onFailure' | 'always';
   screenshots: 'off' | 'onFailure' | 'everyStep';
+  /** Record Web Vitals after every navigation. */
+  pageMetrics?: boolean;
 };
 export type RunScope =
   | { type: 'application' }
@@ -229,6 +231,7 @@ export type StepResultRow = {
     errorKind?: string;
     /** Email received or checked by an email step. */
     email?: EmailMessage & { inbox?: string };
+    perf?: unknown;
     healedLocator?: {
       from: { strategy: string; value: string; name?: string };
       to: { strategy: string; value: string; name?: string };
@@ -344,4 +347,64 @@ export type MailpitStatus = {
   external?: boolean;
   error?: string;
   autostart: boolean;
+};
+
+// ─── Performance (mirrors @stepforge/perf) ─────────────────────────────────────
+export type LoadProfile = 'smoke' | 'load' | 'stress' | 'spike' | 'soak';
+export type LoadTick = {
+  t: number;
+  vus: number;
+  requests: number;
+  errors: number;
+  p95: number;
+  avg: number;
+  totalRequests: number;
+};
+export type LoadThresholds = {
+  p95Ms?: number;
+  p99Ms?: number;
+  avgMs?: number;
+  maxErrorRatePct?: number;
+  minRps?: number;
+};
+export type LoadReport = {
+  engine: 'builtin' | 'k6';
+  profile: LoadProfile;
+  vus: number;
+  durationS: number;
+  target: string;
+  requests: number;
+  errors: number;
+  errorRatePct: number;
+  rps: number;
+  latency: { min: number; avg: number; p50: number; p90: number; p95: number; p99: number; max: number };
+  statusCodes: Record<string, number>;
+  timeline: { t: number; vus: number; requests: number; errors: number; p95: number; avg: number }[];
+  thresholds: {
+    metric: string;
+    label: string;
+    threshold: number;
+    actual: number;
+    unit: string;
+    passed: boolean;
+    message: string;
+  }[];
+  passed: boolean;
+  cancelled?: boolean;
+};
+export type PerfInfo = {
+  profiles: { id: LoadProfile; help: string }[];
+  limits: { maxVus: number; maxDurationS: number };
+  lighthouseCategories: string[];
+  authorizationStatement: string;
+  k6: { available: boolean; path: string | null; version: string | null };
+};
+export type LighthouseResult = {
+  url: string;
+  formFactor: 'desktop' | 'mobile';
+  scores: Record<string, number>;
+  metrics: { lcp?: number; fcp?: number; cls?: number; tbt?: number; speedIndex?: number };
+  reportFile?: string;
+  durationMs: number;
+  warnings: string[];
 };

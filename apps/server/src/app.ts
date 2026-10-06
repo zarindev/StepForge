@@ -22,6 +22,8 @@ import { registerDatabaseRoutes } from './routes/database.ts';
 import { DatabaseService } from './database/service.ts';
 import { EmailService } from './email/service.ts';
 import { registerEmailRoutes } from './routes/email.ts';
+import { PerfService } from './perf/service.ts';
+import { registerPerfRoutes } from './routes/perf.ts';
 import { RunManager } from './runner/manager.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
 
@@ -67,6 +69,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     config.dbFile === ':memory:' ? undefined : config.dbFile,
   );
   const email = new EmailService(db, masterKey, config.dataDir, config.binDir, config.mailpit);
+  const perf = new PerfService(db, masterKey, bus, config.binDir, config.artifactsDir);
   const ctx: AppContext = {
     config,
     db,
@@ -85,11 +88,13 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
       specs,
       database,
       email,
+      perf,
     ),
     recorder: new RecorderManager(db, masterKey, bus),
     specs,
     database,
     email,
+    perf,
     startedAt: new Date(),
   };
 
@@ -121,6 +126,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerApiRoutes(app, ctx);
   registerDatabaseRoutes(app, ctx);
   registerEmailRoutes(app, ctx);
+  registerPerfRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal.

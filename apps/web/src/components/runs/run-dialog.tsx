@@ -31,6 +31,7 @@ const DEFAULTS: RunOptionsForm = {
   video: 'onFailure',
   trace: 'onFailure',
   screenshots: 'everyStep',
+  pageMetrics: false,
 };
 function loadOptions(): RunOptionsForm {
   try {
@@ -240,6 +241,14 @@ function RunDialog({ req }: { req: Request }) {
               label="Stop on first failure"
             />{' '}
             Stop on first failure
+          </label>
+          <label className="flex items-center gap-2">
+            <Switch
+              checked={!!opts.pageMetrics}
+              onChange={(pageMetrics) => set({ pageMetrics })}
+              label="Collect page metrics"
+            />
+            Collect page metrics (Web Vitals)
           </label>
           <label className="flex items-center gap-2">
             <Switch

@@ -6,6 +6,9 @@
 - PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
 
 ### Added
+- Phase 8 performance testing: built-in load engine (profiles, exact percentiles, live timeline, threshold
+  verdicts), k6 export/install/bridge, Web Vitals page metrics, Lighthouse, query plans, Load Designer, load-test
+  authorization per application.
 - Phase 7 email testing: Mailpit (installer, start/stop from Settings, inbox viewer) and IMAP inboxes per
   application, email steps (wait, assert, extract OTP/link/regex, open link), email preview and evidence in run
   results, CareClinic sign-up with email verification.

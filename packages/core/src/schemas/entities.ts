@@ -208,6 +208,8 @@ export const RunOptionsInput = z.object({
   trace: EvidenceModeSchema.default('onFailure'),
   screenshots: z.enum(['off', 'onFailure', 'everyStep']).default('everyStep'),
   timeoutMs: z.number().int().min(1000).max(600_000).optional(),
+  /** Record Web Vitals (LCP, CLS, TTFB, load time…) after every ui.navigate. */
+  pageMetrics: z.boolean().default(false),
 });
 export type RunOptionsInput = z.infer<typeof RunOptionsInput>;
 

@@ -14,6 +14,8 @@ import * as repo from '@stepforge/db/repos';
 import { createApiExecutor } from '@stepforge/executor-api';
 import { createDbExecutor } from '@stepforge/executor-db';
 import { createEmailExecutor } from '@stepforge/executor-email';
+import { createPerfExecutor } from '@stepforge/executor-perf';
+import type { LoadReport } from '@stepforge/perf';
 import { createUiExecutor, BrowserPool } from '@stepforge/executor-ui';
 import { utilExecutor } from '@stepforge/executor-util';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -24,6 +26,7 @@ import type { EventBus } from '../context.ts';
 import type { SpecService } from '../api/specs.ts';
 import type { DatabaseService } from '../database/service.ts';
 import type { EmailService } from '../email/service.ts';
+import type { PerfService } from '../perf/service.ts';
 import { expandScope, testCaseData, unfinishedItems } from './scope.ts';
 
 type Run = typeof schema.runs.$inferSelect;
@@ -58,6 +61,7 @@ export class RunManager {
     private readonly specs?: SpecService,
     private readonly database?: DatabaseService,
     private readonly email?: EmailService,
+    private readonly perf?: PerfService,
   ) {}
 
   /** Path relative to the artifacts root with forward slashes (used in URLs). */
@@ -205,6 +209,21 @@ export class RunManager {
     }
   }
 
+  /** Performance steps: load tests need the application's authorization (and typed confirmation on production). */
+  private perfExecutor(run: Run, env: repo.Environment) {
+    const perf = this.perf!;
+    return createPerfExecutor({
+      authorizeLoad: () => perf.assertAuthorized(run.applicationId),
+      ...(env.isProduction && {
+        production: { applicationName: repo.getApplication(this.db, run.applicationId).name },
+      }),
+      resolveConnection: this.database?.resolverFor(env.id),
+      chromePath: () => perf.chromePath(),
+      k6Path: () => perf.k6Path(),
+      onLoadTick: (tick) => this.bus.publish({ type: 'load.tick', runId: run.id, tick }),
+    });
+  }
+
   private toRunOptions(o: RunOptionsInput, baseUrl: string): RunOptions {
     return {
       ...DEFAULT_RUN_OPTIONS,
@@ -214,6 +233,7 @@ export class RunManager {
       video: o.video,
       trace: o.trace,
       screenshots: o.screenshots,
+      pageMetrics: o.pageMetrics,
       defaultTimeoutMs: o.timeoutMs ?? this.defaults().timeoutMs,
       baseUrl,
     };
@@ -243,6 +263,7 @@ export class RunManager {
       }),
       ...(this.database ? [createDbExecutor({ resolve: this.database.resolverFor(env.id) })] : []),
       ...(this.email ? [createEmailExecutor({ resolve: this.email.resolverFor(run.applicationId) })] : []),
+      ...(this.perf ? [this.perfExecutor(run, env)] : []),
       utilExecutor,
     ];
     const startedAt = run.startedAt ?? now();
@@ -426,11 +447,51 @@ export class RunManager {
               errorKind: s.errorKind,
               healedLocator: s.healedLocator,
               ...(s.email ? { email: s.email } : {}),
+              ...(s.perf ? { perf: s.perf } : {}),
             },
             queryJson: s.query ?? null,
             screenshotPath: s.screenshotPath ? this.rel(s.screenshotPath) : null,
           })
           .run();
+      }
+      this.db.delete(schema.perfMetrics).where(eq(schema.perfMetrics.runItemId, itemId)).run();
+      this.db.delete(schema.loadResults).where(eq(schema.loadResults.runItemId, itemId)).run();
+      for (const s of r.steps) {
+        for (const m of s.metrics ?? [])
+          this.db
+            .insert(schema.perfMetrics)
+            .values({
+              id: newId(),
+              runItemId: itemId,
+              stepId: s.stepId,
+              metric: m.metric,
+              value: m.value,
+              unit: m.unit,
+              threshold: m.threshold ?? null,
+              passed: m.passed ?? null,
+            })
+            .run();
+        const load = s.perf as (LoadReport & { kind?: string }) | undefined;
+        if (load?.kind === 'load') {
+          const file = r.artifacts.find((a) => a.kind === 'load_report' && a.stepId === s.stepId);
+          this.db
+            .insert(schema.loadResults)
+            .values({
+              id: newId(),
+              runItemId: itemId,
+              profile: load.profile,
+              vus: load.vus,
+              durationS: load.durationS,
+              rps: load.rps,
+              p50: load.latency.p50,
+              p90: load.latency.p90,
+              p95: load.latency.p95,
+              p99: load.latency.p99,
+              errorRate: load.errorRatePct,
+              timelinePath: file ? this.rel(file.path) : null,
+            })
+            .run();
+        }
       }
       for (const a of r.artifacts) {
         let size = 0;

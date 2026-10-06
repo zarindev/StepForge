@@ -311,3 +311,4 @@ export function createDbExecutor(opts: { resolve: ConnectionResolver }): Executo
     },
   };
 }
+export { explainQuery, type QueryPlan } from './plan.ts';

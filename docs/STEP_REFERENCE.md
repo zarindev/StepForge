@@ -153,4 +153,18 @@ then use `{{vars.email}}` in the sign-up form and in `waitForEmail.to`. With Gma
 started"); a missing code or link is `failed`; an unknown inbox or an email step without an earlier `waitForEmail`
 is `broken`; an unreachable inbox is a `failed` network error.
 
-Performance steps are documented when their phase lands.
+## Performance steps (`perf.*`) — available since Phase 8
+
+See [PERFORMANCE.md](PERFORMANCE.md) for the Load Designer, profiles, k6 and the safety rules.
+
+| type | params | notes |
+|---|---|---|
+| `pageMetrics` | `url` (optional: open it first), `thresholds`: `lcpMs`, `cls`, `inpMs`, `fcpMs`, `ttfbMs`, `loadMs`; `settleMs` | Measures the test's browser page (needs an earlier UI step). Targets: `lcp`, `cls`, `inp`, `fcp`, `ttfb`, `load`, `domContentLoaded`, `transferBytes`, `requests` |
+| `lighthouse` | `url`, `formFactor` (`desktop`/`mobile`), `categories`, `thresholds`: `performance`, `accessibility`, `bestPractices`, `seo` (minimum 0–100) | Fresh browser, no login. HTML report saved as evidence. Targets: category ids and `lcp`, `fcp`, `cls`, `tbt`, `speedIndex` |
+| `loadTest` | `method`, `url`, `headers`, `body`, `auth` (bearer/basic/apiKey) **or** `requests: [...]`; `profile` (`smoke`/`load`/`stress`/`spike`/`soak`), `vus`, `durationS`, `rampS`, `thresholds`: `p95Ms`, `p99Ms`, `avgMs`, `maxErrorRatePct`, `minRps`; `engine` (`builtin`/`k6`), `requestTimeoutS`, `confirmProduction` | Needs the application's load-test authorization. Fails with the margin (e.g. "p95 latency 912 ms exceeded the threshold of 800 ms by 112 ms"). Targets: `rps`, `p50`, `p90`, `p95`, `p99`, `avg`, `max`, `errorRate`, `requests` |
+| `queryPlan` | `connection`, `sql` (a read), `params`, `maxMs`, `noFullScan`, `repeat` (default 3) | Median time of `repeat` runs and the engine's plan (SQLite, PostgreSQL, MySQL) without running EXPLAIN ANALYZE. Targets: `durationMs`, `fullScans`, `rowCount` |
+
+**Page metrics on every navigation:** tick *Collect page metrics (Web Vitals)* in the Run dialog (run option
+`pageMetrics`) and every `ui.navigate` records LCP, CLS, TTFB, FCP and load time (no thresholds) for analytics.
+
+All metrics are stored per step (`perf_metrics`), load tests also in `load_results`, for trends in Phase 10.

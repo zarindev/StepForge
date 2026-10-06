@@ -1,0 +1,19 @@
+{
+  "name": "@stepforge/perf",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@stepforge/core": "*",
+    "autocannon": "^8.0.0",
+    "chrome-launcher": "^1.2.2",
+    "lighthouse": "^12.8.2",
+    "web-vitals": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/autocannon": "^7.12.7"
+  }
+}

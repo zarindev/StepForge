@@ -53,6 +53,8 @@ export type StepOutcome = {
   query?: unknown;
   /** The email a step received or worked on (shown as a preview in results). */
   email?: unknown;
+  /** A performance report (load test, Lighthouse, page metrics, query plan) shown in results. */
+  perf?: unknown;
   screenshotPath?: string;
   /** Set when the first-ranked locator failed and a lower-ranked one matched (self-healing). */
   healedLocator?: { from: Locator; to: Locator };
@@ -79,6 +81,7 @@ export type StepResult = {
   response?: unknown;
   query?: unknown;
   email?: unknown;
+  perf?: unknown;
   screenshotPath?: string;
   healedLocator?: StepOutcome['healedLocator'];
   metrics?: StepOutcome['metrics'];
@@ -147,6 +150,8 @@ export type RunOptions = {
   screenshots: 'off' | 'onFailure' | 'everyStep';
   /** Per-step network/console capture for diagnosis. */
   captureLogs: boolean;
+  /** Record page metrics (Web Vitals) after every ui.navigate. */
+  pageMetrics?: boolean;
   baseUrl?: string;
 };
 

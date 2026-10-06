@@ -13,6 +13,7 @@ import { PlaceholderPage } from '@/pages/placeholder';
 import { RecorderPage } from '@/pages/recorder';
 import { SettingsPage } from '@/pages/settings';
 import { SqlWorkbenchPage } from '@/pages/sql-workbench';
+import { PerformancePage } from '@/pages/performance';
 
 const rootRoute = createRootRoute({ component: Layout });
 
@@ -23,6 +24,7 @@ const pages: Record<string, () => React.ReactNode> = {
   '/recorder': RecorderPage,
   '/api-client': ApiClientPage,
   '/settings': SettingsPage,
+  '/performance': PerformancePage,
 };
 
 const ExplorerSearch = z.object({

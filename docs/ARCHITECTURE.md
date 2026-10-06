@@ -26,6 +26,8 @@ flowchart TB
 | `@stepforge/executor-db` | SQLite/PostgreSQL/MySQL/SQL Server/MongoDB drivers, SQL safety guard, rollback mode, data-quality audit |
 | `@stepforge/email` | Mailpit and IMAP mailboxes, OTP/link extraction, Mailpit installer and process control |
 | `@stepforge/executor-email` | Email steps (wait, assert, extract, open link) |
+| `@stepforge/perf` | Load engine (autocannon), k6 export/bridge, Web Vitals, Lighthouse |
+| `@stepforge/executor-perf` | Performance steps (page metrics, Lighthouse, load test, query plan) |
 | `@stepforge/executor-util` | Variables, generated data, sandboxed scripts |
 | `@stepforge/recorder` | Recording browser, injected toolbar, network capture |
 | `@stepforge/importers` | OpenAPI/Swagger, Postman, cURL and HAR → scenarios |
