@@ -43,5 +43,5 @@ validated against them.
 
 ## Folder tree (target)
 
-See Section 3 of `STEPFORGE_BUILD_PROMPT.md`. Packages are created in the phase that first needs them
+See Section 3 of the build specification. Packages are created in the phase that first needs them
 so the repo never contains empty placeholder packages.

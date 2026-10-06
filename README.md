@@ -32,4 +32,4 @@ npm run lint && npm run typecheck
 
 ## License
 
-[MIT](LICENSE) © Muzahidul Rahman
+[MIT](LICENSE) © Md Zarin Tasnim

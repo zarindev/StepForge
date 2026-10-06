@@ -4,7 +4,7 @@
   "private": true,
   "description": "Record once. Test every layer. Export anywhere. The free, local QA studio for UI, API, database, email and performance testing.",
   "license": "MIT",
-  "author": "Muzahidul Rahman",
+  "author": "Md Zarin Tasnim",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
