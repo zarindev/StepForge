@@ -1,0 +1,97 @@
+import { z } from 'zod';
+import { HexColor, Priority, Slug } from './common.ts';
+
+/** Input schemas for creating/updating entities through the API. Shared by server, UI and CLI. */
+
+export const ApplicationInput = z.object({
+  name: z.string().min(1).max(120),
+  slug: Slug,
+  description: z.string().max(2000).default(''),
+  icon: z.string().max(40).default('app-window'),
+  color: HexColor.default('#F97316'),
+  category: z.string().max(60).default('web'),
+  tags: z.array(z.string().max(40)).default([]),
+});
+export type ApplicationInput = z.infer<typeof ApplicationInput>;
+
+export const BrowserName = z.enum(['chromium', 'firefox', 'webkit']);
+export const Viewport = z.object({ width: z.number().int().min(200), height: z.number().int().min(200) });
+export const VIEWPORT_PRESETS = {
+  desktop: { width: 1440, height: 900 },
+  tablet: { width: 768, height: 1024 },
+  mobile: { width: 390, height: 844 },
+} as const;
+
+export const EnvironmentInput = z.object({
+  name: z.string().min(1).max(60),
+  baseUrl: z.url(),
+  isProduction: z.boolean().default(false),
+  variables: z.record(z.string(), z.string()).default({}),
+  browserDefaults: z
+    .object({
+      browser: BrowserName.default('chromium'),
+      viewport: Viewport.optional(),
+      headless: z.boolean().default(true),
+    })
+    .default({ browser: 'chromium', headless: true }),
+});
+export type EnvironmentInput = z.infer<typeof EnvironmentInput>;
+
+export const SecretInput = z.object({
+  key: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+  value: z.string().min(1),
+});
+
+export const DbEngine = z.enum(['pg', 'mysql', 'mssql', 'sqlite', 'mongo']);
+export const DbConnectionInput = z.object({
+  name: z.string().min(1).max(80),
+  engine: DbEngine,
+  host: z.string().default(''),
+  port: z.number().int().min(0).max(65535).optional(),
+  database: z.string().default(''),
+  username: z.string().default(''),
+  password: z.string().optional(),
+  options: z.record(z.string(), z.unknown()).default({}),
+  readOnly: z.boolean().default(true),
+  rollbackMode: z.boolean().default(true),
+});
+
+export const ModuleInput = z.object({
+  name: z.string().min(1).max(120),
+  description: z.string().max(2000).default(''),
+  parentId: z.string().nullable().default(null),
+  sortOrder: z.number().int().default(0),
+});
+
+export const ScenarioStatus = z.enum(['draft', 'ready', 'deprecated']);
+export const ScenarioInput = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(5000).default(''),
+  priority: Priority.default('P2'),
+  status: ScenarioStatus.default('draft'),
+  owner: z.string().max(80).default(''),
+  preconditions: z.string().max(5000).default(''),
+});
+
+export const TestTechnique = z.enum([
+  'positive',
+  'negative',
+  'boundary',
+  'equivalence',
+  'error-guessing',
+  'security',
+  'other',
+]);
+export const TestCaseInput = z.object({
+  code: z.string().min(1).max(40),
+  title: z.string().min(1).max(200),
+  data: z.record(z.string(), z.unknown()).default({}),
+  expectedResult: z.string().max(5000).default(''),
+  priority: Priority.default('P2'),
+  technique: TestTechnique.default('positive'),
+  status: z.enum(['active', 'skipped']).default('active'),
+});
+
+export const RunStatus = z.enum(['queued', 'running', 'passed', 'failed', 'interrupted', 'cancelled']);
+export const RunItemStatus = z.enum(['passed', 'failed', 'broken', 'skipped', 'flaky']);
+export const RunTrigger = z.enum(['manual', 'schedule', 'cli', 'retry']);

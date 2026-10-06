@@ -1,0 +1,43 @@
+{
+  "name": "stepforge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Record once. Test every layer. Export anywhere. The free, local QA studio for UI, API, database, email and performance testing.",
+  "license": "MIT",
+  "author": "Muzahidul Rahman",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "packages/executors/*"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "npm run start -w @stepforge/server",
+    "build": "npm run build -w @stepforge/web",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck -w @stepforge/web",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate --config packages/db/drizzle.config.ts",
+    "check:secrets": "node scripts/check-no-secrets.mjs",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.5",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^4.1.11"
+  }
+}

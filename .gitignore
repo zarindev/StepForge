@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+# StepForge runtime data: database, artifacts, master key, downloaded binaries
+data/*
+!data/.gitkeep
+test-results/
+playwright-report/
+.vite/
+*.tsbuildinfo

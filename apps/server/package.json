@@ -1,0 +1,29 @@
+{
+  "name": "@stepforge/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch --clear-screen=false src/index.ts"
+  },
+  "dependencies": {
+    "@fastify/static": "^10.1.5",
+    "@fastify/websocket": "^11.2.0",
+    "@stepforge/core": "*",
+    "@stepforge/crypto": "*",
+    "@stepforge/db": "*",
+    "drizzle-orm": "^0.45.3",
+    "fastify": "^5.4.0",
+    "pino": "^9.7.0",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.20.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
+  }
+}
