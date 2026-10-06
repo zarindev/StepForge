@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `db_connections_env_name_uq` ON `db_connections` (`environment_id`,`name`);

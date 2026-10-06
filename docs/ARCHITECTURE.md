@@ -18,9 +18,15 @@ flowchart TB
 
 | Package | Responsibility |
 |---|---|
-| `@stepforge/core` | Zod schemas, unified step model + catalogue, variable resolver, (Phase 3) scenario engine |
+| `@stepforge/core` | Zod schemas, unified step model + catalogue, variable resolver, scenario engine, plain English, variants |
 | `@stepforge/db` | Drizzle schema, migrations, open/backup/migrate, repositories |
 | `@stepforge/crypto` | AES-256-GCM secrets, master key management |
+| `@stepforge/executor-ui` | Playwright UI steps, ranked/self-healing locators, evidence |
+| `@stepforge/executor-api` | HTTP/GraphQL steps, auth, cookies, JSONPath, JSON Schema, contract hook |
+| `@stepforge/executor-db` | SQLite/PostgreSQL/MySQL/SQL Server/MongoDB drivers, SQL safety guard, rollback mode, data-quality audit |
+| `@stepforge/executor-util` | Variables, generated data, sandboxed scripts |
+| `@stepforge/recorder` | Recording browser, injected toolbar, network capture |
+| `@stepforge/importers` | OpenAPI/Swagger, Postman, cURL and HAR → scenarios |
 | `@stepforge/server` | HTTP/WS API, security hooks, static UI hosting, job queue + scheduler host |
 | `@stepforge/web` | Dashboard |
 
@@ -36,3 +42,11 @@ flowchart TB
 Every step, in every layer, has the same shape (see `packages/core/src/schemas/steps.ts`):
 `type` (`<group>.<name>`), `label`, `params`, `locators[]`, `assertions[]`, `enabled`, `continueOnFail`,
 `timeoutMs`, `retries`, `captureAs`. Executors register by group prefix, so new step types never change the engine.
+
+## Database safety
+
+Database steps and the SQL Workbench go through one policy (`checkPolicy` in `@stepforge/executor-db`) before
+anything reaches a database: read-only connections refuse writes (statement classification across all SQL
+dialects plus a read-only session where the engine supports it), rollback mode owns the transaction, and writes
+on production connections need the application name. Connection passwords are decrypted only inside the
+server process, just before connecting. Details: [DATABASES.md](DATABASES.md).

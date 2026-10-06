@@ -24,6 +24,20 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** Reads a range from `{min,max}`, `[min,max]` or `"min..max"` (either bound may be omitted). */
+export function parseRange(exp: unknown): { min?: number; max?: number } {
+  const num = (v: unknown) => (v === undefined || v === null || v === '' ? undefined : Number(v));
+  if (Array.isArray(exp)) return { min: num(exp[0]), max: num(exp[1]) };
+  if (exp && typeof exp === 'object') {
+    const o = exp as { min?: unknown; max?: unknown };
+    return { min: num(o.min), max: num(o.max) };
+  }
+  const m = /^\s*(-?[\d.]*)\s*\.\.\s*(-?[\d.]*)\s*$/.exec(String(exp ?? ''));
+  return m ? { min: num(m[1]), max: num(m[2]) } : {};
+}
+
+const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : [v]);
+
 /** Evaluates one assertion against an already-obtained actual value. Pure and synchronous. */
 export function evaluateAssertion(a: Assertion, actual: unknown): AssertionResult {
   const exp = a.expected;
@@ -79,6 +93,27 @@ export function evaluateAssertion(a: Assertion, actual: unknown): AssertionResul
     case 'lengthEquals':
       passed = lengthOf(actual) === asNumber(exp);
       break;
+    case 'noNulls':
+      passed = list(actual).every((x) => x !== null && x !== undefined);
+      break;
+    case 'unique': {
+      const seen = list(actual).map((x) => JSON.stringify(x));
+      passed = new Set(seen).size === seen.length;
+      break;
+    }
+    case 'inRange': {
+      const { min, max } = parseRange(exp);
+      passed = list(actual).every((x) => {
+        const n = asNumber(x);
+        return (
+          x !== null &&
+          Number.isFinite(n) &&
+          (min === undefined || n >= min) &&
+          (max === undefined || n <= max)
+        );
+      });
+      break;
+    }
     case 'matchesSchema':
       // JSON Schema validation is provided by the API executor (Phase 5); here it cannot be judged.
       return {

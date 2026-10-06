@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_STEP_TYPES, deriveScenarioKind, Step, stepGroupOf } from '../src/index.ts';
+import {
+  ALL_STEP_TYPES,
+  DbConnectionUpdate,
+  deriveScenarioKind,
+  EnvironmentUpdate,
+  Step,
+  stepGroupOf,
+} from '../src/index.ts';
 
 describe('step model', () => {
   it('applies defaults', () => {
@@ -22,5 +29,13 @@ describe('step model', () => {
     expect(deriveScenarioKind(['ui.navigate', 'util.log', 'ui.click'])).toBe('ui');
     expect(deriveScenarioKind(['api.request'])).toBe('api');
     expect(deriveScenarioKind(['ui.navigate', 'db.query'])).toBe('hybrid');
+  });
+});
+
+describe('update schemas', () => {
+  it('leave omitted fields out instead of resetting them to their defaults', () => {
+    expect(EnvironmentUpdate.parse({ name: 'Staging' })).toEqual({ name: 'Staging' });
+    expect(DbConnectionUpdate.parse({ readOnly: false })).toEqual({ readOnly: false });
+    expect(DbConnectionUpdate.parse({ password: null })).toEqual({ password: null });
   });
 });

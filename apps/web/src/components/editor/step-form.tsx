@@ -58,7 +58,7 @@ function TypedField({
   params: Record<string, unknown>;
   onParams: (p: Record<string, unknown>) => void;
 }) {
-  const { scenarios, blocks } = useEditorCtx();
+  const { scenarios, blocks, connections } = useEditorCtx();
   const value = getPath(params, spec.key);
   const set = (v: unknown) => onParams(setPath(params, spec.key, v));
   const cls = spec.wide ? 'md:col-span-3' : '';
@@ -84,6 +84,31 @@ function TypedField({
           </Select>
         </Field>
       );
+    case 'connection': {
+      const current = String(value ?? '');
+      const known = connections.some((c) => c.id === current);
+      return (
+        <Field
+          label={spec.label}
+          className={cls}
+          hint={
+            connections.length
+              ? 'The run uses the connection with this name in its environment'
+              : 'Add connections on the application’s Databases tab'
+          }
+        >
+          <Select aria-label={spec.label} value={current} onChange={(e) => set(e.target.value || undefined)}>
+            <option value="">Choose…</option>
+            {connections.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+            {current && !known && <option value={current}>{current} (not configured)</option>}
+          </Select>
+        </Field>
+      );
+    }
     case 'scenario':
     case 'block': {
       const opts = spec.kind === 'scenario' ? scenarios : blocks;

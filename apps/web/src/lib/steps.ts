@@ -45,6 +45,14 @@ export function defaultParams(type: string): Record<string, unknown> {
       return { method: 'GET', url: '{{env.baseUrl}}/api/', headers: {} };
     case 'db.query':
       return { connection: '', sql: 'SELECT 1' };
+    case 'db.mongoFind':
+      return { connection: '', collection: '', filter: {} };
+    case 'db.runScript':
+      return { connection: '', script: '' };
+    case 'db.extract':
+      return { path: 'value' };
+    case 'db.dataQualityCheck':
+      return { connection: '', maxIssues: 0 };
     case 'email.waitForEmail':
       return { to: '', subject: '', timeoutMs: 30000 };
     case 'util.setVariable':
@@ -63,6 +71,17 @@ export function summarizeStep(s: StepRecord): string {
   if (s.label) return s.label;
   const p = s.params as Record<string, unknown>;
   const target = s.locators[0] ? ` → ${s.locators[0].name ?? s.locators[0].value}` : '';
-  const main = p.url ?? p.sql ?? p.value ?? p.key ?? p.message ?? p.subject ?? p.name ?? '';
+  const main =
+    p.url ??
+    p.sql ??
+    p.script ??
+    p.collection ??
+    p.procedure ??
+    p.value ??
+    p.key ??
+    p.message ??
+    p.subject ??
+    p.name ??
+    '';
   return `${s.type.split('.')[1]}${main ? ` ${String(main)}` : ''}${target}`;
 }

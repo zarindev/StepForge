@@ -15,6 +15,13 @@
       "when": 1791278836791,
       "tag": "0001_run_details",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791288077303,
+      "tag": "0002_db_connections",
+      "breakpoints": true
     }
   ]
 }

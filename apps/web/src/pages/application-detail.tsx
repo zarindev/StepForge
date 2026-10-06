@@ -4,6 +4,7 @@ import { Archive, ArrowLeft, FolderTree, Pencil, ShieldAlert, Trash2 } from 'luc
 import { useState } from 'react';
 import { AppAvatar, AppFormDialog, type AppFormValues } from '@/components/applications/app-form';
 import { BlocksTab } from '@/components/applications/blocks-tab';
+import { ConnectionsTab } from '@/components/applications/connections-tab';
 import { EnvironmentsTab } from '@/components/applications/environments-tab';
 import { SecretsTab } from '@/components/applications/secrets-tab';
 import { TagsTab } from '@/components/applications/tags-tab';
@@ -19,7 +20,7 @@ import { api } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
 import { qk, useApplication } from '@/lib/queries';
 
-type Tab = 'environments' | 'secrets' | 'tags' | 'blocks' | 'settings';
+type Tab = 'environments' | 'secrets' | 'connections' | 'tags' | 'blocks' | 'settings';
 
 export function ApplicationDetailPage() {
   const { appId } = useParams({ from: '/applications/$appId' });
@@ -123,6 +124,7 @@ export function ApplicationDetailPage() {
         tabs={[
           { value: 'environments', label: 'Environments', count: a.counts.environments },
           { value: 'secrets', label: 'Secrets' },
+          { value: 'connections', label: 'Databases' },
           { value: 'tags', label: 'Tags' },
           { value: 'blocks', label: 'Blocks' },
           { value: 'settings', label: 'Settings' },
@@ -130,6 +132,7 @@ export function ApplicationDetailPage() {
       />
       {tab === 'environments' && <EnvironmentsTab app={a} />}
       {tab === 'secrets' && <SecretsTab app={a} />}
+      {tab === 'connections' && <ConnectionsTab app={a} />}
       {tab === 'tags' && <TagsTab app={a} />}
       {tab === 'blocks' && <BlocksTab app={a} />}
       {tab === 'settings' && (

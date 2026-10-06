@@ -33,3 +33,53 @@ jobs:
           name: playwright-report-${{ matrix.os }}
           path: test-results/
           retention-days: 7
+
+  databases:
+    # Real database servers for the DB executor's integration tests (Section 16: SQLite + PostgreSQL + MySQL
+    # verified). Service containers only run on Linux runners; the tests skip themselves when a URL is unset.
+    name: databases (PostgreSQL, MySQL, SQL Server, MongoDB)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: stepforge
+          POSTGRES_DB: stepforge_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: stepforge
+          MYSQL_DATABASE: stepforge_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pstepforge" --health-interval 5s --health-timeout 5s
+          --health-retries 30
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: 'StepForge#2026'
+        ports: ['1433:1433']
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Wait for SQL Server
+        run: |
+          for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/1433) 2>/dev/null && break; sleep 2; done
+          sleep 15
+      - run: npx vitest run packages/executors/database
+        env:
+          STEPFORGE_TEST_PG_URL: postgres://postgres:stepforge@127.0.0.1:5432/stepforge_test
+          STEPFORGE_TEST_MYSQL_URL: mysql://root:stepforge@127.0.0.1:3306/stepforge_test
+          STEPFORGE_TEST_MSSQL_URL: Server=127.0.0.1,1433;Database=master;User Id=sa;Password=StepForge#2026;Encrypt=true;TrustServerCertificate=true
+          STEPFORGE_TEST_MONGO_URL: mongodb://127.0.0.1:27017

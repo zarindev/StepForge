@@ -1,3 +1,4 @@
+import type { OnMount } from '@monaco-editor/react';
 import { lazy, Suspense } from 'react';
 import { Textarea } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,8 @@ export function CodeEditor({
   height = 140,
   ariaLabel,
   className,
+  onMount,
+  lineNumbers = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -19,6 +22,9 @@ export function CodeEditor({
   height?: number;
   ariaLabel: string;
   className?: string;
+  /** Access to the editor and the monaco namespace (completions, key bindings). */
+  onMount?: OnMount;
+  lineNumbers?: boolean;
 }) {
   const dark = document.documentElement.classList.contains('dark');
   const fallback = (
@@ -44,10 +50,11 @@ export function CodeEditor({
           theme={dark ? 'stepforge-dark' : 'light'}
           value={value}
           onChange={(v) => onChange(v ?? '')}
+          onMount={onMount}
           options={{
             minimap: { enabled: false },
             fontSize: 12,
-            lineNumbers: 'off',
+            lineNumbers: lineNumbers ? 'on' : 'off',
             scrollBeyondLastLine: false,
             wordWrap: 'on',
             ariaLabel,

@@ -204,6 +204,15 @@ describe('evaluateAssertion', () => {
     ['isNotEmpty', 'x', undefined, true],
     ['lengthEquals', [1, 2, 3], 3, true],
     ['exists', null, undefined, false],
+    ['noNulls', [1, 'a', 0], undefined, true],
+    ['noNulls', [1, null], undefined, false],
+    ['unique', ['a', 'b', 'c'], undefined, true],
+    ['unique', [1, 2, 1], undefined, false],
+    ['inRange', [0, 5, 10], { min: 0, max: 10 }, true],
+    ['inRange', 11, [0, 10], false],
+    ['inRange', -4, '0..', false],
+    ['inRange', '7', '..9', true],
+    ['inRange', [null], '0..', false],
   ] as const)('%s(%j, %j) → %s', (operator, actual, expected, passed) => {
     expect(evaluateAssertion({ target: 't', operator, expected }, actual).passed).toBe(passed);
   });

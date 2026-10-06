@@ -17,6 +17,7 @@
     "@stepforge/crypto": "*",
     "@stepforge/db": "*",
     "@stepforge/executor-api": "*",
+    "@stepforge/executor-db": "*",
     "@stepforge/executor-ui": "*",
     "@stepforge/executor-util": "*",
     "@stepforge/importers": "*",

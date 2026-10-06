@@ -82,6 +82,10 @@ export const AssertionOperator = z.enum([
   'isNotEmpty',
   'lengthEquals',
   'matchesSchema',
+  // Column checks (work on a single value or a list, e.g. a DB column): no nulls, all distinct, all in range.
+  'noNulls',
+  'unique',
+  'inRange',
 ]);
 
 /** A single check attached to a step. `target` is interpreted by the executor (e.g. `status`, `$.data.id`). */

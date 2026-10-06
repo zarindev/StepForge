@@ -7,8 +7,8 @@
 | 3 | Scenario engine, UI executor, runner, live view, evidence, results | ✅ Done |
 | 4 | Recorder, Scenario Editor (list/flow/plain-English) | ✅ Done |
 | 5 | API module, API Client, importers, contract check | ✅ Done |
-| 6 | Database module, SQL Workbench, data-quality audit, rollback | ⏳ Next |
-| 7 | Email (Mailpit + IMAP), OTP/link extraction | — |
+| 6 | Database module, SQL Workbench, data-quality audit, rollback | ✅ Done |
+| 7 | Email (Mailpit + IMAP), OTP/link extraction | ⏳ Next |
 | 8 | Performance (metrics, Lighthouse, load, k6, query plans) | — |
 | 9 | Diagnosis engine, bug reports, report exports | — |
 | 10 | Analytics, quality gates, run comparison, flaky detection | — |
@@ -16,6 +16,27 @@
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 6 — Database testing (2026-10-06)
+
+**Delivered**
+- **DB executor** (`@stepforge/executor-db`, `packages/executors/database`): drivers for SQLite (`better-sqlite3`), PostgreSQL (`pg`), MySQL/MariaDB (`mysql2`), SQL Server (`mssql`) and MongoDB (`mongodb`), loaded on first use; one `DbClient` interface (query, procedures, transactions, schema introspection with columns, primary/foreign keys and indexes). Steps `db.query`, `db.mongoFind`, `db.runScript`, `db.callProcedure`, `db.extract`, `db.dataQualityCheck`; assertion targets `rowCount`, `affected`, `value`, column names, `rows[i].col`, `column:col`, JSONPath; new core operators `noNulls`, `unique`, `inRange`. Parameters are bound (`?`/`$1`/`@p1`) and masked like every secret in stored results.
+- **Safety (Section 12, in code):** a conservative SQL classifier (comments/strings stripped per dialect; a statement is a write if *any* dialect's lexing reveals one, so `'a\'; DROP …` cannot slip through), driver-level read-only sessions where engines support them, **rollback mode** that opens a transaction at the first write and rolls back at the end (reads before it see the app's commits; MySQL uses READ COMMITTED), transaction statements refused in rollback mode, and **typed application-name confirmation** for writes on production connections (workbench dialog / `confirmProduction` in steps).
+- **Data-quality audit** (`runAudit`): orphaned references (declared FKs **and** relationships inferred from `x_id` naming), duplicates (email/phone/code-like columns without a unique index, name + date of birth), missing required values, invalid email/phone formats, negative money/quantity values; sampled checks for MongoDB. Every finding carries sample rows and the query that found it.
+- **Connections** per environment (repo + API): unique name per environment (migration `0002_db_connections`), password stored as an encrypted secret outside the environment's secret list and never returned; secrets are purged when a connection, environment or application is deleted; connections cannot point at StepForge's own database. `POST …/connections/test` for drafts, schema (cached 60 s), query and audit endpoints with HTTP mapping (blocked 403, SQL error 422, unreachable 502).
+- **Dashboard:** application **Databases** tab (add/edit/test/delete, read-only and rollback badges, production warning); **SQL Workbench** (connection picker, production banner, schema browser, Monaco with schema-aware autocomplete incl. aliases, Ctrl/Cmd+Enter runs the selection, results grid with NULLs and CSV export, rollback notice, typed confirmation for production writes, drafts per connection); **Data quality audit** tab (checks, tables, findings with samples, open query, save finding as test, save audit as a step); **Save as DB test** with an assertion builder; typed forms for every `db.*` step with a connection picker; query + rows panel in run results; plain-English descriptions.
+- **CareClinic:** schema versioning (old demo databases are rebuilt), and planted DB bugs **CC-DB-01** (deleting a patient leaves orphan appointments; no FK) and **CC-DB-02** (the same patient can be registered twice), recorded in `demo/manifests/planted_bugs.json` (never read by StepForge).
+- `docs/DATABASES.md` (engines, connecting your own servers without Docker, safety rules, workbench, audit, integration tests); STEP_REFERENCE database section; CI job `databases` with PostgreSQL, MySQL, SQL Server and MongoDB service containers.
+
+**Verified**
+- `npm test`: 179 tests (+5 SQL Server tests skipped without a server). New: 17 DB-executor tests on SQLite (classifier incl. cross-dialect tricks, script splitting, policy, driver-level read-only, every step type, rollback vs commit, broken vs failed classification, secret masking of parameters, audit findings and options), 11 server tests (connection API never leaks the password, encrypted at rest, purged with its environment, own-DB refusal, draft test + schema, workbench read/blocked/rollback/syntax error, production confirmation, audit, runs), assertion operator and update-schema tests.
+- **Real servers:** the same integration suite passed against **PostgreSQL 18.4**, **MySQL 9.7.2** and **MongoDB** started locally from portable npm packages (schema, driver-level read-only, rollback while seeing other clients' commits, parameters, procedures, assertions, audit). SQL Server runs in CI only (see KNOWN_ISSUES #20).
+- **Done-when check:** a hybrid scenario — UI login and patient registration in the browser, `db.query` asserting the new row (row count, phone, date of birth, code format), `db.extract`, an API login and search by the extracted code, and `unique`/`noNulls` column checks — **passes**. Scenarios aimed at the planted DB bugs fail with precise messages (orphaned appointments still present; duplicate registration accepted, found by both a count assertion and `db.dataQualityCheck`).
+- `npm run test:e2e`: 12 tests. The Phase 6 E2E adds a SQLite connection through the dialog (tests it first, read-only + rollback by default), browses the schema, queries a table, sees a DELETE blocked, saves a query as a DB test with suggested assertions, audits the database clean, deletes a patient via the API, and finds the orphaned appointment (inferred relationship), then runs the finding's query.
+- The app was started on the existing `data/` folder: two pending migrations applied after an automatic backup.
+- Bugs found and fixed: **zod 4's `.partial()` keeps defaults**, so every PATCH silently reset omitted fields to their defaults (renaming an environment cleared `isProduction` and its variables; editing a connection wiped its file path) — all update schemas now use `patchOf()` without defaults, with a regression test; Monaco's `addCommand` shortcut bound to the wrong editor (now handled on the editor wrapper); `@faker-js/faker` upgraded to 10.x for a high-severity advisory.
 
 ---
 

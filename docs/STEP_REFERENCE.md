@@ -91,4 +91,39 @@ Multipart file fields: `{"doc": {"file": "/path/to/file.pdf"}}`. Cookies set by 
 Assertion targets: `status`, `time` (ms), `size` (bytes), `header:<name>`, `body`, `text`, and JSONPath (`$.data.id`,
 `$.items[*].name` returns a list). `matchesSchema` takes a JSON Schema as `expected` and reports field-level errors.
 
-Database, email and performance steps are documented as their phases land.
+## Database steps (`db.*`) — available since Phase 6
+
+Steps name a **connection** (configured per environment on the application's *Databases* tab). A run uses the
+connection with that name in the run's environment, so `main` can point at a local SQLite file in *Local* and at
+PostgreSQL in *Staging*. Engines: SQLite, PostgreSQL, MySQL/MariaDB, SQL Server, MongoDB. See
+[DATABASES.md](DATABASES.md) for connection setup and the safety rules.
+
+| type | params | notes |
+|---|---|---|
+| `query` | `connection`, `sql`, `params` (array), `maxRows` (default 1000), `confirmProduction` | One statement. On MongoDB, `sql` is a JSON command (below). output = rows |
+| `mongoFind` | `connection`, `collection`, `filter`, `projection`, `sort`, `limit` | MongoDB only. output = documents |
+| `runScript` | `connection`, `script`, `confirmProduction` | Several statements separated by `;` (strings, comments and `$$…$$` bodies are respected). Reports the last result |
+| `callProcedure` | `connection`, `procedure`, `args` (array), `confirmProduction` | PostgreSQL `CALL`, MySQL `CALL`, SQL Server `EXEC`. Always treated as a write |
+| `extract` | `path` | Reads the previous DB result of the same test (targets below) |
+| `dataQualityCheck` | `connection`, `tables` (array or comma list; empty = all), `checks` (`orphans`, `duplicates`, `nulls`, `formats`, `negatives`; empty = all), `duplicateColumns`, `requiredColumns`, `inferRelationships` (default true), `maxIssues` (default 0) | Fails when more than `maxIssues` issues are found; one assertion line per finding. output = the audit report |
+
+**Parameters, not string building.** Placeholders: `?` (SQLite, MySQL), `$1` (PostgreSQL), `@p1` (SQL Server).
+`"params": ["{{data.email}}"]` binds safely; writing `'{{data.email}}'` inside the SQL text inlines the value as-is.
+Secrets used as parameters are masked as `••••` in stored results.
+
+**Assertion targets** on a result: `rowCount`, `affected` (rows changed by a write), `value` (first column of the
+first row — handy for `SELECT COUNT(*)`), a bare column name (that column in the first row), `rows[1].email`,
+`column:email` (every value of the column), JSONPath over the rows (`$[0].id`, `$[*].total`), `rows`, `columns`, `time`.
+Column-style operators: `noNulls`, `unique`, `inRange` (`expected`: `{"min":0,"max":100}`, `[0,100]` or `"0..100"`).
+"Equals a variable": `{"target":"value","operator":"equals","expected":"{{vars.count}}"}`.
+
+**MongoDB commands** (Extended JSON): `{"collection":"patients","find":{"email":"a@b.test"},"sort":{"_id":-1},"limit":5}`,
+`{"collection":"orders","aggregate":[{"$match":{…}},{"$group":{…}}]}`, `{"collection":"x","countDocuments":{…}}`,
+`{"collection":"x","distinct":"field","filter":{…}}`, and writes `insertOne`, `insertMany`,
+`updateOne`/`updateMany` (`{"filter":…,"update":…}`), `deleteOne`/`deleteMany` (`{"filter":…}`).
+
+**Outcomes.** A blocked write, a missing connection, SQL syntax errors and unknown tables/columns make the test
+`broken` (the test needs fixing). Constraint violations and failed assertions make it `failed` (the data or app is
+wrong). A connection that cannot be reached is a `failed` network error.
+
+Email and performance steps are documented as their phases land.

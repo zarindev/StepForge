@@ -12,6 +12,7 @@ import { HomePage } from '@/pages/home';
 import { PlaceholderPage } from '@/pages/placeholder';
 import { RecorderPage } from '@/pages/recorder';
 import { SettingsPage } from '@/pages/settings';
+import { SqlWorkbenchPage } from '@/pages/sql-workbench';
 
 const rootRoute = createRootRoute({ component: Layout });
 
@@ -44,7 +45,6 @@ const navRoutes = [
   navRoute('/applications'),
   navRoute('/recorder'),
   navRoute('/api-client'),
-  navRoute('/sql'),
   navRoute('/performance'),
   navRoute('/runs'),
   navRoute('/bugs'),
@@ -52,6 +52,13 @@ const navRoutes = [
   navRoute('/exports'),
   navRoute('/settings'),
 ];
+
+const sqlRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sql',
+  validateSearch: (s) => z.object({ connection: z.string().optional() }).parse(s),
+  component: SqlWorkbenchPage,
+});
 
 const explorerRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -73,7 +80,13 @@ const applicationDetailRoute = createRoute({
 });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([...navRoutes, explorerRoute, applicationDetailRoute, runDetailRoute]),
+  routeTree: rootRoute.addChildren([
+    ...navRoutes,
+    sqlRoute,
+    explorerRoute,
+    applicationDetailRoute,
+    runDetailRoute,
+  ]),
   defaultNotFoundComponent: () => <p className="text-sm text-muted">Page not found.</p>,
 });
 

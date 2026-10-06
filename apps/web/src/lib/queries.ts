@@ -5,6 +5,7 @@ import { useCurrentAppId, setCurrentAppId } from './current-app';
 import { useLiveEvent, type LiveEvent } from './live';
 import type {
   Application,
+  DbConnection,
   Environment,
   RunDetail,
   RunItemDetail,
@@ -29,7 +30,16 @@ export const qk = {
   run: (id: string) => ['run', id] as const,
   runItem: (id: string) => ['run-item', id] as const,
   lastResults: (appId: string) => ['last-results', appId] as const,
+  connections: (appId: string) => ['connections', appId] as const,
+  dbSchema: (connectionId: string) => ['db-schema', connectionId] as const,
 };
+
+export const useConnections = (appId: string | null | undefined) =>
+  useQuery({
+    queryKey: qk.connections(appId ?? ''),
+    queryFn: () => api<DbConnection[]>(`/api/applications/${appId}/connections`),
+    enabled: !!appId,
+  });
 
 export const useRuns = (appId?: string) =>
   useQuery({

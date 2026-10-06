@@ -191,6 +191,7 @@ export const CLINIC_OPENAPI = {
         responses: {
           '201': { description: 'Created', ...json({ $ref: '#/components/schemas/Patient' }) },
           '401': err('Not logged in'),
+          '409': err('A patient with the same name and date of birth is already registered'),
           '422': err('Validation error'),
         },
       },
@@ -211,6 +212,7 @@ export const CLINIC_OPENAPI = {
         tags: ['Patients'],
         operationId: 'deletePatient',
         summary: 'Delete a patient (admin)',
+        description: 'Deletes the patient together with their appointments.',
         responses: {
           '204': { description: 'Deleted' },
           '401': err('Not logged in'),
