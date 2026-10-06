@@ -253,6 +253,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
           response: maskDeep(outcome.response),
           query: maskDeep(outcome.query),
           email: maskDeep(outcome.email),
+          perf: maskDeep(outcome.perf),
           screenshotPath: outcome.screenshotPath,
           healedLocator: outcome.healedLocator,
           metrics: outcome.metrics,
@@ -286,6 +287,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
           response: maskDeep(outcome?.response ?? evidence.response),
           query: maskDeep(outcome?.query),
           email: maskDeep(outcome?.email),
+          perf: maskDeep(outcome?.perf),
           healedLocator: outcome?.healedLocator,
           metrics: outcome?.metrics,
         };

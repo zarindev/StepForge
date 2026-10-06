@@ -55,6 +55,22 @@ export function defaultParams(type: string): Record<string, unknown> {
       return { connection: '', maxIssues: 0 };
     case 'email.waitForEmail':
       return { to: '', subject: '', timeoutMs: 30000 };
+    case 'perf.loadTest':
+      return {
+        method: 'GET',
+        url: '/',
+        profile: 'load',
+        vus: 10,
+        durationS: 30,
+        rampS: 5,
+        thresholds: { p95Ms: 800, maxErrorRatePct: 1 },
+      };
+    case 'perf.pageMetrics':
+      return { thresholds: { lcpMs: 2500, cls: 0.1 } };
+    case 'perf.lighthouse':
+      return { url: '/', thresholds: { performance: 80 } };
+    case 'perf.queryPlan':
+      return { connection: '', sql: 'SELECT 1', maxMs: 200, noFullScan: true };
     case 'email.extractFromEmail':
       return { kind: 'otp' };
     case 'email.openEmailLink':
@@ -75,8 +91,13 @@ export function summarizeStep(s: StepRecord): string {
   if (s.label) return s.label;
   const p = s.params as Record<string, unknown>;
   const target = s.locators[0] ? ` → ${s.locators[0].name ?? s.locators[0].value}` : '';
+  const reqs = Array.isArray(p.requests) ? (p.requests as { url?: string }[]) : [];
+  const first = reqs[0]?.url
+    ? `${reqs[0].url}${reqs.length > 1 ? ` (+${reqs.length - 1} more)` : ''}`
+    : undefined;
   const main =
     p.url ??
+    first ??
     p.sql ??
     p.script ??
     p.collection ??

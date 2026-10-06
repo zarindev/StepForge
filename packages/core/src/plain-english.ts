@@ -217,8 +217,20 @@ export function describeStep(step: AnyStep): string {
     case 'perf.pageMetrics':
       s = 'Measure page performance (LCP, CLS, TTFB)';
       break;
-    case 'perf.loadTest':
-      s = `Load test ${String(p.url ?? 'the endpoint')}`;
+    case 'perf.loadTest': {
+      const n = Array.isArray(p.requests) ? p.requests.length : 0;
+      s = `Load test ${n > 1 ? `${n} requests` : String(p.url ?? (p.requests as { url?: string }[] | undefined)?.[0]?.url ?? 'the endpoint')} with ${String(p.vus ?? 10)} users (${String(p.profile ?? 'load')})`;
+      break;
+    }
+    case 'perf.lighthouse':
+      s = `Run Lighthouse on ${String(p.url ?? '/')}`;
+      break;
+    case 'perf.queryPlan':
+      s = `Check the query plan of ${q(
+        String(p.sql ?? '')
+          .replace(/\s+/g, ' ')
+          .slice(0, 60),
+      )}`;
       break;
     case 'util.setVariable':
       s = `Remember ${q(p.value)} as ${String(p.name)}`;

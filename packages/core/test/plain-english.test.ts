@@ -53,6 +53,11 @@ describe('plain English', () => {
     ],
     [s('email.openEmailLink', { contains: '/verify' }), 'Open the "/verify" link in the email'],
     [s('db.query', { sql: 'SELECT 1', connection: 'main' }), 'Run the SQL query "SELECT 1" on main'],
+    [
+      s('perf.loadTest', { url: '/api/products', vus: 50, profile: 'stress' }),
+      'Load test /api/products with 50 users (stress)',
+    ],
+    [s('perf.lighthouse', { url: '/checkout' }), 'Run Lighthouse on /checkout'],
   ])('%#', (step, text) => {
     expect(describeStep(step)).toBe(text);
   });

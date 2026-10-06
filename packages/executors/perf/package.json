@@ -1,5 +1,5 @@
 {
-  "name": "@stepforge/executor-ui",
+  "name": "@stepforge/executor-perf",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,7 @@
   },
   "dependencies": {
     "@stepforge/core": "*",
-    "@stepforge/perf": "*",
-    "playwright": "1.63.0"
-  },
-  "devDependencies": {
-    "@stepforge/executor-util": "*"
+    "@stepforge/executor-db": "*",
+    "@stepforge/perf": "*"
   }
 }

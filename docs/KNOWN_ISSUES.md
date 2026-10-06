@@ -32,3 +32,10 @@
 | 28 | Email | Inboxes are polled every second (no IMAP IDLE); IMAP `SINCE` has day granularity, so the exact "received after the test started" check is done on the message time. | Fine for test volumes. |
 | 29 | Email | `openEmailLink` opens the link in the test's browser only when a UI step already opened one; otherwise it makes a plain HTTP request (no JavaScript runs). | Add a `ui.navigate` step first if the page needs a browser. |
 | 30 | Demo | CareClinic has sign-up with email verification only (what Phase 7's done-when needs). The spec's login-OTP flow and planted email bugs are left for the demo/benchmark phase. | Phase 14. |
+| 31 | Performance | The built-in engine holds a constant number of virtual users per stage (stages approximate ramps); k6 exports turn each stage into a 1 s ramp plus a hold. | By design. |
+| 32 | Performance | k6 runs report no per-second timeline (only the summary). | Possible later via k6's JSON output. |
+| 33 | Performance | When StepForge runs k6, resolved requests (which may include secrets) are passed to the k6 process in an environment variable — never written to disk, but visible to the same OS user. | By design; exported scripts use placeholders instead. |
+| 34 | Performance | Lighthouse loads pages without the test's session; logged-in pages need `perf.pageMetrics` after login steps. | Documented. |
+| 35 | Performance | Every UI test page gets the web-vitals script and a hidden `__stepforgeVitals` property. | Needed for page metrics; negligible overhead. |
+| 36 | Performance | Query plans for SQL Server and MongoDB are not implemented (timing works). | Possible later. |
+| 37 | Tests | Load-test unit tests target endpoints with a small artificial delay; unbounded load against a local server saturated the CPU and made parallel UI tests time out. | By design. |

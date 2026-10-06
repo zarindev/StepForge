@@ -9,13 +9,34 @@
 | 5 | API module, API Client, importers, contract check | ✅ Done |
 | 6 | Database module, SQL Workbench, data-quality audit, rollback | ✅ Done |
 | 7 | Email (Mailpit + IMAP), OTP/link extraction | ✅ Done |
-| 8 | Performance (metrics, Lighthouse, load, k6, query plans) | ⏳ Next |
-| 9 | Diagnosis engine, bug reports, report exports | — |
+| 8 | Performance (metrics, Lighthouse, load, k6, query plans) | ✅ Done |
+| 9 | Diagnosis engine, bug reports, report exports | ⏳ Next |
 | 10 | Analytics, quality gates, run comparison, flaky detection | — |
 | 11 | Scheduler, CLI, notifications, JUnit/HTML | — |
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 8 — Performance testing (2026-10-06)
+
+**Delivered**
+- **`@stepforge/perf`**: built-in load engine on autocannon (profiles smoke/load/stress/spike/soak as stages of constant concurrency, exact latency histogram with 0.01 ms resolution below 1 ms, per-second timeline with live ticks, cancel, limits of 1000 VUs / 1 h), threshold verdicts with margins (p95, p99, average, error rate, minimum throughput); **k6** export (stages, thresholds, placeholders → environment variables, secrets never written), k6 detection/installer (pinned v2.3.0) and a bridge that runs k6 and converts its summary; **Web Vitals** via the `web-vitals` library injected inside a closure (LCP, CLS, INP, FCP, TTFB, load time) with threshold checks; **Lighthouse 12** (Node 18+) in Playwright's Chromium with HTML reports and minimum scores.
+- **Query plans** in the DB package (`explainQuery`): SQLite, PostgreSQL and MySQL plans without EXPLAIN ANALYZE, full table scans picked out.
+- **Perf executor** (`@stepforge/executor-perf`): `perf.pageMetrics`, `perf.lighthouse`, `perf.loadTest` (endpoint or a request list, bearer/basic/apiKey auth, built-in or k6), `perf.queryPlan` (reads only; median time; `noFullScan`). Reports on the step (`perf`), evidence (`load_report`, `lighthouse`), and every metric stored in `perf_metrics`; load tests also in `load_results`.
+- **UI executor:** web-vitals in every page; the run option *Collect page metrics* records Web Vitals after each `ui.navigate`.
+- **Safety (Section 12):** load tests need the per-application authorization statement (stored with its timestamp); production environments need the application name typed; enforced in the designer API and in runs.
+- **Server:** perf info, authorization, Load Designer runs (`load.tick`/`load.finished` live events, cancel), k6 export/status/install/path, Lighthouse on demand (report served as an artifact).
+- **Dashboard:** **Performance** page — Load Designer (endpoint or API scenario, profile help, VUs/duration/ramp, thresholds, engine, live chart, report with verdicts and margins, export k6, save as test, typed production confirmation, authorization gate) and Lighthouse (scores, lab metrics, full report); Run dialog option for page metrics; typed forms and plain English for the four perf steps; perf panel in run results (load report, page metrics, Lighthouse scores + report, query plan); Settings → Performance (k6 status, install, custom path).
+- `docs/PERFORMANCE.md`, STEP_REFERENCE performance section; `npm run k6:install`; CI installs Mailpit and k6 for the integration job.
+- No demo-app changes (not needed for this phase).
+
+**Verified**
+- `npm test`: 217 tests (18 skipped: external database servers). New: histogram precision, profile stages, limits, threshold messages, k6 script content; the built-in engine against a local server (percentiles, timeline, verdicts, HTTP errors, bodies/headers, cancel); **real Chromium** for Web Vitals (no page global leaked) and **Lighthouse** (scores, HTML report, min-score failures); **real k6** (v2.2.0 from Homebrew and the pinned v2.3.0 download) running both the bridge and an exported script; 8 server tests.
+- **Done-when check:** a `perf.loadTest` scenario produces a load test report with threshold verdicts — passing thresholds pass, a 30 ms p95 limit against a 60 ms endpoint fails with "p95 latency … ms exceeded the threshold of 30 ms by … ms"; rows land in `load_results` and `perf_metrics`; runs without authorization are refused; production needs the typed name.
+- `npm run test:e2e`: 14 tests. The Phase 8 E2E confirms authorization, runs a load test from the designer with a live chart and a passing report, makes it fail on an impossible throughput threshold, exports and checks the k6 script, saves it as a test, and runs Lighthouse on CareClinic's login page.
+- Bugs found and fixed: sub-millisecond latencies showed as "0 ms"; the last partial second made the chart dip to zero; exported scripts assigned to `__ENV` (k6 ignores it) so `BASE_URL` became a constant; unbounded load in unit tests starved parallel tests.
 
 ---
 

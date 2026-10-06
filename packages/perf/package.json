@@ -1,5 +1,5 @@
 {
-  "name": "@stepforge/executor-ui",
+  "name": "@stepforge/perf",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,12 @@
   },
   "dependencies": {
     "@stepforge/core": "*",
-    "@stepforge/perf": "*",
-    "playwright": "1.63.0"
+    "autocannon": "^8.0.0",
+    "chrome-launcher": "^1.2.2",
+    "lighthouse": "^12.8.2",
+    "web-vitals": "^5.3.0"
   },
   "devDependencies": {
-    "@stepforge/executor-util": "*"
+    "@types/autocannon": "^7.12.7"
   }
 }

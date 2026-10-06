@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { ResultsGrid } from '@/components/database/results-grid';
 import { EmailPreview } from '@/components/email/email-preview';
+import { PerfPanel, type StepPerf } from '@/components/perf/perf-panel';
 import { Link, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Ban, Bandage, ChevronRight, FolderTree, Play, RotateCw, Terminal } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -353,13 +354,15 @@ function ItemPanel({
               ?.body;
             const dbq = (row.queryJson ?? (s as { query?: unknown }).query) as DbStepQuery | null | undefined;
             const email = extra?.email ?? (s as { email?: StepEmail }).email;
+            const perf = (extra?.perf ?? (s as { perf?: unknown }).perf) as StepPerf | undefined;
             const expandable = !!(
               extra?.assertions?.length ||
               extra?.healedLocator ||
               s.screenshotPath ||
               http ||
               dbq ||
-              email
+              email ||
+              perf
             );
             const live = s as LiveStep;
             const depth = live.depth ?? extra?.depth ?? 0;
@@ -458,6 +461,16 @@ function ItemPanel({
                     )}
                     {dbq && <DbQueryPanel q={dbq} />}
                     {email && <EmailPreview email={email} height={280} />}
+                    {perf && (
+                      <PerfPanel
+                        perf={perf}
+                        reportPath={
+                          perf.kind === 'lighthouse'
+                            ? d.artifacts.find((a) => a.kind === 'lighthouse')?.path
+                            : undefined
+                        }
+                      />
+                    )}
                     {extra?.assertions?.map((a, i) => (
                       <p key={i} className={a.passed ? 'text-pass' : 'text-fail'}>
                         {a.passed ? '✓' : '✗'} {a.message}
