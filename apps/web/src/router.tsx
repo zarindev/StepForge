@@ -5,6 +5,8 @@ import { NAV } from '@/lib/nav';
 import { ApplicationDetailPage } from '@/pages/application-detail';
 import { ApplicationsPage } from '@/pages/applications';
 import { ExplorerPage } from '@/pages/explorer';
+import { RunDetailPage } from '@/pages/run-detail';
+import { RunsPage } from '@/pages/runs';
 import { HomePage } from '@/pages/home';
 import { PlaceholderPage } from '@/pages/placeholder';
 import { SettingsPage } from '@/pages/settings';
@@ -14,6 +16,7 @@ const rootRoute = createRootRoute({ component: Layout });
 const pages: Record<string, () => React.ReactNode> = {
   '/': HomePage,
   '/applications': ApplicationsPage,
+  '/runs': RunsPage,
   '/settings': SettingsPage,
 };
 
@@ -53,6 +56,12 @@ const explorerRoute = createRoute({
   component: ExplorerPage,
 });
 
+const runDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/runs/$runId',
+  component: RunDetailPage,
+});
+
 const applicationDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/applications/$appId',
@@ -60,7 +69,7 @@ const applicationDetailRoute = createRoute({
 });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([...navRoutes, explorerRoute, applicationDetailRoute]),
+  routeTree: rootRoute.addChildren([...navRoutes, explorerRoute, applicationDetailRoute, runDetailRoute]),
   defaultNotFoundComponent: () => <p className="text-sm text-muted">Page not found.</p>,
 });
 

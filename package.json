@@ -12,7 +12,8 @@
   "workspaces": [
     "apps/*",
     "packages/*",
-    "packages/executors/*"
+    "packages/executors/*",
+    "demo/*"
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
@@ -26,7 +27,8 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate --config packages/db/drizzle.config.ts",
     "check:secrets": "node scripts/check-no-secrets.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "demo:clinic": "npm run start -w @stepforge/demo-clinic"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

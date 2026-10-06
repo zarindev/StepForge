@@ -1,0 +1,13 @@
+{
+  "name": "@stepforge/executor-util",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^9.9.0",
+    "@stepforge/core": "*"
+  }
+}

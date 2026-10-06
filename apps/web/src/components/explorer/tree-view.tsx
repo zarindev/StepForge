@@ -8,8 +8,10 @@ import {
   Layers,
   MoreHorizontal,
   Pencil,
+  Play,
   Trash2,
 } from 'lucide-react';
+import { StatusIcon } from '@/components/runs/status';
 import { useState, type DragEvent } from 'react';
 import { Badge, PRIORITY_TONE } from '@/components/ui/badge';
 import { Menu } from '@/components/ui/menu';
@@ -31,6 +33,7 @@ export type TreeActions = {
   onDeleteScenario: (s: ScenarioSummary) => void;
   onMoveModule: (id: string, parentId: string | null) => void;
   onMoveScenarios: (ids: string[], moduleId: string) => void;
+  onRunModule: (m: ModuleTreeNode) => void;
 };
 
 export function KindIcon({ kind, className }: { kind: string; className?: string }) {
@@ -56,9 +59,11 @@ export function TreeView({
   onToggleCheck,
   forceExpand,
   actions,
+  lastResults,
 }: {
   nodes: ModuleTreeNode[];
   selectedId: string | null;
+  lastResults: Record<string, string>;
   checked: Set<string>;
   onToggleCheck: (id: string) => void;
   forceExpand: boolean;
@@ -76,6 +81,7 @@ export function TreeView({
 
   const ctx = {
     selectedId,
+    lastResults,
     checked,
     onToggleCheck,
     actions,
@@ -121,6 +127,7 @@ export function TreeView({
 
 type Ctx = {
   selectedId: string | null;
+  lastResults: Record<string, string>;
   checked: Set<string>;
   onToggleCheck: (id: string) => void;
   actions: TreeActions;
@@ -196,6 +203,12 @@ function ModuleRow({ node, depth, ctx }: { node: ModuleTreeNode; depth: number; 
               </button>
             )}
             items={[
+              {
+                label: 'Run module',
+                icon: Play,
+                onSelect: () => ctx.actions.onRunModule(node),
+                disabled: node.total === 0,
+              },
               { label: 'New scenario', icon: FilePlus2, onSelect: () => ctx.actions.onNewScenario(node.id) },
               { label: 'New sub-module', icon: FolderPlus, onSelect: () => ctx.actions.onNewModule(node.id) },
               { label: 'Rename', icon: Pencil, onSelect: () => ctx.actions.onRenameModule(node) },
@@ -283,6 +296,7 @@ function ScenarioRow({
         />
         <KindIcon kind={s.kind} />
         <span className={cn('truncate', selected && 'font-medium')}>{s.name}</span>
+        {ctx.lastResults[s.id] && <StatusIcon status={ctx.lastResults[s.id]!} className="h-3.5 w-3.5" />}
         <Badge tone={PRIORITY_TONE[s.priority]} className="ml-auto shrink-0">
           {s.priority}
         </Badge>

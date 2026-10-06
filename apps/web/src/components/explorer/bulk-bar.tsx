@@ -9,7 +9,8 @@ export type BulkAction =
   | { action: 'duplicate' }
   | { action: 'move'; moduleId: string }
   | { action: 'addTag'; tagId: string }
-  | { action: 'setStatus'; status: string };
+  | { action: 'setStatus'; status: string }
+  | { action: 'run' };
 
 export function BulkBar({
   count,
@@ -76,7 +77,7 @@ export function BulkBar({
       <Button variant="ghost" size="sm" className="text-fail" onClick={() => onAction({ action: 'delete' })}>
         <Trash2 className="h-3.5 w-3.5" /> Delete
       </Button>
-      <Button size="sm" disabled title="The runner arrives in Phase 3">
+      <Button size="sm" onClick={() => onAction({ action: 'run' })}>
         <Play className="h-3.5 w-3.5" /> Run
       </Button>
       <button

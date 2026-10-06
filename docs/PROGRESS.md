@@ -4,8 +4,8 @@
 |---|---|---|
 | 1 | Foundation: monorepo, core, db, crypto, server, web shell, scripts, CI | ✅ Done |
 | 2 | Applications, environments, secrets, modules, tags, Test Explorer, CRUD, versions | ✅ Done |
-| 3 | Scenario engine, UI executor, runner, live view, evidence, results | ⏳ Next |
-| 4 | Recorder, Scenario Editor (list/flow/plain-English) | — |
+| 3 | Scenario engine, UI executor, runner, live view, evidence, results | ✅ Done |
+| 4 | Recorder, Scenario Editor (list/flow/plain-English) | ⏳ Next |
 | 5 | API module, API Client, importers, contract check | — |
 | 6 | Database module, SQL Workbench, data-quality audit, rollback | — |
 | 7 | Email (Mailpit + IMAP), OTP/link extraction | — |
@@ -16,6 +16,25 @@
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 3 — Engine, UI executor, runner and results (2026-10-06)
+
+**Delivered**
+- **Scenario engine** (`@stepforge/core/engine`): `runTestCase()` shared by server and (later) CLI. Lazily creates one executor session per step group, resolves variables per step, enforces step timeouts (plus an outer guard), step-level retries, `continueOnFail` (soft failure), `captureAs`, generic assertions (`evaluateAssertion`, 15 operators), cancellation via `AbortSignal`, failure evidence hooks and secret masking of messages and captured vars. Failures are classified (`assertion`, `timeout`, `element_not_found`, `network`, … → `failed`; `variable`, `unsupported`, `invalid_params`, `script` → `broken`).
+- **UI executor** (`@stepforge/executor-ui`, Playwright 1.63): browser pool per run, fresh context per test case, all `ui.*` steps except `visualCheckpoint`; ranked multi-strategy locators with one native wait (clean traces) and **self-healing** reporting; dialogs, tabs and iframes; per-step JPEG screenshots; on failure a PNG screenshot and DOM snapshot; console (incl. page errors with location) and network logs; video and Playwright trace kept per policy (`off`/`onFailure`/`always`).
+- **Utility executor** (`@stepforge/executor-util`): `setVariable`, `generateData` (Faker + patterns), `wait` (flagged), `log`, sandboxed `runScript` (`node:vm`, timeout, no require/process/eval).
+- **Runner** (`apps/server/src/runner`): scope expansion (application, module incl. sub-modules, tag, scenarios, test cases; deprecated scenarios and skipped test cases left out unless explicitly chosen), persisted queue, one run at a time with N parallel workers, run-level retries → `flaky`, stop on first failure, cancel, resume interrupted runs, delete with artifacts, graceful shutdown marks the active run interrupted. Run items keep a label snapshot so history stays readable after edits/deletes (migration `0001_run_details`, with a hand-fixed `ON DELETE SET NULL`).
+- **API**: `POST/GET /api/runs`, `GET /api/runs/:id`, `GET /api/run-items/:id`, `cancel`, `resume`, `DELETE`, `/api/applications/:id/last-results`; evidence files at `/api/artifacts/files/*` (token required, HTTP range support for video); Playwright **Trace Viewer** served locally at `/trace-viewer/`.
+- **Dashboard**: Run dialog (scope, environment with production warning, browser, viewport, workers, retries, video/trace, headed, stop on first failure; remembers your choices), Run buttons in the top bar, scenario panel, module menu and bulk bar; **Runs** list (status, totals bar, resume, delete); **live run / results view** (progress, per-test status, current step, live screenshot, streamed log, cancel, run again, filters, step timeline with durations, assertion results, healed-locator notes, screenshot lightbox, video player, embedded Trace Viewer, console and network tables); last-result icons in the Test Explorer.
+- **CareClinic demo app** (first slice, `demo/clinic-app`, port 8101): login with three roles, dashboard, patients (search, register with validation), appointments (booking with double-booking check), REST API with bearer/cookie auth, `POST /api/reset`; about half the elements carry `data-testid`. `demo/start-demos.sh|bat`, `npm run demo:clinic`.
+- `docs/STEP_REFERENCE.md` for UI and utility steps.
+
+**Verified**
+- `npm test`: 89 tests. New: 9 engine tests + 12 assertion cases, 5 util-executor tests, 6 UI-executor tests on a fixture page (all locator strategies, healing, dialogs, tabs, iframe, evidence kept/discarded by policy, not-found message), 3 CareClinic tests, 5 runner integration tests driving real Chromium against CareClinic (13-step booking flow passes with per-step screenshots and no secret persisted; failing login keeps video/trace/DOM/console/network and serves video with HTTP 206; retry-then-pass becomes `flaky`; module run with 2 workers cancelled → all skipped; empty scope rejected; run delete).
+- `npm run test:e2e`: 8 tests, stable across repeated parallel runs. The new Phase 3 E2E runs a scenario from the Explorer against CareClinic and checks 11 timeline steps with screenshots, then a module run (1 passed, 1 failed) with the error, video, embedded Trace Viewer, network tab, and the failed icon in the Explorer.
+- Bugs found and fixed during the phase: the engine kept retrying after a non-retryable failure; Drizzle dropped `ON DELETE SET NULL` from an `ALTER TABLE` foreign key; locator polling flooded Playwright traces with "Query count" actions.
 
 ---
 

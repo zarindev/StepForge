@@ -6,6 +6,9 @@ import { useLiveEvent, type LiveEvent } from './live';
 import type {
   Application,
   Environment,
+  RunDetail,
+  RunItemDetail,
+  RunListRow,
   ScenarioDetail,
   ScenarioVersion,
   SecretMeta,
@@ -22,7 +25,31 @@ export const qk = {
   tree: (appId: string) => ['tree', appId] as const,
   scenario: (id: string) => ['scenario', id] as const,
   versions: (id: string) => ['versions', id] as const,
+  runs: (appId?: string) => ['runs', appId ?? 'all'] as const,
+  run: (id: string) => ['run', id] as const,
+  runItem: (id: string) => ['run-item', id] as const,
+  lastResults: (appId: string) => ['last-results', appId] as const,
 };
+
+export const useRuns = (appId?: string) =>
+  useQuery({
+    queryKey: qk.runs(appId),
+    queryFn: () => api<RunListRow[]>(`/api/runs${appId ? `?applicationId=${appId}` : ''}`),
+  });
+export const useRun = (id: string) =>
+  useQuery({ queryKey: qk.run(id), queryFn: () => api<RunDetail>(`/api/runs/${id}`) });
+export const useRunItem = (id: string | null) =>
+  useQuery({
+    queryKey: qk.runItem(id ?? ''),
+    queryFn: () => api<RunItemDetail>(`/api/run-items/${id}`),
+    enabled: !!id,
+  });
+export const useLastResults = (appId: string | null | undefined) =>
+  useQuery({
+    queryKey: qk.lastResults(appId ?? ''),
+    queryFn: () => api<Record<string, string>>(`/api/applications/${appId}/last-results`),
+    enabled: !!appId,
+  });
 
 export const useApplications = () =>
   useQuery({ queryKey: qk.applications, queryFn: () => api<Application[]>('/api/applications') });
@@ -99,6 +126,17 @@ export function useLiveInvalidation(): void {
         qc.invalidateQueries({ queryKey: qk.applications });
         qc.invalidateQueries({ queryKey: ['scenario'] });
         qc.invalidateQueries({ queryKey: ['versions'] });
+      }
+      if (e.type === 'run.updated') {
+        const run = e.run as { id: string; applicationId: string };
+        qc.invalidateQueries({ queryKey: ['runs'] });
+        qc.invalidateQueries({ queryKey: qk.run(run.id) });
+        qc.invalidateQueries({ queryKey: qk.lastResults(run.applicationId) });
+      }
+      if (e.type === 'item.updated') {
+        const item = e.item as { id: string; runId: string };
+        qc.invalidateQueries({ queryKey: qk.run(item.runId) });
+        qc.invalidateQueries({ queryKey: qk.runItem(item.id) });
       }
     },
     [qc],

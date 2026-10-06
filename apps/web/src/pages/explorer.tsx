@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { AppWindow, FolderPlus, FolderTree, ListFilter, MousePointerClick, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { BulkBar, type BulkAction } from '@/components/explorer/bulk-bar';
+import { openRunDialog } from '@/components/runs/run-dialog';
 import { PromptDialog } from '@/components/explorer/prompt-dialog';
 import { ScenarioPanel, type PanelTab } from '@/components/explorer/scenario-panel';
 import { TreeView, type TreeActions } from '@/components/explorer/tree-view';
@@ -14,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/states';
 import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { qk, useCurrentApp, useTags, useTree } from '@/lib/queries';
+import { qk, useCurrentApp, useLastResults, useTags, useTree } from '@/lib/queries';
 import {
   buildTree,
   EMPTY_FILTERS,
@@ -38,6 +39,7 @@ export function ExplorerPage() {
   const navigate = useNavigate({ from: '/explorer' });
   const tree = useTree(app?.id);
   const tags = useTags(app?.id);
+  const lastResults = useLastResults(app?.id);
   const qc = useQueryClient();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
@@ -102,6 +104,12 @@ export function ExplorerPage() {
         undefined,
         'Module moved',
       ),
+    onRunModule: (m) =>
+      openRunDialog({
+        applicationId: app!.id,
+        scope: { type: 'module', id: m.id },
+        label: `Run module "${m.name}" and its sub-modules`,
+      }),
     onMoveScenarios: (ids, moduleId) =>
       bulk(
         { action: 'move', ids, moduleId },
@@ -113,6 +121,13 @@ export function ExplorerPage() {
     const ids = [...checked];
     if (a.action === 'delete')
       return setConfirm({ kind: 'scenarios', ids, label: `${ids.length} scenarios` });
+    if (a.action === 'run') {
+      return openRunDialog({
+        applicationId: app!.id,
+        scope: { type: 'scenarios', ids },
+        label: `Run ${ids.length} selected scenario(s)`,
+      });
+    }
     const labels = {
       duplicate: 'Duplicated',
       move: 'Moved',
@@ -320,6 +335,7 @@ export function ExplorerPage() {
               nodes={nodes}
               selectedId={selectedId}
               checked={checked}
+              lastResults={lastResults.data ?? {}}
               forceExpand={filtering}
               onToggleCheck={(id) =>
                 setChecked((c) => {

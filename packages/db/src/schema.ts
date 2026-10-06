@@ -264,6 +264,7 @@ export const runs = sqliteTable(
     browser: text('browser').notNull().default('chromium'),
     viewport: text('viewport').notNull().default('desktop'),
     workers: integer('workers').notNull().default(1),
+    optionsJson: json<Record<string, unknown>>('options_json').notNull().default({}),
     status: text('status', {
       enum: ['queued', 'running', 'passed', 'failed', 'interrupted', 'cancelled'],
     })
@@ -285,6 +286,15 @@ export const runItems = sqliteTable(
     id: id(),
     runId: fk('run_id', () => runs.id).notNull(),
     testCaseId: fk('test_case_id', () => testCases.id, 'set null'),
+    scenarioId: fk('scenario_id', () => scenarios.id, 'set null'),
+    /** Snapshot of names at run time so history stays readable after edits or deletes. */
+    labelJson: json<{
+      scenario: string;
+      modulePath: string[];
+      testCaseCode: string | null;
+      testCaseTitle: string | null;
+    }>('label_json'),
+    position: integer('position').notNull().default(0),
     scenarioVersion: integer('scenario_version').notNull().default(1),
     status: text('status', { enum: ['queued', 'running', 'passed', 'failed', 'broken', 'skipped', 'flaky'] })
       .notNull()
@@ -296,7 +306,11 @@ export const runItems = sqliteTable(
     diagnosisJson: json<unknown>('diagnosis_json'),
     ...timestamps,
   },
-  (t) => [index('run_items_run_idx').on(t.runId), index('run_items_tc_idx').on(t.testCaseId)],
+  (t) => [
+    index('run_items_run_idx').on(t.runId),
+    index('run_items_tc_idx').on(t.testCaseId),
+    index('run_items_scenario_idx').on(t.scenarioId),
+  ],
 );
 
 export const stepResults = sqliteTable(
@@ -306,6 +320,8 @@ export const stepResults = sqliteTable(
     runItemId: fk('run_item_id', () => runItems.id).notNull(),
     stepId: text('step_id'),
     position: integer('position').notNull(),
+    type: text('type').notNull().default(''),
+    label: text('label').notNull().default(''),
     status: text('status').notNull(),
     durationMs: integer('duration_ms'),
     message: text('message'),

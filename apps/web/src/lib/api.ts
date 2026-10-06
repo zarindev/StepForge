@@ -19,6 +19,16 @@ export function sessionToken(): string {
   return window.__STEPFORGE__?.token ?? '';
 }
 
+/** URL of an evidence file; the token travels as a query param because <img>/<video> cannot set headers. */
+export function artifactUrl(path: string): string {
+  return `/api/artifacts/files/${path.split('/').map(encodeURIComponent).join('/')}?token=${encodeURIComponent(sessionToken())}`;
+}
+
+/** Opens Playwright's Trace Viewer (served locally) on a trace artifact. */
+export function traceViewerUrl(path: string): string {
+  return `/trace-viewer/index.html?trace=${encodeURIComponent(location.origin + artifactUrl(path))}`;
+}
+
 /** Typed fetch wrapper for the local StepForge API. Adds the session token to every request. */
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, headers, ...rest } = init;

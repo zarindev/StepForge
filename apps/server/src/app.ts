@@ -1,6 +1,6 @@
 import fastifyWebsocket from '@fastify/websocket';
 import { loadOrCreateKey } from '@stepforge/crypto';
-import { openDatabase, schema } from '@stepforge/db';
+import { getSetting, openDatabase, schema } from '@stepforge/db';
 import { inArray } from 'drizzle-orm';
 import Fastify, { type FastifyInstance, LogController } from 'fastify';
 import { mkdirSync } from 'node:fs';
@@ -11,7 +11,9 @@ import { registerApplicationRoutes } from './routes/applications.ts';
 import { registerLiveRoutes } from './routes/live.ts';
 import { registerStaticRoutes } from './routes/static.ts';
 import { registerSystemRoutes } from './routes/system.ts';
+import { registerRunRoutes } from './routes/runs.ts';
 import { registerTestRoutes } from './routes/tests.ts';
+import { RunManager } from './runner/manager.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
 
 export type BuildOptions = {
@@ -47,13 +49,18 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     .run();
   if (interrupted.changes > 0) app.log.warn(`Marked ${interrupted.changes} unfinished run(s) as interrupted`);
 
+  const masterKey = loadOrCreateKey(config.keyFile);
+  const bus = new EventBus();
   const ctx: AppContext = {
     config,
     db,
     sqlite,
-    masterKey: loadOrCreateKey(config.keyFile),
+    masterKey,
     token: opts.token ?? generateSessionToken(),
-    bus: new EventBus(),
+    bus,
+    runs: new RunManager(db, bus, config.artifactsDir, masterKey, () => ({
+      timeoutMs: getSetting(db, 'defaultTimeoutMs', 15_000),
+    })),
     startedAt: new Date(),
   };
 
@@ -80,9 +87,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerLiveRoutes(app, ctx);
   registerApplicationRoutes(app, ctx);
   registerTestRoutes(app, ctx);
+  await registerRunRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   app.addHook('onClose', async () => {
+    await ctx.runs.shutdown();
     sqlite.close();
   });
   return { app, ctx };
