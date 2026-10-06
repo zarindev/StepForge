@@ -28,6 +28,8 @@ import { registerPerfRoutes } from './routes/perf.ts';
 import { registerBugRoutes } from './routes/bugs.ts';
 import { registerAnalyticsRoutes } from './routes/analytics.ts';
 import { registerScheduleRoutes } from './routes/schedules.ts';
+import { registerCodegenRoutes } from './routes/codegen.ts';
+import { CodegenService } from './codegen/service.ts';
 import { SchedulerService } from './scheduler/service.ts';
 import { rebuildDaily } from '@stepforge/analytics';
 import { closePdfBrowser } from '@stepforge/reports';
@@ -124,6 +126,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     perf,
     diagnosis,
     scheduler: undefined as unknown as SchedulerService,
+    codegen: new CodegenService(db, config.artifactsDir),
     startedAt: new Date(),
   };
   ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);
@@ -160,6 +163,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerBugRoutes(app, ctx);
   registerAnalyticsRoutes(app, ctx);
   registerScheduleRoutes(app, ctx);
+  registerCodegenRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal.

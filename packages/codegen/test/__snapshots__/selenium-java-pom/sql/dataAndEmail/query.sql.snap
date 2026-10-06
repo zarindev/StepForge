@@ -1,0 +1,3 @@
+-- Data and email: Run the SQL query "SELECT 1" on legacy
+-- connection: legacy (mssql)
+SELECT 1

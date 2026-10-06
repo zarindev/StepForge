@@ -14,6 +14,7 @@
     "@fastify/static": "^10.1.5",
     "@fastify/websocket": "^11.2.0",
     "@stepforge/analytics": "*",
+    "@stepforge/codegen": "*",
     "@stepforge/core": "*",
     "@stepforge/crypto": "*",
     "@stepforge/db": "*",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@stepforge/demo-clinic": "*",
-    "@types/ws": "^8.18.2"
+    "@types/ws": "^8.18.2",
+    "jszip": "^3.10.1"
   }
 }

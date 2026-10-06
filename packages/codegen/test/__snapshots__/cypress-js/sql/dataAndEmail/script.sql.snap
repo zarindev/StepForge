@@ -1,0 +1,4 @@
+-- Data and email: Run a SQL script on local
+-- connection: local (sqlite)
+DELETE FROM carts;
+VACUUM;

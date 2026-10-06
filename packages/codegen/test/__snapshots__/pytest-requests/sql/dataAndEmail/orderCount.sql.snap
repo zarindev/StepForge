@@ -1,0 +1,5 @@
+-- Data and email: Order count
+-- connection: main (pg)
+SELECT COUNT(*) AS n
+FROM orders
+WHERE email = $1

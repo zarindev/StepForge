@@ -29,6 +29,7 @@
     "db:generate": "drizzle-kit generate --config packages/db/drizzle.config.ts",
     "check:secrets": "node scripts/check-no-secrets.mjs",
     "test:e2e": "playwright test",
+    "verify:export": "tsx scripts/verify-export.ts",
     "demo:clinic": "npm run start -w @stepforge/demo-clinic",
     "mailpit:install": "tsx scripts/install-mailpit.ts",
     "k6:install": "tsx scripts/install-k6.ts"

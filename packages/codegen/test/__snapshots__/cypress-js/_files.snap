@@ -1,0 +1,42 @@
+.env.example (21 lines)
+.github/workflows/stepforge-tests.yml (26 lines)
+.gitignore (6 lines)
+.gitlab-ci.yml (13 lines)
+cypress.config.js (30 lines)
+cypress/e2e/api/orders-api.cy.js (268 lines)
+cypress/e2e/back-office/data-and-email.cy.js (125 lines)
+cypress/e2e/shop/checkout/checkout-with-every-ui-step.cy.js (186 lines)
+cypress/plugins/db.cjs (133 lines)
+cypress/plugins/mail.cjs (151 lines)
+cypress/support/api.js (25 lines)
+cypress/support/config.js (15 lines)
+cypress/support/e2e.js (11 lines)
+cypress/support/helpers.js (217 lines)
+cypress/support/mail.js (123 lines)
+package.json (20 lines)
+README.md (73 lines)
+sql/dataAndEmail/orderCount.sql (6 lines)
+sql/dataAndEmail/procedure.sql (4 lines)
+sql/dataAndEmail/query.sql (4 lines)
+sql/dataAndEmail/query2.sql (4 lines)
+sql/dataAndEmail/script.sql (5 lines)
+
+Warnings:
+- Checkout with every UI step | Receipt looks right | visual checkpoints are not exported; add a screenshot comparison in the target framework
+- Orders API | Create an order | the JSON Schema check on "$" is not exported
+- Orders API | OAuth (not exported) | auth type "oauth2" is not exported; set the header yourself
+- Data and email | db.query | SQL Server helpers are not generated; the SQL file is exported for reference
+- Data and email | db.mongoFind | MongoDB steps are not exported; use the MongoDB driver of the target language
+- Data and email | db.dataQualityCheck | the data-quality audit runs only in StepForge
+- Data and email | db.query | the "unknown" connection is not set up in this environment; all database drivers are included and DB_UNKNOWN_URL decides
+- Data and email | email.waitForEmail | IMAP inboxes are not exported; the helper reads a Mailpit server (MAILPIT_URL)
+- Data and email | perf.pageMetrics | performance measurements run only in StepForge
+- Data and email | perf.lighthouse | performance measurements run only in StepForge
+- Data and email | perf.loadTest | load tests are not part of functional tests; export the scenario to k6 instead
+- Data and email | perf.queryPlan | performance measurements run only in StepForge
+- Checkout with every UI step |  | drag and drop needs a plugin in Cypress (e.g. @4tw/cypress-drag-drop)
+- Checkout with every UI step |  | iframes need a plugin in Cypress (e.g. cypress-iframe)
+- Checkout with every UI step |  | Cypress cannot control several tabs; remove the target="_blank" or visit the URL directly
+- Checkout with every UI step |  | Cypress cannot control several tabs; remove the target="_blank" or visit the URL directly
+- Checkout with every UI step |  | Cypress cannot control several tabs; remove the target="_blank" or visit the URL directly
+- Orders API |  | multipart bodies are sent as JSON by cy.request; check the request

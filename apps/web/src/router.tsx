@@ -18,6 +18,7 @@ import { BugsPage } from '@/pages/bugs';
 import { AnalyticsPage } from '@/pages/analytics';
 import { ComparePage } from '@/pages/compare';
 import { SchedulesPage } from '@/pages/schedules';
+import { ExportsPage } from '@/pages/exports';
 
 const rootRoute = createRootRoute({ component: Layout });
 
@@ -55,7 +56,6 @@ const navRoutes = [
   navRoute('/performance'),
   navRoute('/runs'),
   navRoute('/schedules'),
-  navRoute('/exports'),
   navRoute('/settings'),
 ];
 
@@ -77,6 +77,14 @@ const compareRoute = createRoute({
   path: '/runs/compare',
   validateSearch: (s) => z.object({ base: z.string().optional(), head: z.string().optional() }).parse(s),
   component: ComparePage,
+});
+
+const exportsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/exports',
+  /** `scenario` preselects one scenario (Explorer → Export code). */
+  validateSearch: (s) => z.object({ scenario: z.string().optional() }).parse(s),
+  component: ExportsPage,
 });
 
 const bugsRoute = createRoute({
@@ -111,6 +119,7 @@ export const router = createRouter({
   routeTree: rootRoute.addChildren([
     ...navRoutes,
     sqlRoute,
+    exportsRoute,
     bugsRoute,
     analyticsRoute,
     compareRoute,
