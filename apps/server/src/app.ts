@@ -4,6 +4,7 @@ import { getSetting, openDatabase, schema } from '@stepforge/db';
 import { inArray } from 'drizzle-orm';
 import Fastify, { type FastifyInstance, LogController } from 'fastify';
 import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { ZodError } from 'zod';
 import { loadConfig, type ServerConfig } from './config.ts';
 import { EventBus, type AppContext } from './context.ts';
@@ -13,7 +14,9 @@ import { registerStaticRoutes } from './routes/static.ts';
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerRunRoutes } from './routes/runs.ts';
 import { registerTestRoutes } from './routes/tests.ts';
+import { SpecService } from './api/specs.ts';
 import { RecorderManager } from './recorder/manager.ts';
+import { registerApiRoutes } from './routes/api.ts';
 import { registerRecorderRoutes } from './routes/recorder.ts';
 import { RunManager } from './runner/manager.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
@@ -52,6 +55,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   if (interrupted.changes > 0) app.log.warn(`Marked ${interrupted.changes} unfinished run(s) as interrupted`);
 
   const masterKey = loadOrCreateKey(config.keyFile);
+  const specs = new SpecService(db, join(config.dataDir, 'specs'));
   const bus = new EventBus();
   const ctx: AppContext = {
     config,
@@ -60,10 +64,18 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     masterKey,
     token: opts.token ?? generateSessionToken(),
     bus,
-    runs: new RunManager(db, bus, config.artifactsDir, masterKey, () => ({
-      timeoutMs: getSetting(db, 'defaultTimeoutMs', 15_000),
-    })),
+    runs: new RunManager(
+      db,
+      bus,
+      config.artifactsDir,
+      masterKey,
+      () => ({
+        timeoutMs: getSetting(db, 'defaultTimeoutMs', 15_000),
+      }),
+      specs,
+    ),
     recorder: new RecorderManager(db, masterKey, bus),
+    specs,
     startedAt: new Date(),
   };
 
@@ -92,6 +104,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerTestRoutes(app, ctx);
   await registerRunRoutes(app, ctx);
   registerRecorderRoutes(app, ctx);
+  registerApiRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   app.addHook('onClose', async () => {

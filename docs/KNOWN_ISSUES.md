@@ -17,3 +17,7 @@
 | 13 | Recorder | One recording at a time. The recording browser is always Chromium; replays can use any browser. | By design. |
 | 14 | E2E | Dashboard E2E specs run serially because they share one CareClinic instance. | By design. |
 | 15 | Bundle | The dashboard's main JS chunk is ~760 kB (231 kB gzip); Monaco (~3 MB) and React Flow are lazy-loaded. Fine for localhost; revisit splitting in Phase 13. | Phase 13. |
+| 16 | API | OAuth2 supports the client-credentials grant only (authorization-code flows need a browser; record them with the Recorder or store a token as a secret). | By design. |
+| 17 | API | Generated happy paths use the spec's examples as-is, so non-idempotent ones (e.g. booking a fixed slot) pass once per data reset. Use test cases with `{{random.*}}`/generated data for repeatable runs. | Documented. |
+| 18 | API | In the API Client, variables set during runs (e.g. `{{vars.auth.token}}` from the Authenticate block) are not available; the client explains which variable is missing. | By design. |
+| 19 | Importers | CSV datasets (data-driven runs) are not imported yet. | Planned with datasets. |

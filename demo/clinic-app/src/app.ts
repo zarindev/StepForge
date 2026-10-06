@@ -2,6 +2,7 @@ import formbody from '@fastify/formbody';
 import type Database from 'better-sqlite3';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { DEMO_CREDENTIALS, hash, openClinicDb, seed, token } from './db.ts';
+import { CLINIC_OPENAPI, TIME_SLOTS } from './openapi.ts';
 import { esc, layout, loginView } from './views.ts';
 
 type User = { id: number; email: string; name: string; role: 'admin' | 'doctor' | 'receptionist' };
@@ -51,7 +52,8 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
     if (!u) void reply.redirect(`/login?next=${encodeURIComponent(req.url)}`);
     return u;
   };
-  const login = (email: string, password: string): string | undefined => {
+  const login = (email: unknown, password: unknown): string | undefined => {
+    if (typeof email !== 'string' || typeof password !== 'string') return undefined;
     const u = db
       .prepare('SELECT id FROM users WHERE email = ? AND password_hash = ?')
       .get(email.trim().toLowerCase(), hash(password)) as { id: number } | undefined;
@@ -70,11 +72,14 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
     };
     return `PAT-${(row.m ?? 1000) + 1}`;
   };
-  const validatePatient = (b: Record<string, string | undefined>): string | undefined => {
-    if (!b.full_name?.trim()) return 'Full name is required';
-    if (!b.dob || !/^\d{4}-\d{2}-\d{2}$/.test(b.dob)) return 'Date of birth must be YYYY-MM-DD';
-    if (!b.phone || !/^[+\d][\d\s-]{6,}$/.test(b.phone)) return 'Phone number is invalid';
-    if (b.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email)) return 'Email address is invalid';
+  const validatePatient = (b: Record<string, unknown>): string | undefined => {
+    for (const k of ['full_name', 'dob', 'phone', 'email', 'insurance']) {
+      if (b[k] !== undefined && b[k] !== null && typeof b[k] !== 'string') return `${k} must be a string`;
+    }
+    if (!(b.full_name as string | undefined)?.trim()) return 'Full name is required';
+    if (!b.dob || !/^\d{4}-\d{2}-\d{2}$/.test(b.dob as string)) return 'Date of birth must be YYYY-MM-DD';
+    if (!b.phone || !/^[+\d][\d\s-]{6,}$/.test(b.phone as string)) return 'Phone number is invalid';
+    if (b.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email as string)) return 'Email address is invalid';
     return undefined;
   };
   const createPatient = (b: Record<string, string | undefined>): Patient => {
@@ -267,11 +272,16 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
       <label for="reason">Reason for visit</label><textarea id="reason" name="reason" rows="2">${esc(b.reason)}</textarea>
       <p><button type="submit" data-testid="book-appointment">Book appointment</button></p></form></div>`;
   };
-  const validateAppointment = (b: Record<string, string | undefined>): string | undefined => {
+  const validateAppointment = (b: Record<string, string>): string | undefined => {
     if (!b.patient_id) return 'Please select a patient';
     if (!b.doctor_id) return 'Please select a doctor';
     if (!b.date || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return 'Please choose a date';
     if (!b.time) return 'Please choose a time';
+    if (!TIME_SLOTS.includes(b.time)) return 'Please choose one of the available time slots';
+    if (!/^\d+$/.test(b.patient_id) || !db.prepare('SELECT 1 FROM patients WHERE id = ?').get(b.patient_id))
+      return 'Unknown patient';
+    if (!/^\d+$/.test(b.doctor_id) || !db.prepare('SELECT 1 FROM doctors WHERE id = ?').get(b.doctor_id))
+      return 'Unknown doctor';
     const clash = db
       .prepare(
         "SELECT 1 FROM appointments WHERE doctor_id = ? AND date = ? AND time = ? AND status = 'booked'",
@@ -303,6 +313,7 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
 
   // ─── REST API ───────────────────────────────────────────────────────────
   app.get('/api/health', async () => ({ ok: true, app: 'CareClinic' }));
+  app.get('/api/openapi.json', async () => CLINIC_OPENAPI);
   app.post<{ Body: { email?: string; password?: string } }>('/api/auth/login', async (req, reply) => {
     const t = login(req.body?.email ?? '', req.body?.password ?? '');
     if (!t)
@@ -311,13 +322,20 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
   });
   app.addHook('onRequest', async (req, reply) => {
     const path = req.url.split('?')[0]!;
-    if (!path.startsWith('/api/') || ['/api/health', '/api/auth/login', '/api/reset'].includes(path)) return;
+    if (
+      !path.startsWith('/api/') ||
+      ['/api/health', '/api/auth/login', '/api/reset', '/api/openapi.json'].includes(path)
+    )
+      return;
+    // PLANTED BUG CC-API-02 (see demo/manifests/planted_bugs.json): listing appointments skips the auth check.
+    if (path === '/api/appointments' && req.method === 'GET') return;
     const u = apiUser(req);
     if (!u) return reply.code(401).send({ error: 'unauthorized', message: 'Login required' });
     (req as FastifyRequest & { user?: User }).user = u;
   });
   app.get('/api/me', async (req) => (req as FastifyRequest & { user: User }).user);
-  app.get('/api/doctors', async () => doctors());
+  // PLANTED BUG CC-API-01: the fee is serialised as a string, violating the documented schema (number).
+  app.get('/api/doctors', async () => doctors().map((d) => ({ ...d, fee: d.fee.toFixed(2) })));
   app.get<{ Querystring: { q?: string } }>('/api/patients', async (req) => {
     const q = `%${(req.query.q ?? '').trim()}%`;
     return db.prepare('SELECT * FROM patients WHERE full_name LIKE ? OR code LIKE ? ORDER BY id').all(q, q);
@@ -326,15 +344,16 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
     const p = db.prepare('SELECT * FROM patients WHERE id = ?').get(req.params.id);
     return p ?? reply.code(404).send({ error: 'not_found', message: 'Patient not found' });
   });
-  app.post<{ Body: Record<string, string> }>('/api/patients', async (req, reply) => {
+  app.post<{ Body: Record<string, unknown> }>('/api/patients', async (req, reply) => {
     const error = validatePatient(req.body ?? {});
     if (error) return reply.code(422).send({ error: 'validation_error', message: error });
-    return reply.code(201).send(createPatient(req.body));
+    return reply.code(201).send(createPatient(req.body as Record<string, string>));
   });
   app.delete<{ Params: { id: string } }>('/api/patients/:id', async (req, reply) => {
     const u = (req as FastifyRequest & { user: User }).user;
     if (u.role !== 'admin')
       return reply.code(403).send({ error: 'forbidden', message: 'Only admins can delete patients' });
+    // PLANTED BUG CC-API-03: deleting an unknown patient returns 204 instead of the documented 404.
     db.transaction(() => {
       db.prepare('DELETE FROM appointments WHERE patient_id = ?').run(req.params.id);
       db.prepare('DELETE FROM patients WHERE id = ?').run(req.params.id);

@@ -11,6 +11,7 @@ import {
 } from '@stepforge/core';
 import { schema, type StepForgeDb } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
+import { createApiExecutor } from '@stepforge/executor-api';
 import { createUiExecutor, BrowserPool } from '@stepforge/executor-ui';
 import { utilExecutor } from '@stepforge/executor-util';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -18,6 +19,7 @@ import { mkdirSync, rmSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import type { z } from 'zod';
 import type { EventBus } from '../context.ts';
+import type { SpecService } from '../api/specs.ts';
 import { expandScope, testCaseData, unfinishedItems } from './scope.ts';
 
 type Run = typeof schema.runs.$inferSelect;
@@ -49,6 +51,7 @@ export class RunManager {
     private readonly artifactsRoot: string,
     private readonly masterKey: Buffer,
     private readonly defaults: () => { timeoutMs: number },
+    private readonly specs?: SpecService,
   ) {}
 
   /** Path relative to the artifacts root with forward slashes (used in URLs). */
@@ -221,7 +224,19 @@ export class RunManager {
     const abort = new AbortController();
     this.active = { runId, abort };
     const pool = new BrowserPool();
-    const executors = [createUiExecutor(pool), utilExecutor];
+    const specs = this.specs;
+    const executors = [
+      createUiExecutor(pool),
+      createApiExecutor({
+        contracts: specs
+          ? async (ref, req, res) => {
+              const specId = ref.specId ?? specs.latestFor(run.applicationId);
+              return specId ? specs.check(specId, req, res) : null;
+            }
+          : undefined,
+      }),
+      utilExecutor,
+    ];
     const startedAt = run.startedAt ?? now();
     this.db
       .update(schema.runs)

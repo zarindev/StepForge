@@ -1,7 +1,7 @@
 import { defaultParamsFor, type Locator, type StepInput } from './defaults.ts';
 import { readFileSync } from 'node:fs';
 import { chromium, type Browser, type BrowserContext, type Frame, type Page } from 'playwright';
-import { isNoise, type CapturedRequest } from './network.ts';
+import { isNoise, type CapturedRequest } from '@stepforge/importers';
 
 const INJECTED = readFileSync(new URL('./injected.js', import.meta.url), 'utf8');
 /** Navigations within this window after an action are treated as caused by it (not recorded). */

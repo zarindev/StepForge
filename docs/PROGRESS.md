@@ -6,8 +6,8 @@
 | 2 | Applications, environments, secrets, modules, tags, Test Explorer, CRUD, versions | ✅ Done |
 | 3 | Scenario engine, UI executor, runner, live view, evidence, results | ✅ Done |
 | 4 | Recorder, Scenario Editor (list/flow/plain-English) | ✅ Done |
-| 5 | API module, API Client, importers, contract check | ⏳ Next |
-| 6 | Database module, SQL Workbench, data-quality audit, rollback | — |
+| 5 | API module, API Client, importers, contract check | ✅ Done |
+| 6 | Database module, SQL Workbench, data-quality audit, rollback | ⏳ Next |
 | 7 | Email (Mailpit + IMAP), OTP/link extraction | — |
 | 8 | Performance (metrics, Lighthouse, load, k6, query plans) | — |
 | 9 | Diagnosis engine, bug reports, report exports | — |
@@ -16,6 +16,24 @@
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 5 — API testing (2026-10-06)
+
+**Delivered**
+- **API executor** (`@stepforge/executor-api`): `api.request` (any method; JSON, form, multipart, raw bodies; query; auth bearer / basic / API key / OAuth2 client credentials (cached) / cookie; per-test cookie jar; redirects; timeout and cancellation), `api.graphql` (GraphQL errors fail the step unless allowed), `api.extract` (JSONPath/header/status from the last response). Assertion targets: `status`, `time`, `size`, `header:<name>`, `body`, `text`, any JSONPath (`$.items[0].id`, `$.items[*].name`); operators incl. `lengthEquals`, `matches` and **`matchesSchema`** (Ajv + formats, OpenAPI `nullable` supported, field-level messages like `items.1.fee should be number`). `contract` param validates the response against the stored OpenAPI spec (documented status + body schema).
+- **Engine**: executors can judge special assertions (`evaluate` hook) and report their own checks (`assertions`); request/response/query payloads and assertion values are **masked** before leaving the engine; a failing assertion now keeps the step's real request/response (previously lost).
+- **Importers** (`@stepforge/importers`, pure plans): **OpenAPI 3 / Swagger 2** (JSON or YAML, dereferenced) → modules per tag; per operation a happy path (spec examples or schema samples, status + JSON Schema + response time) and negative tests (unauthorized, not found, missing required fields, wrong type, invalid enum); login operations are detected and turned into an **Authenticate block** with password fields replaced by secrets; DELETE happy paths only on request. **Postman v2.1** (folders, `{{vars}}` → `{{env.x}}`, inherited auth, raw/urlencoded/form-data/GraphQL bodies, simple `pm.response.to.have.status()` scripts). **cURL** (devtools style: quotes, `-H`, `-d`/`--data-raw`/`--json`, `-u`, `-F`, `-G`, `-b`). **HAR** (XHR/fetch, noise filtered, deduped by path template). Captured-request conversion moved here from the recorder.
+- **Server**: stored API specs (from text, absolute URL, or a path on an environment), `POST /api/applications/:id/import` (plans materialised in one transaction with blocks and tags), `POST /api/api-client/send` (variables + secrets resolved server-side, masked in the response, contract + assertion results), contract resolver wired into runs.
+- **Dashboard**: **API Client** (specs list with “Generate”, API scenarios list, method/URL/environment, Params/Headers/Body (Monaco)/Auth tabs, response status/time/size, Body/Headers/Contract tabs, “Save as API test”, “Update scenario step”), **Import dialog** (OpenAPI URL or paste/upload with negative/contract/destructive options, Postman, cURL, HAR; result with secrets to set and warnings) also reachable from the Test Explorer; typed forms for API steps; request/response panels in run results.
+- **CareClinic**: OpenAPI 3 spec at `/api/openapi.json`; stricter input validation (types, time slots, existing ids) so only intentional bugs remain; **planted API bugs** CC-API-01 (doctor fee as string), CC-API-02 (appointments listed without auth), CC-API-03 (DELETE unknown patient → 204) in `demo/manifests/planted_bugs.json` (never read by StepForge).
+
+**Verified**
+- `npm test`: 128 tests. New: 8 API-executor tests on a local server (assertions, field-level schema errors, bodies, secret masking of the bearer token in stored requests, cookie jar, basic, OAuth2, GraphQL, extract, contract hook, timeout, ECONNREFUSED, evidence on assertion failure), 6 importer tests (CareClinic spec, YAML/Swagger 2, operation matching, Postman, cURL, HAR), 3 server tests.
+- **Done-when check** (server test + E2E): importing CareClinic's spec from its URL generates 6 modules, 1 Authenticate block and the suite; running it after a demo reset passes everything **except exactly the three planted bugs**, each with a precise message (`fee should be number`, `Expected status equals 401, but got 200`, `Expected status equals 404, but got 204`).
+- `npm run test:e2e`: 11 tests, stable on repeated runs. The Phase 5 E2E imports the spec through the dialog, sends a login request with a secret (masked, contract ok), loads a generated scenario, sees the contract violation on `/api/doctors`, runs the generated module with 4 workers and checks the three failures and their request/response evidence.
+- Bugs found and fixed: CareClinic returned 500 on a wrong-typed login email (found by the generated negative test); failing API assertions dropped the request/response evidence.
 
 ---
 

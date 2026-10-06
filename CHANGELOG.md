@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Phase 5 API testing: API executor (REST, GraphQL, auth incl. OAuth2, cookies, JSONPath, JSON Schema, contract
+  checks), OpenAPI/Swagger, Postman, cURL and HAR importers with generated negative tests, API Client with
+  contract validation, CareClinic OpenAPI spec and planted API bugs.
 - Phase 4 recorder and editor: Shadow-DOM recorder toolbar with assert/extract/mask/insert, ranked
   locators, auto-masked secrets, tab/dialog/iframe handling and network capture → API steps; control flow
   (if/loop/callScenario/useBlock) and reusable blocks; list/flow/plain-English views, typed step forms, locator

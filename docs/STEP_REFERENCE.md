@@ -75,4 +75,20 @@ Generic `assertions` on any UI step can target `url`, `title`, and for steps wit
 | `callScenario` | `scenarioId` | runs another scenario of the same application inline; max nesting depth 5 |
 | `useBlock` | `blockId` | runs a reusable block (application → Blocks tab) |
 
-API, database, email and performance steps are documented as their phases land.
+## API steps (`api.*`) — available since Phase 5
+
+| type | params | notes |
+|---|---|---|
+| `request` | `method`, `url` (absolute or relative to the environment base URL), `headers`, `query`, `body`, `bodyType` (`json`/`form`/`multipart`/`raw`/`none`), `auth`, `followRedirects`, `cookies` (default true), `contract` (`true` or `{ "specId": "…" }`) | output = response body (use `captureAs`) |
+| `graphql` | `url`, `query`, `variables`, `operationName`, `headers`, `auth`, `allowErrors` | GraphQL `errors` fail the step unless `allowErrors` |
+| `extract` | `from` (`body`/`header`/`status`), `path` (JSONPath), `name` (header) | reads the previous API response of the same test |
+
+`auth` examples: `{"type":"bearer","token":"{{secret.apiToken}}"}`, `{"type":"basic","username":"ana","password":"{{secret.pw}}"}`,
+`{"type":"apiKey","in":"header","name":"x-api-key","value":"{{secret.key}}"}`,
+`{"type":"oauth2","tokenUrl":"…","clientId":"…","clientSecret":"{{secret.cs}}","scope":"read"}`, `{"type":"cookie","name":"sid","value":"…"}`.
+Multipart file fields: `{"doc": {"file": "/path/to/file.pdf"}}`. Cookies set by responses are sent back automatically within a test.
+
+Assertion targets: `status`, `time` (ms), `size` (bytes), `header:<name>`, `body`, `text`, and JSONPath (`$.data.id`,
+`$.items[*].name` returns a list). `matchesSchema` takes a JSON Schema as `expected` and reports field-level errors.
+
+Database, email and performance steps are documented as their phases land.

@@ -5,7 +5,8 @@
   "type": "module",
   "description": "CareClinic: a demo clinic app used to prove StepForge works end to end.",
   "exports": {
-    ".": "./src/app.ts"
+    ".": "./src/app.ts",
+    "./openapi": "./src/openapi.ts"
   },
   "scripts": {
     "start": "tsx src/main.ts"
