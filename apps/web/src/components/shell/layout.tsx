@@ -1,6 +1,8 @@
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
+import { Toaster } from '@/components/ui/toast';
 import { NAV } from '@/lib/nav';
+import { useLiveInvalidation } from '@/lib/queries';
 import { CommandPalette } from './command-palette';
 import { Rail } from './rail';
 import { ShortcutsOverlay } from './shortcuts-overlay';
@@ -16,6 +18,7 @@ export function Layout() {
   const [shortcuts, setShortcuts] = useState(false);
   const navigate = useNavigate();
   const chord = useRef<number | null>(null);
+  useLiveInvalidation();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,6 +63,7 @@ export function Layout() {
       </div>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
       <ShortcutsOverlay open={shortcuts} onClose={() => setShortcuts(false)} />
+      <Toaster />
     </div>
   );
 }

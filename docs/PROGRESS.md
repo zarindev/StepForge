@@ -3,8 +3,8 @@
 | # | Phase | Status |
 |---|---|---|
 | 1 | Foundation: monorepo, core, db, crypto, server, web shell, scripts, CI | ✅ Done |
-| 2 | Applications, environments, secrets, modules, tags, Test Explorer, CRUD, versions | ⏳ Next |
-| 3 | Scenario engine, UI executor, runner, live view, evidence, results | — |
+| 2 | Applications, environments, secrets, modules, tags, Test Explorer, CRUD, versions | ✅ Done |
+| 3 | Scenario engine, UI executor, runner, live view, evidence, results | ⏳ Next |
 | 4 | Recorder, Scenario Editor (list/flow/plain-English) | — |
 | 5 | API module, API Client, importers, contract check | — |
 | 6 | Database module, SQL Workbench, data-quality audit, rollback | — |
@@ -16,6 +16,29 @@
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 2 — Organisation (2026-10-06)
+
+**Delivered**
+- `@stepforge/db/repos`: repository layer for applications (with summary counts and `hasProduction`), environments, secrets (AES-256-GCM, write-only, plaintext never returned; `resolveSecrets` reserved for the run engine), modules (unlimited nesting, cycle and cross-application protection, recursive delete), tags, scenarios, steps, test cases, version history, Test Explorer tree, search and bulk actions. `RepoError` carries HTTP status codes; SQLite UNIQUE violations become readable 409s.
+- **Versioning:** every change to a scenario's details or steps bumps `version` and stores a full snapshot (details + steps). Restoring creates a *new* version with the old content, so history is never rewritten. Step IDs are preserved across edits, so run history stays linked to steps.
+- **Test case codes** are generated as `TC-<first 3 letters of module>-NNN`, unique within the application, unless a code is given.
+- REST API: `/api/applications[/:id]`, `/environments`, `/secrets`, `/tags`, `/tree`, `/modules`, `/scenarios` (+ `/steps`, `/tags`, `/duplicate`, `/versions`, `/versions/:v/restore`), `/test-cases`, `/scenarios/bulk`, `/search`. Live `tree.changed` events keep every open tab in sync.
+- **Safety in code:** deleting an application, or a production environment, requires the application name in the request body; the UI asks the user to type it.
+- Dashboard: Applications grid + create/edit dialog (auto slug), application detail (KPIs, production banner, Environments with variables/browser defaults/production switch, Secrets per environment, Tags, Settings with archive and typed-confirm delete), working **app switcher**, **Test Explorer** (nested tree, search incl. TC codes, filters by priority/layer/status/tag, drag-and-drop to move scenarios and nest modules, multi-select bulk tag/move/status/duplicate/delete), scenario panel with **Steps** list editor (typed step picker grouped by layer, JSON params/locators/assertions with validation, enable/continue-on-fail/retries/timeout/captureAs, reorder by drag or arrows, duplicate, delete, dirty tracking), **Test cases** table + dialog, **Details** form + tag toggles, **History** with line diff and restore. `Ctrl+K` now searches scenarios, test cases and applications.
+- Shared schemas: `@stepforge/core` now runs in the browser too (Web Crypto instead of `node:crypto`).
+
+**Verified**
+- `npm test`: 48 tests (18 repository tests, 4 API-level organisation tests including full CareClinic and ShopDesk trees, plus Phase 1 tests).
+- `npm run test:e2e`: 7 tests. The new Phase 2 E2E drives the real UI end to end: create app → two environments (one production → banner) → secret (value never rendered) → tag → nested modules → scenario → 3 steps (kind becomes `hybrid`, v2) → test case `TC-REG-001` → details (v3) → tag toggle → history diff → restore v1 (v4) → `Ctrl+K` finds the test case → drag scenario between modules → bulk tag → tree search/filters → delete app with typed confirmation.
+- Bug found and fixed by E2E: the command palette focused its input on a timer, dropping fast keystrokes; now uses `autoFocus`.
+
+**Deferred (by plan)**
+- Demo apps and a demo-workspace seed arrive with Phase 3–4, so the "organise the demo apps" criterion is covered here by the API test building the CareClinic/ShopDesk trees and the UI E2E building CareClinic.
+- DB connections UI → Phase 6, mail inboxes → Phase 7, reusable blocks and datasets → Phase 3/4 (with `util.useBlock` / data-driven runs), `.stepforge.zip` import/export → Phase 13.
+- Monaco editors, flow view and plain-English view → Phase 4.
 
 ---
 

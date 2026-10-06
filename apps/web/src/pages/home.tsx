@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { AppWindow, Bug, FileCheck2, Layers, PlayCircle, Sparkles } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import { motion } from 'motion/react';
 import { PageHeader } from '@/components/shell/layout';
+import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/states';
@@ -57,6 +59,15 @@ export function HomePage() {
             icon={Sparkles}
             title="Welcome to StepForge"
             description="Your local QA studio is running. Add an application to start organising, recording and running tests. Trends, quality gates and recent runs will appear here as soon as you have results."
+            action={
+              <Link to={system.data?.counts.applications ? '/explorer' : '/applications'}>
+                <Button>
+                  {system.data?.counts.applications
+                    ? 'Open the Test Explorer'
+                    : 'Create your first application'}
+                </Button>
+              </Link>
+            }
           />
         </div>
         <Card>

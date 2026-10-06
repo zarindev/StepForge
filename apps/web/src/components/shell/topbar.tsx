@@ -1,4 +1,5 @@
-import { ChevronsUpDown, Play, Search } from 'lucide-react';
+import { Play, Search } from 'lucide-react';
+import { AppSwitcher } from './app-switcher';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { useLiveConnected } from '@/lib/live';
@@ -8,15 +9,7 @@ export function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const connected = useLiveConnected();
   return (
     <header className="glass sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border px-5">
-      <button
-        className="flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-muted transition-colors hover:text-fg"
-        title="Application switcher (available once you add applications)"
-        disabled
-      >
-        <span className="h-2 w-2 rounded-full bg-skip" />
-        All applications
-        <ChevronsUpDown className="h-3.5 w-3.5" />
-      </button>
+      <AppSwitcher />
 
       <button
         onClick={onOpenPalette}

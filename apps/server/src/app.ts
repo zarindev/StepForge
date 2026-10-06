@@ -7,9 +7,11 @@ import { mkdirSync } from 'node:fs';
 import { ZodError } from 'zod';
 import { loadConfig, type ServerConfig } from './config.ts';
 import { EventBus, type AppContext } from './context.ts';
+import { registerApplicationRoutes } from './routes/applications.ts';
 import { registerLiveRoutes } from './routes/live.ts';
 import { registerStaticRoutes } from './routes/static.ts';
 import { registerSystemRoutes } from './routes/system.ts';
+import { registerTestRoutes } from './routes/tests.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
 
 export type BuildOptions = {
@@ -61,18 +63,23 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
         .code(400)
         .send({ error: 'validation_error', message: 'Invalid request', issues: err.issues });
     }
-    const e = err as Error & { statusCode?: number };
+    const e = err as Error & { statusCode?: number; code?: string };
     const status = e.statusCode ?? 500;
-    if (status >= 500) app.log.error(e);
-    return reply
-      .code(status)
-      .send({ error: status >= 500 ? 'internal_error' : 'bad_request', message: e.message });
+    if (status >= 500) {
+      app.log.error(e);
+      return reply.code(status).send({ error: 'internal_error', message: 'Internal error' });
+    }
+    // Name check, not instanceof: workspace symlinks can load the repos module twice.
+    const code = e.name === 'RepoError' && e.code ? e.code : 'bad_request';
+    return reply.code(status).send({ error: code, message: e.message });
   });
 
   registerSecurity(app, ctx.token);
   await app.register(fastifyWebsocket);
   registerSystemRoutes(app, ctx);
   registerLiveRoutes(app, ctx);
+  registerApplicationRoutes(app, ctx);
+  registerTestRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   app.addHook('onClose', async () => {
