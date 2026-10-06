@@ -31,12 +31,14 @@ flowchart TB
 | `@stepforge/perf` | Load engine (autocannon), k6 export/bridge, Web Vitals, Lighthouse |
 | `@stepforge/executor-perf` | Performance steps (page metrics, Lighthouse, load test, query plan) |
 | `@stepforge/diagnosis` | Rule engine, YAML rules, last-green diff |
-| `@stepforge/reports` | Bug and run report rendering: HTML, PDF (Chromium), XLSX, CSV, Markdown |
+| `@stepforge/reports` | Bug and run report rendering: HTML, PDF (Chromium), XLSX, CSV, Markdown, JUnit XML |
 | `@stepforge/analytics` | Daily aggregates, Home and application analytics, flaky detection, quality gates, run comparison |
+| `@stepforge/notify` | Run summaries for Telegram (Bot API) and email (SMTP via nodemailer) |
 | `@stepforge/executor-util` | Variables, generated data, sandboxed scripts |
 | `@stepforge/recorder` | Recording browser, injected toolbar, network capture |
 | `@stepforge/importers` | OpenAPI/Swagger, Postman, cURL and HAR → scenarios |
-| `@stepforge/server` | HTTP/WS API, security hooks, static UI hosting, job queue + scheduler host |
+| `@stepforge/server` | HTTP/WS API, security hooks, static UI hosting, job queue, in-app scheduler (croner) and notifications |
+| `@stepforge/cli` | `stepforge` command: builds the server in-process (embedded mode, no listener, no scheduler, no crash recovery) to run tests, write reports, export/import applications |
 | `@stepforge/web` | Dashboard |
 
 ## Request security

@@ -9,6 +9,7 @@ import {
   bugsXlsx,
   htmlToPdf,
   runReportHtml,
+  runJunit,
   runXlsx,
 } from '@stepforge/reports';
 import { eq } from 'drizzle-orm';
@@ -26,6 +27,7 @@ const TYPES = {
   md: 'text/markdown; charset=utf-8',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   csv: 'text/csv; charset=utf-8',
+  xml: 'application/xml; charset=utf-8',
 } as const;
 
 function send(reply: FastifyReply, body: string | Buffer, ext: keyof typeof TYPES, filename: string) {
@@ -176,8 +178,10 @@ export function registerBugRoutes(app: FastifyInstance, ctx: AppContext) {
         return send(reply, await htmlToPdf(runReportHtml(data, b), b), 'pdf', name);
       case 'xlsx':
         return send(reply, await runXlsx(data, b), 'xlsx', name);
+      case 'junit':
+        return send(reply, runJunit(data, b), 'xml', name);
       default:
-        throw new repo.RepoError(400, 'invalid', 'format must be html, pdf or xlsx');
+        throw new repo.RepoError(400, 'invalid', 'format must be html, pdf, xlsx or junit');
     }
   });
 

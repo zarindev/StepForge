@@ -1,4 +1,5 @@
-import { BulkScenarioAction } from '@stepforge/core';
+import { BulkScenarioAction, STEPFORGE_VERSION } from '@stepforge/core';
+import { STEPFORGE_AUTHOR } from '@stepforge/reports';
 import * as repo from '@stepforge/db/repos';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -20,6 +21,20 @@ export function registerApplicationRoutes(app: FastifyInstance, ctx: AppContext)
     const created = repo.createApplication(db, req.body as never);
     return reply.code(201).send(created);
   });
+  // Portable JSON (secret values are never included).
+  app.get<{ Params: { id: string } }>('/api/applications/:id/export', async (req, reply) => {
+    const data = repo.exportApplication(
+      db,
+      req.params.id,
+      `StepForge ${STEPFORGE_VERSION} by ${STEPFORGE_AUTHOR}`,
+    );
+    return reply
+      .header('content-disposition', `attachment; filename="stepforge-${data.application.slug}.json"`)
+      .send(data);
+  });
+  app.post<{ Querystring: { slug?: string } }>('/api/applications/import', async (req, reply) =>
+    reply.code(201).send(repo.importApplication(db, req.body, { slug: req.query.slug || undefined })),
+  );
   app.get<P<'id'>>('/api/applications/:id', async (req) => repo.getApplication(db, req.params.id));
   app.patch<P<'id'>>('/api/applications/:id', async (req) =>
     repo.updateApplication(db, req.params.id, req.body as never),

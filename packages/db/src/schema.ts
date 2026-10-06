@@ -286,6 +286,8 @@ export const runs = sqliteTable(
     finishedAt: text('finished_at'),
     durationMs: integer('duration_ms'),
     qualityGateJson: json<unknown>('quality_gate_json'),
+    /** Set for runs started by a schedule (schedule history). */
+    scheduleId: text('schedule_id'),
     ...timestamps,
   },
   (t) => [index('runs_app_idx').on(t.applicationId, t.createdAt), index('runs_status_idx').on(t.status)],
@@ -460,6 +462,8 @@ export const schedules = sqliteTable('schedules', {
   scopeJson: json<Record<string, unknown>>('scope_json').notNull().default({}),
   enabled: bool('enabled').notNull().default(true),
   notifyChannelIdsJson: json<string[]>('notify_channel_ids_json').notNull().default([]),
+  /** Run options (browser, workers, retries…) used for each scheduled run. */
+  optionsJson: json<Record<string, unknown>>('options_json').notNull().default({}),
   lastRunId: text('last_run_id'),
   nextRunAt: text('next_run_at'),
   ...timestamps,

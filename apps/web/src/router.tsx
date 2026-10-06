@@ -17,6 +17,7 @@ import { PerformancePage } from '@/pages/performance';
 import { BugsPage } from '@/pages/bugs';
 import { AnalyticsPage } from '@/pages/analytics';
 import { ComparePage } from '@/pages/compare';
+import { SchedulesPage } from '@/pages/schedules';
 
 const rootRoute = createRootRoute({ component: Layout });
 
@@ -28,6 +29,7 @@ const pages: Record<string, () => React.ReactNode> = {
   '/api-client': ApiClientPage,
   '/settings': SettingsPage,
   '/performance': PerformancePage,
+  '/schedules': SchedulesPage,
 };
 
 const ExplorerSearch = z.object({

@@ -616,3 +616,47 @@ export type CompareRow = {
   error: string | null;
   itemId: string;
 };
+
+// ─── Schedules & notifications (Phase 11) ──────────────────────────────────
+export type NotifyChannel = {
+  id: string;
+  name: string;
+  kind: 'telegram' | 'email';
+  config: Record<string, unknown>;
+  on: 'always' | 'failures';
+  hasSecret: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type Schedule = {
+  id: string;
+  applicationId: string;
+  environmentId: string | null;
+  name: string;
+  cron: string;
+  scopeJson: RunScope;
+  optionsJson: Partial<RunOptionsForm>;
+  enabled: boolean;
+  notifyChannelIdsJson: string[];
+  lastRunId: string | null;
+  nextRunAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastRun: Run | null;
+};
+export type NotificationResult = {
+  channelId: string;
+  channel: string;
+  ok: boolean;
+  skipped?: boolean;
+  error?: string;
+  at: string;
+};
+export type ScheduleRun = Run & { notifications: NotificationResult[] | null };
+export type UpcomingSchedule = {
+  id: string;
+  name: string;
+  application: string;
+  applicationId: string;
+  nextRunAt: string;
+};

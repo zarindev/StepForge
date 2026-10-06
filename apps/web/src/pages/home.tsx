@@ -25,7 +25,7 @@ import { EmptyState, ErrorState } from '@/components/ui/states';
 import { api, type SystemInfo } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
 import { useLiveEvent, type LiveEvent } from '@/lib/live';
-import type { HomeSummary } from '@/lib/types';
+import type { HomeSummary, UpcomingSchedule } from '@/lib/types';
 
 const fmtDuration = (ms: number | null) =>
   ms === null
@@ -213,11 +213,7 @@ export function HomePage() {
                 <CardTitle>Upcoming schedules</CardTitle>
               </CardHeader>
               <CardBody>
-                <EmptyState
-                  icon={CalendarClock}
-                  title="No schedules"
-                  description="Scheduled runs will be listed here."
-                />
+                <UpcomingSchedules />
               </CardBody>
             </Card>
           </div>
@@ -259,5 +255,43 @@ function Row({ label, value }: { label: string; value: string }) {
         {value}
       </span>
     </div>
+  );
+}
+
+function UpcomingSchedules() {
+  const upcoming = useQuery({
+    queryKey: ['schedules', 'upcoming'],
+    queryFn: () => api<UpcomingSchedule[]>('/api/schedules/upcoming'),
+    refetchInterval: 60_000,
+  });
+  if (upcoming.isPending) return <Skeleton className="h-16 w-full" />;
+  if (!upcoming.data?.length)
+    return (
+      <EmptyState
+        icon={CalendarClock}
+        title="No schedules"
+        description="Run tests every night or every hour and get the results by Telegram or email."
+        action={
+          <Link to="/schedules">
+            <Button size="sm" variant="outline">
+              Create a schedule
+            </Button>
+          </Link>
+        }
+      />
+    );
+  return (
+    <ul className="divide-y divide-border/60 text-sm" data-testid="upcoming-schedules">
+      {upcoming.data.map((s) => (
+        <li key={s.id} className="flex items-center gap-3 py-2">
+          <CalendarClock className="h-4 w-4 text-muted" />
+          <Link to="/schedules" className="min-w-0 flex-1 truncate hover:text-brand">
+            {s.name}
+            <span className="ml-2 text-xs text-muted">{s.application}</span>
+          </Link>
+          <span className="text-xs text-muted">{new Date(s.nextRunAt).toLocaleString()}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

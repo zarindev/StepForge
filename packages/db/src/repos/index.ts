@@ -8,3 +8,5 @@ export * from './blocks.ts';
 export * from './connections.ts';
 export * from './inboxes.ts';
 export * from './bugs.ts';
+export * from './automation.ts';
+export * from './portable.ts';

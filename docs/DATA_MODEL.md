@@ -66,3 +66,10 @@ that found them is deleted; `fingerprint` = hash of scenario + failing step + di
 duration, API p95), recomputed after every run; it is derived data and is rebuilt automatically if empty.
 `quality_gates.rules_json` stores the gate rules; each completed run stores its gate verdict in
 `runs.quality_gate_json`.
+
+Schedules (`schedules`) store the cron expression, scope (`scope_json`), run options (`options_json`), the
+notification channel ids (`notify_channel_ids_json`), `last_run_id` and the computed `next_run_at` (NULL when off).
+Runs started by a schedule keep `runs.schedule_id`, which drives the schedule history. Notification channels
+(`notify_channels`) are global; `config_json` holds `{ config, on }` (Telegram chat id, or SMTP host/port/from/to,
+and "always"/"failures"); the bot token or SMTP password is a `secrets` row without an environment (key
+`notify-channel:<id>`), deleted with the channel.

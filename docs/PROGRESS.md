@@ -14,10 +14,35 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 8 | Performance (metrics, Lighthouse, load, k6, query plans) | ✅ Done |
 | 9 | Diagnosis engine, bug reports, report exports | ✅ Done |
 | 10 | Analytics, quality gates, run comparison, flaky detection | ✅ Done |
-| 11 | Scheduler, CLI, notifications, JUnit/HTML | ⏳ Next |
-| 12 | Code generators + snapshot tests | — |
+| 11 | Scheduler, CLI, notifications, JUnit/HTML | ✅ Done |
+| 12 | Code generators + snapshot tests | ⏳ Next |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 11 — Schedules, notifications and the CLI (2026-10-07)
+
+**Delivered**
+- **Schedules** (migration `0005_schedules`: `schedules.options_json`, `runs.schedule_id`): in-app scheduler on croner (5- or 6-field cron, next-run preview, invalid expressions rejected), jobs re-armed on save and on start, a time skipped while the schedule's previous run is still going, **Run now**, history per schedule with notification results, `trigger: schedule` runs with full evidence/diagnosis/analytics.
+- **`@stepforge/notify`**: one summary formatted for email (subject, text, HTML) and Telegram (HTML subset, 4096-character limit): status and counts, schedule, pass rate, duration, quality gate with failing rules, failed tests with their diagnosis (up to 10), link to the run, and "Sent by StepForge — by Md Zarin Tasnim". Telegram via the Bot API (errors never contain the token), email via SMTP (nodemailer); "always" or "failures only"; send test.
+- **Notification channels** stored globally with the token/password as an encrypted secret (never returned by the API).
+- **CLI** (`@stepforge/cli`, `stepforge.sh`, `stepforge.bat`, `npm run stepforge`): `run` (tag/module/scenario filters, browser/workers/retries/headed, live per-test output, `--junit`, `--html`, `--pdf`, `--notify`, `--fail-on-gate`, `--json`, Ctrl+C cancels cleanly; exit 0/1/2), `list`, `report`, `export`, `import`, `secret set` (value from an environment variable or stdin, never an argument). It builds the server in-process in **embedded** mode: no listener, no in-app scheduler, and no crash recovery, so it never marks a running dashboard's runs as interrupted.
+- **JUnit XML** run report (one suite per module, failure/error/skipped, diagnosis in the failure, steps in system-out, author property and credit); also `GET /api/runs/:id/report?format=junit`.
+- **Application export/import** (JSON; secret values, connections and inboxes excluded; secret names listed; block and called-scenario references rewritten on import), also `GET /api/applications/:id/export` and `POST /api/applications/import`.
+- **Dashboard:** **Schedules** page (presets or custom cron with live preview, application/environment/tests, browser, retries, channels, on/off, run now, history, delete), **Settings → Notifications** (Telegram and email channels, failures-only, send test, write-only secrets), Home **upcoming schedules**.
+- `docs/CLI.md` (commands, exit codes, cron, Windows Task Scheduler, GitHub Actions) and `docs/SCHEDULING.md` (schedules, cron, Telegram/email setup, API).
+- No demo-app changes.
+
+**Verified**
+- `npm test`: 286 passed, 18 skipped (external database servers). New: 4 notify tests (formatting, Telegram against a Bot-API stand-in incl. refused token, failures-only, real SMTP through Mailpit), 2 JUnit tests (incl. `xmllint` well-formedness), 5 server tests, 8 CLI tests.
+- **Done-when check:** a schedule with a seconds cron triggers a real run against a local service with a planted bug; the summary arrives by **email in Mailpit** (subject `[StepForge] CareClinic · Staging: FAILED (1/2)`, the diagnosis "The API accepted a duplicate (201 instead of 409 Conflict)", the failing gate rules, the run link, the credit) and as a **Telegram message** to a local Bot-API stand-in. "Run now" on a disabled schedule works and "failures only" skips a passing run. Overlapping ticks are skipped (one run, skipped events).
+- CLI: help and usage errors exit 2; import (ids remapped, a scenario calling a later one reaches its target), `run` exits 1 with a failing test and writes JUnit/HTML, a passing tag exits 0, report for an earlier run, export → import round trip runs identically, `secret set` stores only ciphertext, the bin shim returns real exit codes, and a run marked running by another process is left alone. Ctrl+C on a CLI run was checked by hand: the run ends `cancelled`, its tests `skipped`, exit code 1.
+- `npm run test:e2e`: 17 tests. The Phase 11 E2E adds an email channel in Settings and sends a test, creates a schedule (preset preview, invalid custom cron rejected, custom cron preview), runs it now, sees "QA inbox: sent" in its history, checks the email in Mailpit, and switches it off.
+- The real app started on the existing `data/` folder; the migration was applied after a backup and the new endpoints answer.
+
+**Not verified**
+- Real Telegram (needs a bot token), the Windows Task Scheduler and GitHub Actions recipes, and `stepforge.bat` (KNOWN_ISSUES #48–#49).
 
 ---
 

@@ -1,0 +1,23 @@
+{
+  "name": "@stepforge/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StepForge command line: run tests from CI or the OS scheduler. By Md Zarin Tasnim.",
+  "author": "Md Zarin Tasnim",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "stepforge": "./bin/stepforge.mjs"
+  },
+  "exports": {
+    ".": "./src/cli.ts"
+  },
+  "dependencies": {
+    "@stepforge/core": "*",
+    "@stepforge/db": "*",
+    "@stepforge/reports": "*",
+    "@stepforge/server": "*",
+    "drizzle-orm": "^0.45.3",
+    "tsx": "^4.20.0"
+  }
+}

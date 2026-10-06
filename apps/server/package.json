@@ -26,9 +26,11 @@
     "@stepforge/executor-ui": "*",
     "@stepforge/executor-util": "*",
     "@stepforge/importers": "*",
+    "@stepforge/notify": "*",
     "@stepforge/perf": "*",
     "@stepforge/recorder": "*",
     "@stepforge/reports": "*",
+    "croner": "^10.0.1",
     "drizzle-orm": "^0.45.3",
     "fastify": "^5.4.0",
     "pino": "^9.7.0",
@@ -38,7 +40,7 @@
     "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@types/ws": "^8.18.2",
-    "@stepforge/demo-clinic": "*"
+    "@stepforge/demo-clinic": "*",
+    "@types/ws": "^8.18.2"
   }
 }
