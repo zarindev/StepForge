@@ -20,6 +20,8 @@ import { registerApiRoutes } from './routes/api.ts';
 import { registerRecorderRoutes } from './routes/recorder.ts';
 import { registerDatabaseRoutes } from './routes/database.ts';
 import { DatabaseService } from './database/service.ts';
+import { EmailService } from './email/service.ts';
+import { registerEmailRoutes } from './routes/email.ts';
 import { RunManager } from './runner/manager.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
 
@@ -64,6 +66,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     masterKey,
     config.dbFile === ':memory:' ? undefined : config.dbFile,
   );
+  const email = new EmailService(db, masterKey, config.dataDir, config.binDir, config.mailpit);
   const ctx: AppContext = {
     config,
     db,
@@ -81,10 +84,12 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
       }),
       specs,
       database,
+      email,
     ),
     recorder: new RecorderManager(db, masterKey, bus),
     specs,
     database,
+    email,
     startedAt: new Date(),
   };
 
@@ -115,10 +120,16 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerRecorderRoutes(app, ctx);
   registerApiRoutes(app, ctx);
   registerDatabaseRoutes(app, ctx);
+  registerEmailRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
+
+  // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal.
+  if (getSetting(db, 'mailpitAutostart', false))
+    email.mailpit.start().catch((err: Error) => app.log.warn(`Mailpit did not start: ${err.message}`));
 
   app.addHook('onClose', async () => {
     await ctx.runs.shutdown();
+    await email.mailpit.stop();
     ctx.recorder.discard();
     sqlite.close();
   });

@@ -227,6 +227,8 @@ export type StepResultRow = {
     path?: string;
     depth?: number;
     errorKind?: string;
+    /** Email received or checked by an email step. */
+    email?: EmailMessage & { inbox?: string };
     healedLocator?: {
       from: { strategy: string; value: string; name?: string };
       to: { strategy: string; value: string; name?: string };
@@ -302,4 +304,44 @@ export type AuditReport = {
   coverage: { check: AuditCheck; table: string; columns: string[] }[];
   notes: string[];
   durationMs: number;
+};
+
+// ─── Email (mirrors @stepforge/email) ──────────────────────────────────────────
+export type EmailSummary = { id: string; from: string; to: string[]; subject: string; date: string };
+export type EmailMessage = EmailSummary & {
+  fromName: string;
+  cc: string[];
+  text: string;
+  html: string;
+  links: string[];
+  attachments: { filename: string; contentType: string; size: number }[];
+};
+export type Inbox = {
+  id: string;
+  applicationId: string;
+  name: string;
+  kind: 'mailpit' | 'imap';
+  config: {
+    url?: string;
+    host?: string;
+    port?: number;
+    secure?: boolean;
+    user?: string;
+    mailbox?: string;
+    allowSelfSigned?: boolean;
+  };
+  hasPassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type MailpitStatus = {
+  installed: boolean;
+  running: boolean;
+  version: string;
+  url: string;
+  smtpHost: string;
+  smtpPort: number;
+  external?: boolean;
+  error?: string;
+  autostart: boolean;
 };

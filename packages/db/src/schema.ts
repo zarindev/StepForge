@@ -94,14 +94,20 @@ export const dbConnections = sqliteTable(
   (t) => [uniqueIndex('db_connections_env_name_uq').on(t.environmentId, t.name)],
 );
 
-export const mailInboxes = sqliteTable('mail_inboxes', {
-  id: id(),
-  applicationId: fk('application_id', () => applications.id).notNull(),
-  kind: text('kind', { enum: ['mailpit', 'imap'] }).notNull(),
-  configJson: json<Record<string, unknown>>('config_json').notNull().default({}),
-  secretId: fk('secret_id', () => secrets.id, 'set null'),
-  ...timestamps,
-});
+export const mailInboxes = sqliteTable(
+  'mail_inboxes',
+  {
+    id: id(),
+    applicationId: fk('application_id', () => applications.id).notNull(),
+    /** Email steps refer to an inbox by name. */
+    name: text('name').notNull().default('Inbox'),
+    kind: text('kind', { enum: ['mailpit', 'imap'] }).notNull(),
+    configJson: json<Record<string, unknown>>('config_json').notNull().default({}),
+    secretId: fk('secret_id', () => secrets.id, 'set null'),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('mail_inboxes_app_name_uq').on(t.applicationId, t.name)],
+);
 
 export const apiSpecs = sqliteTable('api_specs', {
   id: id(),

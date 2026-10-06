@@ -77,6 +77,28 @@ export const DbConnectionUpdate = patchOf(DbConnectionInput).extend({
   password: z.string().nullable().optional(),
 });
 
+/** An inbox email steps read from: a Mailpit instance, or any IMAP mailbox (password stored encrypted). */
+export const InboxInput = z.object({
+  name: z.string().trim().min(1).max(60),
+  kind: z.enum(['mailpit', 'imap']),
+  config: z
+    .object({
+      /** Mailpit: web/API URL. Empty = StepForge's own local Mailpit. */
+      url: z.string().max(500).optional(),
+      host: z.string().max(255).optional(),
+      port: z.number().int().min(1).max(65535).optional(),
+      secure: z.boolean().optional(),
+      user: z.string().max(255).optional(),
+      mailbox: z.string().max(255).optional(),
+      allowSelfSigned: z.boolean().optional(),
+    })
+    .default({}),
+  password: z.string().max(1000).optional(),
+});
+export const InboxUpdate = patchOf(InboxInput).extend({
+  password: z.string().max(1000).nullable().optional(),
+});
+
 export const ModuleInput = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(2000).default(''),

@@ -1,0 +1,20 @@
+{
+  "name": "@stepforge/email",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@stepforge/core": "*",
+    "imapflow": "^2.2.6",
+    "mailparser": "^3.9.36"
+  },
+  "devDependencies": {
+    "@types/mailparser": "^3.9.0",
+    "@types/nodemailer": "^8.0.2",
+    "hoodiecrow-imap": "^3.0.1",
+    "nodemailer": "^10.0.15"
+  }
+}

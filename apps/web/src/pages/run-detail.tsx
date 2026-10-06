@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { ResultsGrid } from '@/components/database/results-grid';
+import { EmailPreview } from '@/components/email/email-preview';
 import { Link, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Ban, Bandage, ChevronRight, FolderTree, Play, RotateCw, Terminal } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -351,12 +352,14 @@ function ItemPanel({
             const httpRes = (extra as { body?: { status?: number; body?: unknown; timeMs?: number } } | null)
               ?.body;
             const dbq = (row.queryJson ?? (s as { query?: unknown }).query) as DbStepQuery | null | undefined;
+            const email = extra?.email ?? (s as { email?: StepEmail }).email;
             const expandable = !!(
               extra?.assertions?.length ||
               extra?.healedLocator ||
               s.screenshotPath ||
               http ||
-              dbq
+              dbq ||
+              email
             );
             const live = s as LiveStep;
             const depth = live.depth ?? extra?.depth ?? 0;
@@ -454,6 +457,7 @@ function ItemPanel({
                       </div>
                     )}
                     {dbq && <DbQueryPanel q={dbq} />}
+                    {email && <EmailPreview email={email} height={280} />}
                     {extra?.assertions?.map((a, i) => (
                       <p key={i} className={a.passed ? 'text-pass' : 'text-fail'}>
                         {a.passed ? '✓' : '✗'} {a.message}
@@ -504,6 +508,8 @@ function ItemPanel({
     </>
   );
 }
+
+type StepEmail = NonNullable<NonNullable<StepResultRow['responseJson']>['email']>;
 
 type DbStepQuery = {
   connection?: string;

@@ -6,6 +6,9 @@
 - PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
 
 ### Added
+- Phase 7 email testing: Mailpit (installer, start/stop from Settings, inbox viewer) and IMAP inboxes per
+  application, email steps (wait, assert, extract OTP/link/regex, open link), email preview and evidence in run
+  results, CareClinic sign-up with email verification.
 - Phase 6 database testing: DB executor for SQLite, PostgreSQL, MySQL, SQL Server and MongoDB (query, Mongo find,
   scripts, procedures, extract, data-quality check), read-only guard with driver-level read-only sessions, rollback
   mode, typed confirmation for production writes, encrypted connection passwords, SQL Workbench with schema

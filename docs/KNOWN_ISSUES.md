@@ -27,3 +27,8 @@
 | 23 | Databases | Query timeouts stop waiting but do not cancel the statement on the server. | Revisit (driver-specific cancellation). |
 | 24 | Databases | `{{…}}` placeholders inside the SQL text are inlined as-is (no escaping). | Use `params` with `?`/`$1`/`@p1` placeholders; documented in STEP_REFERENCE. |
 | 25 | Dependencies | `npm audit`: moderate advisory in `sprintf-js` (via `mssql` → `tedious`), a DoS through attacker-controlled format strings. StepForge never passes user input as a format string to it. | Upgrade when tedious updates. |
+| 26 | Email | The IMAP adapter is tested against an in-process IMAP server (`hoodiecrow-imap`) — login, search, plus-addressing, parsing, bad passwords — not against Gmail/Outlook themselves (that needs real credentials). | Try it with your own test mailbox; report provider quirks. |
+| 27 | Email | Mailpit is downloaded from GitHub at setup. Offline setups skip it (setup continues); install later from Settings → Email, or put the binary in `data/bin/` yourself. IMAP inboxes work without it. | By design. |
+| 28 | Email | Inboxes are polled every second (no IMAP IDLE); IMAP `SINCE` has day granularity, so the exact "received after the test started" check is done on the message time. | Fine for test volumes. |
+| 29 | Email | `openEmailLink` opens the link in the test's browser only when a UI step already opened one; otherwise it makes a plain HTTP request (no JavaScript runs). | Add a `ui.navigate` step first if the page needs a browser. |
+| 30 | Demo | CareClinic has sign-up with email verification only (what Phase 7's done-when needs). The spec's login-OTP flow and planted email bugs are left for the demo/benchmark phase. | Phase 14. |

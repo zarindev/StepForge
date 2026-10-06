@@ -176,7 +176,7 @@ describe('database connections', () => {
         database: clinicDb,
       },
     );
-    expect(good).toMatchObject({ ok: true, message: expect.stringMatching(/5 tables/) });
+    expect(good).toMatchObject({ ok: true, message: expect.stringMatching(/6 tables/) });
 
     connId = (
       await ok('POST', `/api/environments/${envId}/connections`, {

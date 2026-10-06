@@ -7,7 +7,8 @@ export const hash = (pw: string) => createHash('sha256').update(`careclinic:${pw
 export const token = () => randomBytes(24).toString('hex');
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, password_hash TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, password_hash TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS email_codes (email TEXT PRIMARY KEY, code TEXT NOT NULL, expires_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS doctors (id INTEGER PRIMARY KEY, name TEXT NOT NULL, specialty TEXT NOT NULL, fee REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS patients (
@@ -39,7 +40,7 @@ const PATIENTS = [
 ] as const;
 
 /** Bumped when SCHEMA changes; older demo databases are rebuilt from scratch (it is demo data). */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export function openClinicDb(file: string): Database.Database {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
@@ -62,7 +63,7 @@ export function openClinicDb(file: string): Database.Database {
 export function seed(db: Database.Database): void {
   db.transaction(() => {
     db.exec(
-      'DELETE FROM sessions; DELETE FROM appointments; DELETE FROM patients; DELETE FROM doctors; DELETE FROM users;',
+      'DELETE FROM email_codes; DELETE FROM sessions; DELETE FROM appointments; DELETE FROM patients; DELETE FROM doctors; DELETE FROM users;',
     );
     const u = db.prepare('INSERT INTO users (email, name, role, password_hash) VALUES (?, ?, ?, ?)');
     for (const [email, name, role, pw] of USERS) u.run(email, name, role, hash(pw));

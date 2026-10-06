@@ -4,6 +4,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { DEMO_CREDENTIALS, hash, openClinicDb, seed, token } from './db.ts';
 import { CLINIC_OPENAPI, TIME_SLOTS } from './openapi.ts';
 import { esc, layout, loginView } from './views.ts';
+import { registerSignup, type SmtpOptions } from './signup.ts';
 
 type User = { id: number; email: string; name: string; role: 'admin' | 'doctor' | 'receptionist' };
 type Patient = {
@@ -26,7 +27,7 @@ function cookie(req: FastifyRequest, name: string): string | undefined {
     .find(([k]) => k === name)?.[1];
 }
 
-export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
+export function createClinicApp(opts: { dbFile: string; logger?: boolean; smtp?: SmtpOptions }) {
   const db: Database.Database = openClinicDb(opts.dbFile);
   const app = Fastify({ logger: opts.logger ?? false });
   app.register(formbody);
@@ -55,7 +56,7 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
   const login = (email: unknown, password: unknown): string | undefined => {
     if (typeof email !== 'string' || typeof password !== 'string') return undefined;
     const u = db
-      .prepare('SELECT id FROM users WHERE email = ? AND password_hash = ?')
+      .prepare('SELECT id FROM users WHERE email = ? AND password_hash = ? AND verified = 1')
       .get(email.trim().toLowerCase(), hash(password)) as { id: number } | undefined;
     if (!u) return undefined;
     const t = token();
@@ -109,7 +110,16 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
     }[];
 
   // ─── UI ────────────────────────────────────────────────────────────────
-  app.get('/login', async (req, reply) => page(reply, 'Sign in', loginView(), undefined));
+  app.get<{ Querystring: { verified?: string } }>('/login', async (req, reply) =>
+    page(
+      reply,
+      'Sign in',
+      loginView(),
+      undefined,
+      req.query.verified ? 'Email verified. You can sign in now.' : undefined,
+    ),
+  );
+  registerSignup(app, db, opts.smtp ?? { host: '127.0.0.1', port: 1025 });
   app.post<{ Body: { email?: string; password?: string }; Querystring: { next?: string } }>(
     '/login',
     async (req, reply) => {

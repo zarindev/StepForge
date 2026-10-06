@@ -58,7 +58,7 @@ function TypedField({
   params: Record<string, unknown>;
   onParams: (p: Record<string, unknown>) => void;
 }) {
-  const { scenarios, blocks, connections } = useEditorCtx();
+  const { scenarios, blocks, connections, inboxes } = useEditorCtx();
   const value = getPath(params, spec.key);
   const set = (v: unknown) => onParams(setPath(params, spec.key, v));
   const cls = spec.wide ? 'md:col-span-3' : '';
@@ -109,6 +109,30 @@ function TypedField({
         </Field>
       );
     }
+    case 'inbox':
+      return (
+        <Field
+          label={spec.label}
+          className={cls}
+          hint="Empty: the application's first inbox, or the local Mailpit"
+        >
+          <Select
+            aria-label={spec.label}
+            value={String(value ?? '')}
+            onChange={(e) => set(e.target.value || undefined)}
+          >
+            <option value="">Default inbox</option>
+            {inboxes.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.label}
+              </option>
+            ))}
+            {!!value && !inboxes.some((i) => i.id === value) && (
+              <option value={String(value)}>{String(value)} (not configured)</option>
+            )}
+          </Select>
+        </Field>
+      );
     case 'scenario':
     case 'block': {
       const opts = spec.kind === 'scenario' ? scenarios : blocks;
