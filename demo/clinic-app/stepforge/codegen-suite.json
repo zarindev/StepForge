@@ -1,0 +1,185 @@
+{
+  "format": "stepforge.application",
+  "version": 1,
+  "exportedAt": "2026-10-07T00:00:00.000Z",
+  "generator": "StepForge 0.1.0 · StepForge by Md Zarin Tasnim",
+  "application": {
+    "name": "CareClinic",
+    "slug": "careclinic",
+    "description": "Demo clinic app: the suite used to prove exported code runs (Phase 12).",
+    "tags": []
+  },
+  "environments": [
+    {
+      "name": "Local",
+      "baseUrl": "http://127.0.0.1:8101",
+      "variables": { "receptionEmail": "reception@careclinic.test" },
+      "secretKeys": ["password"]
+    }
+  ],
+  "tags": [{ "name": "smoke", "color": "#22C55E" }, { "name": "email", "color": "#6366F1" }],
+  "modules": [
+    { "ref": "m-patients", "parentRef": null, "name": "Patients" },
+    { "ref": "m-api", "parentRef": null, "name": "API" },
+    { "ref": "m-accounts", "parentRef": null, "name": "Accounts" }
+  ],
+  "blocks": [
+    {
+      "ref": "b-signin",
+      "name": "Sign in",
+      "steps": [
+        { "type": "ui.navigate", "label": "Open the login page", "params": { "url": "/login" } },
+        { "type": "ui.fill", "label": "Type the email", "params": { "value": "{{data.email}}" }, "locators": [{ "strategy": "label", "value": "Email" }] },
+        { "type": "ui.fill", "label": "Type the password", "params": { "value": "{{secret.password}}" }, "locators": [{ "strategy": "testId", "value": "password" }] },
+        { "type": "ui.click", "label": "Sign in", "params": {}, "locators": [{ "strategy": "role", "value": "button", "name": "Sign in" }] }
+      ]
+    }
+  ],
+  "datasets": [],
+  "scenarios": [
+    {
+      "ref": "s-register",
+      "moduleRef": "m-patients",
+      "name": "Register a patient",
+      "priority": "P1",
+      "status": "ready",
+      "tags": ["smoke"],
+      "preconditions": "The receptionist account exists.",
+      "steps": [
+        { "type": "util.useBlock", "label": "Sign in", "params": { "blockId": "b-signin" } },
+        { "type": "ui.assert", "label": "The dashboard is shown", "params": { "check": "urlMatches", "expected": "/$" } },
+        { "type": "ui.click", "label": "Open the registration form", "params": {}, "locators": [{ "strategy": "testId", "value": "quick-new-patient" }] },
+        { "type": "util.generateData", "label": "Generate a patient name", "params": { "kind": "name" }, "captureAs": "patient" },
+        { "type": "ui.fill", "label": "Full name", "params": { "value": "{{vars.patient}}" }, "locators": [{ "strategy": "label", "value": "Full name" }] },
+        { "type": "ui.fill", "label": "Date of birth", "params": { "value": "1990-05-17" }, "locators": [{ "strategy": "label", "value": "Date of birth" }] },
+        { "type": "ui.fill", "label": "Phone", "params": { "value": "+1-555-777-1234" }, "locators": [{ "strategy": "testId", "value": "patient-phone" }] },
+        { "type": "ui.click", "label": "Save", "params": {}, "locators": [{ "strategy": "testId", "value": "save-patient" }] },
+        { "type": "ui.assert", "label": "Patient saved", "params": { "check": "textMatches", "expected": "Patient PAT-\\d+ registered" }, "locators": [{ "strategy": "role", "value": "status" }] },
+        { "type": "ui.extract", "label": "Read the patient code", "params": { "from": "text", "regex": "(PAT-\\d+)" }, "locators": [{ "strategy": "role", "value": "status" }], "captureAs": "code" },
+        { "type": "ui.assert", "label": "The new patient's page shows the name", "params": { "check": "textContains", "expected": "{{vars.patient}}" }, "locators": [{ "strategy": "testId", "value": "patient-title" }] }
+      ],
+      "testCases": [{ "code": "TC-PAT-001", "title": "Receptionist registers a patient", "data": { "email": "reception@careclinic.test" }, "priority": "P1" }]
+    },
+    {
+      "ref": "s-api-create",
+      "moduleRef": "m-api",
+      "name": "Create a patient through the API",
+      "priority": "P1",
+      "status": "ready",
+      "tags": ["smoke"],
+      "steps": [
+        {
+          "type": "api.request",
+          "label": "Log in",
+          "params": { "method": "POST", "url": "/api/auth/login", "body": { "email": "{{env.receptionEmail}}", "password": "{{secret.password}}" }, "bodyType": "json" },
+          "assertions": [{ "target": "status", "operator": "equals", "expected": 200 }, { "target": "$.token", "operator": "exists" }],
+          "captureAs": "session"
+        },
+        { "type": "util.generateData", "label": "Generate a name", "params": { "kind": "name" }, "captureAs": "patient" },
+        {
+          "type": "api.request",
+          "label": "Create the patient",
+          "params": {
+            "method": "POST",
+            "url": "/api/patients",
+            "auth": { "type": "bearer", "token": "{{vars.session.token}}" },
+            "body": { "full_name": "{{vars.patient}}", "dob": "1985-02-03", "phone": "+1-555-0100", "email": "{{random.email}}" },
+            "bodyType": "json"
+          },
+          "assertions": [
+            { "target": "status", "operator": "equals", "expected": 201 },
+            { "target": "$.code", "operator": "matches", "expected": "^PAT-\\d+$" },
+            { "target": "$.full_name", "operator": "equals", "expected": "{{vars.patient}}" },
+            { "target": "time", "operator": "lt", "expected": 5000 }
+          ],
+          "captureAs": "created"
+        },
+        {
+          "type": "api.request",
+          "label": "Read it back",
+          "params": { "method": "GET", "url": "/api/patients/{{vars.created.id}}", "auth": { "type": "bearer", "token": "{{vars.session.token}}" } },
+          "assertions": [{ "target": "status", "operator": "equals", "expected": 200 }, { "target": "$.id", "operator": "equals", "expected": "{{vars.created.id}}" }]
+        },
+        {
+          "type": "db.query",
+          "label": "The patient is stored",
+          "params": { "connection": "clinic", "sql": "SELECT full_name, phone FROM patients WHERE id = ?", "params": ["{{vars.created.id}}"] },
+          "assertions": [
+            { "target": "rowCount", "operator": "equals", "expected": 1 },
+            { "target": "value", "operator": "equals", "expected": "{{vars.patient}}" },
+            { "target": "phone", "operator": "equals", "expected": "+1-555-0100" }
+          ]
+        }
+      ],
+      "testCases": []
+    },
+    {
+      "ref": "s-api-auth",
+      "moduleRef": "m-api",
+      "name": "Health and rejected logins",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [],
+      "steps": [
+        {
+          "type": "api.request",
+          "label": "Health check",
+          "params": { "method": "GET", "url": "/api/health" },
+          "assertions": [{ "target": "status", "operator": "equals", "expected": 200 }, { "target": "$.app", "operator": "equals", "expected": "CareClinic" }]
+        },
+        { "type": "api.extract", "label": "Remember the app name", "params": { "from": "body", "path": "$.app" }, "captureAs": "app" },
+        {
+          "type": "util.loop",
+          "label": "Try wrong passwords",
+          "params": {
+            "over": ["wrong", "reception123!", ""],
+            "as": "attempt",
+            "steps": [
+              {
+                "type": "api.request",
+                "label": "Log in with a wrong password",
+                "params": { "method": "POST", "url": "/api/auth/login", "body": { "email": "{{env.receptionEmail}}", "password": "{{vars.attempt}}" } },
+                "assertions": [{ "target": "status", "operator": "equals", "expected": 401 }, { "target": "$.error", "operator": "equals", "expected": "invalid_credentials" }]
+              }
+            ]
+          }
+        },
+        {
+          "type": "util.if",
+          "label": "Only for CareClinic",
+          "params": {
+            "condition": { "value": "{{vars.app}}", "operator": "equals", "expected": "CareClinic" },
+            "steps": [
+              { "type": "api.request", "label": "Protected endpoint needs a token", "params": { "method": "GET", "url": "/api/me" }, "assertions": [{ "target": "status", "operator": "equals", "expected": 401 }] }
+            ],
+            "else": [{ "type": "util.log", "label": "Not CareClinic", "params": { "message": "Unexpected app {{vars.app}}" } }]
+          }
+        }
+      ],
+      "testCases": []
+    },
+    {
+      "ref": "s-signup",
+      "moduleRef": "m-accounts",
+      "name": "Sign up with email verification",
+      "priority": "P1",
+      "status": "ready",
+      "tags": ["email"],
+      "steps": [
+        { "type": "util.setVariable", "label": "A unique address for this run", "params": { "name": "email", "value": "qa+{{run.id}}@example.test" } },
+        { "type": "ui.navigate", "label": "Open the sign-up page", "params": { "url": "/signup" } },
+        { "type": "ui.fill", "label": "Full name", "params": { "value": "Quinn QA" }, "locators": [{ "strategy": "label", "value": "Full name" }] },
+        { "type": "ui.fill", "label": "Email", "params": { "value": "{{vars.email}}" }, "locators": [{ "strategy": "testId", "value": "signup-email" }] },
+        { "type": "ui.fill", "label": "Password", "params": { "value": "{{secret.password}}" }, "locators": [{ "strategy": "label", "value": "Password" }] },
+        { "type": "ui.click", "label": "Create the account", "params": {}, "locators": [{ "strategy": "testId", "value": "signup-submit" }], "assertions": [{ "target": "url", "operator": "contains", "expected": "/verify" }] },
+        { "type": "email.waitForEmail", "label": "Wait for the verification email", "params": { "to": "{{vars.email}}", "subject": "Verify your CareClinic account", "timeoutMs": 20000 } },
+        { "type": "email.assertEmail", "label": "It has a code and a link", "params": { "subjectContains": "Verify", "bodyContains": "verification code", "hasLink": "verify" } },
+        { "type": "email.extractFromEmail", "label": "Read the code", "params": { "kind": "otp" }, "captureAs": "otp" },
+        { "type": "ui.fill", "label": "Enter the code", "params": { "value": "{{vars.otp}}" }, "locators": [{ "strategy": "testId", "value": "verify-code" }] },
+        { "type": "ui.click", "label": "Verify", "params": {}, "locators": [{ "strategy": "role", "value": "button", "name": "Verify email" }] },
+        { "type": "ui.assert", "label": "Back on the login page, verified", "params": { "check": "urlContains", "expected": "verified=1" } }
+      ],
+      "testCases": []
+    }
+  ]
+}

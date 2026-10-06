@@ -1,0 +1,17 @@
+{
+  "name": "@stepforge/codegen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turns StepForge scenarios into ready-to-run Playwright, Cypress, Selenium, API and documentation projects. By Md Zarin Tasnim.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@stepforge/core": "*",
+    "esbuild": "^0.25.0",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
+    "prettier": "^3.6.0"
+  }
+}

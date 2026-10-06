@@ -27,6 +27,7 @@ stepforge report  --run <id> --format html|pdf|xlsx|junit --out <file>
 stepforge export  --app <slug> --out <file>
 stepforge import  --file <file> [--slug <new-slug>]
 stepforge secret  set --app <slug> --env <name> --key <NAME> (--from-env <VAR> | value on stdin)
+stepforge codegen --app <slug> --target <id> --out <dir> [--env <name>] [--tag|--module|--scenario] [--pom] [--ci github,gitlab]
 ```
 
 Every command accepts `--data-dir <dir>` (default: `./data`, or `STEPFORGE_DATA_DIR`) and `--help`.
@@ -74,6 +75,16 @@ Stores an environment secret, encrypted with the data folder's key. The value ne
 ```bash
 ./stepforge.sh secret set --app careclinic --env Staging --key ADMIN_PASSWORD --from-env ADMIN_PASSWORD
 printf '%s' "$ADMIN_PASSWORD" | ./stepforge.sh secret set --app careclinic --env Staging --key ADMIN_PASSWORD
+```
+
+### `codegen`
+
+Writes a ready-to-run project (or document) into a folder: `stepforge codegen --list` shows the targets
+(`playwright-ts`, `cypress-js`, `selenium-java`, `k6`, `postman`, `docs-gherkin`…). `--pom` uses page objects,
+`--ci github,gitlab` adds CI files. Warnings (steps that need attention) are printed. See [CODEGEN.md](CODEGEN.md).
+
+```bash
+./stepforge.sh codegen --app careclinic --target playwright-ts --out ../careclinic-tests --ci github
 ```
 
 ## Scheduling with the operating system

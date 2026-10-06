@@ -73,3 +73,7 @@ Runs started by a schedule keep `runs.schedule_id`, which drives the schedule hi
 (`notify_channels`) are global; `config_json` holds `{ config, on }` (Telegram chat id, or SMTP host/port/from/to,
 and "always"/"failures"); the bot token or SMTP password is a `secrets` row without an environment (key
 `notify-channel:<id>`), deleted with the channel.
+
+Code exports (`exports`) record each download: `kind` is the target id, `options_json` the request (scope, page
+objects, CI files) plus the scenario and warning counts and the file name, and `path` the zip (or document) kept
+under `data/artifacts/exports/` for downloading again.

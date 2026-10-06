@@ -3,10 +3,11 @@ import { schema } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
 import { buildApp, type BuildOptions } from '@stepforge/server';
 import { CREDIT } from '@stepforge/reports';
+import { TARGETS } from '@stepforge/codegen';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 /** Exit codes: 0 all passed, 1 tests failed (or the quality gate with --fail-on-gate), 2 usage or setup error. */
@@ -31,6 +32,7 @@ Commands
   export    Write an application as portable JSON (secrets are never included)
   import    Create an application from an export
   secret    Store an environment secret (encrypted), e.g. in CI after "import"
+  codegen   Export tests as a ready-to-run project (Playwright, Cypress, Selenium, API, docs)
 
 run
   --app <slug>          Application (required)
@@ -53,6 +55,8 @@ export    --app <slug> --out <file>
 import    --file <file> [--slug <new-slug>]
 list      [--app <slug>]
 secret    set --app <slug> --env <name> --key <NAME> (--from-env <VAR> | value on stdin)
+codegen   --app <slug> --target <id> --out <dir> [--env <name>] [--tag|--module|--scenario]
+          [--pom] [--ci github,gitlab]   (targets: stepforge codegen --list)
 
 Global
   --data-dir <dir>      StepForge data folder (default: ./data or STEPFORGE_DATA_DIR)
@@ -137,6 +141,10 @@ const OPTIONS = {
   file: { type: 'string' },
   slug: { type: 'string' },
   key: { type: 'string' },
+  target: { type: 'string' },
+  pom: { type: 'boolean' },
+  ci: { type: 'string' },
+  list: { type: 'boolean' },
   'from-env': { type: 'string' },
   'data-dir': { type: 'string' },
   json: { type: 'boolean' },
@@ -444,7 +452,69 @@ const secretCmd: Handler = async (c, v, io) => {
   return EXIT.passed;
 };
 
+const codegenCmd: Handler = async (c, v, io) => {
+  if (v.list) {
+    for (const t of TARGETS)
+      io.out(`${t.id.padEnd(16)} ${t.label} (${t.language})${t.pom ? ' · --pom' : ''}`);
+    return EXIT.passed;
+  }
+  const { db } = c.ctx;
+  const application = findApp(c, need(v, 'app'));
+  const target = need(v, 'target');
+  if (!TARGETS.some((t) => t.id === target))
+    throw new UsageError(`Unknown target "${target}". Run "stepforge codegen --list".`);
+  const out = resolve(need(v, 'out'));
+  let environmentId: string | undefined;
+  if (typeof v.env === 'string') {
+    const env = repo.listEnvironments(db, application.id).find((e) => lc(e.name) === lc(v.env as string));
+    if (!env) throw new UsageError(`No environment "${v.env}" in ${application.name}`);
+    environmentId = env.id;
+  }
+  const filters = (['tag', 'module', 'scenario'] as const).filter((k) => v[k] !== undefined);
+  if (filters.length > 1) throw new UsageError('Use only one of --tag, --module and --scenario');
+  let scope: Record<string, unknown> = { type: 'application' };
+  if (typeof v.tag === 'string') {
+    const tag = repo.listTags(db, application.id).find((t) => lc(t.name) === lc(v.tag as string));
+    if (!tag) throw new UsageError(`No tag "${v.tag}" in ${application.name}`);
+    scope = { type: 'tag', id: tag.id };
+  } else if (typeof v.module === 'string') {
+    const mod = repo.listModules(db, application.id).find((m) => lc(m.name) === lc(v.module as string));
+    if (!mod) throw new UsageError(`No module "${v.module}" in ${application.name}`);
+    scope = { type: 'module', id: mod.id };
+  } else if (Array.isArray(v.scenario)) {
+    const tree = repo.getTree(db, application.id);
+    scope = {
+      type: 'scenarios',
+      ids: v.scenario.map((name) => {
+        const s = tree.scenarios.find((x) => lc(x.name) === lc(name));
+        if (!s) throw new UsageError(`No scenario "${name}" in ${application.name}`);
+        return s.id;
+      }),
+    };
+  }
+  const { project } = await c.ctx.codegen.build(application.id, {
+    target,
+    environmentId,
+    scope,
+    pom: !!v.pom,
+    ci:
+      typeof v.ci === 'string'
+        ? v.ci
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean)
+        : [],
+  });
+  for (const [path, content] of Object.entries(project.files)) write(join(out, path), content);
+  io.out(`Wrote ${Object.keys(project.files).length} files to ${out}`);
+  for (const w of project.warnings)
+    io.out(`  ⚠ ${w.scenario ? `${w.scenario} — ` : ''}${w.step ? `${w.step}: ` : ''}${w.message}`);
+  io.out(`Run it: cd ${out} && ${project.run}`);
+  return EXIT.passed;
+};
+
 const COMMANDS: Record<string, Handler> = {
+  codegen: wrap(codegenCmd),
   secret: wrap(secretCmd),
   run: wrap(run),
   list: wrap(list),

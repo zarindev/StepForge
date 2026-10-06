@@ -35,6 +35,21 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  exported-code:
+    # Phase 12 done-when: the Playwright project StepForge exports runs green against the demo app.
+    name: exported Playwright project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run mailpit:install
+      - run: npx playwright install --with-deps chromium
+      - run: npm run verify:export
+
   databases:
     # Real database servers for the DB executor's integration tests (Section 16: SQLite + PostgreSQL + MySQL
     # verified). Service containers only run on Linux runners; the tests skip themselves when a URL is unset.

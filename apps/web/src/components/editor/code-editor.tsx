@@ -15,16 +15,30 @@ export function CodeEditor({
   className,
   onMount,
   lineNumbers = false,
+  readOnly = false,
 }: {
   value: string;
   onChange: (v: string) => void;
-  language: 'json' | 'sql' | 'javascript' | 'plaintext';
+  language:
+    | 'json'
+    | 'sql'
+    | 'javascript'
+    | 'typescript'
+    | 'python'
+    | 'java'
+    | 'yaml'
+    | 'markdown'
+    | 'xml'
+    | 'shell'
+    | 'plaintext';
   height?: number;
   ariaLabel: string;
   className?: string;
   /** Access to the editor and the monaco namespace (completions, key bindings). */
   onMount?: OnMount;
   lineNumbers?: boolean;
+  /** Viewer mode (e.g. previews of generated code). */
+  readOnly?: boolean;
 }) {
   const dark = document.documentElement.classList.contains('dark');
   const fallback = (
@@ -34,6 +48,7 @@ export function CodeEditor({
       className={cn('font-mono text-xs', className)}
       style={{ height }}
       value={value}
+      readOnly={readOnly}
       onChange={(e) => onChange(e.target.value)}
     />
   );
@@ -59,6 +74,8 @@ export function CodeEditor({
             wordWrap: 'on',
             ariaLabel,
             tabSize: 2,
+            readOnly,
+            domReadOnly: readOnly,
             automaticLayout: true,
             padding: { top: 8 },
           }}

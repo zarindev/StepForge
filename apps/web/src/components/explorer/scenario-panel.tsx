@@ -1,4 +1,5 @@
-import { Copy, Play, Trash2 } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Code2, Copy, Play, Trash2 } from 'lucide-react';
 import { openRunDialog } from '@/components/runs/run-dialog';
 import { Badge, PRIORITY_TONE, STATUS_TONE } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,16 @@ export function ScenarioPanel({
           <Button variant="ghost" size="icon" aria-label="Delete scenario" title="Delete" onClick={onDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>
+          <Link
+            to="/exports"
+            search={{ scenario: s.id }}
+            aria-label="Export code"
+            title="Export as Playwright, Cypress, Selenium… code"
+          >
+            <Button variant="ghost" size="icon" tabIndex={-1}>
+              <Code2 className="h-4 w-4" />
+            </Button>
+          </Link>
           <Button
             size="sm"
             disabled={s.steps.length === 0}

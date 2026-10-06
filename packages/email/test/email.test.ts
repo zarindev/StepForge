@@ -43,6 +43,13 @@ describe('extractors', () => {
   it('returns nothing when the email has no code, or only ambiguous numbers', () => {
     expect(extractOtp('Welcome to CareClinic! Your appointment is confirmed.')).toBeUndefined();
     expect(extractOtp('Invoice 4821 and invoice 9932 are attached')).toBeUndefined();
+    // Regression: digits of a run id inside the verification link (next to "verify" and "code=") are not the code.
+    expect(
+      extractOtp(
+        'Your verification code is 482913. It expires in 10 minutes.\n\nOr open this link: http://127.0.0.1:8131/verify?email=qa%2B19a81234567f4821%40example.test&code=482913',
+      ),
+    ).toBe('482913');
+    expect(extractOtp('Code sent to qa+20261005123@example.test: 551 204')).toBe('551204');
     expect(extractOtp('code 12', { minLength: 4 })).toBeUndefined();
     expect(extractOtp('Your code is AB12', { minLength: 4 })).toBeUndefined();
   });

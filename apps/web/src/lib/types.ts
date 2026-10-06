@@ -660,3 +660,29 @@ export type UpcomingSchedule = {
   applicationId: string;
   nextRunAt: string;
 };
+
+// ─── Code export (Phase 12) ────────────────────────────────────────────────
+export type CodegenTarget = {
+  id: string;
+  label: string;
+  group: 'UI and hybrid' | 'API' | 'Documentation';
+  language: string;
+  pom: boolean;
+  ci: boolean;
+  apiOnly: boolean;
+};
+export type CodegenPreview = {
+  target: string;
+  run: string;
+  scenarios: number;
+  warnings: { scenario?: string; step?: string; message: string }[];
+  files: { path: string; size: number; content?: string; binary?: boolean }[];
+};
+export type ExportRecord = {
+  id: string;
+  applicationId: string;
+  kind: string;
+  optionsJson: { scenarios: number; warnings: number; filename: string };
+  path: string;
+  createdAt: string;
+};

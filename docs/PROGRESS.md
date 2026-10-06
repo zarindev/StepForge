@@ -15,9 +15,30 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 9 | Diagnosis engine, bug reports, report exports | ✅ Done |
 | 10 | Analytics, quality gates, run comparison, flaky detection | ✅ Done |
 | 11 | Scheduler, CLI, notifications, JUnit/HTML | ✅ Done |
-| 12 | Code generators + snapshot tests | ⏳ Next |
-| 13 | Public-repo polish, onboarding, fresh-clone test | — |
+| 12 | Code generators + snapshot tests | ✅ Done |
+| 13 | Public-repo polish, onboarding, fresh-clone test | ⏳ Next |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 12 — Code export (2026-10-07)
+
+**Delivered**
+- **`@stepforge/codegen`**: steps → a language-neutral list of operations (placeholders parsed into config, secrets, test data, variables, run id and random values; blocks and called scenarios inlined; generic UI assertions mapped to native checks) → **13 targets**: Playwright Test (TypeScript), Playwright + pytest, Cypress, Selenium + pytest, Selenium + JUnit 5, pytest + requests, REST Assured, k6, Postman v2.1, cURL, Markdown, Gherkin and Excel test cases. Optional **Page Object Model** for the five UI targets; GitHub Actions and GitLab CI files; README, `.env.example`, SQL files. Generated JS/TS/JSON is formatted with Prettier.
+- **Runtime helpers** shipped with each project (`packages/codegen/runtime`): StepForge's operators and assertion targets, JSONPath, Faker data, API wrappers, DB access (pg/mysql/sqlite per language), Mailpit email checks with the OTP extractor, and a Selenium finder (`find.js`) that matches roles, labels, text and test ids like StepForge. The Cypress helpers are compiled from the TypeScript ones (one source of truth).
+- **Never silently broken:** anything a target cannot express is a `TODO(StepForge)` comment plus a warning in the dialog, README and CLI.
+- **Server:** targets, preview, download (zip, or the document itself), export history kept in `data/artifacts/exports/` and downloadable again. **CLI:** `stepforge codegen`. **Dashboard:** **Exports** page (application, environment, all/module/tag/chosen scenarios, target cards, page objects, CI files, file tree with a read-only code viewer, warnings, run command, download, earlier exports) and an "Export code" button on scenarios in the Explorer.
+- **Bug fixed** (found by running the exported Java tests): one-time-code extraction could pick digits from a run id inside the verification link; digits inside links and email addresses are now ignored — in StepForge itself and in all exported helpers (regression test fails on the old code).
+- `demo/clinic-app/stepforge/codegen-suite.json` (a CareClinic suite for the export check), `scripts/verify-export.ts` / `npm run verify:export`, CI job `exported-code`, `docs/CODEGEN.md`; CLI.md updated.
+
+**Verified**
+- `npm test`: 319 passed, 18 skipped (external database servers). New: 27 codegen tests (values, plan and warnings, **snapshots of every target** plus page-object variants from a fixture with every step type, and for every target: all TypeScript/JavaScript parses, all Python compiles, `bash -n` passes, JSON parses, and a planted secret value never appears; Excel read back; zip layout), 5 server tests (preview, a real stored secret absent from all 13 targets, download/history/re-download, scope filters, errors), 1 CLI test, 2 OTP regression checks.
+- **Done-when check:** `npm run verify:export` starts CareClinic and Mailpit, imports the suite into a throwaway StepForge, exports Playwright, runs `npm install` and `npx playwright test` in the exported project: **4/4 passed**. The same check for **every runnable target, with and without page objects**: Playwright TS 4/4, Cypress 15.21 4/4, Playwright Python 4/4, Selenium Python 4/4, Selenium Java (JDK 17 + Maven) 4/4, pytest 2/2, REST Assured 2/2, k6 17/17 checks, cURL all checks, Postman/newman 17/17. With a wrong password the sign-in tests fail in every framework (results are not vacuous). Versions in CODEGEN.md.
+- `npm run test:e2e`: 18 tests. The Phase 12 E2E previews the Playwright export, reads files in the viewer, sees the warning, switches to page objects, downloads and opens the zip, sees it in history, previews Gherkin, and exports one scenario to k6 from the Explorer.
+- The real app on the existing `data/` folder serves the targets and the Exports page (no migration this phase).
+
+**Not verified**
+- The `exported-code` job on GitHub Actions and the generated CI files (no remote/runners), and Windows (KNOWN_ISSUES #56).
 
 ---
 

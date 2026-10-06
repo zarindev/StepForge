@@ -13,6 +13,7 @@
     ".": "./src/cli.ts"
   },
   "dependencies": {
+    "@stepforge/codegen": "*",
     "@stepforge/core": "*",
     "@stepforge/db": "*",
     "@stepforge/reports": "*",

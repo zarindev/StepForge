@@ -33,6 +33,7 @@ flowchart TB
 | `@stepforge/diagnosis` | Rule engine, YAML rules, last-green diff |
 | `@stepforge/reports` | Bug and run report rendering: HTML, PDF (Chromium), XLSX, CSV, Markdown, JUnit XML |
 | `@stepforge/analytics` | Daily aggregates, Home and application analytics, flaky detection, quality gates, run comparison |
+| `@stepforge/codegen` | Scenarios → language-neutral operations → 13 export targets (code projects, API formats, documents); runtime helpers shipped in `runtime/` |
 | `@stepforge/notify` | Run summaries for Telegram (Bot API) and email (SMTP via nodemailer) |
 | `@stepforge/executor-util` | Variables, generated data, sandboxed scripts |
 | `@stepforge/recorder` | Recording browser, injected toolbar, network capture |

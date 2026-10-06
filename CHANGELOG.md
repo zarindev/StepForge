@@ -3,9 +3,17 @@
 ## [Unreleased]
 
 ### Fixed
+- One-time-code extraction no longer picks digits inside a link or an email address (e.g. a run id in a
+  verification link) over the real code.
 - PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
 
 ### Added
+- Phase 12 code export: 13 targets — Playwright (TypeScript and Python), Cypress, Selenium (Python and Java), pytest +
+  requests, REST Assured, k6, Postman v2.1, cURL, Markdown, Gherkin and Excel test cases — with optional Page Object
+  Model and GitHub/GitLab CI files, API/DB/email helpers that keep StepForge's check rules, TODO markers and warnings
+  for anything that cannot be translated, Exports page (preview, download, history), Explorer shortcut,
+  `stepforge codegen`, application export/import API, snapshot tests and `npm run verify:export` (CI job for the
+  Playwright export).
 - Phase 11 automation: schedules (cron presets or expressions with next-run preview, run now, history, skipping a
   time while the previous run is still going), Telegram and email notifications with failures, diagnoses, quality
   gate and a link (secrets encrypted, "failures only" option, send test), the `stepforge` CLI (`run` with

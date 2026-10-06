@@ -80,6 +80,9 @@ export function extractOtp(
     const after = text.slice(m.index + raw.length, m.index + raw.length + 25);
     // Skip things that look like years in a date, or a phone number continuing.
     if (/^\s*[-/]\s*\d/.test(after) || /\d\s*[-/]\s*$/.test(before)) continue;
+    // Digits inside a link or an email address (e.g. a run id in the sign-up address) are never the code.
+    const token = `${/\S*$/.exec(before)![0]}${raw}${/^\S*/.exec(after)![0]}`;
+    if (/:\/\/|@|%[0-9a-f]{2}|[?&][\w-]+=/i.test(token)) continue;
     let score = 0;
     if (OTP_WORDS.test(before)) score += 10;
     if (OTP_WORDS.test(after)) score += 4;
