@@ -6,10 +6,15 @@ const shot = async (page: Page, name: string) => {
 };
 
 test.describe.serial('organise a test tree (Phase 2)', () => {
-  test('applications, environments, secrets, tags, modules, scenarios, steps, test cases, history', async ({ page }) => {
+  test('applications, environments, secrets, tags, modules, scenarios, steps, test cases, history', async ({
+    page,
+  }) => {
     // ── create the application ──
     await page.goto('/applications');
-    await page.getByRole('button', { name: /New application|Create your first application/ }).first().click();
+    await page
+      .getByRole('button', { name: /New application|Create your first application/ })
+      .first()
+      .click();
     await page.getByPlaceholder('e.g. CareClinic').fill('CareClinic');
     await expect(page.locator('input.font-mono').first()).toHaveValue('careclinic'); // auto slug
     await page.getByRole('button', { name: 'Create application' }).click();
@@ -128,9 +133,11 @@ test.describe.serial('organise a test tree (Phase 2)', () => {
     await expect(page).toHaveURL(/tab=testCases/);
 
     // drag "Book appointment" into Patients
-    await page.getByRole('treeitem', { name: 'Book appointment' }).locator('div').first().dragTo(
-      page.getByRole('treeitem', { name: 'Patients' }).locator('div').first(),
-    );
+    await page
+      .getByRole('treeitem', { name: 'Book appointment' })
+      .locator('div')
+      .first()
+      .dragTo(page.getByRole('treeitem', { name: 'Patients' }).locator('div').first());
     await expect(page.getByText('Scenario moved')).toBeVisible();
 
     // bulk: select both, add tag

@@ -51,12 +51,10 @@ export function registerApplicationRoutes(app: FastifyInstance, ctx: AppContext)
     if (env.isProduction) {
       const appName = repo.getApplication(db, env.applicationId).name;
       if (Confirm.parse(req.body ?? {}).confirm !== appName) {
-        return reply
-          .code(400)
-          .send({
-            error: 'confirmation_required',
-            message: `Production environment: type "${appName}" to confirm`,
-          });
+        return reply.code(400).send({
+          error: 'confirmation_required',
+          message: `Production environment: type "${appName}" to confirm`,
+        });
       }
     }
     repo.deleteEnvironment(db, env.id);
