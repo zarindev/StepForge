@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileCheck2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { FileCheck2, Pencil, Plus, Trash2, Wand2 } from 'lucide-react';
+import { VariantsDialog } from './variants-dialog';
 import { useState } from 'react';
 import { Badge, PRIORITY_TONE, STATUS_TONE } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ type Form = {
 export function TestCasesTab({ scenario }: { scenario: ScenarioDetail }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<TestCase | 'new' | null>(null);
+  const [variants, setVariants] = useState(false);
   const refresh = () => {
     qc.invalidateQueries({ queryKey: qk.scenario(scenario.id) });
     qc.invalidateQueries({ queryKey: qk.tree(scenario.applicationId) });
@@ -62,10 +64,22 @@ export function TestCasesTab({ scenario }: { scenario: ScenarioDetail }) {
         <p className="text-sm text-muted">
           Each test case runs the scenario with its own data, available as {'{{data.<field>}}'}.
         </p>
-        <Button size="sm" onClick={() => setEditing('new')}>
-          <Plus className="h-3.5 w-3.5" /> Add test case
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!scenario.testCases.some((t) => Object.keys(t.dataJson).length)}
+            title="Create negative / boundary / security variants by rules"
+            onClick={() => setVariants(true)}
+          >
+            <Wand2 className="h-3.5 w-3.5" /> Generate variants
+          </Button>
+          <Button size="sm" onClick={() => setEditing('new')}>
+            <Plus className="h-3.5 w-3.5" /> Add test case
+          </Button>
+        </div>
       </div>
+      {variants && <VariantsDialog scenario={scenario} onClose={() => setVariants(false)} />}
       {scenario.testCases.length === 0 ? (
         <EmptyState
           icon={FileCheck2}

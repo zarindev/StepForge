@@ -9,6 +9,7 @@ import { RunDetailPage } from '@/pages/run-detail';
 import { RunsPage } from '@/pages/runs';
 import { HomePage } from '@/pages/home';
 import { PlaceholderPage } from '@/pages/placeholder';
+import { RecorderPage } from '@/pages/recorder';
 import { SettingsPage } from '@/pages/settings';
 
 const rootRoute = createRootRoute({ component: Layout });
@@ -17,6 +18,7 @@ const pages: Record<string, () => React.ReactNode> = {
   '/': HomePage,
   '/applications': ApplicationsPage,
   '/runs': RunsPage,
+  '/recorder': RecorderPage,
   '/settings': SettingsPage,
 };
 

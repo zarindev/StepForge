@@ -132,7 +132,14 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean }) {
        <div class="card"><div class="muted">Patients</div><div class="kpi" data-testid="kpi-patients">${n('SELECT COUNT(*) n FROM patients')}</div></div>
        <div class="card"><div class="muted">Upcoming appointments</div><div class="kpi" id="kpi-appointments">${n("SELECT COUNT(*) n FROM appointments WHERE status = 'booked'")}</div></div>
        <div class="card"><div class="muted">Doctors</div><div class="kpi">${n('SELECT COUNT(*) n FROM doctors')}</div></div></div>
-       <p><a class="btn" href="/patients/new" data-testid="quick-new-patient">Register patient</a> <a class="btn" href="/appointments/new">Book appointment</a></p>`,
+       <p><a class="btn" href="/patients/new" data-testid="quick-new-patient">Register patient</a> <a class="btn" href="/appointments/new">Book appointment</a></p>
+       <div class="card"><h2 style="font-size:16px;margin:0 0 8px">Next appointments</h2><ul id="next-appointments" class="muted"><li>Loading…</li></ul></div>
+       <script>
+         fetch('/api/appointments').then((r) => r.json()).then((rows) => {
+           document.getElementById('next-appointments').innerHTML = rows.slice(0, 3)
+             .map((a) => '<li>' + a.date + ' ' + a.time + ' · ' + a.patient_name + ' with ' + a.doctor_name + '</li>').join('') || '<li>None</li>';
+         });
+       </script>`,
       u,
     );
   });

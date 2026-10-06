@@ -5,8 +5,8 @@
 | 1 | Foundation: monorepo, core, db, crypto, server, web shell, scripts, CI | ✅ Done |
 | 2 | Applications, environments, secrets, modules, tags, Test Explorer, CRUD, versions | ✅ Done |
 | 3 | Scenario engine, UI executor, runner, live view, evidence, results | ✅ Done |
-| 4 | Recorder, Scenario Editor (list/flow/plain-English) | ⏳ Next |
-| 5 | API module, API Client, importers, contract check | — |
+| 4 | Recorder, Scenario Editor (list/flow/plain-English) | ✅ Done |
+| 5 | API module, API Client, importers, contract check | ⏳ Next |
 | 6 | Database module, SQL Workbench, data-quality audit, rollback | — |
 | 7 | Email (Mailpit + IMAP), OTP/link extraction | — |
 | 8 | Performance (metrics, Lighthouse, load, k6, query plans) | — |
@@ -16,6 +16,29 @@
 | 12 | Code generators + snapshot tests | — |
 | 13 | Public-repo polish, onboarding, fresh-clone test | — |
 | 14 | Showcase package, optional Electron | — |
+
+---
+
+## Phase 4 — Recorder and Scenario Editor (2026-10-06)
+
+**Delivered**
+- **Recorder** (`@stepforge/recorder`): headed Chromium with the StepForge toolbar injected via `addInitScript` into every page and frame, rendered in a **Shadow DOM**, wired with `exposeBinding`. Toolbar: Record/Pause, **Assert** (pick an element → visible / text equals / contains / value / URL contains / hidden), **Extract** (save text into a variable), **Mask** (store any field as a secret), **Insert** (API request, DB query, wait for email, note, wait), Undo, Stop. Captures clicks, double-clicks, typing (debounced to one `fill` per field visit), selects (by label), checkboxes/radios, file inputs, Enter/Escape, typed navigations, new tabs (`switchTab`), closed tabs, dialogs (`handleDialog` inserted *before* the triggering action) and iframes (`switchFrame` in and out). Ignores focus clicks, label clicks that toggle a control, and the browser's synthetic submit click after Enter.
+- **Locator ranking** in the page: `data-testid/data-test/data-cy/data-qa` → ARIA role + accessible name → label → placeholder → stable text → stable CSS (hashed/auto-generated ids and classes ignored) → XPath, with uniqueness-aware scores. Weak structural fallbacks are dropped when two strong locators exist (they caused false "healing" onto the wrong element).
+- **Secrets:** password fields are auto-masked into `{{secret.<key>}}`; the value stays server-side and is saved encrypted into the environment on save.
+- **Network capture** of XHR/fetch (noise and static assets filtered, JSON bodies ≤ 64 KB) and `networkToApiSteps()` (dedupe by method + path template, `{{env.baseUrl}}`, auth headers → secrets, status + time assertions).
+- **Server**: one recording at a time, live `recorder.updated` events, `start/stop/undo/discard/save`; saving creates the scenario, optionally an API scenario from selected requests, and stores captured secrets.
+- **Engine control flow**: `util.if` (value conditions with any assertion operator, then/else), `util.loop` (count or array, `vars.item`/`vars.index`, max 1000), `util.callScenario`, `util.useBlock` (max call depth 5) with nested results numbered like `2`, `3.1`, `4[2].1`, `5e.1`. Nested steps are validated on save.
+- **Reusable blocks**: repository + API + Blocks tab on the application page.
+- **Plain English** (`describeStep` / `describeSteps` in core): readable sentences preferring human locators (“Click the "Sign in" button”), used by the editor now and by bug reports/docs later.
+- **Scenario Editor**: List / **Flow** (React Flow, layer colours, branches fan out, click a node to edit) / **Plain English** views; typed forms for 30 step types; **locator editor** (reorder, make primary, add/remove fallbacks); nested then/else/loop lists; **Monaco** (bundled locally, lazy-loaded) for JSON, SQL and scripts; advanced JSON for assertions.
+- **Generate variants** (rule-based, `generateVariants` in core): empty, whitespace, too long, numeric boundaries, invalid email/phone/date, HTML/script and SQL-quote inputs → new test cases with technique and expected result.
+- **Explorer**: “Move module to…” (keyboard alternative to drag-and-drop); deep links into another application now switch the app automatically (bug found by E2E). Run results show nested step paths with indentation.
+- CareClinic dashboard now loads “Next appointments” via `fetch`, so recordings capture real API traffic.
+
+**Verified**
+- `npm test`: 111 tests. New: 4 control-flow engine tests, plain-English (11 cases) and variants tests, 3 recorder tests driving a real browser against CareClinic (login + booking with Assert/Extract via the toolbar, masked password, network capture, then **replay with the engine on fresh demo data passes**; typed navigation, undo, pause and dialog ordering; API dedupe), 2 server tests (record → save with secret + API scenario → run passes; blocks + `useBlock` inside a loop, nested-step validation).
+- `npm run test:e2e`: 10 tests, run serially (specs share one CareClinic instance; resetting it logs everyone out). The Phase 4 E2E starts a recording **from the dashboard**, drives the server-launched browser over CDP, sees 13 steps arrive live, reviews and saves, checks the Plain English and Flow views and the locator editor, then replays the recording → passed. A second E2E covers variants, move module, blocks and a nested `useBlock` loop built in the typed form.
+- Bugs found and fixed: implicit form submission recorded an extra click; weak CSS fallbacks healed onto the wrong element; a URL typed right after starting was ignored; cross-application deep links showed an empty panel.
 
 ---
 

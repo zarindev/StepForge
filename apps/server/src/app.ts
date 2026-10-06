@@ -13,6 +13,8 @@ import { registerStaticRoutes } from './routes/static.ts';
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerRunRoutes } from './routes/runs.ts';
 import { registerTestRoutes } from './routes/tests.ts';
+import { RecorderManager } from './recorder/manager.ts';
+import { registerRecorderRoutes } from './routes/recorder.ts';
 import { RunManager } from './runner/manager.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
 
@@ -61,6 +63,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     runs: new RunManager(db, bus, config.artifactsDir, masterKey, () => ({
       timeoutMs: getSetting(db, 'defaultTimeoutMs', 15_000),
     })),
+    recorder: new RecorderManager(db, masterKey, bus),
     startedAt: new Date(),
   };
 
@@ -88,10 +91,12 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerApplicationRoutes(app, ctx);
   registerTestRoutes(app, ctx);
   await registerRunRoutes(app, ctx);
+  registerRecorderRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   app.addHook('onClose', async () => {
     await ctx.runs.shutdown();
+    ctx.recorder.discard();
     sqlite.close();
   });
   return { app, ctx };

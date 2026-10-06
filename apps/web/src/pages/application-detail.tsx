@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Archive, ArrowLeft, FolderTree, Pencil, ShieldAlert, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { AppAvatar, AppFormDialog, type AppFormValues } from '@/components/applications/app-form';
+import { BlocksTab } from '@/components/applications/blocks-tab';
 import { EnvironmentsTab } from '@/components/applications/environments-tab';
 import { SecretsTab } from '@/components/applications/secrets-tab';
 import { TagsTab } from '@/components/applications/tags-tab';
@@ -18,7 +19,7 @@ import { api } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
 import { qk, useApplication } from '@/lib/queries';
 
-type Tab = 'environments' | 'secrets' | 'tags' | 'settings';
+type Tab = 'environments' | 'secrets' | 'tags' | 'blocks' | 'settings';
 
 export function ApplicationDetailPage() {
   const { appId } = useParams({ from: '/applications/$appId' });
@@ -123,12 +124,14 @@ export function ApplicationDetailPage() {
           { value: 'environments', label: 'Environments', count: a.counts.environments },
           { value: 'secrets', label: 'Secrets' },
           { value: 'tags', label: 'Tags' },
+          { value: 'blocks', label: 'Blocks' },
           { value: 'settings', label: 'Settings' },
         ]}
       />
       {tab === 'environments' && <EnvironmentsTab app={a} />}
       {tab === 'secrets' && <SecretsTab app={a} />}
       {tab === 'tags' && <TagsTab app={a} />}
+      {tab === 'blocks' && <BlocksTab app={a} />}
       {tab === 'settings' && (
         <div className="max-w-2xl space-y-4">
           <Card className="flex items-center justify-between gap-4 p-4">

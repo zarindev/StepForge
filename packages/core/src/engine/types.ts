@@ -53,7 +53,11 @@ export type StepOutcome = {
 
 export type StepResult = {
   stepId: string;
+  /** Global execution order (unique per test case, also used for evidence file names). */
   position: number;
+  /** Human path in the step tree, e.g. "3" or "4.2" or "5[2].1" for loop iteration 2. */
+  path: string;
+  depth: number;
   type: string;
   label: string;
   status: StepStatus;
@@ -82,7 +86,15 @@ export type TestCaseResult = {
 };
 
 export type EngineEvent =
-  | { type: 'step.started'; stepId: string; position: number; stepType: string; label: string }
+  | {
+      type: 'step.started';
+      stepId: string;
+      position: number;
+      path: string;
+      depth: number;
+      stepType: string;
+      label: string;
+    }
   | { type: 'step.finished'; result: StepResult }
   | { type: 'log'; level: 'info' | 'warn' | 'error'; message: string };
 

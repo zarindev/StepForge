@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { AppWindow, FolderPlus, FolderTree, ListFilter, MousePointerClick, Search, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BulkBar, type BulkAction } from '@/components/explorer/bulk-bar';
 import { openRunDialog } from '@/components/runs/run-dialog';
+import { MoveModuleDialog } from '@/components/explorer/move-module-dialog';
 import { PromptDialog } from '@/components/explorer/prompt-dialog';
 import { ScenarioPanel, type PanelTab } from '@/components/explorer/scenario-panel';
 import { TreeView, type TreeActions } from '@/components/explorer/tree-view';
@@ -15,7 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/states';
 import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { qk, useCurrentApp, useLastResults, useTags, useTree } from '@/lib/queries';
+import { setCurrentAppId } from '@/lib/current-app';
+import { qk, useCurrentApp, useLastResults, useScenario, useTags, useTree } from '@/lib/queries';
 import {
   buildTree,
   EMPTY_FILTERS,
@@ -46,11 +48,18 @@ export function ExplorerPage() {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [moving, setMoving] = useState<ModuleTreeNode | null>(null);
 
   const nodes = useMemo(() => (tree.data ? buildTree(tree.data, filters) : []), [tree.data, filters]);
   const moduleOptions = useMemo(() => (tree.data ? flattenModules(tree.data) : []), [tree.data]);
-  const selectedId =
-    search.scenario && tree.data?.scenarios.some((s) => s.id === search.scenario) ? search.scenario : null;
+  const inTree = !!search.scenario && !!tree.data?.scenarios.some((s) => s.id === search.scenario);
+  const selectedId = inTree ? search.scenario! : null;
+  // Deep links (run results, search, bookmarks) may point into another application: switch to it.
+  const linked = useScenario(search.scenario && tree.data && !inTree ? search.scenario : null);
+  useEffect(() => {
+    if (linked.data && app && linked.data.applicationId !== app.id)
+      setCurrentAppId(linked.data.applicationId);
+  }, [linked.data, app]);
   const select = (id: string | null, tab?: PanelTab) =>
     navigate({
       search: (prev) => ({
@@ -104,6 +113,7 @@ export function ExplorerPage() {
         undefined,
         'Module moved',
       ),
+    onMoveModuleTo: (m) => setMoving(m),
     onRunModule: (m) =>
       openRunDialog({
         applicationId: app!.id,
@@ -402,6 +412,21 @@ export function ExplorerPage() {
           busy={run.isPending}
           onClose={() => setPrompt(null)}
           onSubmit={submitPrompt}
+        />
+      )}
+      {moving && tree.data && (
+        <MoveModuleDialog
+          module={moving}
+          tree={tree.data}
+          busy={run.isPending}
+          onClose={() => setMoving(null)}
+          onMove={(parentId) =>
+            exec(
+              () => api(`/api/modules/${moving.id}`, { method: 'PATCH', json: { parentId } }),
+              () => setMoving(null),
+              'Module moved',
+            )
+          }
         />
       )}
       <ConfirmDialog

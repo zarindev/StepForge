@@ -12,6 +12,9 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
+  // Specs share one CareClinic instance (and resetting it logs everyone out), so they run one at a time.
+  workers: 1,
+  fullyParallel: false,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
@@ -39,6 +42,8 @@ export default defineConfig({
         STEPFORGE_DATA_DIR: dataDir,
         STEPFORGE_OPEN_BROWSER: '0',
         STEPFORGE_LOG_LEVEL: 'warn',
+        STEPFORGE_RECORDER_HEADLESS: '1',
+        STEPFORGE_RECORDER_CDP_PORT: '9333',
       },
     },
   ],

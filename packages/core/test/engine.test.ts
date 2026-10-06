@@ -214,3 +214,144 @@ describe('evaluateAssertion', () => {
     );
   });
 });
+
+describe('control flow', () => {
+  const util = (log: string[]): Executor => ({
+    group: 'util',
+    async createSession(ctx) {
+      return {
+        async execute(step) {
+          const p = step.params as Record<string, unknown>;
+          if (step.type === 'util.setVariable') ctx.resolver.setVar(String(p.name), p.value);
+          if (step.type === 'util.log') log.push(String(p.message));
+          if (p.fail) throw new StepError('assertion', 'nested boom');
+          return {};
+        },
+        async close() {
+          return [];
+        },
+      };
+    },
+  });
+  const go = (
+    s: ReturnType<typeof steps>,
+    extra: Partial<Parameters<typeof runTestCase>[0]> = {},
+    log: string[] = [],
+  ) =>
+    runTestCase({
+      runId: 'R',
+      steps: s,
+      executors: [util(log)],
+      options: opts,
+      artifactsDir: '/tmp',
+      ...extra,
+    });
+  const logStep = (message: string) => ({ type: 'util.log', params: { message } });
+
+  it('if/else picks a branch from a value comparison', async () => {
+    const log: string[] = [];
+    const r = await go(
+      steps(
+        { type: 'util.setVariable', params: { name: 'n', value: 3 } },
+        {
+          type: 'util.if',
+          params: {
+            condition: { value: '{{vars.n}}', operator: 'gt', expected: 2 },
+            steps: [logStep('big')],
+            else: [logStep('small')],
+          },
+        },
+        {
+          type: 'util.if',
+          params: {
+            condition: { value: '{{vars.n}}', operator: 'gt', expected: 5 },
+            steps: [logStep('huge')],
+            else: [logStep('not huge')],
+          },
+        },
+      ),
+      {},
+      log,
+    );
+    expect(r.status).toBe('passed');
+    expect(log).toEqual(['big', 'not huge']);
+    expect(r.steps.find((s) => s.type === 'util.log' && s.depth === 1)?.path).toBe('2.1');
+    expect(r.steps.find((s) => s.path === '3e.1')).toBeDefined();
+  });
+
+  it('loops over a count and over an array, exposing item and index', async () => {
+    const log: string[] = [];
+    const r = await go(
+      steps(
+        { type: 'util.loop', params: { count: 2, steps: [logStep('tick {{vars.item}}')] } },
+        {
+          type: 'util.loop',
+          params: { over: ['a', 'b', 'c'], as: 'letter', steps: [logStep('{{vars.index}}:{{vars.letter}}')] },
+        },
+      ),
+      {},
+      log,
+    );
+    expect(log).toEqual(['tick 1', 'tick 2', '0:a', '1:b', '2:c']);
+    expect(r.steps.map((s) => s.path)).toContain('2[3].1');
+    expect(r.steps.find((s) => s.type === 'util.loop')?.message).toBe('Ran 2/2 iteration(s)');
+  });
+
+  it('a failing nested step fails the parent and stops the test', async () => {
+    const log: string[] = [];
+    const r = await go(
+      steps(
+        {
+          type: 'util.loop',
+          params: { count: 3, steps: [{ type: 'util.log', params: { message: 'x', fail: true } }] },
+        },
+        logStep('after'),
+      ),
+      {},
+      log,
+    );
+    expect(r.status).toBe('failed');
+    expect(r.error).toBe('nested boom');
+    expect(log).toEqual(['x']);
+    expect(r.steps.find((s) => s.type === 'util.loop')?.status).toBe('failed');
+    expect(r.steps.at(-1)).toMatchObject({ path: '2', status: 'skipped' });
+  });
+
+  it('callScenario and useBlock run loaded steps; recursion is capped; invalid nested steps are broken', async () => {
+    const log: string[] = [];
+    const loginId = newId();
+    const r = await go(
+      steps(
+        { type: 'util.useBlock', params: { blockId: 'B1' } },
+        { type: 'util.callScenario', params: { scenarioId: 'S1' } },
+      ),
+      {
+        loadBlockSteps: () => steps(logStep('block step')),
+        loadScenarioSteps: () => [{ ...steps(logStep('scenario step'))[0]!, id: loginId }],
+      },
+      log,
+    );
+    expect(r.status).toBe('passed');
+    expect(log).toEqual(['block step', 'scenario step']);
+
+    const self = await go(steps({ type: 'util.callScenario', params: { scenarioId: 'S' } }), {
+      loadScenarioSteps: () => steps({ type: 'util.callScenario', params: { scenarioId: 'S' } }),
+    });
+    expect(self.status).toBe('broken');
+    expect(self.error).toMatch(/deeper than 5/);
+
+    const bad = await go(
+      steps({
+        type: 'util.if',
+        params: {
+          condition: { value: 1, operator: 'equals', expected: 1 },
+          steps: [{ type: 'ui.teleport' }],
+        },
+      }),
+    );
+    expect(bad).toMatchObject({ status: 'broken', errorKind: 'invalid_params' });
+    expect((await go(steps({ type: 'util.callScenario', params: { scenarioId: 'S' } }))).errorKind).toBe(
+      'unsupported',
+    );
+  });
+});

@@ -70,6 +70,9 @@ Generic `assertions` on any UI step can target `url`, `title`, and for steps wit
 | `wait` | `ms` | logged as a warning: prefer `ui.waitFor` |
 | `log` | `message` | |
 | `runScript` | `code` (JavaScript; `return` a value) | sees copies of `vars` and may set `vars.x`; no `require`, `process`, `eval`, files or network; 5 s max |
-| `if` / `loop` / `callScenario` / `useBlock` | — | arrive in Phase 4 |
+| `if` | `condition: { value, operator, expected }`, `steps` (then), `else` | any assertion operator; nested results numbered `3.1` (then) / `3e.1` (else) |
+| `loop` | `count` **or** `over` (an array, e.g. `{{vars.items}}`), `as` (default `item`), `steps` | exposes `{{vars.item}}` and `{{vars.index}}`; max 1000 iterations; results `4[2].1` |
+| `callScenario` | `scenarioId` | runs another scenario of the same application inline; max nesting depth 5 |
+| `useBlock` | `blockId` | runs a reusable block (application → Blocks tab) |
 
 API, database, email and performance steps are documented as their phases land.
