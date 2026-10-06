@@ -6,7 +6,10 @@ test.describe('dashboard shell', () => {
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible();
-    await expect(page.getByText('Welcome to StepForge')).toBeVisible();
+    // A fresh workspace shows the welcome panel; once runs exist, the dashboard (other specs may have run first).
+    await expect(
+      page.getByText('Welcome to StepForge').or(page.getByText('Pass/fail trend (30 days)')),
+    ).toBeVisible();
     await expect(page.getByText('Applications', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Local', { exact: true })).toBeVisible(); // live WebSocket connected
     await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible(); // system info loaded

@@ -472,3 +472,147 @@ export type LighthouseResult = {
   durationMs: number;
   warnings: string[];
 };
+
+// ─── Analytics (mirrors @stepforge/analytics) ──────────────────────────────────
+export type GateRule =
+  | { kind: 'passRate'; min: number; priority?: Priority; tag?: string; level?: 'block' | 'warn' }
+  | { kind: 'openBugs'; severity: BugSeverity; max: number; level?: 'block' | 'warn' }
+  | { kind: 'flakyRate'; max: number; level?: 'block' | 'warn' }
+  | { kind: 'apiP95' | 'loadP95' | 'pageLcp'; maxMs: number; level?: 'block' | 'warn' }
+  | { kind: 'maxDuration'; maxMinutes: number; level?: 'block' | 'warn' };
+export type GateStatus = 'green' | 'amber' | 'red' | 'unknown';
+export type GateResult = {
+  gateId: string;
+  name: string;
+  status: GateStatus;
+  runId: string | null;
+  rules: { rule: GateRule; label: string; passed: boolean | null; actual: string; message: string }[];
+};
+export type AppGates = {
+  status: GateStatus;
+  gates: GateResult[];
+  definitions?: { id: string; name: string; rules: GateRule[] }[];
+};
+export type HomeSummary = {
+  kpis: {
+    applications: number;
+    scenarios: number;
+    testCases: number;
+    runsThisWeek: number;
+    passRate: number | null;
+    flakyRate: number | null;
+    openBugs: number;
+    avgDurationMs: number | null;
+  };
+  gates: (AppGates & { applicationId: string; application: string; color: string })[];
+  trend: { date: string; runs: number; passed: number; failed: number; flaky: number; other: number }[];
+  recentRuns: {
+    id: string;
+    application: string;
+    color?: string;
+    status: RunStatus;
+    totals: Totals;
+    createdAt: string;
+    durationMs: number | null;
+  }[];
+};
+type GroupRowT = {
+  key: string;
+  label: string;
+  total: number;
+  passed: number;
+  failed: number;
+  flaky: number;
+  skipped: number;
+  passRate: number | null;
+};
+export type AppAnalytics = {
+  days: number;
+  totals: { tests: number; runs: number; passRate: number | null; failed: number; flaky: number };
+  byModule: GroupRowT[];
+  byLayer: GroupRowT[];
+  byTag: GroupRowT[];
+  byEnvironment: GroupRowT[];
+  failureCategories: { category: string; count: number }[];
+  topFailing: {
+    key: string;
+    scenarioId: string | null;
+    scenario: string;
+    testCase: string | null;
+    failures: number;
+    runs: number;
+    lastError: string | null;
+    category: string | null;
+    lastItemId: string;
+    lastRunId: string;
+  }[];
+  slowest: {
+    scenarioId: string | null;
+    scenario: string;
+    testCase: string | null;
+    avgMs: number;
+    maxMs: number;
+    runs: number;
+  }[];
+  flaky: {
+    key: string;
+    scenarioId: string | null;
+    scenario: string;
+    testCase: string | null;
+    score: number;
+    runs: number;
+    flakyRuns: number;
+    history: string[];
+    lastItemId: string;
+    lastRunId: string;
+  }[];
+  perf: {
+    apiResponseTime: { date: string; avg: number; p95: number; count: number }[];
+    pageLcp: { date: string; avg: number; p95: number; count: number }[];
+    load: {
+      at: string;
+      scenario: string;
+      profile: string;
+      vus: number;
+      rps: number;
+      p95: number | null;
+      errorRate: number;
+      runId?: string;
+    }[];
+  };
+  heatmap: { date: string; runs: number; tests: number; passRate: number | null }[];
+  gates: AppGates;
+};
+export type RunComparison = {
+  base: {
+    id: string;
+    status: RunStatus;
+    createdAt: string;
+    durationMs: number | null;
+    totals: Totals;
+    passRate: number | null;
+  };
+  head: RunComparison['base'];
+  fixed: CompareRow[];
+  newFailures: CompareRow[];
+  stillFailing: CompareRow[];
+  stillPassing: number;
+  added: number;
+  removed: number;
+  perfDeltas: {
+    test: string;
+    metric: string;
+    unit: string;
+    before: number;
+    after: number;
+    deltaPct: number | null;
+  }[];
+};
+export type CompareRow = {
+  key: string;
+  name: string;
+  before: string | null;
+  after: string | null;
+  error: string | null;
+  itemId: string;
+};

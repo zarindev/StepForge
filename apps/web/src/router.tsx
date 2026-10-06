@@ -15,6 +15,8 @@ import { SettingsPage } from '@/pages/settings';
 import { SqlWorkbenchPage } from '@/pages/sql-workbench';
 import { PerformancePage } from '@/pages/performance';
 import { BugsPage } from '@/pages/bugs';
+import { AnalyticsPage } from '@/pages/analytics';
+import { ComparePage } from '@/pages/compare';
 
 const rootRoute = createRootRoute({ component: Layout });
 
@@ -62,6 +64,19 @@ const sqlRoute = createRoute({
   component: SqlWorkbenchPage,
 });
 
+const analyticsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/applications/$appId/analytics',
+  component: AnalyticsPage,
+});
+
+const compareRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/runs/compare',
+  validateSearch: (s) => z.object({ base: z.string().optional(), head: z.string().optional() }).parse(s),
+  component: ComparePage,
+});
+
 const bugsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/bugs',
@@ -79,6 +94,8 @@ const explorerRoute = createRoute({
 const runDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/runs/$runId',
+  /** `item` opens one test's results directly (drill-down from analytics and bugs). */
+  validateSearch: (s) => z.object({ item: z.string().optional() }).parse(s),
   component: RunDetailPage,
 });
 
@@ -93,6 +110,8 @@ export const router = createRouter({
     ...navRoutes,
     sqlRoute,
     bugsRoute,
+    analyticsRoute,
+    compareRoute,
     explorerRoute,
     applicationDetailRoute,
     runDetailRoute,

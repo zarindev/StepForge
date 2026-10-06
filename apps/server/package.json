@@ -13,6 +13,7 @@
   "dependencies": {
     "@fastify/static": "^10.1.5",
     "@fastify/websocket": "^11.2.0",
+    "@stepforge/analytics": "*",
     "@stepforge/core": "*",
     "@stepforge/crypto": "*",
     "@stepforge/db": "*",

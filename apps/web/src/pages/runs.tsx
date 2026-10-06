@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Play, PlayCircle, RotateCw, Trash2 } from 'lucide-react';
+import { GitCompare, Play, PlayCircle, RotateCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { formatDuration, StatusPill, timeAgo, TotalsBar } from '@/components/runs/status';
 import { openRunDialog } from '@/components/runs/run-dialog';
@@ -42,6 +42,11 @@ export function RunsPage() {
               <Switch checked={onlyCurrent} onChange={setOnlyCurrent} label="Only current application" />{' '}
               {app ? `Only ${app.name}` : 'Current app'}
             </label>
+            <Link to="/runs/compare" search={{}}>
+              <Button variant="outline" disabled={!app}>
+                <GitCompare className="h-4 w-4" /> Compare
+              </Button>
+            </Link>
             <Button
               disabled={!app}
               onClick={() =>

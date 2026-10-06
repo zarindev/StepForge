@@ -87,9 +87,10 @@
   fix: 'Return the documented types and fields (or update the API spec if the change is intended).'
   evidence: { Request: '{{request.method}} {{request.url}}', 'Schema errors': '{{schemaErrorList}}' }
 
+# Below the specific status rules (401, 404, 500…), which explain more; above plain value mismatches.
 - id: api-unexpected-status
   category: wrong_status
-  priority: 76
+  priority: 65
   confidence: 0.7
   owner: app
   when: { layer: api, expectedStatus: { exists: true }, status: { exists: true } }

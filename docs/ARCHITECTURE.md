@@ -32,6 +32,7 @@ flowchart TB
 | `@stepforge/executor-perf` | Performance steps (page metrics, Lighthouse, load test, query plan) |
 | `@stepforge/diagnosis` | Rule engine, YAML rules, last-green diff |
 | `@stepforge/reports` | Bug and run report rendering: HTML, PDF (Chromium), XLSX, CSV, Markdown |
+| `@stepforge/analytics` | Daily aggregates, Home and application analytics, flaky detection, quality gates, run comparison |
 | `@stepforge/executor-util` | Variables, generated data, sandboxed scripts |
 | `@stepforge/recorder` | Recording browser, injected toolbar, network capture |
 | `@stepforge/importers` | OpenAPI/Swagger, Postman, cURL and HAR → scenarios |

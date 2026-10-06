@@ -46,3 +46,6 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 40 | Diagnosis | Locator suggestions compare the old locator's words with the page's test ids, accessible names, labels and text; renamed elements with completely different wording are not found. | Record the step again. |
 | 41 | Bugs | Bugs are filed for every failed or broken test, including test-owned ones (e.g. locator changed); filter by "Whose issue" on the Bugs page. | By design. |
 | 42 | Reports | PDF and HTML exports embed the failure screenshot; videos and traces stay in StepForge (linked from the bug's run). | By design (file size). |
+| 43 | Analytics | Days are UTC calendar days; a run near midnight counts on the UTC date. | Possible later: a time-zone setting. |
+| 44 | Analytics | Quality gates read the latest completed run of the application across environments (not per environment). | Possible later: per-environment gates. |
+| 45 | Analytics | Breakdowns are computed from results in the chosen window (up to 365 days) on each request; very large histories may make the Analytics page slower. Home and the calendar use the daily aggregates. | Revisit if needed. |

@@ -6,6 +6,9 @@
 - PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
 
 ### Added
+- Phase 10 analytics: Home dashboard (KPIs, trend, quality gates, recent runs), application analytics (breakdowns,
+  failure categories, top failing/slowest/flaky tests with drill-down, performance trends, calendar), quality gates
+  with block/warn rules, run comparison, daily aggregates refreshed after every run.
 - Phase 9 diagnosis and bug reports: rule-based diagnosis (53 YAML rules, user rules, last-green diff, locator
   suggestions with one-click fix, annotated failure screenshots), automatic deduplicated bug reports, exports
   (bug PDF/HTML/Markdown, bug list PDF/XLSX/Jira/Trello CSV, run report HTML/PDF/XLSX) with the report author

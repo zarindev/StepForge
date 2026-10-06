@@ -26,6 +26,8 @@ import { PerfService } from './perf/service.ts';
 import { DiagnosisService } from './diagnosis/service.ts';
 import { registerPerfRoutes } from './routes/perf.ts';
 import { registerBugRoutes } from './routes/bugs.ts';
+import { registerAnalyticsRoutes } from './routes/analytics.ts';
+import { rebuildDaily } from '@stepforge/analytics';
 import { closePdfBrowser } from '@stepforge/reports';
 import { RunManager } from './runner/manager.ts';
 import { generateSessionToken, registerSecurity } from './security.ts';
@@ -62,6 +64,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     .where(inArray(schema.runs.status, ['queued', 'running']))
     .run();
   if (interrupted.changes > 0) app.log.warn(`Marked ${interrupted.changes} unfinished run(s) as interrupted`);
+
+  // Analytics aggregates are derived data: fill them in once for databases from before Phase 10.
+  if (
+    !db.select().from(schema.analyticsDaily).limit(1).get() &&
+    db.select().from(schema.runs).limit(1).get()
+  ) {
+    const days = rebuildDaily(db);
+    app.log.info(`Built analytics for ${days} day(s) of existing runs`);
+  }
 
   const masterKey = loadOrCreateKey(config.keyFile);
   const specs = new SpecService(db, join(config.dataDir, 'specs'));
@@ -134,6 +145,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerEmailRoutes(app, ctx);
   registerPerfRoutes(app, ctx);
   registerBugRoutes(app, ctx);
+  registerAnalyticsRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal.
