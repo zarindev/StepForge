@@ -41,6 +41,13 @@ export type StepOutcome = {
   output?: unknown;
   /** Values for step.assertions targets (e.g. `url`, `text`, `status`). */
   getTarget?: (target: string) => unknown | Promise<unknown>;
+  /**
+   * Lets an executor judge assertions the generic evaluator cannot (e.g. `matchesSchema`, OpenAPI contract).
+   * Return undefined to fall back to the generic evaluator.
+   */
+  evaluate?: (assertion: Assertion) => AssertionResult | undefined | Promise<AssertionResult | undefined>;
+  /** Checks the executor ran itself (e.g. an OpenAPI contract), reported alongside the step's assertions. */
+  assertions?: AssertionResult[];
   request?: unknown;
   response?: unknown;
   query?: unknown;

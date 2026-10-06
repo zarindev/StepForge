@@ -1,7 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { AppWindow, FolderPlus, FolderTree, ListFilter, MousePointerClick, Search, X } from 'lucide-react';
+import {
+  AppWindow,
+  FileUp,
+  FolderPlus,
+  FolderTree,
+  ListFilter,
+  MousePointerClick,
+  Search,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { ImportDialog } from '@/components/api/import-dialog';
 import { BulkBar, type BulkAction } from '@/components/explorer/bulk-bar';
 import { openRunDialog } from '@/components/runs/run-dialog';
 import { MoveModuleDialog } from '@/components/explorer/move-module-dialog';
@@ -49,6 +59,7 @@ export function ExplorerPage() {
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [moving, setMoving] = useState<ModuleTreeNode | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const nodes = useMemo(() => (tree.data ? buildTree(tree.data, filters) : []), [tree.data, filters]);
   const moduleOptions = useMemo(() => (tree.data ? flattenModules(tree.data) : []), [tree.data]);
@@ -232,9 +243,19 @@ export function ExplorerPage() {
             <h1 className="flex items-center gap-2 text-sm font-semibold">
               <FolderTree className="h-4 w-4 text-brand" /> {app.name}
             </h1>
-            <Button variant="ghost" size="sm" onClick={() => setPrompt({ kind: 'module', parentId: null })}>
-              <FolderPlus className="h-3.5 w-3.5" /> Module
-            </Button>
+            <div className="flex">
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Import OpenAPI, Postman, cURL or HAR"
+                onClick={() => setImporting(true)}
+              >
+                <FileUp className="h-3.5 w-3.5" /> Import
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setPrompt({ kind: 'module', parentId: null })}>
+                <FolderPlus className="h-3.5 w-3.5" /> Module
+              </Button>
+            </div>
           </div>
           <div className="flex gap-1.5">
             <div className="relative flex-1">
@@ -414,6 +435,7 @@ export function ExplorerPage() {
           onSubmit={submitPrompt}
         />
       )}
+      {importing && <ImportDialog applicationId={app.id} onClose={() => setImporting(false)} />}
       {moving && tree.data && (
         <MoveModuleDialog
           module={moving}

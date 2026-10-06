@@ -1,0 +1,38 @@
+{
+  "$comment": "Ground truth for scripts/benchmark.ts. StepForge itself must NEVER read this file; only the benchmark compares its findings against it.",
+  "bugs": [
+    {
+      "id": "CC-API-01",
+      "app": "careclinic",
+      "layer": "api",
+      "category": "schema_mismatch",
+      "title": "Doctor fee is returned as a string",
+      "location": "GET /api/doctors",
+      "expected": "fee is a number (OpenAPI: type number)",
+      "actual": "fee is a string such as \"60.00\"",
+      "introducedInPhase": 5
+    },
+    {
+      "id": "CC-API-02",
+      "app": "careclinic",
+      "layer": "api",
+      "category": "missing_auth",
+      "title": "Appointments can be listed without logging in",
+      "location": "GET /api/appointments",
+      "expected": "401 without a token (OpenAPI: bearerAuth required)",
+      "actual": "200 with every appointment",
+      "introducedInPhase": 5
+    },
+    {
+      "id": "CC-API-03",
+      "app": "careclinic",
+      "layer": "api",
+      "category": "wrong_status",
+      "title": "Deleting an unknown patient returns 204",
+      "location": "DELETE /api/patients/{id}",
+      "expected": "404 for an id that does not exist",
+      "actual": "204 No Content",
+      "introducedInPhase": 5
+    }
+  ]
+}

@@ -219,6 +219,7 @@ export type StepResultRow = {
   durationMs: number | null;
   message: string | null;
   screenshotPath: string | null;
+  requestJson?: unknown;
   responseJson: {
     assertions?: AssertionResult[];
     attempts?: number;

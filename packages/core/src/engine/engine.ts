@@ -13,6 +13,7 @@ import {
   type RunnableStep,
   type StepContext,
   type StepErrorKind,
+  type StepOutcome,
   type StepResult,
   type TestCaseResult,
   type TestContext,
@@ -146,6 +147,10 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
   let firstFailure: { stepId: string; kind: StepErrorKind; message: string } | undefined;
   let stopped = false;
 
+  /** Secrets must never be persisted: request/response payloads are masked before they leave the engine. */
+  const maskDeep = <T>(v: T): T =>
+    v === undefined ? v : (JSON.parse(resolver.mask(JSON.stringify(v))) as T);
+
   const record = (r: StepResult) => {
     results.push(r);
     emit({ type: 'step.finished', result: r });
@@ -212,12 +217,20 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
       const assertions: AssertionResult[] = [];
       let session: ExecutorSession | undefined;
       let resolved: RunnableStep = step;
+      // Kept for failures after the action itself succeeded (e.g. an API assertion): its request/response matter most.
+      let outcome: StepOutcome | undefined;
       try {
         resolved = resolveStep(step, resolver);
         session = await sessionFor(stepGroupOf(step.type));
         // Guard slightly above the step timeout: executors enforce their own timeouts first.
-        const outcome = await withTimeout(session.execute(resolved, stepCtx), timeoutMs + 5_000, signal);
+        outcome = await withTimeout(session.execute(resolved, stepCtx), timeoutMs + 5_000, signal);
+        assertions.push(...(outcome.assertions ?? []));
         for (const a of resolved.assertions) {
+          const custom = outcome.evaluate ? await outcome.evaluate(a) : undefined;
+          if (custom) {
+            assertions.push(custom);
+            continue;
+          }
           const actual = outcome.getTarget ? await outcome.getTarget(a.target) : undefined;
           assertions.push(evaluateAssertion(a, actual));
         }
@@ -230,10 +243,10 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
           attempts: attempt,
           durationMs: Date.now() - stepStarted,
           message: outcome.message ? resolver.mask(outcome.message) : undefined,
-          assertions,
-          request: outcome.request,
-          response: outcome.response,
-          query: outcome.query,
+          assertions: maskDeep(assertions),
+          request: maskDeep(outcome.request),
+          response: maskDeep(outcome.response),
+          query: maskDeep(outcome.query),
           screenshotPath: outcome.screenshotPath,
           healedLocator: outcome.healedLocator,
           metrics: outcome.metrics,
@@ -261,10 +274,13 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
           durationMs: Date.now() - stepStarted,
           message: resolver.mask(message),
           errorKind: kind,
-          assertions,
-          screenshotPath: evidence.screenshotPath,
-          request: evidence.request,
-          response: evidence.response,
+          assertions: maskDeep(assertions),
+          screenshotPath: evidence.screenshotPath ?? outcome?.screenshotPath,
+          request: maskDeep(outcome?.request ?? evidence.request),
+          response: maskDeep(outcome?.response ?? evidence.response),
+          query: maskDeep(outcome?.query),
+          healedLocator: outcome?.healedLocator,
+          metrics: outcome?.metrics,
         };
         break;
       }

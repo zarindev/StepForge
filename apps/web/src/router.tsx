@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter } from '@tanstack/react-rout
 import { z } from 'zod';
 import { Layout } from '@/components/shell/layout';
 import { NAV } from '@/lib/nav';
+import { ApiClientPage } from '@/pages/api-client';
 import { ApplicationDetailPage } from '@/pages/application-detail';
 import { ApplicationsPage } from '@/pages/applications';
 import { ExplorerPage } from '@/pages/explorer';
@@ -19,6 +20,7 @@ const pages: Record<string, () => React.ReactNode> = {
   '/applications': ApplicationsPage,
   '/runs': RunsPage,
   '/recorder': RecorderPage,
+  '/api-client': ApiClientPage,
   '/settings': SettingsPage,
 };
 

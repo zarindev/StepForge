@@ -343,7 +343,18 @@ function ItemPanel({
             const L = LAYER[groupOf(s.type)];
             const row = s as StepResultRow;
             const extra = row.responseJson;
-            const expandable = !!(extra?.assertions?.length || extra?.healedLocator || s.screenshotPath);
+            const http = (s as StepResultRow).requestJson as
+              | { method?: string; url?: string; headers?: Record<string, string>; body?: unknown }
+              | null
+              | undefined;
+            const httpRes = (extra as { body?: { status?: number; body?: unknown; timeMs?: number } } | null)
+              ?.body;
+            const expandable = !!(
+              extra?.assertions?.length ||
+              extra?.healedLocator ||
+              s.screenshotPath ||
+              http
+            );
             const live = s as LiveStep;
             const depth = live.depth ?? extra?.depth ?? 0;
             const num = live.path ?? extra?.path ?? String(s.position + 1);
@@ -413,6 +424,31 @@ function ItemPanel({
                         </code>
                         . Consider updating the scenario.
                       </p>
+                    )}
+                    {http && (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div>
+                          <p className="mb-1 font-medium text-muted">Request</p>
+                          <pre className="max-h-60 overflow-auto rounded border border-border bg-bg p-2 font-mono text-[11px]">
+                            {`${http.method} ${http.url}\n${Object.entries(http.headers ?? {})
+                              .map(([k, v]) => `${k}: ${v}`)
+                              .join(
+                                '\n',
+                              )}${http.body !== undefined ? `\n\n${JSON.stringify(http.body, null, 2)}` : ''}`}
+                          </pre>
+                        </div>
+                        <div>
+                          <p className="mb-1 font-medium text-muted">
+                            Response{' '}
+                            {httpRes?.status !== undefined && `· ${httpRes.status} · ${httpRes.timeMs} ms`}
+                          </p>
+                          <pre className="max-h-60 overflow-auto rounded border border-border bg-bg p-2 font-mono text-[11px]">
+                            {typeof httpRes?.body === 'string'
+                              ? httpRes.body
+                              : JSON.stringify(httpRes?.body, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
                     )}
                     {extra?.assertions?.map((a, i) => (
                       <p key={i} className={a.passed ? 'text-pass' : 'text-fail'}>

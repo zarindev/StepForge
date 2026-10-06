@@ -5,4 +5,4 @@ export {
   type RecorderState,
   type StartOptions,
 } from './session.ts';
-export { networkToApiSteps, pathTemplate, isNoise, type CapturedRequest } from './network.ts';
+export { networkToApiSteps, pathTemplate, isNoise, type CapturedRequest } from '@stepforge/importers';
