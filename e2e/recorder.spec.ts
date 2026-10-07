@@ -35,7 +35,7 @@ test.describe.serial('recorder and scenario editor (Phase 4)', () => {
     await page.goto('/');
     const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
       name: 'Clinic Recorded',
-      slug: 'clinic-recorded',
+      slug: `clinic-recorded-${Date.now().toString(36)}`, // unique: a CI retry must not collide
     });
     await sfApi(page, 'POST', `/api/applications/${app.id}/environments`, { name: 'Local', baseUrl: CLINIC });
     await sfApi(page, 'POST', `/api/applications/${app.id}/modules`, { name: 'Appointments' });
@@ -137,7 +137,7 @@ test.describe.serial('recorder and scenario editor (Phase 4)', () => {
     await page.goto('/');
     const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
       name: 'Clinic Explorer Rec',
-      slug: 'clinic-explorer-rec',
+      slug: `clinic-explorer-rec-${Date.now().toString(36)}`, // unique: a CI retry must not collide
     });
     await sfApi(page, 'POST', `/api/applications/${app.id}/environments`, { name: 'Local', baseUrl: CLINIC });
     await sfApi(page, 'POST', `/api/applications/${app.id}/modules`, { name: 'Sign in' });
@@ -193,7 +193,7 @@ test.describe.serial('recorder and scenario editor (Phase 4)', () => {
     await page.goto('/');
     const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
       name: 'Editor Lab',
-      slug: 'editor-lab',
+      slug: `editor-lab-${Date.now().toString(36)}`, // unique: a CI retry must not collide
     });
     const parent = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/modules`, {
       name: 'Accounts',

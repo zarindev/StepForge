@@ -50,7 +50,7 @@ test.describe.serial('run scenarios with evidence (Phase 3)', () => {
     await sfApi(page, 'POST', `${CLINIC}/api/reset`).catch(() => null); // demo reset is cross-origin; ignore if blocked
     const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
       name: 'CareClinic Runs',
-      slug: 'careclinic-runs',
+      slug: `careclinic-runs-${Date.now().toString(36)}`, // unique: a CI retry must not collide
     });
     const env = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/environments`, {
       name: 'Local',
