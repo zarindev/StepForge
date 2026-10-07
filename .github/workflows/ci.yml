@@ -87,7 +87,10 @@ jobs:
         shell: bash
         run: |
           for i in $(seq 1 90); do curl -sf http://127.0.0.1:4400/api/health && exit 0; sleep 2; done
-          cat stepforge*.log; exit 1
+          cat stepforge*.log
+          # Also as an annotation, readable without downloading the job log.
+          echo "::error title=StepForge did not start::$(tail -n 60 stepforge*.log 2>&1 | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\r//g' -e 's/\n/%0A/g')"
+          exit 1
       - name: Onboarding smoke test
         shell: bash
         run: npx tsx scripts/smoke-onboarding.ts http://127.0.0.1:4400
@@ -140,6 +143,8 @@ jobs:
       - run: npm ci
       - run: npm run mailpit:install
       - run: npm run k6:install
+      # packages/perf's page-metric tests drive Chromium.
+      - run: npx playwright install --with-deps chromium
       - name: Wait for SQL Server
         run: |
           for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/1433) 2>/dev/null && break; sleep 2; done

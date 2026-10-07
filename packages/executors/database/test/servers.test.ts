@@ -50,7 +50,8 @@ function setupSql(engine: SqlEngine): string[] {
     'DROP TABLE IF EXISTS customers',
     `CREATE TABLE customers (id INT PRIMARY KEY, full_name VARCHAR(100) NOT NULL, dob VARCHAR(10), email VARCHAR(100), phone VARCHAR(30))`,
     `CREATE TABLE orders (id INT PRIMARY KEY, customer_id INT, total ${money} NOT NULL, status VARCHAR(20))`,
-    `CREATE TABLE items (id INT PRIMARY KEY, order_id INT REFERENCES orders(id), qty INT)`,
+    // Table-level FOREIGN KEY: MySQL before 9.0 parses an inline column REFERENCES but ignores it.
+    `CREATE TABLE items (id INT PRIMARY KEY, order_id INT, qty INT, FOREIGN KEY (order_id) REFERENCES orders(id))`,
     `CREATE UNIQUE INDEX customers_phone_uq ON customers (phone)`,
     `INSERT INTO customers (id, full_name, dob, email, phone) VALUES (1, 'Ana Lopez', '1988-04-12', 'ana@example.test', '+1 555 0101')`,
     `INSERT INTO customers (id, full_name, dob, email, phone) VALUES (2, 'Ben Carter', '1975-09-30', 'not-an-email', '+1 555 0102')`,
