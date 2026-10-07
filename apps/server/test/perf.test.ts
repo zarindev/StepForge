@@ -234,7 +234,8 @@ describe('page metrics and query plans in runs', () => {
       'Page is fast',
       [
         { type: 'ui.navigate', params: { url: '/page' } },
-        { type: 'perf.pageMetrics', params: { thresholds: { lcpMs: 4000, cls: 0.1, ttfbMs: 1000 } } },
+        // Generous limits: this checks the step, not the machine (Windows CI paints a trivial page in 4–5 s).
+        { type: 'perf.pageMetrics', params: { thresholds: { lcpMs: 60_000, cls: 0.1, ttfbMs: 10_000 } } },
       ],
       { pageMetrics: true },
     );
