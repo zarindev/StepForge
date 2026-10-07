@@ -4,3 +4,6 @@ data
 packages/db/migrations
 package-lock.json
 *.md
+docs/samples
+docs/case-study/*.html
+docs/case-study/export

@@ -46,7 +46,7 @@ describe('OpenAPI import → generated suite against CareClinic', () => {
       { url: '/api/openapi.json', environmentId: envId },
     );
     expect(spec.parsedJson.title).toBe('CareClinic API');
-    expect(spec.parsedJson.operations).toHaveLength(10);
+    expect(spec.parsedJson.operations).toHaveLength(13);
 
     const imported = await ok<{
       rootModuleId: string;

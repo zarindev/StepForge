@@ -60,7 +60,8 @@ export function registerSignup(app: FastifyInstance, db: Database.Database, smtp
       code,
       new Date(Date.now() + CODE_TTL_MS).toISOString(),
     );
-    const link = `${origin}/verify?email=${encodeURIComponent(email)}&code=${code}`;
+    // PLANTED BUG CC-EMAIL-01: the emailed link points at /verfy (typo), which does not exist.
+    const link = `${origin}/verfy?email=${encodeURIComponent(email)}&code=${code}`;
     await mailer.sendMail({
       from: 'CareClinic <no-reply@careclinic.test>',
       to: email,

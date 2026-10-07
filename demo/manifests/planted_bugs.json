@@ -1,5 +1,5 @@
 {
-  "$comment": "Ground truth for scripts/benchmark.ts. StepForge itself must NEVER read this file; only the benchmark compares its findings against it.",
+  "$comment": "Ground truth for scripts/benchmark.ts. StepForge itself must NEVER read this file; only the benchmark compares its findings against it, after the runs. 'detectedBy' names the demo-workspace scenario expected to catch the bug, 'run' the run it shows up in (mobile = the mobile-viewport run of scenarios tagged 'mobile'), and 'acceptableDiagnoses' the diagnosis categories that count as a correct diagnosis. All fields were written before the first benchmark run.",
   "bugs": [
     {
       "id": "CC-API-01",
@@ -10,7 +10,12 @@
       "location": "GET /api/doctors",
       "expected": "fee is a number (OpenAPI: type number)",
       "actual": "fee is a string such as \"60.00\"",
-      "introducedInPhase": 5
+      "introducedInPhase": 5,
+      "detectedBy": "Doctors match the documented schema",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "schema_mismatch"
+      ]
     },
     {
       "id": "CC-API-02",
@@ -21,7 +26,13 @@
       "location": "GET /api/appointments",
       "expected": "401 without a token (OpenAPI: bearerAuth required)",
       "actual": "200 with every appointment",
-      "introducedInPhase": 5
+      "introducedInPhase": 5,
+      "detectedBy": "Appointments require a login",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "missing_auth",
+        "auth_required"
+      ]
     },
     {
       "id": "CC-API-03",
@@ -32,7 +43,13 @@
       "location": "DELETE /api/patients/{id}",
       "expected": "404 for an id that does not exist",
       "actual": "204 No Content",
-      "introducedInPhase": 5
+      "introducedInPhase": 5,
+      "detectedBy": "Deleting an unknown patient returns 404",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "wrong_status",
+        "not_found"
+      ]
     },
     {
       "id": "CC-DB-01",
@@ -43,7 +60,13 @@
       "location": "DELETE /api/patients/{id} · appointments.patient_id",
       "expected": "The patient's appointments are deleted with the patient (documented in the OpenAPI description)",
       "actual": "Appointments keep pointing at the deleted patient id; appointments.patient_id has no foreign key",
-      "introducedInPhase": 6
+      "introducedInPhase": 6,
+      "detectedBy": "Deleting a patient removes their appointments",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "data_integrity",
+        "data_quality"
+      ]
     },
     {
       "id": "CC-DB-02",
@@ -54,7 +77,358 @@
       "location": "POST /api/patients and /patients/new · patients",
       "expected": "409 when a patient with the same full name and date of birth exists",
       "actual": "A second patients row is created with a new code",
-      "introducedInPhase": 6
+      "introducedInPhase": 6,
+      "detectedBy": "The same patient cannot be registered twice",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "validation_missing",
+        "db_constraint",
+        "data_integrity"
+      ]
+    },
+    {
+      "id": "CC-UI-01",
+      "app": "careclinic",
+      "layer": "ui",
+      "category": "wrong_label",
+      "title": "The upcoming-appointments KPI is labelled \"Cancelled appointments\"",
+      "location": "Dashboard · appointments KPI",
+      "expected": "\"Upcoming appointments\"",
+      "actual": "\"Cancelled appointments\"",
+      "detectedBy": "Dashboard labels the appointment count",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "CC-UI-02",
+      "app": "careclinic",
+      "layer": "ui",
+      "category": "broken_on_mobile",
+      "title": "The Book button cannot be clicked on mobile",
+      "location": "/appointments/new at ≤ 600 px",
+      "expected": "The booking form is usable on a phone",
+      "actual": "An \"install our app\" sheet covers the page and cannot be dismissed",
+      "detectedBy": "Book an appointment on a phone",
+      "run": "mobile",
+      "acceptableDiagnoses": [
+        "element_covered",
+        "element_hidden",
+        "timeout"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "CC-UI-03",
+      "app": "careclinic",
+      "layer": "ui",
+      "category": "js_error",
+      "title": "The next-appointments widget throws a TypeError",
+      "location": "Dashboard · Next appointments",
+      "expected": "The next three appointments are listed",
+      "actual": "The list stays at \"Loading…\" (a.patient is undefined)",
+      "detectedBy": "Dashboard lists the next appointments",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "js_exception"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "CC-EMAIL-01",
+      "app": "careclinic",
+      "layer": "email",
+      "category": "wrong_link",
+      "title": "The verification email links to /verfy",
+      "location": "Sign-up email",
+      "expected": "A link to /verify that verifies the account",
+      "actual": "/verfy does not exist (404)",
+      "detectedBy": "Verify with the link in the email",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "email_link_missing",
+        "not_found",
+        "assertion_mismatch",
+        "wrong_status"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "CC-BIZ-01",
+      "app": "careclinic",
+      "layer": "logic",
+      "category": "business_rule",
+      "title": "The bill ignores insurance",
+      "location": "GET /api/appointments/{id}/bill",
+      "expected": "20% discount for patients with an insurance provider",
+      "actual": "discount is always 0",
+      "detectedBy": "Insured patients get 20% off",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "CC-BIZ-02",
+      "app": "careclinic",
+      "layer": "logic",
+      "category": "double_booking",
+      "title": "The booking form allows double-booking a doctor",
+      "location": "POST /appointments (form)",
+      "expected": "\"This doctor is already booked at that time\"",
+      "actual": "The second booking is accepted",
+      "detectedBy": "The booking form refuses a double booking",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "element_not_found",
+        "assertion_mismatch",
+        "validation_missing",
+        "timeout"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "CC-PERF-01",
+      "app": "careclinic",
+      "layer": "performance",
+      "category": "slow_endpoint",
+      "title": "The visits report takes about 1.5 s",
+      "location": "GET /api/reports/visits",
+      "expected": "Answers in well under a second",
+      "actual": "~1.5 s",
+      "detectedBy": "The visits report answers quickly",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "slow_api",
+        "perf_threshold",
+        "slow_down"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "CC-PERF-02",
+      "app": "careclinic",
+      "layer": "performance",
+      "category": "n_plus_one",
+      "title": "The doctors' schedule runs one query per row (N+1)",
+      "location": "GET /api/doctors/schedule",
+      "expected": "One query (join)",
+      "actual": "One query per doctor and per appointment",
+      "detectedBy": "The doctors' schedule answers quickly",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "slow_api",
+        "perf_threshold",
+        "slow_down"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-UI-01",
+      "app": "shopdesk",
+      "layer": "ui",
+      "category": "wrong_label",
+      "title": "Products with no stock are shown as \"In stock\"",
+      "location": "/products · status badge",
+      "expected": "\"Out of stock\"",
+      "actual": "\"In stock\"",
+      "detectedBy": "Out-of-stock products are marked",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-UI-02",
+      "app": "shopdesk",
+      "layer": "ui",
+      "category": "broken_on_mobile",
+      "title": "\"Complete sale\" cannot be clicked on mobile",
+      "location": "/sales/new at ≤ 600 px",
+      "expected": "The point of sale works on a phone",
+      "actual": "A \"rate us\" sheet covers the page and cannot be dismissed",
+      "detectedBy": "Complete a sale on a phone",
+      "run": "mobile",
+      "acceptableDiagnoses": [
+        "element_covered",
+        "element_hidden",
+        "timeout"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-UI-03",
+      "app": "shopdesk",
+      "layer": "ui",
+      "category": "js_error",
+      "title": "The cart total throws a TypeError",
+      "location": "/sales/new · cart total",
+      "expected": "The running total (quantity × price)",
+      "actual": "Stays at 0.00 (line.unitPrice is undefined)",
+      "detectedBy": "The cart shows the running total",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "js_exception"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-API-01",
+      "app": "shopdesk",
+      "layer": "api",
+      "category": "wrong_status",
+      "title": "A product without a name is accepted with 200",
+      "location": "POST /api/products",
+      "expected": "422 (name is required)",
+      "actual": "200 and a product called \"Unnamed\"",
+      "detectedBy": "A product without a name is rejected",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "wrong_status",
+        "validation_missing"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-API-02",
+      "app": "shopdesk",
+      "layer": "api",
+      "category": "schema_mismatch",
+      "title": "Prices are strings",
+      "location": "GET /api/products",
+      "expected": "price and cost are numbers",
+      "actual": "\"24.00\"",
+      "detectedBy": "Products match the documented schema",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "schema_mismatch"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-API-03",
+      "app": "shopdesk",
+      "layer": "api",
+      "category": "missing_auth",
+      "title": "The profit report is public",
+      "location": "GET /api/reports/profit",
+      "expected": "401 without a token (admins only)",
+      "actual": "200 with the report",
+      "detectedBy": "The profit report requires a login",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "missing_auth",
+        "auth_required"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-DB-01",
+      "app": "shopdesk",
+      "layer": "db",
+      "category": "negative_stock",
+      "title": "Stock can go negative",
+      "location": "POST /api/sales · products.stock",
+      "expected": "Selling more than is in stock is refused; stock ≥ 0",
+      "actual": "The sale is accepted and stock goes below 0",
+      "detectedBy": "Stock never goes negative",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "data_quality",
+        "assertion_mismatch",
+        "data_integrity",
+        "validation_missing"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-DB-02",
+      "app": "shopdesk",
+      "layer": "db",
+      "category": "orphan_rows",
+      "title": "Deleting a product leaves its sale lines behind",
+      "location": "DELETE /api/products/{id} · sale_items.product_id",
+      "expected": "Sale lines are removed with the product (documented)",
+      "actual": "sale_items rows point at a deleted product",
+      "detectedBy": "Deleting a product removes its sale lines",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "data_integrity",
+        "data_quality"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-BIZ-01",
+      "app": "shopdesk",
+      "layer": "logic",
+      "category": "business_rule",
+      "title": "Profit is always 0",
+      "location": "GET /api/reports/profit",
+      "expected": "profit = revenue − quantity × unit cost",
+      "actual": "Cost of goods uses the selling price",
+      "detectedBy": "Profit is revenue minus cost",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-BIZ-02",
+      "app": "shopdesk",
+      "layer": "logic",
+      "category": "business_rule",
+      "title": "The sale total ignores the quantity",
+      "location": "POST /api/sales · total",
+      "expected": "Sum of quantity × price",
+      "actual": "Each unit price counted once",
+      "detectedBy": "A sale total counts every unit",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-PERF-01",
+      "app": "shopdesk",
+      "layer": "performance",
+      "category": "slow_endpoint",
+      "title": "The sales report takes about 1.5 s",
+      "location": "GET /api/reports/sales",
+      "expected": "Answers in well under a second",
+      "actual": "~1.5 s",
+      "detectedBy": "The sales report answers quickly",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "slow_api",
+        "perf_threshold",
+        "slow_down"
+      ],
+      "introducedInPhase": 14
+    },
+    {
+      "id": "SD-PERF-02",
+      "app": "shopdesk",
+      "layer": "performance",
+      "category": "n_plus_one",
+      "title": "Expanded sales run one query per row (N+1)",
+      "location": "GET /api/sales?expand=items",
+      "expected": "One query (join)",
+      "actual": "One query per sale and per line",
+      "detectedBy": "Expanded sales answer quickly",
+      "run": "desktop",
+      "acceptableDiagnoses": [
+        "slow_api",
+        "perf_threshold",
+        "slow_down"
+      ],
+      "introducedInPhase": 14
     }
   ]
 }

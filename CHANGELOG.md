@@ -3,11 +3,25 @@
 ## [Unreleased]
 
 ### Fixed
+- Diagnosis: a failed response-time check on an API step is now diagnosed as a slow API (rule `api-slow-response`)
+  instead of a generic assertion mismatch.
+- Diagnosis: JavaScript errors only count when they happened on the page the step failed on, so an error on an
+  earlier page no longer takes the blame.
+- UI executor: a click blocked by another element keeps Playwright's "… intercepts pointer events" reason, so it is
+  diagnosed as *element covered* rather than a slow page.
 - One-time-code extraction no longer picks digits inside a link or an email address (e.g. a run id in a
   verification link) over the real code.
 - PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
 
 ### Added
+- Phase 14 showcase: a second demo app, **ShopDesk** (shop back office on port 8102), and 25 planted bugs across both
+  demo apps (API, database, UI, email, business logic, performance) in `demo/manifests/planted_bugs.json`, which
+  StepForge never reads (guard test); the demo workspace now loads both apps (45 scenarios). `scripts/benchmark.ts`
+  measures detection and diagnosis into `docs/benchmarks.json` (25/25 detected, 24/25 diagnosed correctly, 0 false
+  alarms). `scripts/capture_showcase.ts` (replaces `capture_screenshots.ts`) captures screenshots, WebM clips and real
+  sample exports (`docs/samples/`). A 15-slide case study (`docs/case-study/case-study.html`), promo cards and
+  `scripts/export_case_study.ts` (PDF, slide PNGs, Upwork and social images, with size, dimension and overflow
+  checks), `UPWORK_LISTING.md` and `CASE_STUDY.md`. `npm run demo:shop`.
 - Phase 13 public-repo polish: first-run onboarding (load the CareClinic demo workspace — 17 scenarios, database
   connection, quality gate, demo app started by StepForge — or create an application with a guided recorder tour),
   `npm start -- --demo`, editable runner defaults (used by the Run dialog, schedules and the CLI), daily evidence

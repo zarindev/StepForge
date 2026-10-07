@@ -138,6 +138,9 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean; smtp?:
     return reply.header('set-cookie', 'cc_session=; Path=/; Max-Age=0').redirect('/login');
   });
 
+  // PLANTED BUG CC-UI-01: the upcoming-appointments KPI is labelled "Cancelled appointments".
+  // PLANTED BUG CC-UI-03: the "Next appointments" widget reads a.patient.name (undefined) and throws a TypeError,
+  // so the list never leaves "Loading…".
   app.get('/', async (req, reply) => {
     const u = requireUser(req, reply);
     if (!u) return;
@@ -147,14 +150,14 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean; smtp?:
       'Dashboard',
       `<h1>Welcome, ${esc(u.name)}</h1><div class="grid">
        <div class="card"><div class="muted">Patients</div><div class="kpi" data-testid="kpi-patients">${n('SELECT COUNT(*) n FROM patients')}</div></div>
-       <div class="card"><div class="muted">Upcoming appointments</div><div class="kpi" id="kpi-appointments">${n("SELECT COUNT(*) n FROM appointments WHERE status = 'booked'")}</div></div>
+       <div class="card"><div class="muted" data-testid="kpi-appointments-label">Cancelled appointments</div><div class="kpi" id="kpi-appointments">${n("SELECT COUNT(*) n FROM appointments WHERE status = 'booked'")}</div></div>
        <div class="card"><div class="muted">Doctors</div><div class="kpi">${n('SELECT COUNT(*) n FROM doctors')}</div></div></div>
        <p><a class="btn" href="/patients/new" data-testid="quick-new-patient">Register patient</a> <a class="btn" href="/appointments/new">Book appointment</a></p>
        <div class="card"><h2 style="font-size:16px;margin:0 0 8px">Next appointments</h2><ul id="next-appointments" class="muted"><li>Loading…</li></ul></div>
        <script>
          fetch('/api/appointments').then((r) => r.json()).then((rows) => {
            document.getElementById('next-appointments').innerHTML = rows.slice(0, 3)
-             .map((a) => '<li>' + a.date + ' ' + a.time + ' · ' + a.patient_name + ' with ' + a.doctor_name + '</li>').join('') || '<li>None</li>';
+             .map((a) => '<li>' + a.date + ' ' + a.time + ' · ' + a.patient.name + ' with ' + a.doctor_name + '</li>').join('') || '<li>None</li>';
          });
        </script>`,
       u,
@@ -284,7 +287,7 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean; smtp?:
       <label for="reason">Reason for visit</label><textarea id="reason" name="reason" rows="2">${esc(b.reason)}</textarea>
       <p><button type="submit" data-testid="book-appointment">Book appointment</button></p></form></div>`;
   };
-  const validateAppointment = (b: Record<string, string>): string | undefined => {
+  const validateAppointment = (b: Record<string, string>, checkClash = true): string | undefined => {
     if (!b.patient_id) return 'Please select a patient';
     if (!b.doctor_id) return 'Please select a doctor';
     if (!b.date || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return 'Please choose a date';
@@ -294,11 +297,13 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean; smtp?:
       return 'Unknown patient';
     if (!/^\d+$/.test(b.doctor_id) || !db.prepare('SELECT 1 FROM doctors WHERE id = ?').get(b.doctor_id))
       return 'Unknown doctor';
-    const clash = db
-      .prepare(
-        "SELECT 1 FROM appointments WHERE doctor_id = ? AND date = ? AND time = ? AND status = 'booked'",
-      )
-      .get(b.doctor_id, b.date, b.time);
+    const clash =
+      checkClash &&
+      db
+        .prepare(
+          "SELECT 1 FROM appointments WHERE doctor_id = ? AND date = ? AND time = ? AND status = 'booked'",
+        )
+        .get(b.doctor_id, b.date, b.time);
     if (clash) return 'This doctor is already booked at that time';
     return undefined;
   };
@@ -310,14 +315,26 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean; smtp?:
       .run(b.patient_id, b.doctor_id, b.date, b.time, b.reason ?? '', new Date().toISOString())
       .lastInsertRowid;
 
+  // PLANTED BUG CC-UI-02: on narrow screens (≤ 600 px) an "install our app" sheet covers the booking form and its
+  // close button does nothing, so the Book button cannot be clicked on mobile.
+  const appSheet = `<style>.app-sheet{display:none}@media (max-width:600px){.app-sheet{display:block;position:fixed;inset:56px 0 0 0;background:rgba(15,118,110,.96);color:#fff;padding:40px 24px;z-index:50}}</style>
+    <div class="app-sheet" data-testid="app-sheet"><h2>Get the CareClinic app</h2><p>Book appointments faster on your phone.</p><button type="button" class="secondary" onclick="void 0">Not now</button></div>`;
   app.get<{ Querystring: { patient?: string } }>('/appointments/new', async (req, reply) => {
     const u = requireUser(req, reply);
-    if (u) return page(reply, 'Book appointment', appointmentForm({ patient_id: req.query.patient }), u);
+    if (u)
+      return page(
+        reply,
+        'Book appointment',
+        appointmentForm({ patient_id: req.query.patient }) + appSheet,
+        u,
+      );
   });
   app.post<{ Body: Record<string, string> }>('/appointments', async (req, reply) => {
     const u = requireUser(req, reply);
     if (!u) return;
-    const error = validateAppointment(req.body);
+    // PLANTED BUG CC-BIZ-02: the booking form skips the double-booking check (the API keeps it), so the same doctor
+    // can be booked twice for the same slot through the UI.
+    const error = validateAppointment(req.body, false);
     if (error) return page(reply.code(422), 'Book appointment', appointmentForm(req.body, error), u);
     createAppointment(req.body);
     return reply.redirect(`/appointments?flash=${encodeURIComponent('Appointment booked')}`);
@@ -387,6 +404,57 @@ export function createClinicApp(opts: { dbFile: string; logger?: boolean; smtp?:
     const id = createAppointment(b);
     return reply.code(201).send(db.prepare('SELECT * FROM appointments WHERE id = ?').get(id));
   });
+  // Billing: insured patients get 20% off the doctor's fee (documented in the OpenAPI description).
+  // PLANTED BUG CC-BIZ-01: the bill ignores insurance — the discount is always 0.
+  app.get<{ Params: { id: string } }>('/api/appointments/:id/bill', async (req, reply) => {
+    const a = db
+      .prepare(
+        'SELECT a.id, d.fee, p.insurance FROM appointments a JOIN doctors d ON d.id = a.doctor_id JOIN patients p ON p.id = a.patient_id WHERE a.id = ?',
+      )
+      .get(req.params.id) as { id: number; fee: number; insurance: string | null } | undefined;
+    if (!a) return reply.code(404).send({ error: 'not_found', message: 'Appointment not found' });
+    const discount = 0;
+    return {
+      appointment_id: a.id,
+      fee: a.fee,
+      insurance: a.insurance || null,
+      discount,
+      total: a.fee - discount,
+    };
+  });
+  // PLANTED BUG CC-PERF-01: the visits report is deliberately slow (about 1.5 s).
+  app.get('/api/reports/visits', async () => {
+    await new Promise((r) => setTimeout(r, 1500));
+    return db
+      .prepare(
+        'SELECT d.name doctor, COUNT(a.id) visits FROM doctors d LEFT JOIN appointments a ON a.doctor_id = d.id GROUP BY d.id ORDER BY d.id',
+      )
+      .all();
+  });
+  // PLANTED BUG CC-PERF-02: the doctors' schedule runs one query per doctor and one per appointment (N+1); each query
+  // here costs ~40 ms like a remote database round trip would.
+  app.get('/api/doctors/schedule', async () => {
+    const roundTrip = () => new Promise((r) => setTimeout(r, 40));
+    const out = [];
+    for (const d of doctors()) {
+      await roundTrip();
+      const appts = db
+        .prepare(
+          "SELECT id, patient_id, date, time FROM appointments WHERE doctor_id = ? AND status = 'booked' ORDER BY date, time LIMIT 20",
+        )
+        .all(d.id) as { id: number; patient_id: number; date: string; time: string }[];
+      const rows = [];
+      for (const a of appts) {
+        await roundTrip();
+        const p = db.prepare('SELECT full_name FROM patients WHERE id = ?').get(a.patient_id) as
+          { full_name: string } | undefined;
+        rows.push({ ...a, patient: p?.full_name ?? null });
+      }
+      out.push({ doctor: d.name, appointments: rows });
+    }
+    return out;
+  });
+
   // Resets the demo data set (used by tests and the StepForge demo workspace). Local demo only.
   app.post('/api/reset', async () => {
     seed(db);

@@ -181,9 +181,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     ctx.maintenance.startRetention((m) => app.log.info(m));
     // A loaded demo workspace brings its demo app back with StepForge.
     if (ctx.demo.status().loaded)
-      ctx.demo
-        .startClinic()
-        .catch((err: Error) => app.log.warn(`CareClinic demo did not start: ${err.message}`));
+      ctx.demo.startAll().catch((err: Error) => app.log.warn(`Demo apps did not start: ${err.message}`));
   }
 
   app.addHook('onClose', async () => {

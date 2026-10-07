@@ -53,7 +53,22 @@ export function buildFacts(input: DiagnosisInput): Record<string, unknown> {
     .filter(Boolean);
 
   const consoleErrors = (input.console ?? []).filter((c) => c.type === 'error' || c.type === 'pageerror');
-  const pageError = (input.console ?? []).find((c) => c.type === 'pageerror');
+  // A JavaScript error explains a UI failure only when it was thrown on the page the step failed on
+  // (an error on an earlier page, e.g. the dashboard after login, does not break a later page).
+  const pagePath = (u: string | undefined) => {
+    const m = /(https?:\/\/[^\s)]+?)(?::\d+)*\)?$/.exec(u ?? '');
+    try {
+      return m ? new URL(m[1]!).pathname : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const failedOn = f.diagnostics?.pageUrl ? pagePath(f.diagnostics.pageUrl) : undefined;
+  const pageError = (input.console ?? []).find(
+    (c) =>
+      c.type === 'pageerror' &&
+      (failedOn === undefined || pagePath(c.location) === undefined || pagePath(c.location) === failedOn),
+  );
   const corsError = consoleErrors.find((c) => /CORS|Access-Control-Allow-Origin|cross-origin/i.test(c.text));
   const net = input.network ?? [];
   const failedRequests = net.filter((n) => isXhr(n) && ((n.status ?? 0) >= 400 || !!n.failure));

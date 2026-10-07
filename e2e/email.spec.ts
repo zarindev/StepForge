@@ -104,7 +104,7 @@ test('email: start Mailpit, run a sign-up with OTP, preview the email and browse
   );
   await shot(page, 'email-inbox-viewer');
   await viewer.getByRole('tab', { name: 'Links' }).click();
-  await expect(viewer.getByText(/\/verify\?email=.*&code=\d{6}/)).toBeVisible();
+  await expect(viewer.getByText(/\?email=.*&code=\d{6}/)).toBeVisible();
   await viewer.getByRole('button', { name: 'Clear inbox' }).click();
   await expect(viewer.getByText('No emails yet')).toBeVisible();
   await viewer.getByRole('button', { name: 'Close' }).click();

@@ -10,21 +10,70 @@ import type { EventBus } from '../context.ts';
 import type { EmailService } from '../email/service.ts';
 
 /**
- * The demo workspace (first-run onboarding, `npm start -- --demo`). Sample data only on an explicit request:
- * starts the CareClinic demo app, imports its scenarios and adds what an export never carries — the demo
- * credentials (public demo data, stored encrypted like any secret), the SQLite connection and a quality gate.
+ * The demo workspace (first-run onboarding, `npm start -- --demo`). Sample data only on an explicit request: starts
+ * the two demo apps (CareClinic and ShopDesk), imports their scenarios and adds what an export never carries — the
+ * demo credentials (public demo data, stored encrypted like any secret), a SQLite connection and a quality gate.
  */
-export const DEMO_WORKSPACE = join(REPO_ROOT, 'demo/clinic-app/stepforge/workspace.json');
-const CLINIC_MAIN = join(REPO_ROOT, 'demo/clinic-app/src/main.ts');
-/** CareClinic's documented demo accounts (see the demo app's login page). */
-const DEMO_SECRETS = { password: 'Reception123!', adminPassword: 'Admin123!' };
-const PREFERRED_PORT = 8101;
+type DemoApp = {
+  key: 'clinic' | 'shop';
+  name: string;
+  slug: string;
+  main: string;
+  workspace: string;
+  port: number;
+  env: (port: number, dbFile: string, config: ServerConfig) => Record<string, string>;
+  /** The demo app's documented demo accounts (shown on its login page). */
+  secrets: Record<string, string>;
+  connection: string;
+};
+
+export const DEMO_APPS: DemoApp[] = [
+  {
+    key: 'clinic',
+    name: 'CareClinic',
+    slug: 'careclinic',
+    main: join(REPO_ROOT, 'demo/clinic-app/src/main.ts'),
+    workspace: join(REPO_ROOT, 'demo/clinic-app/stepforge/workspace.json'),
+    port: 8101,
+    env: (port, dbFile, config) => ({
+      CLINIC_PORT: String(port),
+      CLINIC_DB: dbFile,
+      CLINIC_SMTP_PORT: String(config.mailpit.smtpPort),
+    }),
+    secrets: { password: 'Reception123!', adminPassword: 'Admin123!' },
+    connection: 'clinic',
+  },
+  {
+    key: 'shop',
+    name: 'ShopDesk',
+    slug: 'shopdesk',
+    main: join(REPO_ROOT, 'demo/shop-app/src/main.ts'),
+    workspace: join(REPO_ROOT, 'demo/shop-app/stepforge/workspace.json'),
+    port: 8102,
+    env: (port, dbFile) => ({ SHOP_PORT: String(port), SHOP_DB: dbFile }),
+    secrets: { adminPassword: 'Admin123!', cashierPassword: 'Cashier123!' },
+    connection: 'shop',
+  },
+];
+/** Kept for the first demo workspace format (CareClinic only). */
+export const DEMO_WORKSPACE = DEMO_APPS[0]!.workspace;
 
 export type DemoStatus = {
   available: boolean;
   loaded: boolean;
+  /** CareClinic's application (the first demo app). */
   applicationId: string | null;
+  apps: { key: string; name: string; applicationId: string | null; running: boolean; url: string | null }[];
   clinic: { running: boolean; url: string | null };
+};
+
+export type DemoLoaded = {
+  applicationId: string;
+  clinicUrl: string;
+  applications: { key: string; name: string; applicationId: string; url: string }[];
+  mailpit: boolean;
+  created: boolean;
+  warnings: string[];
 };
 
 const portFree = (port: number) =>
@@ -42,9 +91,8 @@ const anyPort = () =>
   });
 
 export class DemoService {
-  private clinic?: ChildProcess;
-  private clinicUrl: string | null = null;
-  private starting?: Promise<string>;
+  private procs = new Map<string, { child: ChildProcess; url: string }>();
+  private starting = new Map<string, Promise<string>>();
 
   constructor(
     private readonly db: StepForgeDb,
@@ -54,47 +102,63 @@ export class DemoService {
     private readonly bus: EventBus,
   ) {}
 
-  private loadedAppId(): string | null {
-    const id = getSetting<string | null>(this.db, 'demoApplicationId', null);
-    if (!id) return null;
-    try {
-      repo.getApplication(this.db, id);
-      return id;
-    } catch {
-      return null; // the demo application was deleted
+  private loadedIds(): Record<string, string> {
+    const ids = getSetting<Record<string, string>>(this.db, 'demoApplications', {});
+    const out: Record<string, string> = {};
+    for (const [k, id] of Object.entries(ids)) {
+      try {
+        repo.getApplication(this.db, id);
+        out[k] = id;
+      } catch {
+        // deleted
+      }
     }
+    return out;
   }
 
   status(): DemoStatus {
+    const ids = this.loadedIds();
+    const apps = DEMO_APPS.map((a) => {
+      const p = this.procs.get(a.key);
+      return {
+        key: a.key,
+        name: a.name,
+        applicationId: ids[a.key] ?? null,
+        running: !!p && p.child.exitCode === null,
+        url: p?.url ?? null,
+      };
+    });
     return {
-      available: existsSync(DEMO_WORKSPACE) && existsSync(CLINIC_MAIN),
-      loaded: this.loadedAppId() !== null,
-      applicationId: this.loadedAppId(),
-      clinic: { running: !!this.clinic && this.clinic.exitCode === null, url: this.clinicUrl },
+      available: DEMO_APPS.every((a) => existsSync(a.workspace) && existsSync(a.main)),
+      loaded: Object.keys(ids).length > 0,
+      applicationId: ids.clinic ?? null,
+      apps,
+      clinic: { running: apps[0]!.running, url: apps[0]!.url },
     };
   }
 
-  /** Starts CareClinic (once) on 8101, or on a free port when 8101 is taken, with its data under data/demo. */
-  startClinic(): Promise<string> {
-    if (this.clinic && this.clinic.exitCode === null && this.clinicUrl)
-      return Promise.resolve(this.clinicUrl);
-    this.starting ??= (async () => {
-      const port = (await portFree(PREFERRED_PORT)) ? PREFERRED_PORT : await anyPort();
+  /** Starts one demo app (once) on its usual port, or on a free port when that one is taken. */
+  startApp(key: string): Promise<string> {
+    const app = DEMO_APPS.find((a) => a.key === key)!;
+    const running = this.procs.get(key);
+    if (running && running.child.exitCode === null) return Promise.resolve(running.url);
+    const pending = this.starting.get(key);
+    if (pending) return pending;
+    const promise = (async () => {
+      const port = (await portFree(app.port)) ? app.port : await anyPort();
       mkdirSync(join(this.config.dataDir, 'demo'), { recursive: true });
-      const child = spawn(process.execPath, ['--import', 'tsx', CLINIC_MAIN], {
+      const child = spawn(process.execPath, ['--import', 'tsx', app.main], {
         cwd: REPO_ROOT,
         env: {
           ...process.env,
-          CLINIC_PORT: String(port),
-          CLINIC_DB: join(this.config.dataDir, 'demo', 'clinic.db'),
-          CLINIC_SMTP_PORT: String(this.config.mailpit.smtpPort),
+          ...app.env(port, join(this.config.dataDir, 'demo', `${app.key}.db`), this.config),
         },
         stdio: 'ignore',
       });
       const url = `http://127.0.0.1:${port}`;
       const deadline = Date.now() + 30_000;
       for (;;) {
-        if (child.exitCode !== null) throw new Error('The CareClinic demo app stopped while starting');
+        if (child.exitCode !== null) throw new Error(`The ${app.name} demo app stopped while starting`);
         if (
           await fetch(`${url}/api/health`)
             .then((r) => r.ok)
@@ -103,37 +167,37 @@ export class DemoService {
           break;
         if (Date.now() > deadline) {
           child.kill();
-          throw new Error('The CareClinic demo app did not start within 30 s');
+          throw new Error(`The ${app.name} demo app did not start within 30 s`);
         }
         await new Promise((r) => setTimeout(r, 250));
       }
-      this.clinic = child;
-      this.clinicUrl = url;
-      child.once('exit', () => {
-        this.clinic = undefined;
-        this.clinicUrl = null;
-      });
-      // Keep the demo environment pointing at wherever CareClinic runs now.
-      const appId = this.loadedAppId();
+      this.procs.set(key, { child, url });
+      child.once('exit', () => this.procs.delete(key));
+      // Keep the demo environment pointing at wherever the app runs now.
+      const appId = this.loadedIds()[key];
       if (appId)
         for (const env of repo.listEnvironments(this.db, appId))
           if (env.baseUrl !== url && /^http:\/\/127\.0\.0\.1:\d+$/.test(env.baseUrl))
             repo.updateEnvironment(this.db, env.id, { baseUrl: url });
       return url;
-    })().finally(() => {
-      this.starting = undefined;
-    });
-    return this.starting;
+    })().finally(() => this.starting.delete(key));
+    this.starting.set(key, promise);
+    return promise;
+  }
+
+  /** CareClinic (kept for callers from the first demo version). */
+  startClinic(): Promise<string> {
+    return this.startApp('clinic');
+  }
+
+  /** Starts every demo app; used when StepForge starts with a loaded demo workspace. */
+  async startAll(): Promise<void> {
+    const ids = this.loadedIds();
+    await Promise.all(DEMO_APPS.filter((a) => ids[a.key]).map((a) => this.startApp(a.key)));
   }
 
   /** Loads the demo workspace (idempotent: a second call only starts the apps again). */
-  async load(): Promise<{
-    applicationId: string;
-    clinicUrl: string;
-    mailpit: boolean;
-    created: boolean;
-    warnings: string[];
-  }> {
+  async load(): Promise<DemoLoaded> {
     const warnings: string[] = [];
     let mailpit = false;
     setSetting(this.db, 'mailpitAutostart', true);
@@ -142,45 +206,59 @@ export class DemoService {
       mailpit = true;
     } catch (err) {
       warnings.push(
-        `Mailpit did not start (${(err as Error).message}); the email scenario needs it — see Settings → Email.`,
+        `Mailpit did not start (${(err as Error).message}); the email scenarios need it — see Settings → Email.`,
       );
     }
-    const clinicUrl = await this.startClinic();
-    const existing = this.loadedAppId();
-    if (existing) return { applicationId: existing, clinicUrl, mailpit, created: false, warnings };
-
-    const data = JSON.parse(readFileSync(DEMO_WORKSPACE, 'utf8')) as { environments: { baseUrl: string }[] };
-    for (const e of data.environments) e.baseUrl = clinicUrl;
-    // Another application may already use the slug (e.g. an earlier, deleted-setting demo): pick a free one.
-    let slug = 'careclinic';
-    for (let i = 2; repo.getApplicationBySlug(this.db, slug); i++) slug = `careclinic-${i}`;
-    const imported = repo.importApplication(this.db, data, { slug });
-    const env = repo.listEnvironments(this.db, imported.applicationId)[0]!;
-    for (const [key, value] of Object.entries(DEMO_SECRETS))
-      repo.setSecret(this.db, this.masterKey, env.id, { key, value });
-    repo.createConnection(
-      this.db,
-      this.masterKey,
-      env.id,
-      {
-        name: 'clinic',
-        engine: 'sqlite',
-        database: join(this.config.dataDir, 'demo', 'clinic.db'),
-        readOnly: true,
-        rollbackMode: true,
-      },
-      this.config.dbFile === ':memory:' ? undefined : this.config.dbFile,
-    );
-    saveGate(this.db, imported.applicationId, DEFAULT_GATE);
-    setSetting(this.db, 'demoApplicationId', imported.applicationId);
+    const ids = this.loadedIds();
+    let created = false;
+    const applications: DemoLoaded['applications'] = [];
+    for (const app of DEMO_APPS) {
+      const url = await this.startApp(app.key);
+      if (ids[app.key]) {
+        applications.push({ key: app.key, name: app.name, applicationId: ids[app.key]!, url });
+        continue;
+      }
+      const data = JSON.parse(readFileSync(app.workspace, 'utf8')) as { environments: { baseUrl: string }[] };
+      for (const e of data.environments) e.baseUrl = url;
+      let slug = app.slug;
+      for (let i = 2; repo.getApplicationBySlug(this.db, slug); i++) slug = `${app.slug}-${i}`;
+      const imported = repo.importApplication(this.db, data, { slug });
+      const env = repo.listEnvironments(this.db, imported.applicationId)[0]!;
+      for (const [key, value] of Object.entries(app.secrets))
+        repo.setSecret(this.db, this.masterKey, env.id, { key, value });
+      repo.createConnection(
+        this.db,
+        this.masterKey,
+        env.id,
+        {
+          name: app.connection,
+          engine: 'sqlite',
+          database: join(this.config.dataDir, 'demo', `${app.key}.db`),
+          readOnly: true,
+          rollbackMode: true,
+        },
+        this.config.dbFile === ':memory:' ? undefined : this.config.dbFile,
+      );
+      saveGate(this.db, imported.applicationId, DEFAULT_GATE);
+      ids[app.key] = imported.applicationId;
+      setSetting(this.db, 'demoApplications', ids);
+      created = true;
+      applications.push({ key: app.key, name: app.name, applicationId: imported.applicationId, url });
+      this.bus.publish({ type: 'tree.changed', applicationId: imported.applicationId });
+    }
     setSetting(this.db, 'onboardingComplete', true);
-    this.bus.publish({ type: 'tree.changed', applicationId: imported.applicationId });
-    return { applicationId: imported.applicationId, clinicUrl, mailpit, created: true, warnings };
+    return {
+      applicationId: applications[0]!.applicationId,
+      clinicUrl: applications[0]!.url,
+      applications,
+      mailpit,
+      created,
+      warnings,
+    };
   }
 
   stop(): void {
-    this.clinic?.kill();
-    this.clinic = undefined;
-    this.clinicUrl = null;
+    for (const p of this.procs.values()) p.child.kill();
+    this.procs.clear();
   }
 }

@@ -1,28 +1,51 @@
 <!doctype html>
 <html>
-<head><title>Fixture Login</title></head>
-<body>
-  <h1>Clinic login</h1>
-  <form id="f" onsubmit="event.preventDefault(); login()">
-    <label for="email">Email</label><input id="email" name="email" />
-    <label for="pw">Password</label><input id="pw" type="password" />
-    <label><input type="checkbox" id="remember" /> Remember me</label>
-    <select id="role" aria-label="Role"><option value="admin">Admin</option><option value="doctor">Doctor</option></select>
-    <button type="submit" data-testid="login-btn">Sign in</button>
-  </form>
-  <p id="msg" role="status"></p>
-  <button id="del" onclick="if (confirm('Delete?')) document.getElementById('msg').textContent = 'Deleted'; else document.getElementById('msg').textContent = 'Kept'">Delete record</button>
-  <a id="newtab" href="/other.html" target="_blank">Open help</a>
-  <iframe id="frm" srcdoc="<button onclick=&quot;this.textContent='Clicked in frame'&quot;>Frame button</button>"></iframe>
-  <button id="boom" onclick="null.x()">Crash</button>
-  <script>
-    function login() {
-      const email = document.getElementById('email').value;
-      setTimeout(() => {
-        document.getElementById('msg').textContent = 'Welcome ' + email + ' (' + document.getElementById('role').value + ')';
-      }, 300);
-      fetch('/api/login', { method: 'POST' });
-    }
-  </script>
-</body>
+  <head>
+    <title>Fixture Login</title>
+  </head>
+  <body>
+    <h1>Clinic login</h1>
+    <form
+      id="f"
+      onsubmit="
+        event.preventDefault();
+        login();
+      "
+    >
+      <label for="email">Email</label><input id="email" name="email" /> <label for="pw">Password</label
+      ><input id="pw" type="password" />
+      <label><input type="checkbox" id="remember" /> Remember me</label>
+      <select id="role" aria-label="Role">
+        <option value="admin">Admin</option>
+        <option value="doctor">Doctor</option>
+      </select>
+      <button type="submit" data-testid="login-btn">Sign in</button>
+    </form>
+    <p id="msg" role="status"></p>
+    <button
+      id="del"
+      onclick="
+        if (confirm('Delete?')) document.getElementById('msg').textContent = 'Deleted';
+        else document.getElementById('msg').textContent = 'Kept';
+      "
+    >
+      Delete record
+    </button>
+    <a id="newtab" href="/other.html" target="_blank">Open help</a>
+    <iframe
+      id="frm"
+      srcdoc="<button onclick=&quot;this.textContent='Clicked in frame'&quot;>Frame button</button>"
+    ></iframe>
+    <button id="boom" onclick="null.x()">Crash</button>
+    <script>
+      function login() {
+        const email = document.getElementById('email').value;
+        setTimeout(() => {
+          document.getElementById('msg').textContent =
+            'Welcome ' + email + ' (' + document.getElementById('role').value + ')';
+        }, 300);
+        fetch('/api/login', { method: 'POST' });
+      }
+    </script>
+  </body>
 </html>

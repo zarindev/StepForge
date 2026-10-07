@@ -166,7 +166,7 @@ export class MaintenanceService {
       this.db.delete(schema.analyticsDaily).run();
       this.db
         .delete(schema.settings)
-        .where(inArray(schema.settings.key, ['demoApplicationId', 'onboardingComplete']))
+        .where(inArray(schema.settings.key, ['demoApplications', 'onboardingComplete']))
         .run();
     });
     rmSync(join(this.config.artifactsDir, 'runs'), { recursive: true, force: true });

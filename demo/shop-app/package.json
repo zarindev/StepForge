@@ -1,0 +1,20 @@
+{
+  "name": "@stepforge/demo-shop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ShopDesk: a demo shop back office (products, stock, sales, purchases, profit) used to prove StepForge works end to end.",
+  "exports": {
+    ".": "./src/app.ts",
+    "./openapi": "./src/openapi.ts"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@fastify/formbody": "^8.0.2",
+    "better-sqlite3": "^12.2.0",
+    "fastify": "^5.4.0",
+    "tsx": "^4.20.0"
+  }
+}

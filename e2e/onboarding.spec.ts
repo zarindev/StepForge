@@ -71,6 +71,7 @@ test.describe.serial('first-run onboarding (Phase 13)', () => {
     await page.getByRole('button', { name: 'Load demo workspace' }).click();
     const loaded = page.getByTestId('demo-loaded');
     await expect(loaded).toContainText('CareClinic is ready at', { timeout: 60_000 });
+    await expect(loaded).toContainText('ShopDesk is ready at');
     await shot(page, 'phase13-demo-loaded');
     await loaded.getByRole('button', { name: 'Run all tests' }).click();
     await expect(page).toHaveURL(/\/runs\/[0-9A-Z]{26}$/);
@@ -84,8 +85,8 @@ test.describe.serial('first-run onboarding (Phase 13)', () => {
     const run = await sfApi<{
       totalsJson: { total: number; passed: number; failed: number; broken: number };
     }>(page, 'GET', `/api/runs/${runId}`);
-    // 17 scenarios = 20 test-case runs; the 5 that check the demo app's real defects fail.
-    expect(run.totalsJson).toMatchObject({ total: 20, passed: 15, failed: 5, broken: 0 });
+    // CareClinic: 25 scenarios = 28 test-case runs; the 12 that check its planted defects fail (desktop size).
+    expect(run.totalsJson).toMatchObject({ total: 28, passed: 16, failed: 12, broken: 0 });
     await page.reload();
     await expect(page.getByText('Failed', { exact: true }).first()).toBeVisible();
     await shot(page, 'phase13-demo-run');
@@ -95,6 +96,16 @@ test.describe.serial('first-run onboarding (Phase 13)', () => {
     await expect(page.getByTestId('home-gates')).toContainText('CareClinic');
     await expect(page.getByTestId('welcome')).toHaveCount(0);
 
+    // "Run all tests" also started a ShopDesk run: let it finish before cleaning up.
+    await expect
+      .poll(
+        async () =>
+          (await sfApi<{ status: string }[]>(page, 'GET', '/api/runs')).filter((r) =>
+            ['queued', 'running'].includes(r.status),
+          ).length,
+        { timeout: 180_000, intervals: [2000] },
+      )
+      .toBe(0);
     // Leave an empty workspace for the other specs (the demo uses the "careclinic" slug); this also stops CareClinic.
     await sfApi(page, 'POST', '/api/maintenance/delete-everything', { confirm: 'DELETE EVERYTHING' });
   });

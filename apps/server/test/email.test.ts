@@ -153,7 +153,7 @@ describe.skipIf(!hasMailpit)('email testing with Mailpit', () => {
         params: {
           from: 'no-reply@careclinic.test',
           bodyContains: 'expires in 10 minutes',
-          hasLink: '/verify',
+          hasLink: 'code=',
         },
       },
       { type: 'email.extractFromEmail', params: { kind: 'otp' }, captureAs: 'otp' },
@@ -228,7 +228,7 @@ describe.skipIf(!hasMailpit)('email testing with Mailpit', () => {
       to: [expect.stringMatching(/^new\.hire\+/)],
     });
     const full = await ok<{ links: string[] }>('GET', `/api/inboxes/local/messages/${list[0]!.id}`);
-    expect(full.links[0]).toMatch(/\/verify\?email=.*&code=\d{6}$/);
+    expect(full.links[0]).toMatch(/\?email=.*&code=\d{6}$/); // the link's path is a planted bug (CC-EMAIL-01)
     expect((await call('DELETE', '/api/inboxes/local/messages')).statusCode).toBe(204);
     expect(await ok('GET', '/api/inboxes/local/messages')).toEqual([]);
   }, 90_000);

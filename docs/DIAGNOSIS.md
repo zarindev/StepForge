@@ -12,9 +12,10 @@ to reproduce and the evidence, or counts another occurrence of an existing one.
 - API requests and responses (status, body, JSON-schema and OpenAPI contract errors);
 - database results (rows, counts, constraint errors), emails, performance reports;
 - the browser's console (JavaScript exceptions with their location, CORS errors) and network log (failed and slow
-  requests, DNS/connection failures);
-- the page at the moment of failure: whether the element exists or is hidden, and which elements now look like the
-  one the step wanted (for a changed locator);
+  requests, DNS/connection failures). JavaScript errors only count when they happened on the page the step failed
+  on, so an error on an earlier page doesn't take the blame;
+- the page at the moment of failure: whether the element exists, is hidden or is covered by another element (the
+  covering element is named), and which elements now look like the one the step wanted (for a changed locator);
 - the same test's **last passing run** ("last-green diff"): what changed in the step's result, HTTP status, response
   field types, row counts, duration, locator healing, browser and base URL;
 - the test's recent history (passed/failed pattern for flakiness).
@@ -31,7 +32,7 @@ to reproduce and the evidence, or counts another occurrence of an existing one.
 ## Categories covered
 
 Locator changed (with a suggested locator and one-click accept), element covered or hidden, navigation timeout,
-slow API behind a timeout, HTTP 400/401/403/404/409/422/429/500/502/503/504, missing authentication check, missing
+slow API (behind a timeout, or a failed response-time check), HTTP 400/401/403/404/409/422/429/500/502/503/504, missing authentication check, missing
 validation (duplicate or invalid input accepted), wrong status for missing records, CORS, network offline/DNS,
 JSON-schema and contract mismatch (field by field), assertion mismatch (with the value difference), database
 unreachable, constraint violation, empty result, data-integrity mismatch, data-quality audit failures, email not

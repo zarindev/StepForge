@@ -24,8 +24,10 @@ describe('OpenAPI importer', () => {
     expect(plan.root.children!.map((m) => m.name).sort()).toEqual([
       'Appointments',
       'Auth',
+      'Billing',
       'Doctors',
       'Patients',
+      'Reports',
       'System',
     ]);
     expect(all).toContain('Patients: POST /api/patients — happy path');

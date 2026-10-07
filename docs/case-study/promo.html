@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StepForge Promo Cards</title>
+<meta name="description" content="StepForge Upwork thumbnail and social preview cards — by Md Zarin Tasnim.">
+<meta name="author" content="Md Zarin Tasnim">
+<!--
+  StepForge promo cards — by Md Zarin Tasnim. Rendered by scripts/export_case_study.ts:
+  #thumbnail 1600×1200 (Upwork, content inside a 90% safe area), #github 1280×640, #post 1200×675.
+  Numbers marked data-bench come from docs/benchmarks.json.
+-->
+<style>
+  @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+  @font-face { font-family: 'JetBrains Mono'; src: url('fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2'); font-weight: 100 800; font-display: block; }
+  :root { --bg: #0B0D12; --bg2: #111520; --text: #F5F7FA; --muted: #9AA4B2; --accent: #F97316; --accent2: #FB923C; --line: rgba(255,255,255,.1); --mono: 'JetBrains Mono', Menlo, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #05060a; font-family: 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; gap: 32px; padding: 32px 16px; align-items: flex-start; }
+  body.export { padding: 0; gap: 0; }
+  .card { position: relative; overflow: hidden; flex: none;
+    background: radial-gradient(900px 600px at 90% -10%, rgba(249,115,22,.22), transparent 60%), radial-gradient(700px 500px at -10% 110%, rgba(96,165,250,.08), transparent 60%), linear-gradient(180deg, var(--bg), var(--bg2)); }
+  .card::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(180deg, #000, transparent 75%); }
+  .card > * { position: relative; }
+  .safe { position: absolute; display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; gap: 14px; font-weight: 750; letter-spacing: -.02em; }
+  .browser { border-radius: 14px; overflow: hidden; background: #0f121a; border: 1px solid rgba(255,255,255,.14); box-shadow: 0 40px 100px rgba(0,0,0,.6); }
+  .browser .bar { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 14px; background: #171b26; border-bottom: 1px solid var(--line); }
+  .browser .bar i { width: 11px; height: 11px; border-radius: 50%; }
+  .browser .bar i:nth-child(1) { background: #FF5F57; } .browser .bar i:nth-child(2) { background: #FEBC2E; } .browser .bar i:nth-child(3) { background: #28C840; }
+  .browser img { display: block; width: 100%; object-fit: cover; object-position: top left; }
+  .badge { display: inline-flex; align-items: baseline; gap: 14px; background: var(--accent); color: #1a0c02; border-radius: 18px; padding: 16px 26px; font-weight: 800; box-shadow: 0 20px 60px rgba(249,115,22,.35); }
+  .chip { font-size: 20px; padding: 9px 16px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid var(--line); color: #D5DBE5; white-space: nowrap; }
+  .hl { color: var(--accent2); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="sfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FB923C"/><stop offset="1" stop-color="#EA580C"/></linearGradient>
+    <symbol id="logo" viewBox="0 0 64 64">
+      <path d="M8 22h40c0 6-4 10-10 11v7h6v6H20v-6h6v-7C15 32 8 28 8 22z" fill="url(#sfg)"/>
+      <path d="M48 22h8c0 3-3 5-8 5z" fill="#EA580C"/>
+      <rect x="16" y="46" width="32" height="6" rx="2" fill="#C2410C"/>
+      <circle cx="30" cy="25" r="6.5" fill="#0B0D12"/>
+      <path d="M28 21.8v6.4l5-3.2z" fill="#F97316"/>
+      <path d="M50 6l1.6 4.4L56 12l-4.4 1.6L50 18l-1.6-4.4L44 12l4.4-1.6z" fill="#FDE68A"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- Upwork thumbnail: 1600×1200, everything inside the central 90% (80 px / 60 px margins) -->
+<section class="card" id="thumbnail" style="width:1600px;height:1200px">
+  <div class="safe" data-safe style="left:80px;top:60px;right:80px;bottom:60px;padding:30px 30px 0">
+    <div class="brand" style="font-size:34px"><svg width="62" height="62"><use href="#logo"/></svg>StepForge</div>
+    <div style="font-size:112px;font-weight:800;letter-spacing:-.045em;line-height:1;margin-top:34px">Md Zarin Tasnim</div>
+    <div style="font-size:46px;font-weight:650;letter-spacing:-.02em;margin-top:22px;line-height:1.2">I build test automation that <span class="hl">finds real bugs</span> — and explains them.</div>
+    <div style="position:relative;flex:1;margin-top:46px">
+      <div class="browser" style="position:absolute;left:0;top:0;width:1040px">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <img src="../assets/screenshots/diagnosis.png" alt="" style="height:620px">
+      </div>
+      <div style="position:absolute;right:0;top:70px;width:380px;display:flex;flex-direction:column;gap:22px;align-items:flex-end">
+        <div class="badge" style="flex-direction:column;align-items:flex-start;gap:4px;padding:26px 30px">
+          <span style="font-size:96px;letter-spacing:-.04em;line-height:1"><span data-bench="totals.detected">25</span>/<span data-bench="totals.plantedBugs">25</span></span>
+          <span style="font-size:26px;font-weight:700;line-height:1.25">planted bugs caught</span>
+        </div>
+        <div class="chip" style="font-size:22px"><b data-bench="totals.diagnosisAccuracyPct">96</b>% diagnosed correctly</div>
+        <div class="chip" style="font-size:22px"><b data-bench="totals.falseAlarms">0</b> false alarms</div>
+        <div class="chip" style="font-size:22px">UI · API · DB · Email · Perf</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GitHub social preview: 1280×640 -->
+<section class="card" id="github" style="width:1280px;height:640px">
+  <div class="safe" style="left:72px;top:64px;width:700px;bottom:64px">
+    <div class="brand" style="font-size:30px"><svg width="56" height="56"><use href="#logo"/></svg>StepForge</div>
+    <div style="font-size:76px;font-weight:800;letter-spacing:-.04em;line-height:1.02;margin-top:30px">Record once.<br><span class="hl">Test every layer.</span><br>Export anywhere.</div>
+    <div style="font-size:26px;color:var(--muted);margin-top:26px;line-height:1.4">Free, local QA studio for UI, API, database, email &amp; performance testing.</div>
+    <div style="display:flex;gap:12px;margin-top:auto"><span class="chip">Playwright</span><span class="chip">127.0.0.1 only</span><span class="chip">MIT</span><span class="chip">by Md Zarin Tasnim</span></div>
+  </div>
+  <div class="browser" data-shot style="position:absolute;left:820px;top:130px;width:700px">
+    <div class="bar"><i></i><i></i><i></i></div>
+    <img src="../assets/screenshots/home.png" alt="" style="height:440px">
+  </div>
+</section>
+
+<!-- LinkedIn / X post: 1200×675 -->
+<section class="card" id="post" style="width:1200px;height:675px">
+  <div class="safe" style="left:64px;top:60px;width:560px;bottom:60px">
+    <div class="brand" style="font-size:28px"><svg width="50" height="50"><use href="#logo"/></svg>StepForge</div>
+    <div style="font-size:54px;font-weight:800;letter-spacing:-.035em;line-height:1.08;margin-top:28px">I planted <span class="hl"><span data-bench="totals.plantedBugs">25</span> bugs</span> in two apps. My QA studio caught <span class="hl">all <span data-bench="totals.detected">25</span></span>.</div>
+    <div style="font-size:24px;color:var(--muted);margin-top:22px;line-height:1.4"><span data-bench="totals.diagnosedCorrectly">24</span> explained correctly · <span data-bench="totals.falseAlarms">0</span> false alarms · <span data-bench="totals.testRuns">51</span> tests in <span data-bench="totals.runTimeSeconds">83.6</span> s</div>
+    <div style="margin-top:auto;font-size:22px;color:#D5DBE5">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-shot style="position:absolute;left:670px;top:96px;width:620px">
+    <div class="bar"><i></i><i></i><i></i></div>
+    <img src="../assets/screenshots/diagnosis.png" alt="" style="height:440px">
+  </div>
+</section>
+
+<script>
+  if (new URLSearchParams(location.search).has('export')) document.body.classList.add('export');
+</script>
+</body>
+</html>

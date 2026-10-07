@@ -19,6 +19,7 @@ type DemoStatus = {
 type Loaded = {
   applicationId: string;
   clinicUrl: string;
+  applications: { key: string; name: string; applicationId: string; url: string }[];
   mailpit: boolean;
   created: boolean;
   warnings: string[];
@@ -57,19 +58,25 @@ export function Welcome() {
     },
     onError: toastError,
   });
+  // One run per demo app; the first opens (the other is on the Runs page).
   const run = useMutation({
     mutationFn: async () => {
-      const envs = await api<{ id: string }[]>(`/api/applications/${result!.applicationId}/environments`);
-      return api<{ id: string }>('/api/runs', {
-        method: 'POST',
-        json: {
-          applicationId: result!.applicationId,
-          environmentId: envs[0]!.id,
-          scope: { type: 'application' },
-        },
-      });
+      const ids: string[] = [];
+      for (const a of result!.applications ?? [{ applicationId: result!.applicationId }]) {
+        const envs = await api<{ id: string }[]>(`/api/applications/${a.applicationId}/environments`);
+        const r = await api<{ id: string }>('/api/runs', {
+          method: 'POST',
+          json: {
+            applicationId: a.applicationId,
+            environmentId: envs[0]!.id,
+            scope: { type: 'application' },
+          },
+        });
+        ids.push(r.id);
+      }
+      return ids;
     },
-    onSuccess: (r) => void navigate({ to: '/runs/$runId', params: { runId: r.id }, search: {} }),
+    onSuccess: (ids) => void navigate({ to: '/runs/$runId', params: { runId: ids[0]! }, search: {} }),
     onError: toastError,
   });
 
@@ -92,15 +99,19 @@ export function Welcome() {
           </div>
           {result ? (
             <div className="flex flex-1 flex-col text-sm" data-testid="demo-loaded">
-              <p className="flex items-center gap-2 text-pass">
-                <CheckCircle2 className="h-4 w-4" /> CareClinic is ready at{' '}
-                <a className="font-mono underline" href={result.clinicUrl} target="_blank" rel="noreferrer">
-                  {result.clinicUrl}
-                </a>
-              </p>
+              {(result.applications ?? [{ key: 'clinic', name: 'CareClinic', url: result.clinicUrl }]).map(
+                (a) => (
+                  <p key={a.key} className="flex items-center gap-2 text-pass">
+                    <CheckCircle2 className="h-4 w-4" /> {a.name} is ready at{' '}
+                    <a className="font-mono underline" href={a.url} target="_blank" rel="noreferrer">
+                      {a.url}
+                    </a>
+                  </p>
+                ),
+              )}
               <p className="mt-2 text-muted">
-                17 scenarios across UI, API, database, email and performance. Some fail on purpose: the demo
-                app has real defects for StepForge to find and explain.
+                45 scenarios across UI, API, database, email, business rules and performance. Some fail on
+                purpose: the demo apps have real defects for StepForge to find and explain.
               </p>
               {result.warnings.map((w) => (
                 <p key={w} className="mt-2 text-xs text-warn">
@@ -108,8 +119,8 @@ export function Welcome() {
                 </p>
               ))}
               <p className="mt-2 text-xs text-muted">
-                Demo sign-in: reception@careclinic.test / Reception123! (admin: admin@careclinic.test /
-                Admin123!)
+                Demo sign-in: CareClinic reception@careclinic.test / Reception123! · ShopDesk
+                cashier@shopdesk.test / Cashier123! (admins: admin@… / Admin123!)
               </p>
               <div className="mt-auto flex flex-wrap gap-2 pt-4">
                 <Button disabled={run.isPending} onClick={() => run.mutate()}>
@@ -123,14 +134,15 @@ export function Welcome() {
           ) : (
             <div className="flex flex-1 flex-col text-sm">
               <p className="text-muted">
-                Starts the CareClinic demo app and the local email catcher, then adds 17 ready scenarios, a
-                database connection and a quality gate. About a minute to your first results.
+                Starts two demo apps (CareClinic, a clinic, and ShopDesk, a shop back office) and the local
+                email catcher, then adds 45 ready scenarios, database connections and quality gates. About a
+                minute to your first results.
               </p>
               <div className="mt-auto pt-4">
                 <Button disabled={!demo.data?.available || load.isPending} onClick={() => load.mutate()}>
                   {load.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Starting CareClinic and importing…
+                      <Loader2 className="h-4 w-4 animate-spin" /> Starting the demo apps and importing…
                     </>
                   ) : (
                     'Load demo workspace'

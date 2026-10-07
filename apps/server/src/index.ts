@@ -43,7 +43,7 @@ async function main(): Promise<void> {
       .load()
       .then((r) =>
         app.log.info(
-          `Demo workspace ${r.created ? 'loaded' : 'already loaded'}; CareClinic at ${r.clinicUrl}${r.warnings.length ? ` (${r.warnings.join(' ')})` : ''}`,
+          `Demo workspace ${r.created ? 'loaded' : 'already loaded'}: ${r.applications.map((a) => `${a.name} at ${a.url}`).join(', ')}${r.warnings.length ? ` (${r.warnings.join(' ')})` : ''}`,
         ),
       )
       .catch((err: Error) => app.log.error(`Demo workspace failed: ${err.message}`));

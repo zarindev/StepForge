@@ -17,7 +17,55 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 11 | Scheduler, CLI, notifications, JUnit/HTML | ✅ Done |
 | 12 | Code generators + snapshot tests | ✅ Done |
 | 13 | Public-repo polish, onboarding, fresh-clone test | ✅ Done (Windows/Ubuntu via CI after push) |
-| 14 | Showcase package, optional Electron | ⏳ Next |
+| 14 | Showcase package, optional Electron | ✅ Done (Electron skipped: optional) |
+
+---
+
+## Phase 14 — Showcase package (2026-10-07)
+
+**Delivered**
+- **Demo apps (spec section 14):** CareClinic gained 8 planted bugs (13 in total) and ShopDesk was added
+  (`demo/shop-app`, port 8102: sign-in with two roles, products, stock, POS sales, purchases, profit and sales reports,
+  REST API with an OpenAPI spec; 12 planted bugs). Every planted bug is marked `// PLANTED BUG <id>` in the source and
+  listed in `demo/manifests/planted_bugs.json` with the scenario that should catch it and the accepted diagnoses,
+  written before the first benchmark run. StepForge never reads the manifest: `apps/server/test/guard.test.ts` fails
+  if any file under `apps/` or `packages/` mentions it. Demo workspaces: CareClinic 25 scenarios in 10 modules,
+  ShopDesk 20 scenarios in 8 modules, each with a phone scenario (tag `mobile`). The demo service starts both apps;
+  onboarding, Settings, `--demo`, `demo/start-demos.*` and the welcome screen follow.
+- **Diagnosis improvements found by the benchmark:** `api-slow-response` rule (failed response-time checks → slow
+  API), JavaScript errors scoped to the page the step failed on (`diagnostics.pageUrl`), and the UI executor keeps
+  Playwright's "intercepts pointer events" reason (covered element on phones). Each has a regression test.
+- **Benchmark:** `scripts/benchmark.ts` runs a throwaway StepForge with the demo workspace (each app: whole suite at
+  desktop size, phone scenarios at mobile size, one worker), then scores against the manifest →
+  `docs/benchmarks.json`. Final run: **25/25 planted bugs detected, 24/25 diagnosed correctly (96%), 0 false alarms,
+  45 scenarios, 51 test runs, 83.6 s** (Apple M3 Pro). The miss, CC-UI-01, is KNOWN_ISSUES #61.
+- **Showcase capture:** `scripts/capture_showcase.ts` (replaces `capture_screenshots.ts`): 21 screenshots at
+  1440×900 @2x (API client with a real request, SQL workbench with a real query, a real load test, the diagnosis and
+  email runs, the recorder; plus the recording browser itself at 1280×800), 3 WebM clips (`docs/assets/clips/`: recorder, live run, failure
+  diagnosis), and `docs/samples/`: bug report PDF (BUG-005, the 20% discount bug), run report XLSX and HTML, the
+  exported Playwright project, a Cypress spec, a Selenium test and a k6 script, all real exports.
+- **Case study:** `docs/case-study/case-study.html` (15 slides, 1600×1200, dark, Inter bundled locally, real screenshots
+  in browser frames) and `promo.html` (Upwork thumbnail, GitHub and LinkedIn/X cards). Every number is a `data-bench`
+  element filled from `docs/benchmarks.json`. `scripts/export_case_study.ts` → `docs/case-study/export/`: PDF, 15 slide
+  PNGs, Upwork 00–06 (PNG + JPG), social images; it checks dimensions, JPG sizes, the PDF page count, overflow, footer
+  collisions, the thumbnail's 90% safe area and text over screenshots. `UPWORK_LISTING.md`, `CASE_STUDY.md`.
+- README: benchmark tables, two demo apps, case study and samples links, roadmap. CHECKLIST items 9, 17 and 18 done.
+
+**Verified**
+- `npm test`: 331 passed, 18 skipped. New: both demo apps' scenario outcomes (desktop and phone), the guard test,
+  ShopDesk unit tests, 3 diagnosis cases, a covered-element executor test.
+- `npm run test:e2e`: 20 passed. `npm run verify:export` (Playwright): passed. Lint, typecheck, build: clean.
+- `scripts/smoke-onboarding.ts` against a fresh data folder: welcome → load demo → run → CareClinic 16 passed,
+  12 failed, 0 broken, gate red.
+- Benchmark run three times with the same detection and diagnosis results (run time 83.6–84.2 s).
+- `scripts/export_case_study.ts`: all files at the exact sizes, no layout problems; every slide and card checked by
+  eye (fixed on the way: cover overflow, unreadable full-screen shots now zoomed, a title wrapping, text under a
+  screenshot on the GitHub card).
+
+**Not done / not verified**
+- Electron installer: optional, not built (KNOWN_ISSUES #64).
+- `docs/assets/demo.gif`: needs a screen recording or ffmpeg/gifski (KNOWN_ISSUES #63); WebM clips are ready.
+- GitHub social preview, Upwork portfolio entry and URL placeholders: manual (CHECKLIST to-dos).
 
 ---
 

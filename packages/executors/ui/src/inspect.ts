@@ -3,7 +3,12 @@ import type { Locator } from 'playwright';
 import { buildLocator, type Scope } from './locators.ts';
 
 export type Candidate = { locator: StepLocator; text?: string; score: number; count: number };
-export type FailureDiagnostics = { matchCount: number; visible?: boolean; candidates: Candidate[] };
+export type FailureDiagnostics = {
+  matchCount: number;
+  visible?: boolean;
+  candidates: Candidate[];
+  pageUrl?: string;
+};
 
 /** What the browser reports about one element (computed in the page). */
 type ElementInfo = {
