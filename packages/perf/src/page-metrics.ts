@@ -78,6 +78,17 @@ export async function collectPageMetrics(
 ): Promise<PageMetrics> {
   await page.waitForLoadState('load', { timeout: opts.timeoutMs ?? 15_000 }).catch(() => undefined);
   await page.waitForTimeout(opts.settleMs ?? 400);
+  // Paint metrics arrive asynchronously after load; on a slow machine 400 ms is not always enough. Wait for
+  // FCP and LCP (when the Web Vitals script is on the page) for up to 3 s more.
+  for (const deadline = Date.now() + 3000; Date.now() < deadline;) {
+    const ready = await page
+      .evaluate(
+        `(() => { const v = window.__stepforgeVitals; return !v || (v.FCP !== undefined && v.LCP !== undefined); })()`,
+      )
+      .catch(() => true);
+    if (ready) break;
+    await page.waitForTimeout(100);
+  }
   // Runs in the page; a string so this Node package needs no DOM types.
   const raw = (await page.evaluate(`(() => {
     const nav = performance.getEntriesByType('navigation')[0];
