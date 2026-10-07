@@ -173,10 +173,10 @@ async function main() {
     await waitRun(shopRun);
     await page.evaluate((id) => localStorage.setItem('stepforge.currentApp', id), appId);
 
-    const tree = await api<{ scenarios: { id: string; name: string }[] }>(
-      'GET',
-      `/api/applications/${appId}/tree`,
-    );
+    const tree = await api<{
+      scenarios: { id: string; name: string }[];
+      modules: { id: string; name: string }[];
+    }>('GET', `/api/applications/${appId}/tree`);
     const scenarioId = (name: string) => tree.scenarios.find((s) => s.name.startsWith(name))!.id;
     const hybrid = scenarioId('Register in the UI');
     const run = await api<{ items: Item[] }>('GET', `/api/runs/${runId}`);
@@ -284,12 +284,25 @@ async function main() {
       await saveClip(c, p, 'failure-diagnosis');
     }
 
-    // ─── Clip: the recorder (StepForge's step list fills in while the app is used) ──
+    // ─── Clip: the recorder, started from a new scenario in the Test Explorer ("Record steps") ──
     {
+      // A throwaway scenario, deleted afterwards so the samples export only the demo suite.
+      const draft = await api<{ id: string }>(
+        'POST',
+        `/api/modules/${tree.modules.find((m) => m.name === 'Appointments')!.id}/scenarios`,
+        { name: 'Receptionist books a follow-up' },
+      );
       const c = await clipContext(clipTmp);
       const p = await c.newPage();
       await openApp(p, appId);
-      await p.goto(`${base}/recorder`);
+      await p.goto(`${base}/explorer?scenario=${draft.id}`);
+      await p.getByText('No steps yet').waitFor();
+      await p.waitForTimeout(1200);
+      await p.screenshot({ path: join(SHOTS, 'explorer-record.png') });
+      console.log('  screenshots/explorer-record.png');
+      await p.getByRole('button', { name: 'Record steps' }).click();
+      await p.getByText('Recording steps for').waitFor();
+      await p.waitForTimeout(800);
       await p.getByLabel('Start page').fill('/login');
       await p.getByRole('button', { name: 'Start recording' }).click();
       await p.getByText('Recording', { exact: true }).waitFor({ timeout: 20_000 });
@@ -306,6 +319,7 @@ async function main() {
       await p.waitForTimeout(2000);
       await saveClip(c, p, 'recorder');
       await api('POST', '/api/recorder/discard').catch(() => undefined);
+      await api('DELETE', `/api/scenarios/${draft.id}`);
     }
     rmSync(clipTmp, { recursive: true, force: true });
 
