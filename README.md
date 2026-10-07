@@ -3,7 +3,7 @@
 <img src="docs/assets/banner.svg" alt="StepForge — Record once. Test every layer. Export anywhere." width="100%" />
 
 <p>
-  <a href="https://github.com/YOUR_GITHUB_USERNAME/stepforge/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/YOUR_GITHUB_USERNAME/stepforge/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/zarindev/stepforge/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/zarindev/stepforge/actions/workflows/ci.yml/badge.svg" /></a>
   <img alt="Node 20+" src="https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" />
   <img alt="Playwright" src="https://img.shields.io/badge/Playwright-1.63-2EAD33?logo=playwright&logoColor=white" />
@@ -82,7 +82,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 **Windows**
 
 ```bat
-git clone https://github.com/YOUR_GITHUB_USERNAME/stepforge.git
+git clone https://github.com/zarindev/stepforge.git
 cd stepforge
 setup.bat
 start.bat
@@ -91,7 +91,7 @@ start.bat
 **macOS / Linux**
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/stepforge.git
+git clone https://github.com/zarindev/stepforge.git
 cd stepforge
 ./setup.sh
 ./start.sh
@@ -427,6 +427,6 @@ Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.
   <p>Creator of StepForge</p>
   <p>
     <a href="https://www.upwork.com/freelancers/~01b847509724f9e1ff"><img alt="Hire me on Upwork" src="https://img.shields.io/badge/Hire%20me-Upwork-6FDA44?style=for-the-badge&logo=upwork&logoColor=white" /></a>
-    <a href="https://github.com/YOUR_GITHUB_USERNAME"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-follow-181717?style=for-the-badge&logo=github&logoColor=white" /></a>
+    <a href="https://github.com/zarindev"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-follow-181717?style=for-the-badge&logo=github&logoColor=white" /></a>
   </p>
 </div>

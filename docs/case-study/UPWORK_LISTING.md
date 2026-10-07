@@ -54,12 +54,11 @@ All images are 1600×1200 (Upwork's 4:3). Use the PNGs, or the JPGs in `export/u
 ## Project URL
 
 ```
-https://github.com/YOUR_GITHUB_USERNAME/stepforge
+https://github.com/zarindev/stepforge
 ```
 
-Replace `YOUR_GITHUB_USERNAME` once the repository is public (also on the case study's last slide in
-`case-study.html`, then rerun `npx tsx scripts/export_case_study.ts`). The last slide already links the Upwork profile,
-<https://www.upwork.com/freelancers/~01b847509724f9e1ff>.
+The repository must be public at that address before you add it. The case study's last slide links both the
+repository and the Upwork profile, <https://www.upwork.com/freelancers/~01b847509724f9e1ff>.
 
 ## Rebuilding the images
 
