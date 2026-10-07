@@ -6,6 +6,8 @@ coverage/
 .env
 .env.*
 !.env.example
+# Codegen snapshots of generated .env.example files (variable names only, no values)
+!.env.example.snap
 # StepForge runtime data: database, artifacts, master key, downloaded binaries
 data/*
 !data/.gitkeep

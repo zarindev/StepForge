@@ -5,7 +5,7 @@ const tracked = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filte
 const offenders = tracked.filter(
   (f) =>
     (f.startsWith('data/') && f !== 'data/.gitkeep') ||
-    (/(^|\/)\.env(\.|$)/.test(f) && !f.endsWith('.env.example')),
+    (/(^|\/)\.env(\.|$)/.test(f) && !f.endsWith('.env.example') && !f.endsWith('.env.example.snap')),
 );
 if (offenders.length > 0) {
   console.error('These files must never be committed (runtime data / secrets):');
