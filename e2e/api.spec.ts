@@ -34,7 +34,7 @@ test('API client, OpenAPI import and the generated suite against CareClinic (Pha
   await page.goto('/');
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
     name: 'Clinic API',
-    slug: 'clinic-api',
+    slug: `clinic-api-${Date.now().toString(36)}`, // unique: a CI retry must not collide
   });
   const env = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/environments`, {
     name: 'Local',
@@ -62,9 +62,13 @@ test('API client, OpenAPI import and the generated suite against CareClinic (Pha
   await page.getByLabel('Request URL').fill('{{env.baseUrl}}/api/auth/login');
   await page.getByRole('tab', { name: 'Body' }).click();
   await page.getByLabel('Body type').selectOption('json');
-  await page.getByTestId('code-Request body').click();
+  // Monaco loads lazily: wait for it, and check the text landed before sending (slow CI machines).
+  const body = page.getByTestId('code-Request body');
+  await body.locator('.monaco-editor').waitFor();
+  await body.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.insertText('{"email":"admin@careclinic.test","password":"{{secret.apiPassword}}"}');
+  await expect(body).toContainText('admin@careclinic.test');
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByTestId('response-status')).toHaveText('200 OK');
   await expect(page.getByTestId('contract-badge')).toHaveText(/contract ok/);

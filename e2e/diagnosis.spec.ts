@@ -32,7 +32,7 @@ test('diagnosis, bugs and exports (Phase 9)', async ({ page, request }) => {
   await page.goto('/');
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
     name: 'Clinic Bugs',
-    slug: 'clinic-bugs',
+    slug: `clinic-bugs-${Date.now().toString(36)}`, // unique: a CI retry must not collide
   });
   const env = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/environments`, {
     name: 'Local',

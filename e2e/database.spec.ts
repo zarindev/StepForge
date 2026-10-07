@@ -30,6 +30,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
 /** Replaces the Monaco editor's content (insertText avoids auto-closing brackets/quotes). */
 async function setEditor(page: Page, text: string) {
   const editor = page.getByTestId('code-SQL editor');
+  await editor.locator('.monaco-editor').waitFor(); // Monaco loads lazily
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.press('Delete');
@@ -45,7 +46,7 @@ test('SQL Workbench: connect, browse, query, guard writes, audit and save a DB t
   await page.goto('/');
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
     name: 'Clinic DB',
-    slug: 'clinic-db',
+    slug: `clinic-db-${Date.now().toString(36)}`, // unique: a CI retry must not collide
   });
   await sfApi(page, 'POST', `/api/applications/${app.id}/environments`, { name: 'Local', baseUrl: CLINIC });
   await sfApi(page, 'POST', `/api/applications/${app.id}/modules`, { name: 'Data integrity' });

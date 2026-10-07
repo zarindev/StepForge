@@ -32,7 +32,7 @@ test('analytics: home dashboard, quality gate, drill-down and run comparison fro
   await page.goto('/');
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
     name: 'Clinic Analytics',
-    slug: 'clinic-analytics',
+    slug: `clinic-analytics-${Date.now().toString(36)}`, // unique: a CI retry must not collide
   });
   const env = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/environments`, {
     name: 'Local',

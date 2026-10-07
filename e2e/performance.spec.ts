@@ -33,7 +33,7 @@ test('performance: authorize, load test with threshold verdicts, export k6, save
   await page.goto('/');
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
     name: 'Clinic Perf',
-    slug: 'clinic-perf',
+    slug: `clinic-perf-${Date.now().toString(36)}`, // unique: a CI retry must not collide
   });
   await sfApi(page, 'POST', `/api/applications/${app.id}/environments`, { name: 'Local', baseUrl: CLINIC });
   await sfApi(page, 'POST', `/api/applications/${app.id}/modules`, { name: 'Load' });
@@ -77,7 +77,7 @@ test('performance: authorize, load test with threshold verdicts, export k6, save
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Export k6 script' }).click(),
   ]);
-  expect(download.suggestedFilename()).toBe('clinic-perf-load-test.js');
+  expect(download.suggestedFilename()).toMatch(/^clinic-perf-[a-z0-9]+-load-test\.js$/);
   const script = readFileSync((await download.path())!, 'utf8');
   expect(script).toContain("import http from 'k6/http';");
   expect(script).toContain('`${BASE_URL}/api/health`');

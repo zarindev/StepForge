@@ -61,7 +61,7 @@ test('email: start Mailpit, run a sign-up with OTP, preview the email and browse
 
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
     name: 'Clinic Mail',
-    slug: 'clinic-mail',
+    slug: `clinic-mail-${Date.now().toString(36)}`, // unique: a CI retry must not collide
   });
   await sfApi(page, 'POST', `/api/applications/${app.id}/environments`, { name: 'Local', baseUrl: CLINIC });
   const mod = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/modules`, {
