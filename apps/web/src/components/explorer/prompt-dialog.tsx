@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ export function PromptDialog({
   onSubmit,
   onClose,
   busy,
+  secondary,
 }: {
   title: string;
   label: string;
@@ -22,6 +23,8 @@ export function PromptDialog({
   onSubmit: (value: string) => void;
   onClose: () => void;
   busy?: boolean;
+  /** A second way to submit, e.g. "Create & record". */
+  secondary?: { label: ReactNode; onSubmit: (value: string) => void };
 }) {
   const [value, setValue] = useState(initial);
   const submit = () => value.trim() && onSubmit(value.trim());
@@ -36,6 +39,15 @@ export function PromptDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
+          {secondary && (
+            <Button
+              variant="outline"
+              disabled={!value.trim() || busy}
+              onClick={() => value.trim() && secondary.onSubmit(value.trim())}
+            >
+              {secondary.label}
+            </Button>
+          )}
           <Button disabled={!value.trim() || busy} onClick={submit}>
             {confirmLabel}
           </Button>

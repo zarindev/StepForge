@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ListPlus, Save, Undo2 } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import { Disc3, ListPlus, Save, Undo2 } from 'lucide-react';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { EditorProvider } from '@/components/editor/context';
 import { fromDrafts, toDrafts, type DraftStep } from '@/components/editor/drafts';
@@ -19,12 +20,14 @@ const FlowView = lazy(() => import('@/components/editor/flow-view').then((m) => 
 
 /** Editable step list with save/discard and list / flow / plain-English views. */
 export function StepsEditor({ scenario }: { scenario: ScenarioDetail }) {
+  const navigate = useNavigate();
   return (
     <EditorProvider applicationId={scenario.applicationId} selfId={scenario.id}>
       <StepsWorkbench
         initial={scenario.steps}
         title={scenario.name}
         saveLabel="Save steps"
+        onRecord={() => navigate({ to: '/recorder', search: { scenario: scenario.id } })}
         save={(steps) =>
           api<ScenarioDetail>(`/api/scenarios/${scenario.id}/steps`, { method: 'PUT', json: { steps } })
         }
@@ -46,12 +49,15 @@ export function StepsWorkbench({
   save,
   onSaved,
   saveLabel,
+  onRecord,
 }: {
   initial: StepRecord[];
   title?: string;
   save: (steps: StepRecord[]) => Promise<unknown>;
   onSaved: (qc: ReturnType<typeof useQueryClient>, result: unknown) => void;
   saveLabel: string;
+  /** Opens the Recorder to record steps into this scenario (scenarios only, not blocks). */
+  onRecord?: () => void;
 }) {
   const original = useMemo(() => toDrafts(initial), [initial]);
   const [steps, setSteps] = useState<DraftStep[]>(original);
@@ -90,6 +96,21 @@ export function StepsWorkbench({
         </div>
         <div className="ml-auto flex items-center gap-2">
           {dirty && <span className="text-xs text-warn">Unsaved changes</span>}
+          {onRecord && steps.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={dirty}
+              title={
+                dirty
+                  ? 'Save or discard your changes first'
+                  : 'Record more steps in a browser; they are added at the end'
+              }
+              onClick={onRecord}
+            >
+              <Disc3 className="h-3.5 w-3.5 text-fail" /> Record steps
+            </Button>
+          )}
           <Button variant="ghost" size="sm" disabled={!dirty} onClick={() => setSteps(original)}>
             <Undo2 className="h-3.5 w-3.5" /> Discard
           </Button>
@@ -104,7 +125,18 @@ export function StepsWorkbench({
             <EmptyState
               icon={ListPlus}
               title="No steps yet"
-              description="Record them with the Recorder, or add UI, API, database, email, performance and utility steps by hand."
+              description={
+                onRecord
+                  ? 'Record them by clicking through your app in a browser, or add UI, API, database, email, performance and utility steps by hand below.'
+                  : 'Add UI, API, database, email, performance and utility steps below.'
+              }
+              action={
+                onRecord && (
+                  <Button disabled={dirty} onClick={onRecord}>
+                    <Disc3 className="h-4 w-4" /> Record steps
+                  </Button>
+                )
+              }
             />
             <StepList steps={steps} onChange={setSteps} openKey={open} onOpen={setOpen} />
           </>

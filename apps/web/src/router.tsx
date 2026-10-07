@@ -25,12 +25,14 @@ const rootRoute = createRootRoute({ component: Layout });
 const pages: Record<string, () => React.ReactNode> = {
   '/': HomePage,
   '/runs': RunsPage,
-  '/recorder': RecorderPage,
   '/api-client': ApiClientPage,
   '/settings': SettingsPage,
   '/performance': PerformancePage,
   '/schedules': SchedulesPage,
 };
+
+/** Started from the Test Explorer: record into this scenario, or save the new scenario into this module. */
+const RecorderSearch = z.object({ scenario: z.string().optional(), module: z.string().optional() });
 
 const ExplorerSearch = z.object({
   scenario: z.string().optional(),
@@ -49,13 +51,19 @@ function navRoute<P extends string>(path: P) {
 
 const navRoutes = [
   navRoute('/'),
-  navRoute('/recorder'),
   navRoute('/api-client'),
   navRoute('/performance'),
   navRoute('/runs'),
   navRoute('/schedules'),
   navRoute('/settings'),
 ];
+
+const recorderRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/recorder',
+  validateSearch: (s) => RecorderSearch.parse(s),
+  component: RecorderPage,
+});
 
 const sqlRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -124,6 +132,7 @@ const applicationDetailRoute = createRoute({
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     ...navRoutes,
+    recorderRoute,
     sqlRoute,
     applicationsRoute,
     exportsRoute,

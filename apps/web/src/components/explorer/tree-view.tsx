@@ -1,10 +1,11 @@
 import {
   ChevronRight,
   Copy,
+  Disc3,
   FilePlus2,
   Folder,
-  FolderOpen,
   FolderInput,
+  FolderOpen,
   FolderPlus,
   Layers,
   MoreHorizontal,
@@ -28,6 +29,8 @@ export type TreeActions = {
   onSelectScenario: (id: string, tab?: 'testCases') => void;
   onNewModule: (parentId: string | null) => void;
   onNewScenario: (moduleId: string) => void;
+  /** Opens the Recorder; the recording is saved as a new scenario in this module. */
+  onRecordScenario: (moduleId: string) => void;
   onRenameModule: (m: ModuleTreeNode) => void;
   onDeleteModule: (m: ModuleTreeNode) => void;
   onDuplicateScenario: (id: string) => void;
@@ -212,6 +215,11 @@ function ModuleRow({ node, depth, ctx }: { node: ModuleTreeNode; depth: number; 
                 disabled: node.total === 0,
               },
               { label: 'New scenario', icon: FilePlus2, onSelect: () => ctx.actions.onNewScenario(node.id) },
+              {
+                label: 'Record a scenario',
+                icon: Disc3,
+                onSelect: () => ctx.actions.onRecordScenario(node.id),
+              },
               { label: 'New sub-module', icon: FolderPlus, onSelect: () => ctx.actions.onNewModule(node.id) },
               { label: 'Rename', icon: Pencil, onSelect: () => ctx.actions.onRenameModule(node) },
               { label: 'Move to…', icon: FolderInput, onSelect: () => ctx.actions.onMoveModuleTo(node) },
@@ -234,13 +242,20 @@ function ModuleRow({ node, depth, ctx }: { node: ModuleTreeNode; depth: number; 
             <ScenarioRow key={s.id} s={s} depth={depth + 1} ctx={ctx} />
           ))}
           {node.children.length === 0 && node.scenarios.length === 0 && (
-            <button
-              onClick={() => ctx.actions.onNewScenario(node.id)}
-              className="flex h-7 items-center gap-1.5 text-xs text-muted hover:text-fg"
-              style={{ paddingLeft: pad + 34 }}
-            >
-              <FilePlus2 className="h-3.5 w-3.5" /> Add a scenario
-            </button>
+            <div className="flex h-7 items-center gap-3 text-xs text-muted" style={{ paddingLeft: pad + 34 }}>
+              <button
+                onClick={() => ctx.actions.onNewScenario(node.id)}
+                className="flex items-center gap-1.5 hover:text-fg"
+              >
+                <FilePlus2 className="h-3.5 w-3.5" /> Add a scenario
+              </button>
+              <button
+                onClick={() => ctx.actions.onRecordScenario(node.id)}
+                className="flex items-center gap-1.5 hover:text-fg"
+              >
+                <Disc3 className="h-3.5 w-3.5" /> Record one
+              </button>
+            </div>
           )}
         </div>
       )}

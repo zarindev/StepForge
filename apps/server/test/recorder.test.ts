@@ -122,6 +122,72 @@ describe('recorder API', () => {
     expect(done.status).toBe('passed');
   }, 90_000);
 
+  it('records from the Test Explorer: appends to an existing scenario or saves into the chosen module', async () => {
+    const existing = await ok<{ id: string }>('POST', `/api/modules/${moduleId}/scenarios`, {
+      name: 'Open the login page',
+      steps: [{ type: 'ui.navigate', params: { url: '/login' } }],
+    });
+    const other = (await ok('POST', '/api/applications', { name: 'Other', slug: 'other-rec' })).id;
+    const otherModule = (await ok('POST', `/api/applications/${other}/modules`, { name: 'M' })).id;
+    const foreign = await app.inject({
+      method: 'POST',
+      url: '/api/recorder/start',
+      headers: H,
+      payload: { applicationId: appId, environmentId: envId, moduleId: otherModule, headless: true },
+    });
+    expect(foreign.statusCode).toBe(400);
+
+    const started = await ok<{ target: unknown }>('POST', '/api/recorder/start', {
+      applicationId: appId,
+      environmentId: envId,
+      startPath: '/login',
+      headless: true,
+      scenarioId: existing.id,
+    });
+    expect(started.target).toEqual({
+      scenarioId: existing.id,
+      scenarioName: 'Open the login page',
+      existingSteps: 1,
+      moduleId,
+    });
+    const page = ctx.recorder.session()!.page;
+    await page.getByLabel('Email').fill('admin@careclinic.test');
+    await page.getByLabel('Email').press('Tab'); // a field becomes a step when it loses focus
+    await new Promise((r) => setTimeout(r, 300));
+    const stopped = await ok<{ steps: { type: string }[]; target: { scenarioId: string } }>(
+      'POST',
+      '/api/recorder/stop',
+    );
+    expect(stopped.target.scenarioId).toBe(existing.id);
+    expect(stopped.steps.map((x) => x.type)).toEqual(['ui.navigate', 'ui.fill']);
+    const saved = await ok<{ scenario: { id: string; version: number; steps: { type: string }[] } }>(
+      'POST',
+      '/api/recorder/save',
+      { scenarioId: existing.id },
+    );
+    expect(saved.scenario.id).toBe(existing.id);
+    expect(saved.scenario.steps.map((x) => x.type)).toEqual(['ui.navigate', 'ui.navigate', 'ui.fill']);
+    expect(saved.scenario.version).toBe(2);
+
+    // Started from a module: the target is kept until saving
+    const fromModule = await ok<{ target: unknown }>('POST', '/api/recorder/start', {
+      applicationId: appId,
+      environmentId: envId,
+      headless: true,
+      moduleId,
+    });
+    expect(fromModule.target).toEqual({ moduleId });
+    const stopped2 = await ok<{ target: unknown }>('POST', '/api/recorder/stop');
+    expect(stopped2.target).toEqual({ moduleId });
+    const noName = await app.inject({ method: 'POST', url: '/api/recorder/save', headers: H, payload: {} });
+    expect(noName.statusCode).toBe(400);
+    const created = await ok<{ scenario: { moduleId: string; name: string } }>('POST', '/api/recorder/save', {
+      moduleId,
+      name: 'Recorded into a module',
+    });
+    expect(created.scenario).toMatchObject({ moduleId, name: 'Recorded into a module' });
+  }, 90_000);
+
   it('blocks: create, use from a scenario with util.useBlock, and validate nested steps', async () => {
     await ok('PUT', `/api/environments/${envId}/secrets`, { key: 'password', value: 'Admin123!' });
     const block = await ok<{ id: string }>('POST', `/api/applications/${appId}/blocks`, {
