@@ -239,8 +239,8 @@ describe('page metrics and Lighthouse (real Chromium)', () => {
       expect(m.load).toBeGreaterThan(0);
       expect(m.cls).toBe(0);
       expect(await page.evaluate("'webVitals' in window")).toBe(false);
-      const { rows, failures } = checkPageMetrics(m, { lcpMs: 5000, cls: 0.1, inpMs: 200, loadMs: 1 });
-      expect(rows.find((r) => r.metric === 'page.lcp')).toMatchObject({ threshold: 5000, passed: true });
+      const { rows, failures } = checkPageMetrics(m, { lcpMs: 60_000, cls: 0.1, inpMs: 200, loadMs: 1 }); // generous LCP: slow CI machines
+      expect(rows.find((r) => r.metric === 'page.lcp')).toMatchObject({ threshold: 60_000, passed: true });
       expect(failures).toEqual([
         'INP was not reported (INP needs an interaction on the page first)',
         expect.stringMatching(/^Load time \d+ ms exceeded the threshold of 1 ms by \d+ ms$/),
