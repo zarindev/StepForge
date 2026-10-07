@@ -154,7 +154,7 @@ const SETUP: Record<Family, { github: string[]; gitlabImage: string; gitlab: str
     github: [
       '      - uses: actions/setup-node@v4',
       '        with:',
-      '          node-version: 20',
+      '          node-version: 22',
       '      - run: npm install',
       '      - run: npx playwright install --with-deps chromium',
       '      - run: npx playwright test',
@@ -166,7 +166,7 @@ const SETUP: Record<Family, { github: string[]; gitlabImage: string; gitlab: str
     github: [
       '      - uses: actions/setup-node@v4',
       '        with:',
-      '          node-version: 20',
+      '          node-version: 22',
       '      - run: npm install',
       '      - run: npx cypress run',
     ],

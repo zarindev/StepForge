@@ -4,7 +4,7 @@
 
 <p>
   <a href="https://github.com/zarindev/stepforge/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/zarindev/stepforge/actions/workflows/ci.yml/badge.svg" /></a>
-  <img alt="Node 20+" src="https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white" />
+  <img alt="Node 22+" src="https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" />
   <img alt="Playwright" src="https://img.shields.io/badge/Playwright-1.63-2EAD33?logo=playwright&logoColor=white" />
   <img alt="Cypress export" src="https://img.shields.io/badge/export-Cypress-69D3A7?logo=cypress&logoColor=white" />
@@ -76,7 +76,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 | You need | Version | Notes |
 | --- | --- | --- |
-| [Node.js](https://nodejs.org) | 20 or newer | Everything else (Playwright's Chromium, Mailpit) is installed by `setup` |
+| [Node.js](https://nodejs.org) | 22 or newer | Everything else (Playwright's Chromium, Mailpit) is installed by `setup` |
 | [Git](https://git-scm.com) | any | |
 
 **Windows**

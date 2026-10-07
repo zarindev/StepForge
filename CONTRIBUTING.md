@@ -14,7 +14,7 @@ cd stepforge
 npm run dev           # API with auto-restart + dashboard with hot reload (http://127.0.0.1:5173)
 ```
 
-Node 20+ is the only requirement. Optional tools for some tests: `npm run mailpit:install` (email), `npm run
+Node 22+ is the only requirement. Optional tools for some tests: `npm run mailpit:install` (email), `npm run
 k6:install` (k6), Python 3 / Java 17 + Maven (to run exported Python and Java projects).
 
 ## Checks (all must pass)

@@ -150,7 +150,7 @@ documented miss rather than tuning a rule to the benchmark.
 
 ## 6. Tech stack
 
-Node.js 20+, TypeScript and npm workspaces; Fastify, SQLite and Drizzle ORM on the server; React, Vite, Tailwind CSS,
+Node.js 22+, TypeScript and npm workspaces; Fastify, SQLite and Drizzle ORM on the server; React, Vite, Tailwind CSS,
 TanStack, Monaco and React Flow in the dashboard; Playwright, autocannon, k6, Lighthouse and Mailpit as engines;
 Vitest, Playwright E2E, ESLint, Prettier and GitHub Actions for quality.
 
