@@ -14,6 +14,9 @@ function read(): string | null {
 
 let current = read();
 
+/** The selected application id outside React. */
+export const getCurrentAppId = (): string | null => current;
+
 export function setCurrentAppId(id: string | null): void {
   current = id;
   try {

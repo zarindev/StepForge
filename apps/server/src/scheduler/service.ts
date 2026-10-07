@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { EventBus } from '../context.ts';
 import type { RunManager } from '../runner/manager.ts';
+import { runDefaults } from '../routes/system.ts';
 
 export const ScheduleInput = z.object({
   name: z.string().trim().min(1).max(120),
@@ -147,7 +148,7 @@ export class SchedulerService {
         applicationId: s.applicationId,
         environmentId: s.environmentId,
         scope: s.scopeJson as never,
-        options: RunOptionsInput.parse(s.optionsJson ?? {}),
+        options: RunOptionsInput.parse({ ...runDefaults(this.db), ...(s.optionsJson ?? {}) }),
         trigger: 'schedule',
       },
       { scheduleId: s.id },

@@ -50,6 +50,54 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run verify:export
 
+  fresh-clone:
+    # Phase 13: a fresh clone with only Node + Git → setup → start → onboarding → demo workspace → a run that
+    # passes and fails as expected. Uses the documented scripts, nothing else.
+    name: fresh clone (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      STEPFORGE_OPEN_BROWSER: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ./setup.sh
+          npx playwright install-deps chromium
+      - name: Setup (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: setup.bat
+      - name: Start (Linux)
+        if: runner.os == 'Linux'
+        run: nohup ./start.sh > stepforge.log 2>&1 &
+      - name: Start (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Start-Process cmd -ArgumentList '/c', 'start.bat' -RedirectStandardOutput stepforge.log -RedirectStandardError stepforge.err.log
+      - name: Wait for StepForge
+        shell: bash
+        run: |
+          for i in $(seq 1 90); do curl -sf http://127.0.0.1:4400/api/health && exit 0; sleep 2; done
+          cat stepforge*.log; exit 1
+      - name: Onboarding smoke test
+        shell: bash
+        run: npx tsx scripts/smoke-onboarding.ts http://127.0.0.1:4400
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fresh-clone-${{ matrix.os }}
+          path: |
+            stepforge*.log
+            smoke-onboarding-failure.png
+
   databases:
     # Real database servers for the DB executor's integration tests (Section 16: SQLite + PostgreSQL + MySQL
     # verified). Service containers only run on Linux runners; the tests skip themselves when a URL is unset.

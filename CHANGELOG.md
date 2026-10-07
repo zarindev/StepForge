@@ -8,6 +8,12 @@
 - PATCH endpoints no longer reset omitted fields to their defaults (zod `.partial()` keeps defaults).
 
 ### Added
+- Phase 13 public-repo polish: first-run onboarding (load the CareClinic demo workspace — 17 scenarios, database
+  connection, quality gate, demo app started by StepForge — or create an application with a guided recorder tour),
+  `npm start -- --demo`, editable runner defaults (used by the Run dialog, schedules and the CLI), daily evidence
+  retention, application import/export and demo controls in Settings, encryption-key rotation, danger zone, error
+  states on every page, full README with banner and screenshots, CONTRIBUTING, SECURITY, LEGAL, a section 16 checklist,
+  screenshot capture script, fresh-clone smoke test and CI job (Ubuntu + Windows).
 - Phase 12 code export: 13 targets — Playwright (TypeScript and Python), Cypress, Selenium (Python and Java), pytest +
   requests, REST Assured, k6, Postman v2.1, cURL, Markdown, Gherkin and Excel test cases — with optional Page Object
   Model and GitHub/GitLab CI files, API/DB/email helpers that keep StepForge's check rules, TODO markers and warnings

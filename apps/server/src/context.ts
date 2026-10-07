@@ -9,6 +9,8 @@ import type { PerfService } from './perf/service.ts';
 import type { DiagnosisService } from './diagnosis/service.ts';
 import type { SchedulerService } from './scheduler/service.ts';
 import type { CodegenService } from './codegen/service.ts';
+import type { DemoService } from './demo/service.ts';
+import type { MaintenanceService } from './maintenance/service.ts';
 import type { RecorderManager } from './recorder/manager.ts';
 import type { RunManager } from './runner/manager.ts';
 
@@ -37,5 +39,7 @@ export type AppContext = {
   diagnosis: DiagnosisService;
   scheduler: SchedulerService;
   codegen: CodegenService;
+  demo: DemoService;
+  maintenance: MaintenanceService;
   startedAt: Date;
 };

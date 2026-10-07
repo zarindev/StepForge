@@ -30,6 +30,9 @@ import { registerAnalyticsRoutes } from './routes/analytics.ts';
 import { registerScheduleRoutes } from './routes/schedules.ts';
 import { registerCodegenRoutes } from './routes/codegen.ts';
 import { CodegenService } from './codegen/service.ts';
+import { DemoService } from './demo/service.ts';
+import { MaintenanceService } from './maintenance/service.ts';
+import { registerMaintenanceRoutes } from './routes/maintenance.ts';
 import { SchedulerService } from './scheduler/service.ts';
 import { rebuildDaily } from '@stepforge/analytics';
 import { closePdfBrowser } from '@stepforge/reports';
@@ -127,6 +130,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     diagnosis,
     scheduler: undefined as unknown as SchedulerService,
     codegen: new CodegenService(db, config.artifactsDir),
+    demo: new DemoService(db, masterKey, config, email, bus),
+    maintenance: new MaintenanceService(db, sqlite, config, masterKey),
     startedAt: new Date(),
   };
   ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);
@@ -164,16 +169,27 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerAnalyticsRoutes(app, ctx);
   registerScheduleRoutes(app, ctx);
   registerCodegenRoutes(app, ctx);
+  registerMaintenanceRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
   // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal.
   if (getSetting(db, 'mailpitAutostart', false))
     email.mailpit.start().catch((err: Error) => app.log.warn(`Mailpit did not start: ${err.message}`));
 
-  if (!opts.embedded) ctx.scheduler.start();
+  if (!opts.embedded) {
+    ctx.scheduler.start();
+    ctx.maintenance.startRetention((m) => app.log.info(m));
+    // A loaded demo workspace brings its demo app back with StepForge.
+    if (ctx.demo.status().loaded)
+      ctx.demo
+        .startClinic()
+        .catch((err: Error) => app.log.warn(`CareClinic demo did not start: ${err.message}`));
+  }
 
   app.addHook('onClose', async () => {
     ctx.scheduler.stop();
+    ctx.maintenance.stop();
+    ctx.demo.stop();
     await ctx.runs.shutdown();
     await email.mailpit.stop();
     await closePdfBrowser();
@@ -182,3 +198,5 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   });
   return { app, ctx };
 }
+
+export { runDefaults } from './routes/system.ts';

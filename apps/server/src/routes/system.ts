@@ -83,3 +83,16 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): voi
     return { key, value };
   });
 }
+
+/** Settings → Runner defaults, for runs that do not choose their own options (schedules, CLI). */
+export function runDefaults(db: AppContext['db']): {
+  browser: 'chromium' | 'firefox' | 'webkit';
+  viewport: 'desktop' | 'tablet' | 'mobile';
+  workers: number;
+} {
+  return {
+    browser: getSetting(db, 'defaultBrowser', SETTINGS_DEFAULTS.defaultBrowser),
+    viewport: getSetting(db, 'defaultViewport', SETTINGS_DEFAULTS.defaultViewport),
+    workers: Math.min(8, getSetting(db, 'workers', SETTINGS_DEFAULTS.workers)),
+  };
+}

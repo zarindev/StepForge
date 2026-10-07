@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { AppWindow, Plus, ShieldAlert } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
@@ -15,10 +15,12 @@ import { api } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
 import { qk, useApplications } from '@/lib/queries';
 import type { Application } from '@/lib/types';
+import { continueTourAfterCreate } from '@/components/onboarding/tour';
 
 export function ApplicationsPage() {
   const apps = useApplications();
-  const [creating, setCreating] = useState(false);
+  const search = useSearch({ strict: false }) as { new?: boolean };
+  const [creating, setCreating] = useState(!!search.new);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const create = useMutation({
@@ -28,6 +30,7 @@ export function ApplicationsPage() {
       setCurrentAppId(app.id);
       setCreating(false);
       toast(`Created ${app.name}`);
+      continueTourAfterCreate();
       navigate({ to: '/applications/$appId', params: { appId: app.id } });
     },
   });

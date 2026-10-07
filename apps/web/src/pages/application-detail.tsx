@@ -137,7 +137,11 @@ export function ApplicationDetailPage() {
           { value: 'settings', label: 'Settings' },
         ]}
       />
-      {tab === 'environments' && <EnvironmentsTab app={a} />}
+      {tab === 'environments' && (
+        <div data-tour="environments">
+          <EnvironmentsTab app={a} />
+        </div>
+      )}
       {tab === 'secrets' && <SecretsTab app={a} />}
       {tab === 'connections' && <ConnectionsTab app={a} />}
       {tab === 'inboxes' && <InboxesTab app={a} />}

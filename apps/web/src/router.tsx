@@ -24,7 +24,6 @@ const rootRoute = createRootRoute({ component: Layout });
 
 const pages: Record<string, () => React.ReactNode> = {
   '/': HomePage,
-  '/applications': ApplicationsPage,
   '/runs': RunsPage,
   '/recorder': RecorderPage,
   '/api-client': ApiClientPage,
@@ -50,7 +49,6 @@ function navRoute<P extends string>(path: P) {
 
 const navRoutes = [
   navRoute('/'),
-  navRoute('/applications'),
   navRoute('/recorder'),
   navRoute('/api-client'),
   navRoute('/performance'),
@@ -77,6 +75,14 @@ const compareRoute = createRoute({
   path: '/runs/compare',
   validateSearch: (s) => z.object({ base: z.string().optional(), head: z.string().optional() }).parse(s),
   component: ComparePage,
+});
+
+const applicationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/applications',
+  /** `new` opens the create dialog (first-run onboarding). */
+  validateSearch: (s) => z.object({ new: z.boolean().optional() }).parse(s),
+  component: ApplicationsPage,
 });
 
 const exportsRoute = createRoute({
@@ -119,6 +125,7 @@ export const router = createRouter({
   routeTree: rootRoute.addChildren([
     ...navRoutes,
     sqlRoute,
+    applicationsRoute,
     exportsRoute,
     bugsRoute,
     analyticsRoute,

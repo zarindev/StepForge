@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, Input, Select, Switch } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/states';
+import { EmptyState, ErrorState } from '@/components/ui/states';
 import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useLiveEvent, type LiveEvent } from '@/lib/live';
@@ -75,6 +75,8 @@ export function RecorderPage() {
       />
       {recording.isPending ? (
         <Skeleton className="h-64" />
+      ) : recording.isError ? (
+        <ErrorState error={recording.error} onRetry={() => void recording.refetch()} />
       ) : !r ? (
         <StartPanel />
       ) : r.state === 'stopped' ? (
@@ -117,7 +119,7 @@ function StartPanel() {
   const env = envs.data?.find((e) => e.id === envId);
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
-      <Card>
+      <Card data-tour="recorder-start">
         <CardHeader>
           <CardTitle>New recording{app ? ` in ${app.name}` : ''}</CardTitle>
         </CardHeader>
@@ -151,13 +153,17 @@ function StartPanel() {
           {envs.data?.length === 0 && (
             <p className="text-sm text-fail">Add an environment to this application first.</p>
           )}
-          <Button disabled={!envId || start.isPending} onClick={() => start.mutate()}>
+          <Button
+            data-tour="recorder-button"
+            disabled={!envId || start.isPending}
+            onClick={() => start.mutate()}
+          >
             <Circle className="h-3.5 w-3.5 fill-current text-fail" />{' '}
             {start.isPending ? 'Opening browser…' : 'Start recording'}
           </Button>
         </CardBody>
       </Card>
-      <Card>
+      <Card data-tour="recorder-tips">
         <CardHeader>
           <CardTitle>How it works</CardTitle>
         </CardHeader>
@@ -458,7 +464,6 @@ function ReviewPanel({ rec }: { rec: NonNullable<Recording> }) {
                     </li>
                   ))}
                 </ul>
-                <p className="text-xs text-muted">API steps run once the API module lands (Phase 5).</p>
               </>
             )}
           </CardBody>

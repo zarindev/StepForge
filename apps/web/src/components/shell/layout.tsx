@@ -8,6 +8,7 @@ import { CommandPalette } from './command-palette';
 import { Rail } from './rail';
 import { ShortcutsOverlay } from './shortcuts-overlay';
 import { Topbar } from './topbar';
+import { RecorderTour } from '@/components/onboarding/tour';
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -66,6 +67,7 @@ export function Layout() {
       <ShortcutsOverlay open={shortcuts} onClose={() => setShortcuts(false)} />
       <Toaster />
       <RunDialogHost />
+      <RecorderTour />
     </div>
   );
 }

@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, Select, Switch } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/states';
+import { EmptyState, ErrorState } from '@/components/ui/states';
 import { toast, toastError } from '@/components/ui/toast';
 import { api, ApiError, download, sessionToken } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
@@ -378,7 +378,9 @@ export function ExportsPage() {
                 ))}
               </ul>
             )}
-            {targets.isPending ? (
+            {targets.isError ? (
+              <ErrorState error={targets.error} onRetry={() => void targets.refetch()} />
+            ) : targets.isPending ? (
               <Skeleton className="h-40 w-full" />
             ) : (
               <TargetPicker targets={targets.data ?? []} value={target} onChange={setTarget} />
@@ -493,7 +495,9 @@ export function ExportsPage() {
           <CardTitle>Earlier exports</CardTitle>
         </CardHeader>
         <CardBody>
-          {!history.data?.length ? (
+          {history.isError ? (
+            <ErrorState error={history.error} onRetry={() => void history.refetch()} />
+          ) : !history.data?.length ? (
             <p className="text-sm text-muted">Downloads are kept here so you can get them again.</p>
           ) : (
             <table className="w-full text-sm" data-testid="export-history">

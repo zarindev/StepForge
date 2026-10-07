@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Input, Select } from '@/components/ui/input';
-import { EmptyState } from '@/components/ui/states';
+import { EmptyState, ErrorState } from '@/components/ui/states';
 import { Tabs } from '@/components/ui/tabs';
 import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
@@ -211,6 +211,7 @@ export function ApiClientPage() {
         <div className="space-y-4">
           <Card className="p-3">
             <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">API specs</p>
+            {specs.isError && <ErrorState error={specs.error} onRetry={() => void specs.refetch()} />}
             {specs.data?.length === 0 && (
               <p className="text-xs text-muted">
                 Import an OpenAPI spec to generate tests and check contracts.

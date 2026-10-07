@@ -68,3 +68,11 @@ body {
   background: color-mix(in srgb, var(--sf-elevated) 82%, transparent);
   backdrop-filter: blur(14px);
 }
+
+/* Guided tour: the control the current step talks about. */
+.tour-target {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 4px;
+  border-radius: 12px;
+  transition: outline-color 0.2s;
+}

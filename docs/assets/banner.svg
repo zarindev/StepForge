@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" fill="none" role="img" aria-label="StepForge — Record once. Test every layer. Export anywhere.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B0D12"/>
+      <stop offset="1" stop-color="#111520"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.28" cy="0.5" r="0.45">
+      <stop offset="0" stop-color="#F97316" stop-opacity="0.45"/>
+      <stop offset="0.55" stop-color="#F97316" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#F97316" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="anvil" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FB923C"/>
+      <stop offset="1" stop-color="#EA580C"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" stroke="#FFFFFF" stroke-opacity="0.035"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="400" fill="url(#bg)"/>
+  <rect width="1280" height="400" fill="url(#grid)"/>
+  <rect width="1280" height="400" fill="url(#glow)"/>
+  <!-- logo -->
+  <g transform="translate(250 120) scale(2.5)">
+    <path d="M8 22h40c0 6-4 10-10 11v7h6v6H20v-6h6v-7C15 32 8 28 8 22z" fill="url(#anvil)"/>
+    <path d="M48 22h8c0 3-3 5-8 5z" fill="#EA580C"/>
+    <rect x="16" y="46" width="32" height="6" rx="2" fill="#C2410C"/>
+    <circle cx="30" cy="25" r="6.5" fill="#0B0D12"/>
+    <path d="M28 21.8v6.4l5-3.2z" fill="#F97316"/>
+    <path d="M50 6l1.6 4.4L56 12l-4.4 1.6L50 18l-1.6-4.4L44 12l4.4-1.6z" fill="#FDE68A"/>
+  </g>
+  <!-- name and tagline -->
+  <text x="450" y="190" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="84" font-weight="700" fill="#F5F7FA" letter-spacing="-2">StepForge</text>
+  <text x="452" y="242" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="28" font-weight="500" fill="#FB923C">Record once. Test every layer. Export anywhere.</text>
+  <text x="452" y="286" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#9AA4B2">Free, local QA studio · UI · API · Database · Email · Performance</text>
+  <!-- layer chips -->
+  <g font-family="'JetBrains Mono', Menlo, Consolas, monospace" font-size="15" fill="#C7CEDA">
+    <rect x="452" y="314" width="132" height="30" rx="8" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.1"/>
+    <text x="470" y="334">100% local</text>
+    <rect x="594" y="314" width="120" height="30" rx="8" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.1"/>
+    <text x="610" y="334">zero cost</text>
+    <rect x="724" y="314" width="132" height="30" rx="8" fill="#F97316" fill-opacity="0.12" stroke="#F97316" stroke-opacity="0.4"/>
+    <text x="740" y="334" fill="#FDBA74">open source</text>
+  </g>
+</svg>
