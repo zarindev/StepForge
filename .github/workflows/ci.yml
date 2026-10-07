@@ -76,24 +76,25 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: setup.bat
-      - name: Start (Linux)
-        if: runner.os == 'Linux'
-        run: nohup ./start.sh > stepforge.log 2>&1 &
-      - name: Start (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Start-Process cmd -ArgumentList '/c', 'start.bat' -RedirectStandardOutput stepforge.log -RedirectStandardError stepforge.err.log
-      - name: Wait for StepForge
+      # One step: the Windows runner ends a step's background processes when the step finishes, so starting
+      # StepForge in its own step would stop it before the check runs.
+      - name: Start, wait for StepForge and run the onboarding smoke test
         shell: bash
         run: |
-          for i in $(seq 1 90); do curl -sf http://127.0.0.1:4400/api/health && exit 0; sleep 2; done
-          cat stepforge*.log
-          # Also as an annotation, readable without downloading the job log.
-          echo "::error title=StepForge did not start::$(tail -n 60 stepforge*.log 2>&1 | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\r//g' -e 's/\n/%0A/g')"
-          exit 1
-      - name: Onboarding smoke test
-        shell: bash
-        run: npx tsx scripts/smoke-onboarding.ts http://127.0.0.1:4400
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmd //c start.bat > stepforge.log 2>&1 &
+          else
+            ./start.sh > stepforge.log 2>&1 &
+          fi
+          up=0
+          for i in $(seq 1 90); do curl -sf http://127.0.0.1:4400/api/health && up=1 && break; sleep 2; done
+          if [ "$up" != 1 ]; then
+            cat stepforge.log
+            # Also as an annotation, readable without downloading the job log.
+            echo "::error title=StepForge did not start::$(tail -n 60 stepforge.log 2>&1 | sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\r//g' -e 's/\n/%0A/g')"
+            exit 1
+          fi
+          npx tsx scripts/smoke-onboarding.ts http://127.0.0.1:4400
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

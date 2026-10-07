@@ -175,6 +175,43 @@ describe('recorder', () => {
     expect(session.snapshot().steps[1]!.params).toEqual({ url: '/login?from=typed' });
   }, 60_000);
 
+  it('keeps the toolbar off the top navigation, and it can be dragged away', async () => {
+    const session = await RecordingSession.start({
+      startUrl: `${base}/login`,
+      baseUrl: base,
+      headless: true,
+    });
+    const page = session.page;
+    try {
+      await page.getByLabel('Email').fill('reception@careclinic.test');
+      await page.getByLabel('Password').fill('Reception123!');
+      await page.getByRole('button', { name: 'Sign in' }).click();
+      await page.waitForURL(`${base}/`);
+      const toolbar = page.locator('stepforge-recorder');
+      const viewport = page.viewportSize()!;
+      const before = (await toolbar.boundingBox())!;
+      expect(before.y).toBeGreaterThan(viewport.height / 2); // docked at the bottom
+      // The navigation is clickable while recording (the toolbar used to cover it at the top)
+      await page.getByTestId('nav-appointments').click({ timeout: 5_000 });
+      await page.waitForURL(`${base}/appointments`);
+
+      const grip = (await toolbar.getByTitle('Drag to move the toolbar').boundingBox())!;
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(40, 200, { steps: 5 });
+      await page.mouse.up();
+      const after = (await toolbar.boundingBox())!;
+      expect(after.y).toBeLessThan(viewport.height / 2);
+      expect(after.x).toBeLessThan(before.x);
+      await settle();
+      // Dragging is not recorded as a step
+      expect(session.snapshot().steps.map((x) => x.type)).not.toContain('ui.drag');
+      expect(session.snapshot().steps.at(-1)).toMatchObject({ type: 'ui.click' });
+    } finally {
+      await session.stop();
+    }
+  });
+
   it('templates id-like path segments for API dedupe', () => {
     expect(pathTemplate('/api/patients/42/notes')).toBe('/api/patients/{id}/notes');
     expect(pathTemplate('/api/x/3f2b8c1e-1a2b-4c3d-8e9f-0a1b2c3d4e5f')).toBe('/api/x/{id}');

@@ -4,17 +4,24 @@
   if (window.__sfRecorderInstalled) return;
   window.__sfRecorderInstalled = true;
   const isTop = window === window.top;
-  const emit = (payload) => (window.__stepforgeEmit ? window.__stepforgeEmit(payload) : Promise.resolve(null));
+  const emit = (payload) =>
+    window.__stepforgeEmit ? window.__stepforgeEmit(payload) : Promise.resolve(null);
 
   // ─── Locator generation ────────────────────────────────────────────────
   const TEST_ID_ATTRS = ['data-testid', 'data-test', 'data-cy', 'data-qa'];
-  const HASHED = /(^|[-_])([a-z]{1,4}[-_])?[a-z0-9]*\d[a-z0-9]{4,}$|^css-|^sc-|^jss\d|^Mui[A-Za-z]+-\w+-\d+|^_[a-zA-Z0-9]{5,}$|^ng-|^ember\d|^react-|:r\d/;
+  const HASHED =
+    /(^|[-_])([a-z]{1,4}[-_])?[a-z0-9]*\d[a-z0-9]{4,}$|^css-|^sc-|^jss\d|^Mui[A-Za-z]+-\w+-\d+|^_[a-zA-Z0-9]{5,}$|^ng-|^ember\d|^react-|:r\d/;
   const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
   function interactiveAncestor(el) {
     let cur = el;
     for (let i = 0; cur && i < 6; i++, cur = cur.parentElement) {
-      if (cur.matches?.('button, a[href], input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=option], [role=checkbox], [onclick], [data-testid], [data-test], [data-cy]')) return cur;
+      if (
+        cur.matches?.(
+          'button, a[href], input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=option], [role=checkbox], [onclick], [data-testid], [data-test], [data-cy]',
+        )
+      )
+        return cur;
     }
     return el;
   }
@@ -24,12 +31,14 @@
     if (explicit) return explicit.split(' ')[0];
     const tag = el.tagName.toLowerCase();
     const type = (el.getAttribute('type') || '').toLowerCase();
-    if (tag === 'button' || (tag === 'input' && ['submit', 'button', 'reset', 'image'].includes(type))) return 'button';
+    if (tag === 'button' || (tag === 'input' && ['submit', 'button', 'reset', 'image'].includes(type)))
+      return 'button';
     if (tag === 'a' && el.hasAttribute('href')) return 'link';
     if (tag === 'input' && type === 'checkbox') return 'checkbox';
     if (tag === 'input' && type === 'radio') return 'radio';
     if (tag === 'input' && type === 'search') return 'searchbox';
-    if (tag === 'input' && ['', 'text', 'email', 'tel', 'url', 'password', 'number'].includes(type)) return type === 'number' ? 'spinbutton' : 'textbox';
+    if (tag === 'input' && ['', 'text', 'email', 'tel', 'url', 'password', 'number'].includes(type))
+      return type === 'number' ? 'spinbutton' : 'textbox';
     if (tag === 'textarea') return 'textbox';
     if (tag === 'select') return el.multiple || el.size > 1 ? 'listbox' : 'combobox';
     if (/^h[1-6]$/.test(tag)) return 'heading';
@@ -51,7 +60,13 @@
     const aria = el.getAttribute('aria-label');
     if (aria) return norm(aria);
     const by = el.getAttribute('aria-labelledby');
-    if (by) return norm(by.split(/\s+/).map((id) => document.getElementById(id)?.textContent || '').join(' '));
+    if (by)
+      return norm(
+        by
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent || '')
+          .join(' '),
+      );
     const tag = el.tagName.toLowerCase();
     if (['input', 'select', 'textarea'].includes(tag)) {
       const type = (el.getAttribute('type') || '').toLowerCase();
@@ -66,7 +81,9 @@
 
   function countRoleName(role, name) {
     let n = 0;
-    for (const e of document.querySelectorAll('a, button, input, select, textarea, h1, h2, h3, h4, h5, h6, img, option, summary, [role]')) {
+    for (const e of document.querySelectorAll(
+      'a, button, input, select, textarea, h1, h2, h3, h4, h5, h6, img, option, summary, [role]',
+    )) {
       if (implicitRole(e) === role && accessibleName(e) === name) n++;
       if (n > 1) break;
     }
@@ -84,7 +101,8 @@
       let part = cur.tagName.toLowerCase();
       const name = cur.getAttribute('name');
       const classes = [...cur.classList].filter((c) => !HASHED.test(c)).slice(0, 2);
-      if (name && ['input', 'select', 'textarea', 'button'].includes(part)) part += `[name="${CSS.escape(name)}"]`;
+      if (name && ['input', 'select', 'textarea', 'button'].includes(part))
+        part += `[name="${CSS.escape(name)}"]`;
       else if (classes.length) part += classes.map((c) => `.${CSS.escape(c)}`).join('');
       const parent = cur.parentElement;
       if (parent) {
@@ -101,7 +119,9 @@
   function xpath(el) {
     const parts = [];
     for (let cur = el; cur && cur.nodeType === 1; cur = cur.parentElement) {
-      const same = cur.parentElement ? [...cur.parentElement.children].filter((c) => c.tagName === cur.tagName) : [cur];
+      const same = cur.parentElement
+        ? [...cur.parentElement.children].filter((c) => c.tagName === cur.tagName)
+        : [cur];
       parts.unshift(`${cur.tagName.toLowerCase()}${same.length > 1 ? `[${same.indexOf(cur) + 1}]` : ''}`);
     }
     return `/${parts.join('/')}`;
@@ -116,7 +136,8 @@
     };
     for (const attr of TEST_ID_ATTRS) {
       const v = el.getAttribute(attr);
-      if (v) add('testId', v, document.querySelectorAll(`[${attr}="${CSS.escape(v)}"]`).length === 1 ? 100 : 70);
+      if (v)
+        add('testId', v, document.querySelectorAll(`[${attr}="${CSS.escape(v)}"]`).length === 1 ? 100 : 70);
     }
     const role = implicitRole(el);
     const name = role ? accessibleName(el) : '';
@@ -148,8 +169,14 @@
 
   function secretKeyFor(el) {
     const raw = el.getAttribute('name') || el.id || el.getAttribute('autocomplete') || 'password';
-    const words = raw.replace(/[^A-Za-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
-    const key = words.map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join('');
+    const words = raw
+      .replace(/[^A-Za-z0-9]+/g, ' ')
+      .trim()
+      .split(' ')
+      .filter(Boolean);
+    const key = words
+      .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+      .join('');
     return /^[A-Za-z_]/.test(key) ? key : `secret${key}`;
   }
 
@@ -166,10 +193,16 @@
   function buildToolbar() {
     if (!isTop || host) return;
     host = document.createElement('stepforge-recorder');
-    host.style.cssText = 'all: initial; position: fixed; z-index: 2147483647; top: 12px; left: 50%; transform: translateX(-50%);';
+    // Bottom centre by default: app navigation usually sits at the top. The grip moves it out of the way.
+    host.style.cssText =
+      'all: initial; position: fixed; z-index: 2147483647; bottom: 16px; left: 50%; transform: translateX(-50%);';
     root = host.attachShadow({ mode: 'open' });
     root.innerHTML = `
       <style>
+        :host{display:flex;flex-direction:column-reverse;align-items:center}
+        :host(.below){flex-direction:column}
+        .grip{cursor:grab;color:#5b6375;padding:4px 2px 4px 4px;font:14px/1 system-ui;user-select:none;touch-action:none}
+        .grip:active{cursor:grabbing}
         .bar{display:flex;align-items:center;gap:4px;padding:6px;border-radius:12px;background:#0B0D12;color:#e7e9ee;font:12px/1 Inter,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35),0 0 0 1px rgba(249,115,22,.4)}
         button,select{all:unset;cursor:pointer;padding:7px 10px;border-radius:8px;color:#e7e9ee}
         button:hover,select:hover{background:rgba(255,255,255,.08)}
@@ -179,12 +212,13 @@
         @keyframes p{50%{opacity:.35}}
         .count{color:#8b93a7;padding:0 6px}
         .stop{background:#F97316;color:#fff;font-weight:600}.stop:hover{background:#fb923c}
-        .panel{margin-top:6px;padding:10px;border-radius:12px;background:#0B0D12;color:#e7e9ee;font:12px Inter,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35);display:none;max-width:420px}
+        .panel{margin:6px 0;padding:10px;border-radius:12px;background:#0B0D12;color:#e7e9ee;font:12px Inter,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35);display:none;max-width:420px}
         .panel.open{display:block}.panel b{display:block;margin-bottom:8px;color:#FDBA74}
         .panel button{display:block;width:calc(100% - 20px);margin:2px 0;background:rgba(255,255,255,.04)}
         .panel input{all:unset;display:block;width:calc(100% - 16px);padding:7px 8px;margin:6px 0;border-radius:6px;background:#161a23;color:#fff}
       </style>
       <div class="bar" part="bar">
+        <span class="grip" title="Drag to move the toolbar" aria-hidden="true">⠿</span>
         <span class="dot" title="Recording"></span>
         <button data-cmd="pause" title="Pause / resume recording">Pause</button>
         <button data-mode="assert" title="Click an element to add a check">Assert</button>
@@ -197,21 +231,51 @@
       </div>
       <div class="panel"></div>`;
     overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #F97316;background:rgba(249,115,22,.12);border-radius:4px;display:none;z-index:2147483646;';
+    overlay.style.cssText =
+      'position:fixed;pointer-events:none;border:2px solid #F97316;background:rgba(249,115,22,.12);border-radius:4px;display:none;z-index:2147483646;';
     root.appendChild(overlay);
     panel = root.querySelector('.panel');
-    root.querySelectorAll('[data-mode]').forEach((b) =>
-      b.addEventListener('click', () => setMode(mode === b.dataset.mode ? 'record' : b.dataset.mode)),
-    );
-    root.querySelector('[data-cmd=pause]').addEventListener('click', () => command(state.paused ? 'resume' : 'pause'));
+    root
+      .querySelectorAll('[data-mode]')
+      .forEach((b) =>
+        b.addEventListener('click', () => setMode(mode === b.dataset.mode ? 'record' : b.dataset.mode)),
+      );
+    root
+      .querySelector('[data-cmd=pause]')
+      .addEventListener('click', () => command(state.paused ? 'resume' : 'pause'));
     root.querySelector('[data-cmd=undo]').addEventListener('click', () => command('undo'));
     root.querySelector('[data-cmd=stop]').addEventListener('click', () => command('stop'));
     root.querySelector('[data-cmd=insert]').addEventListener('change', (e) => {
       if (e.target.value) emit({ kind: 'insert', stepType: e.target.value }).then(refresh);
       e.target.value = '';
     });
+    enableDrag(root.querySelector('.grip'));
     (document.body || document.documentElement).appendChild(host);
     refresh();
+  }
+
+  /** Drag the toolbar by its grip; the panel opens below it in the top half of the window, above it otherwise. */
+  function enableDrag(grip) {
+    let start = null;
+    grip.addEventListener('pointerdown', (e) => {
+      const r = host.getBoundingClientRect();
+      start = { x: e.clientX - r.left, y: e.clientY - r.top };
+      grip.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    grip.addEventListener('pointermove', (e) => {
+      if (!start) return;
+      const r = host.getBoundingClientRect();
+      const left = Math.min(Math.max(0, e.clientX - start.x), window.innerWidth - r.width);
+      const top = Math.min(Math.max(0, e.clientY - start.y), window.innerHeight - r.height);
+      Object.assign(host.style, { left: `${left}px`, top: `${top}px`, bottom: 'auto', transform: 'none' });
+      host.classList.toggle('below', top < window.innerHeight / 2);
+    });
+    const end = () => {
+      start = null;
+    };
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
   }
 
   function render() {
@@ -219,7 +283,9 @@
     root.querySelector('.bar').classList.toggle('paused', state.paused);
     root.querySelector('[data-cmd=pause]').textContent = state.paused ? 'Resume' : 'Pause';
     root.querySelector('.count').textContent = `${state.steps} step${state.steps === 1 ? '' : 's'}`;
-    root.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(mode === b.dataset.mode)));
+    root
+      .querySelectorAll('[data-mode]')
+      .forEach((b) => b.setAttribute('aria-pressed', String(mode === b.dataset.mode)));
   }
 
   function refresh() {
@@ -258,7 +324,9 @@
   let lastEnterAt = 0;
   const TEXT_INPUT = /^(|text|email|password|search|tel|url|number|date|datetime-local|month|week|time)$/;
   const isTextField = (el) =>
-    el.tagName === 'TEXTAREA' || el.isContentEditable || (el.tagName === 'INPUT' && TEXT_INPUT.test((el.getAttribute('type') || '').toLowerCase()));
+    el.tagName === 'TEXTAREA' ||
+    el.isContentEditable ||
+    (el.tagName === 'INPUT' && TEXT_INPUT.test((el.getAttribute('type') || '').toLowerCase()));
 
   function recording() {
     return state.recording && !state.paused;
@@ -266,7 +334,9 @@
 
   function sendAction(action, el, extra = {}) {
     if (!recording()) return Promise.resolve();
-    return emit({ kind: 'action', action, locators: locatorsFor(el), describe: describe(el), ...extra }).then(refresh);
+    return emit({ kind: 'action', action, locators: locatorsFor(el), describe: describe(el), ...extra }).then(
+      refresh,
+    );
   }
 
   function flushFill() {
@@ -321,7 +391,10 @@
         sendAction('press', e.target, { key: 'Enter' });
       } else if (e.key === 'Escape') {
         flushFill();
-        sendAction('press', e.target === document.body ? document.documentElement : e.target, { key: 'Escape', noLocator: true });
+        sendAction('press', e.target === document.body ? document.documentElement : e.target, {
+          key: 'Escape',
+          noLocator: true,
+        });
       }
     },
     true,
@@ -333,7 +406,13 @@
       if (!overlay || mode === 'record' || ours(e)) return;
       const el = interactiveAncestor(e.target);
       const r = el.getBoundingClientRect();
-      Object.assign(overlay.style, { display: 'block', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+      Object.assign(overlay.style, {
+        display: 'block',
+        left: `${r.left}px`,
+        top: `${r.top}px`,
+        width: `${r.width}px`,
+        height: `${r.height}px`,
+      });
     },
     true,
   );
@@ -344,31 +423,47 @@
     const value = isField ? el.value : '';
     const options = [
       ['visible', 'is visible', undefined],
-      ...(text ? [['text', `text is "${text.slice(0, 40)}"`, text], ['textContains', 'text contains…', text]] : []),
+      ...(text
+        ? [
+            ['text', `text is "${text.slice(0, 40)}"`, text],
+            ['textContains', 'text contains…', text],
+          ]
+        : []),
       ...(isField ? [['value', `value is "${value.slice(0, 40)}"`, value]] : []),
       ['urlContains', `URL contains "${location.pathname}"`, location.pathname],
       ['hidden', 'is hidden', undefined],
     ];
-    openPanel(`<b>Add a check on ${describe(el).replace(/</g, '&lt;')}</b>${options.map((o, i) => `<button data-i="${i}">${o[1].replace(/</g, '&lt;')}</button>`).join('')}<input placeholder="Expected text (for contains)" value="${text.replace(/"/g, '&quot;')}">`);
+    openPanel(
+      `<b>Add a check on ${describe(el).replace(/</g, '&lt;')}</b>${options.map((o, i) => `<button data-i="${i}">${o[1].replace(/</g, '&lt;')}</button>`).join('')}<input placeholder="Expected text (for contains)" value="${text.replace(/"/g, '&quot;')}">`,
+    );
     panel.querySelectorAll('button[data-i]').forEach((b) =>
       b.addEventListener('click', () => {
         const [check, , expected] = options[Number(b.dataset.i)];
         const exp = check === 'textContains' ? panel.querySelector('input').value : expected;
         const noLocator = check === 'urlContains';
-        emit({ kind: 'assert', check, expected: exp, locators: noLocator ? [] : locatorsFor(el) }).then(refresh);
+        emit({ kind: 'assert', check, expected: exp, locators: noLocator ? [] : locatorsFor(el) }).then(
+          refresh,
+        );
         setMode('record');
       }),
     );
   }
 
   function pickExtract(el) {
-    openPanel(`<b>Save the text of ${describe(el).replace(/</g, '&lt;')}</b><input placeholder="Variable name, e.g. patientCode" value="value"><button data-save>Save as variable</button>`);
+    openPanel(
+      `<b>Save the text of ${describe(el).replace(/</g, '&lt;')}</b><input placeholder="Variable name, e.g. patientCode" value="value"><button data-save>Save as variable</button>`,
+    );
     const input = panel.querySelector('input');
     input.select();
     panel.querySelector('[data-save]').addEventListener('click', () => {
       const name = input.value.replace(/[^A-Za-z0-9_]/g, '') || 'value';
       const isField = ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
-      emit({ kind: 'extract', from: isField ? 'value' : 'text', varName: name, locators: locatorsFor(el) }).then(refresh);
+      emit({
+        kind: 'extract',
+        from: isField ? 'value' : 'text',
+        varName: name,
+        locators: locatorsFor(el),
+      }).then(refresh);
       setMode('record');
     });
   }
@@ -392,11 +487,21 @@
       }
       if (!recording()) return;
       // Enter in a form field makes the browser click the default submit button (detail 0): already recorded as the key press.
-      if (e.detail === 0 && Date.now() - lastEnterAt < 500 && (el.type === 'submit' || el.tagName === 'BUTTON')) return;
+      if (
+        e.detail === 0 &&
+        Date.now() - lastEnterAt < 500 &&
+        (el.type === 'submit' || el.tagName === 'BUTTON')
+      )
+        return;
       if (isTextField(el) || el.tagName === 'SELECT' || el.tagName === 'OPTION') return; // focus clicks; fill/select record the intent
       const type = (el.getAttribute('type') || '').toLowerCase();
       if (el.tagName === 'INPUT' && ['checkbox', 'radio', 'file'].includes(type)) return; // recorded on change
-      if (el.tagName === 'LABEL' && el.control && ['checkbox', 'radio', 'file'].includes((el.control.type || '').toLowerCase())) return;
+      if (
+        el.tagName === 'LABEL' &&
+        el.control &&
+        ['checkbox', 'radio', 'file'].includes((el.control.type || '').toLowerCase())
+      )
+        return;
       flushFill();
       sendAction(e.detail === 2 ? 'dblclick' : 'click', el);
     },

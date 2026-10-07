@@ -60,7 +60,7 @@ beforeAll(async () => {
   ({ app, ctx } = await testServer());
   target = createServer((req, res) => {
     if (req.url === '/api/health') return void res.writeHead(200).end('{"ok":true}');
-    if (req.url === '/api/slow') return void setTimeout(() => res.writeHead(200).end('{}'), 2500);
+    if (req.url === '/api/slow') return void setTimeout(() => res.writeHead(200).end('{}'), 6000);
     // The planted defect: booking twice is accepted instead of 409 Conflict.
     if (req.url === '/api/bookings') return void res.writeHead(201).end('{"id":1}');
     res.writeHead(404).end();
@@ -173,7 +173,10 @@ describe('overlapping ticks', () => {
       environmentId: env,
       cron: '* * * * * *',
     });
-    await new Promise((r) => setTimeout(r, 2200));
+    // Wait for the second tick (skipped: the first run is still waiting for the 6 s endpoint), not a fixed time —
+    // CI machines can be slow to start the first run.
+    for (const deadline = Date.now() + 10_000; !events.includes('schedule.skipped') && Date.now() < deadline;)
+      await new Promise((r) => setTimeout(r, 100));
     await ok('DELETE', `/api/schedules/${s.id}`);
     ctx.bus.off('event', on);
     await ctx.runs.idle();
