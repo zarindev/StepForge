@@ -44,6 +44,10 @@ mask a field. Each recorded step stores a ranked set of locators (test id, role,
 doesn't break the test, and a failed locator suggests a one-click fix. Typed passwords become `{{secret.…}}`
 references automatically.
 
+Recording starts wherever the user is: from the Recorder page, or from the Test Explorer, with *Create & record* in
+the New scenario dialog, *Record steps* on a scenario (the steps are added after its existing ones, reviewed first) or
+*Record a scenario* in a module's menu.
+
 ![Record once](export/slides/slide-04.png)
 
 ### Every layer in one scenario
