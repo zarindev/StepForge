@@ -1,7 +1,7 @@
 import { STEPFORGE_VERSION, type RunScope } from '@stepforge/core';
 import { schema } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
-import { buildApp, type BuildOptions } from '@stepforge/server';
+import { buildApp, runDefaults, type BuildOptions } from '@stepforge/server';
 import { CREDIT } from '@stepforge/reports';
 import { TARGETS } from '@stepforge/codegen';
 import { eq } from 'drizzle-orm';
@@ -268,7 +268,7 @@ const run: Handler = async (c, v, io) => {
       applicationId: application.id,
       environmentId: env.id,
       scope,
-      options: options as never,
+      options: { ...runDefaults(db), ...options } as never,
       trigger: 'cli',
     });
   } catch (err) {

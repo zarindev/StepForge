@@ -4,6 +4,12 @@ import { MailpitCard } from '@/components/email/mailpit-card';
 import { K6Card } from '@/components/perf/k6-card';
 import { NotificationsCard } from '@/components/settings/notifications-card';
 import { AiCard, ReportBrandingCard } from '@/components/settings/report-cards';
+import {
+  DataCard,
+  RetentionCard,
+  RunnerDefaultsCard,
+  SecurityCard,
+} from '@/components/settings/system-cards';
 import { PageHeader } from '@/components/shell/layout';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -70,35 +76,15 @@ export function SettingsPage() {
             {save.isError && <p className="mt-2 text-sm text-fail">{(save.error as Error).message}</p>}
           </CardBody>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Runner defaults</CardTitle>
-          </CardHeader>
-          <CardBody className="grid grid-cols-2 gap-3 text-sm">
-            {settings.data &&
-              (
-                [
-                  ['Browser', settings.data.defaultBrowser],
-                  ['Viewport', settings.data.defaultViewport],
-                  ['Default timeout', `${settings.data.defaultTimeoutMs} ms`],
-                  ['Parallel workers', String(settings.data.workers)],
-                ] as const
-              ).map(([k, v]) => (
-                <div key={k} className="rounded-lg border border-border px-3 py-2">
-                  <div className="text-xs text-muted">{k}</div>
-                  <div className="font-mono text-sm">{v}</div>
-                </div>
-              ))}
-            <p className="col-span-2 text-xs text-muted">
-              Editable runner and retention settings arrive with their phases.
-            </p>
-          </CardBody>
-        </Card>
+        <RunnerDefaultsCard settings={settings.data} />
+        <RetentionCard settings={settings.data} />
         <MailpitCard />
         <K6Card />
         <NotificationsCard />
         <ReportBrandingCard settings={settings.data} />
         <AiCard settings={settings.data} />
+        <DataCard />
+        <SecurityCard />
       </div>
     </>
   );

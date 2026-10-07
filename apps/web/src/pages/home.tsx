@@ -26,6 +26,7 @@ import { api, type SystemInfo } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
 import { useLiveEvent, type LiveEvent } from '@/lib/live';
 import type { HomeSummary, UpcomingSchedule } from '@/lib/types';
+import { readLoaded, Welcome } from '@/components/onboarding/welcome';
 
 const fmtDuration = (ms: number | null) =>
   ms === null
@@ -116,17 +117,17 @@ export function HomePage() {
 
       {home.isPending ? (
         <Skeleton className="mt-6 h-64" />
+      ) : !k?.applications || (!hasResults && readLoaded()) ? (
+        <Welcome />
       ) : !hasResults ? (
         <div className="mt-6">
           <EmptyState
             icon={Sparkles}
-            title="Welcome to StepForge"
-            description="Your local QA studio is running. Add an application to start organising, recording and running tests. Trends, quality gates and recent runs appear here as soon as you have results."
+            title="No results yet"
+            description="Run some tests and trends, quality gates and recent runs appear here."
             action={
-              <Link to={k?.applications ? '/explorer' : '/applications'}>
-                <Button>
-                  {k?.applications ? 'Open the Test Explorer' : 'Create your first application'}
-                </Button>
+              <Link to="/explorer" search={{}}>
+                <Button>Open the Test Explorer</Button>
               </Link>
             }
           />

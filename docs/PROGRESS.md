@@ -16,8 +16,56 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 10 | Analytics, quality gates, run comparison, flaky detection | ✅ Done |
 | 11 | Scheduler, CLI, notifications, JUnit/HTML | ✅ Done |
 | 12 | Code generators + snapshot tests | ✅ Done |
-| 13 | Public-repo polish, onboarding, fresh-clone test | ⏳ Next |
-| 14 | Showcase package, optional Electron | — |
+| 13 | Public-repo polish, onboarding, fresh-clone test | ✅ Done (Windows/Ubuntu via CI after push) |
+| 14 | Showcase package, optional Electron | ⏳ Next |
+
+---
+
+## Phase 13 — Onboarding, polish and the fresh-clone check (2026-10-07)
+
+**Delivered**
+- **First-run onboarding:** the Home welcome offers **Load demo workspace** or **Create your first application**. The
+  demo starts the CareClinic demo app as a child process (port 8101, or a free port; restarted with StepForge,
+  stopped with it) and Mailpit, imports `demo/clinic-app/stepforge/workspace.json` — 8 modules, 17 scenarios across
+  UI, API, database, email, performance and an end-to-end hybrid flow, 2 reusable blocks, data-driven test cases —
+  and adds the demo credentials as encrypted secrets, a SQLite connection and the recommended quality gate. "Run all
+  tests" follows. Creating an application starts a 4-step **guided recorder tour** (coach card that outlines the
+  control it describes). `npm start -- --demo` / `STEPFORGE_DEMO=1` loads the same workspace — sample data only on an
+  explicit request.
+- **Settings:** editable runner defaults (now used by the Run dialog, schedules and the CLI), **evidence retention**
+  (daily job removing screenshots/videos/traces of old passes, optionally failures; results stay; "Clean up now"),
+  demo workspace controls, **application import/export** (JSON), **encryption-key rotation** (re-encrypts every
+  secret in one transaction, new key written first, old key kept as a backup), **danger zone** (delete run history /
+  delete everything, typed confirmation enforced by the server).
+- **Polish:** error states added to Recorder, API Client and Exports (every page now has loading, empty and error
+  states); leftover "Phase N" text removed.
+- **Public repository:** README rewritten to spec 15.7 (banner `docs/assets/banner.svg`, badges, comparison, features,
+  quick start for Windows and macOS/Linux, demo in 60 seconds, first recorded test, Mermaid architecture, screenshot
+  grid, Playwright/Cypress/Selenium export examples taken from real exports, CLI/CI, data and privacy, configuration,
+  safety, troubleshooting, roadmap, author card); `CONTRIBUTING.md`, `SECURITY.md`, `LEGAL.md`; `.env.example`
+  completed; `docs/CHECKLIST.md` (section 16 status with evidence).
+- `scripts/capture_screenshots.ts` (18 screenshots at 1440×900 @2x, dark plus light for Home, editor and results, in
+  `docs/assets/screenshots/`), `scripts/smoke-onboarding.ts`, CI job **fresh-clone** (Ubuntu + Windows).
+
+**Verified**
+- `npm test`: 323 passed, 18 skipped (external database servers). New: demo-workspace test (load in one call, tree,
+  environment, secrets not exposed, connection, idempotent reload, then a full run: **each of the 17 scenarios has
+  the intended outcome** — 12 pass, 5 fail on CareClinic's real defects, each failure a product failure with the
+  right diagnosis: duplicate accepted, missing auth, 204 for something missing, schema mismatch, orphan rows — and
+  the gate is red), 3 maintenance tests (retention removes only old passing evidence and keeps results; key rotation
+  keeps every secret readable and backs up the old key; danger zone requires the exact typed word).
+- `npm run test:e2e`: 20 tests. New: onboarding — create an application and walk the recorder tour (forward, back,
+  done, stays done after reload); load the demo workspace from the welcome screen, run all tests, **15 passed /
+  5 failed / 0 broken**, Home shows the red gate.
+- **Fresh clone (macOS):** `git clone` into an empty folder → `./setup.sh` (33 s; npm install, Chromium, Mailpit
+  download, build) → `./start.sh` → `scripts/smoke-onboarding.ts`: welcome → demo loaded → run 15 passed, 5 failed,
+  gate red, about 13 s. Stopping StepForge stopped CareClinic (no orphan process); starting again brought it back and
+  repointed the demo environment.
+- Every file and image the README links to exists (checked).
+
+**Not verified**
+- The fresh clone on **Windows and Ubuntu** (the `fresh-clone` CI job runs it once the repository is pushed), and how
+  the README renders on GitHub. Chromium was already in Playwright's cache on this machine, so setup reused it.
 
 ---
 

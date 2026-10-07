@@ -16,3 +16,4 @@ playwright-report/
 
 # demo app databases
 demo/*/.data/
+smoke-onboarding-failure.png

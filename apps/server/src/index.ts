@@ -37,6 +37,17 @@ async function main(): Promise<void> {
 
   const url = `http://127.0.0.1:${port}`;
   app.log.info(`StepForge is running at ${url}`);
+  // `npm start -- --demo` (or STEPFORGE_DEMO=1): load the demo workspace — sample data only when asked for.
+  if (process.argv.includes('--demo') || process.env.STEPFORGE_DEMO === '1') {
+    ctx.demo
+      .load()
+      .then((r) =>
+        app.log.info(
+          `Demo workspace ${r.created ? 'loaded' : 'already loaded'}; CareClinic at ${r.clinicUrl}${r.warnings.length ? ` (${r.warnings.join(' ')})` : ''}`,
+        ),
+      )
+      .catch((err: Error) => app.log.error(`Demo workspace failed: ${err.message}`));
+  }
   if (ctx.config.openBrowser && !process.env.STEPFORGE_DEV) openBrowser(url);
 
   let closing = false;

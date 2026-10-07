@@ -1,11 +1,11 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Play, ShieldAlert } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Select, Switch } from '@/components/ui/input';
-import { api } from '@/lib/api';
+import { api, type Settings } from '@/lib/api';
 import { useEnvironments, useTags, useTree } from '@/lib/queries';
 import type { Run, RunOptionsForm, RunScope } from '@/lib/types';
 import { flattenModules } from '@/lib/tree';
@@ -33,11 +33,18 @@ const DEFAULTS: RunOptionsForm = {
   screenshots: 'everyStep',
   pageMetrics: false,
 };
-function loadOptions(): RunOptionsForm {
+/** Saved choices from the last run win; otherwise Settings → Runner defaults. */
+function loadOptions(settings?: Partial<Settings>): RunOptionsForm {
+  const base: RunOptionsForm = {
+    ...DEFAULTS,
+    ...(settings?.defaultBrowser && { browser: settings.defaultBrowser }),
+    ...(settings?.defaultViewport && { viewport: settings.defaultViewport }),
+    ...(settings?.workers && { workers: Math.min(8, settings.workers) }),
+  };
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}') };
+    return { ...base, ...JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}') };
   } catch {
-    return DEFAULTS;
+    return base;
   }
 }
 
@@ -59,7 +66,15 @@ function RunDialog({ req }: { req: Request }) {
   const tree = useTree(req.scope ? null : req.applicationId);
   const tags = useTags(req.scope ? null : req.applicationId);
   const [envId, setEnvId] = useState('');
-  const [opts, setOpts] = useState<RunOptionsForm>(loadOptions);
+  const settings = useQuery({ queryKey: ['settings'], queryFn: () => api<Settings>('/api/settings') });
+  const [opts, setOpts] = useState<RunOptionsForm>(() => loadOptions(settings.data));
+  const [settled, setSettled] = useState(!!settings.data);
+  useEffect(() => {
+    if (!settled && settings.data) {
+      setOpts(loadOptions(settings.data));
+      setSettled(true);
+    }
+  }, [settings.data, settled]);
   const [scopeChoice, setScopeChoice] = useState('application');
   const navigate = useNavigate();
   const qc = useQueryClient();
