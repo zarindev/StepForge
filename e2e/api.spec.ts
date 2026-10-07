@@ -50,7 +50,7 @@ test('API client, OpenAPI import and the generated suite against CareClinic (Pha
   await dialog.getByLabel('Spec URL').fill('/api/openapi.json');
   await dialog.getByRole('button', { name: 'Import', exact: true }).click();
   await expect(dialog.getByRole('status')).toContainText(
-    /Created \d+ scenario\(s\) in 6 module\(s\) and 1 block/,
+    /Created \d+ scenario\(s\) in 8 module\(s\) and 1 block/,
   );
   await expect(dialog).toContainText('apiPassword');
   await shot(page, 'import-result');

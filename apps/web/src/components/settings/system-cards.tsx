@@ -187,25 +187,28 @@ export function DataCard() {
   const demo = useQuery({
     queryKey: ['demo'],
     queryFn: () =>
-      api<{ available: boolean; loaded: boolean; clinic: { running: boolean; url: string | null } }>(
-        '/api/demo',
-      ),
+      api<{
+        available: boolean;
+        loaded: boolean;
+        apps: { key: string; name: string; running: boolean; url: string | null }[];
+      }>('/api/demo'),
   });
   useEffect(() => {
     if (!appId && apps.data?.[0]) setAppId(apps.data[0].id);
   }, [apps.data, appId]);
   const load = useMutation({
     mutationFn: () =>
-      api<{ applicationId: string; clinicUrl: string; created: boolean }>('/api/demo/load', {
-        method: 'POST',
-      }),
+      api<{ applicationId: string; created: boolean; applications: { name: string; url: string }[] }>(
+        '/api/demo/load',
+        {
+          method: 'POST',
+        },
+      ),
     onSuccess: (r) => {
       setCurrentAppId(r.applicationId);
       void qc.invalidateQueries();
       toast(
-        r.created
-          ? `Demo workspace loaded; CareClinic at ${r.clinicUrl}`
-          : `CareClinic is running at ${r.clinicUrl}`,
+        `${r.created ? 'Demo workspace loaded' : 'Demo apps running'}: ${r.applications.map((a) => `${a.name} at ${a.url}`).join(', ')}`,
       );
     },
     onError: toastError,
@@ -246,11 +249,9 @@ export function DataCard() {
         <div className="flex flex-wrap items-center gap-3">
           <Rocket className="h-4 w-4 text-brand" />
           <span className="flex-1 text-muted">
-            Demo workspace (CareClinic):{' '}
+            Demo workspace (CareClinic, ShopDesk):{' '}
             {demo.data?.loaded
-              ? demo.data.clinic.running
-                ? `loaded, running at ${demo.data.clinic.url}`
-                : 'loaded, demo app stopped'
+              ? demo.data.apps.map((a) => `${a.name} ${a.running ? `at ${a.url}` : 'stopped'}`).join(' · ')
               : 'not loaded'}
           </span>
           <Button
@@ -261,7 +262,7 @@ export function DataCard() {
           >
             {demo.data?.loaded ? (
               <>
-                <Play className="h-3.5 w-3.5" /> Start CareClinic
+                <Play className="h-3.5 w-3.5" /> Start demo apps
               </>
             ) : (
               'Load demo workspace'

@@ -23,7 +23,8 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 <!--
   demo.gif — to record (about 30 s, 1440×900): Home → "Load demo workspace" → Run all tests → open a failed test and
-  its diagnosis → Exports → Playwright preview. Save as docs/assets/demo.gif and replace this comment with:
+  its diagnosis → Exports → Playwright preview. Ready-made WebM clips of the recorder, a live run and a diagnosis are in
+  docs/assets/clips/ (scripts/capture_showcase.ts). Save as docs/assets/demo.gif and replace this comment with:
   <p align="center"><img src="docs/assets/demo.gif" alt="StepForge in 30 seconds" width="100%" /></p>
 -->
 
@@ -100,13 +101,15 @@ StepForge opens at <http://127.0.0.1:4400> (or the next free port).
 
 ### Load the demo workspace in 60 seconds
 
-1. On the welcome screen, choose **Load demo workspace**. StepForge starts the **CareClinic** demo app and the local
-   email catcher, and adds 17 scenarios across UI, API, database, email and performance.
-2. Press **Run all tests**. A few seconds later: 15 passed, 5 failed. The failures are real defects in the demo app.
+1. On the welcome screen, choose **Load demo workspace**. StepForge starts two demo apps, **CareClinic** (a clinic) and
+   **ShopDesk** (a shop back office), plus the local email catcher, and adds 45 scenarios across UI, API, database,
+   email, business logic and performance.
+2. Press **Run all tests**: one run per demo app. The red tests are real defects planted in the demo apps.
 3. Open a failed test to see where it failed, why, whose issue it is and how to fix it.
 
-Demo sign-in, if you want to click around CareClinic yourself: `reception@careclinic.test` / `Reception123!`
-(admin: `admin@careclinic.test` / `Admin123!`). Prefer the command line? `npm start -- --demo` loads the same workspace.
+Demo sign-ins, if you want to click around yourself: CareClinic `reception@careclinic.test` / `Reception123!` (admin:
+`admin@careclinic.test` / `Admin123!`); ShopDesk `cashier@shopdesk.test` / `Cashier123!` (admin:
+`admin@shopdesk.test` / `Admin123!`). Prefer the command line? `npm start -- --demo` loads the same workspace.
 
 ## Your first recorded test
 
@@ -272,9 +275,31 @@ summaries: [docs/SCHEDULING.md](docs/SCHEDULING.md).
 
 ## Benchmarks
 
-Benchmark numbers (detection rate on planted defects, run times, diagnosis accuracy) are produced by
-`scripts/benchmark.ts` against the bundled demo apps and recorded in `docs/benchmarks.json`. They will appear here once
-that run exists; this README only ever shows measured numbers.
+The two demo apps contain bugs planted on purpose, listed with the acceptable diagnosis for each in
+`demo/manifests/planted_bugs.json`. StepForge never reads that file (a guard test fails the build if app code mentions
+it). `scripts/benchmark.ts` runs every demo scenario at desktop size and the phone scenarios at mobile size, then
+scores the results against the manifest and writes [`docs/benchmarks.json`](docs/benchmarks.json).
+
+| | Result |
+| --- | --- |
+| Planted bugs detected | **25 / 25 (100%)** |
+| Diagnosed correctly | **24 / 25 (96%)** |
+| False alarms | **0** |
+| Scenarios / test runs | 45 / 51 |
+| Total run time | 83.6 s |
+
+| Demo app | Scenarios | Test runs | Planted bugs | Detected | Diagnosed correctly |
+| --- | --- | --- | --- | --- | --- |
+| CareClinic | 25 | 29 | 13 | 13 | 12 |
+| ShopDesk | 20 | 22 | 12 | 12 | 12 |
+
+Planted bugs cover API, database, UI, email, business logic and performance. Measured on an Apple M3 Pro (11 cores,
+18 GB, Node 23.6), one test at a time. The one wrong diagnosis is described in
+[docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md). Run it yourself: `npm run mailpit:install && npx tsx scripts/benchmark.ts`.
+
+**Case study and samples.** A 15-slide case study ([HTML](docs/case-study/case-study.html),
+[PDF](docs/case-study/export/StepForge-Case-Study.pdf), [write-up](docs/case-study/CASE_STUDY.md)) and real exported
+files (bug report PDF, run reports, a Playwright project, Cypress, Selenium and k6) in [docs/samples](docs/samples).
 
 ## Data and privacy
 
@@ -380,8 +405,9 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] Schedules, notifications, CLI, JUnit
 - [x] Code export to 13 targets
 - [x] Onboarding with a demo workspace
-- [ ] A second demo app (ShopDesk) and published benchmarks
-- [ ] Showcase material and an optional desktop installer
+- [x] A second demo app (ShopDesk) and published benchmarks
+- [x] Showcase material: case study, samples, screenshots and clips
+- [ ] An optional desktop installer (Electron)
 - [ ] Visual checkpoints (screenshot comparison)
 
 ## Contributing

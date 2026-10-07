@@ -1,0 +1,1916 @@
+{
+  "format": "stepforge.application",
+  "version": 1,
+  "exportedAt": "2026-10-07T00:00:00.000Z",
+  "generator": "StepForge demo workspace · StepForge by Md Zarin Tasnim",
+  "application": {
+    "name": "ShopDesk",
+    "slug": "shopdesk",
+    "description": "Demo shop back office (products, stock, sales, purchases, profit). Some tests fail on purpose: the demo app has real defects for StepForge to find and diagnose.",
+    "icon": "shopping-cart",
+    "color": "#EA580C",
+    "category": "web",
+    "tags": [
+      "demo"
+    ]
+  },
+  "environments": [
+    {
+      "name": "Local",
+      "baseUrl": "http://127.0.0.1:8102",
+      "variables": {
+        "adminEmail": "admin@shopdesk.test",
+        "cashierEmail": "cashier@shopdesk.test"
+      },
+      "secretKeys": [
+        "adminPassword",
+        "cashierPassword"
+      ]
+    }
+  ],
+  "tags": [
+    {
+      "name": "smoke",
+      "color": "#22C55E"
+    },
+    {
+      "name": "regression",
+      "color": "#6366F1"
+    },
+    {
+      "name": "api",
+      "color": "#0EA5E9"
+    },
+    {
+      "name": "database",
+      "color": "#A855F7"
+    },
+    {
+      "name": "performance",
+      "color": "#EF4444"
+    },
+    {
+      "name": "mobile",
+      "color": "#14B8A6"
+    }
+  ],
+  "modules": [
+    {
+      "ref": "m-auth",
+      "parentRef": null,
+      "name": "Sign in",
+      "sortOrder": 0
+    },
+    {
+      "ref": "m-products",
+      "parentRef": null,
+      "name": "Products",
+      "sortOrder": 1
+    },
+    {
+      "ref": "m-sales",
+      "parentRef": null,
+      "name": "Sales",
+      "sortOrder": 2
+    },
+    {
+      "ref": "m-stock",
+      "parentRef": null,
+      "name": "Stock",
+      "sortOrder": 3
+    },
+    {
+      "ref": "m-reports",
+      "parentRef": null,
+      "name": "Reports",
+      "sortOrder": 4
+    },
+    {
+      "ref": "m-api",
+      "parentRef": null,
+      "name": "API",
+      "sortOrder": 5
+    },
+    {
+      "ref": "m-perf",
+      "parentRef": null,
+      "name": "Performance",
+      "sortOrder": 6
+    },
+    {
+      "ref": "m-e2e",
+      "parentRef": null,
+      "name": "End to end",
+      "sortOrder": 7
+    }
+  ],
+  "blocks": [
+    {
+      "ref": "b-signin-admin",
+      "name": "Sign in as the admin",
+      "steps": [
+        {
+          "type": "ui.navigate",
+          "label": "Open the login page",
+          "params": {
+            "url": "/login"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Email",
+          "params": {
+            "value": "{{env.adminEmail}}"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Email"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Password",
+          "params": {
+            "value": "{{secret.adminPassword}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "password"
+            },
+            {
+              "strategy": "label",
+              "value": "Password"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Sign in",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Sign in"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "b-signin-cashier",
+      "name": "Sign in as the cashier",
+      "steps": [
+        {
+          "type": "ui.navigate",
+          "label": "Open the login page",
+          "params": {
+            "url": "/login"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Email",
+          "params": {
+            "value": "{{env.cashierEmail}}"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Email"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Password",
+          "params": {
+            "value": "{{secret.cashierPassword}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "password"
+            },
+            {
+              "strategy": "label",
+              "value": "Password"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Sign in",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Sign in"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "b-api-admin",
+      "name": "API login as admin",
+      "description": "Keeps the token as {{vars.admin.token}}.",
+      "steps": [
+        {
+          "type": "api.request",
+          "label": "Log in as admin",
+          "params": {
+            "method": "POST",
+            "url": "/api/auth/login",
+            "body": {
+              "email": "{{env.adminEmail}}",
+              "password": "{{secret.adminPassword}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            }
+          ],
+          "captureAs": "admin"
+        }
+      ]
+    }
+  ],
+  "datasets": [],
+  "scenarios": [
+    {
+      "ref": "s-login",
+      "moduleRef": "m-auth",
+      "name": "Sign in as the cashier",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "smoke"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin-cashier"
+          }
+        },
+        {
+          "type": "ui.assert",
+          "label": "Greeting",
+          "params": {
+            "check": "textContains",
+            "expected": "Hello, Casey Cashier"
+          },
+          "locators": [
+            {
+              "strategy": "css",
+              "value": "h1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-search",
+      "moduleRef": "m-products",
+      "name": "Search products",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "regression"
+      ],
+      "testCases": [
+        {
+          "code": "TC-PRO-101",
+          "title": "By name",
+          "data": {
+            "query": "kettle",
+            "expected": "Gooseneck kettle"
+          }
+        },
+        {
+          "code": "TC-PRO-102",
+          "title": "By SKU",
+          "data": {
+            "query": "SKU-1002",
+            "expected": "Ceramic mug"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin-cashier"
+          }
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open products",
+          "params": {
+            "url": "/products"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Search",
+          "params": {
+            "value": "{{data.query}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "product-search"
+            },
+            {
+              "strategy": "label",
+              "value": "Search products"
+            }
+          ]
+        },
+        {
+          "type": "ui.press",
+          "label": "Search",
+          "params": {
+            "key": "Enter"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "product-search"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Found",
+          "params": {
+            "check": "textContains",
+            "expected": "{{data.expected}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "products-table"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-add-product",
+      "moduleRef": "m-products",
+      "name": "Add a product",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "smoke"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the product form",
+          "params": {
+            "url": "/products/new"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Name",
+          "params": {
+            "value": "Pour-over stand"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Product name"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "SKU",
+          "params": {
+            "value": "{{vars.sku}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "product-sku"
+            },
+            {
+              "strategy": "label",
+              "value": "SKU"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Price",
+          "params": {
+            "value": "29.90"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Price"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Unit cost",
+          "params": {
+            "value": "12.40"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Unit cost"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Opening stock",
+          "params": {
+            "value": "15"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Opening stock"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Save",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "save-product"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Added",
+          "params": {
+            "check": "text",
+            "expected": "Product {{vars.sku}} added"
+          },
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "status"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Listed",
+          "params": {
+            "check": "textContains",
+            "expected": "Pour-over stand"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "products-table"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-out-of-stock",
+      "moduleRef": "m-products",
+      "name": "Out-of-stock products are marked",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "regression"
+      ],
+      "testCases": [],
+      "description": "Paper filters (SKU-1004) have 0 in stock.",
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin-cashier"
+          }
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Search the filters",
+          "params": {
+            "url": "/products?q=SKU-1004"
+          }
+        },
+        {
+          "type": "ui.assert",
+          "label": "Marked as out of stock",
+          "params": {
+            "check": "textContains",
+            "expected": "Out of stock"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "products-table"
+            }
+          ],
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "ref": "s-cashier-403",
+      "moduleRef": "m-api",
+      "name": "Cashiers cannot add products",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "api"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "api.request",
+          "label": "Log in as cashier",
+          "params": {
+            "method": "POST",
+            "url": "/api/auth/login",
+            "body": {
+              "email": "{{env.cashierEmail}}",
+              "password": "{{secret.cashierPassword}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            }
+          ],
+          "captureAs": "cashier"
+        },
+        {
+          "type": "api.request",
+          "label": "Try to add a product",
+          "params": {
+            "method": "POST",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.cashier.token}}"
+            },
+            "body": {
+              "sku": "SKU-NOPE",
+              "name": "Nope",
+              "price": 1,
+              "cost": 1
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 403
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-no-name",
+      "moduleRef": "m-api",
+      "name": "A product without a name is rejected",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "api",
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "api.request",
+          "label": "Add a product without a name",
+          "params": {
+            "method": "POST",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "sku": "{{vars.sku}}",
+              "price": 5,
+              "cost": 2
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 422
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-schema",
+      "moduleRef": "m-api",
+      "name": "Products match the documented schema",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "api",
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "api.request",
+          "label": "List products",
+          "params": {
+            "method": "GET",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "body",
+              "operator": "matchesSchema",
+              "expected": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "sku",
+                    "name",
+                    "price",
+                    "cost",
+                    "stock"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "sku": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "cost": {
+                      "type": "number"
+                    },
+                    "stock": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-profit-auth",
+      "moduleRef": "m-api",
+      "name": "The profit report requires a login",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "api",
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "api.request",
+          "label": "Profit report without a token",
+          "params": {
+            "method": "GET",
+            "url": "/api/reports/profit"
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 401
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-health",
+      "moduleRef": "m-api",
+      "name": "Health check",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "api",
+        "smoke"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "api.request",
+          "label": "GET /api/health",
+          "params": {
+            "method": "GET",
+            "url": "/api/health"
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "$.app",
+              "operator": "equals",
+              "expected": "ShopDesk"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-sell-one",
+      "moduleRef": "m-sales",
+      "name": "Selling one unit reduces stock",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "smoke",
+        "database"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "api.request",
+          "label": "Add a product",
+          "params": {
+            "method": "POST",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "sku": "{{vars.sku}}",
+              "name": "Test item {{vars.sku}}",
+              "price": 12.5,
+              "cost": 5,
+              "stock": 10
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ],
+          "captureAs": "product"
+        },
+        {
+          "type": "api.request",
+          "label": "Sell one",
+          "params": {
+            "method": "POST",
+            "url": "/api/sales",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "items": [
+                {
+                  "product_id": "{{vars.product.id}}",
+                  "qty": 1
+                }
+              ]
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            },
+            {
+              "target": "$.total",
+              "operator": "equals",
+              "expected": 12.5
+            }
+          ]
+        },
+        {
+          "type": "db.query",
+          "label": "Stock is 9",
+          "params": {
+            "connection": "shop",
+            "sql": "SELECT stock FROM products WHERE id = ?",
+            "params": [
+              "{{vars.product.id}}"
+            ]
+          },
+          "assertions": [
+            {
+              "target": "value",
+              "operator": "equals",
+              "expected": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-qty-total",
+      "moduleRef": "m-sales",
+      "name": "A sale total counts every unit",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "api.request",
+          "label": "Add a product",
+          "params": {
+            "method": "POST",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "sku": "{{vars.sku}}",
+              "name": "Test item {{vars.sku}}",
+              "price": 9.5,
+              "cost": 3,
+              "stock": 20
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ],
+          "captureAs": "product"
+        },
+        {
+          "type": "api.request",
+          "label": "Sell three",
+          "params": {
+            "method": "POST",
+            "url": "/api/sales",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "items": [
+                {
+                  "product_id": "{{vars.product.id}}",
+                  "qty": 3
+                }
+              ]
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            },
+            {
+              "target": "$.total",
+              "operator": "equals",
+              "expected": 28.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-cart-total",
+      "moduleRef": "m-sales",
+      "name": "The cart shows the running total",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin-cashier"
+          }
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the point of sale",
+          "params": {
+            "url": "/sales/new"
+          }
+        },
+        {
+          "type": "ui.select",
+          "label": "Product",
+          "params": {
+            "label": "Ceramic mug (SKU-1002) — 9.50"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Product"
+            },
+            {
+              "strategy": "testId",
+              "value": "sale-product"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Quantity",
+          "params": {
+            "value": "2"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Quantity"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Add to cart",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Add to cart"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Total is 2 × 9.50",
+          "params": {
+            "check": "text",
+            "expected": "19.00"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "cart-total"
+            }
+          ],
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "ref": "s-sale-mobile",
+      "moduleRef": "m-sales",
+      "name": "Complete a sale on a phone",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "mobile",
+        "regression"
+      ],
+      "description": "Run with the mobile viewport (tag \"mobile\").",
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin-cashier"
+          }
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the point of sale",
+          "params": {
+            "url": "/sales/new"
+          }
+        },
+        {
+          "type": "ui.select",
+          "label": "Product",
+          "params": {
+            "label": "Ceramic mug (SKU-1002) — 9.50"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Product"
+            },
+            {
+              "strategy": "testId",
+              "value": "sale-product"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Quantity",
+          "params": {
+            "value": "1"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Quantity"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Add to cart",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Add to cart"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Complete the sale",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "complete-sale"
+            },
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Complete sale"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Completed",
+          "params": {
+            "check": "textContains",
+            "expected": "completed"
+          },
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "status"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-receive",
+      "moduleRef": "m-stock",
+      "name": "Receiving stock increases it",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "database"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "api.request",
+          "label": "Add a product",
+          "params": {
+            "method": "POST",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "sku": "{{vars.sku}}",
+              "name": "Test item {{vars.sku}}",
+              "price": 15,
+              "cost": 6,
+              "stock": 4
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ],
+          "captureAs": "product"
+        },
+        {
+          "type": "api.request",
+          "label": "Receive 6",
+          "params": {
+            "method": "POST",
+            "url": "/api/purchases",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "product_id": "{{vars.product.id}}",
+              "qty": 6
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            },
+            {
+              "target": "$.stock",
+              "operator": "equals",
+              "expected": 10
+            }
+          ]
+        },
+        {
+          "type": "db.query",
+          "label": "Stock is 10 in the database",
+          "params": {
+            "connection": "shop",
+            "sql": "SELECT stock FROM products WHERE id = ?",
+            "params": [
+              "{{vars.product.id}}"
+            ]
+          },
+          "assertions": [
+            {
+              "target": "value",
+              "operator": "equals",
+              "expected": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-negative",
+      "moduleRef": "m-stock",
+      "name": "Stock never goes negative",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "database",
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "api.request",
+          "label": "Add a product",
+          "params": {
+            "method": "POST",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "sku": "{{vars.sku}}",
+              "name": "Test item {{vars.sku}}",
+              "price": 20,
+              "cost": 8,
+              "stock": 2
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ],
+          "captureAs": "product"
+        },
+        {
+          "type": "api.request",
+          "label": "Try to sell 5 of 2",
+          "params": {
+            "method": "POST",
+            "url": "/api/sales",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "items": [
+                {
+                  "product_id": "{{vars.product.id}}",
+                  "qty": 5
+                }
+              ]
+            }
+          },
+          "assertions": []
+        },
+        {
+          "type": "db.query",
+          "label": "Stock is not below zero",
+          "params": {
+            "connection": "shop",
+            "sql": "SELECT stock FROM products WHERE id = ?",
+            "params": [
+              "{{vars.product.id}}"
+            ]
+          },
+          "assertions": [
+            {
+              "target": "value",
+              "operator": "gte",
+              "expected": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-orphans",
+      "moduleRef": "m-stock",
+      "name": "Deleting a product removes its sale lines",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "database",
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "api.request",
+          "label": "Add a product",
+          "params": {
+            "method": "POST",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "sku": "{{vars.sku}}",
+              "name": "Test item {{vars.sku}}",
+              "price": 7,
+              "cost": 2,
+              "stock": 5
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ],
+          "captureAs": "product"
+        },
+        {
+          "type": "api.request",
+          "label": "Sell one",
+          "params": {
+            "method": "POST",
+            "url": "/api/sales",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "items": [
+                {
+                  "product_id": "{{vars.product.id}}",
+                  "qty": 1
+                }
+              ]
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ]
+        },
+        {
+          "type": "api.request",
+          "label": "Delete the product",
+          "params": {
+            "method": "DELETE",
+            "url": "/api/products/{{vars.product.id}}",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 204
+            }
+          ]
+        },
+        {
+          "type": "db.query",
+          "label": "No sale lines point at it",
+          "params": {
+            "connection": "shop",
+            "sql": "SELECT COUNT(*) AS n FROM sale_items WHERE product_id = ?",
+            "params": [
+              "{{vars.product.id}}"
+            ]
+          },
+          "assertions": [
+            {
+              "target": "value",
+              "operator": "equals",
+              "expected": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-profit",
+      "moduleRef": "m-reports",
+      "name": "Profit is revenue minus cost",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "api",
+        "regression"
+      ],
+      "testCases": [],
+      "description": "One unit sold at 10.00 that cost 4.00 makes 6.00 profit.",
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "api.request",
+          "label": "Add a product",
+          "params": {
+            "method": "POST",
+            "url": "/api/products",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "sku": "{{vars.sku}}",
+              "name": "Test item {{vars.sku}}",
+              "price": 10,
+              "cost": 4,
+              "stock": 5
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ],
+          "captureAs": "product"
+        },
+        {
+          "type": "api.request",
+          "label": "Sell one",
+          "params": {
+            "method": "POST",
+            "url": "/api/sales",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "items": [
+                {
+                  "product_id": "{{vars.product.id}}",
+                  "qty": 1
+                }
+              ]
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ]
+        },
+        {
+          "type": "api.request",
+          "label": "Profit report",
+          "params": {
+            "method": "GET",
+            "url": "/api/reports/profit",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "$.lines[-1:].profit",
+              "operator": "equals",
+              "expected": [
+                6
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-perf-sales",
+      "moduleRef": "m-perf",
+      "name": "The sales report answers quickly",
+      "priority": "P3",
+      "status": "ready",
+      "tags": [
+        "performance",
+        "api"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "api.request",
+          "label": "Sales report",
+          "params": {
+            "method": "GET",
+            "url": "/api/reports/sales",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "time",
+              "operator": "lt",
+              "expected": 800
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-perf-expand",
+      "moduleRef": "m-perf",
+      "name": "Expanded sales answer quickly",
+      "priority": "P3",
+      "status": "ready",
+      "tags": [
+        "performance",
+        "api"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "api.request",
+          "label": "Sales with their lines",
+          "params": {
+            "method": "GET",
+            "url": "/api/sales?expand=items",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "time",
+              "operator": "lt",
+              "expected": 150
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-hybrid",
+      "moduleRef": "m-e2e",
+      "name": "Add a product in the UI, sell it through the API, check the database",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "smoke",
+        "api",
+        "database"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A new SKU",
+          "params": {
+            "kind": "pattern",
+            "pattern": "SKU-9#####"
+          },
+          "captureAs": "sku"
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the product form",
+          "params": {
+            "url": "/products/new"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Name",
+          "params": {
+            "value": "Cold brew bottle"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Product name"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "SKU",
+          "params": {
+            "value": "{{vars.sku}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "product-sku"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Price",
+          "params": {
+            "value": "18"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Price"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Unit cost",
+          "params": {
+            "value": "7"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Unit cost"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Opening stock",
+          "params": {
+            "value": "6"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Opening stock"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Save",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "save-product"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Added",
+          "params": {
+            "check": "textContains",
+            "expected": "added"
+          },
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "status"
+            }
+          ]
+        },
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "api.request",
+          "label": "Find it through the API",
+          "params": {
+            "method": "GET",
+            "url": "/api/products?q={{vars.sku}}",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "$",
+              "operator": "lengthEquals",
+              "expected": 1
+            }
+          ],
+          "captureAs": "found"
+        },
+        {
+          "type": "api.request",
+          "label": "Sell one",
+          "params": {
+            "method": "POST",
+            "url": "/api/sales",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "items": [
+                {
+                  "product_id": "{{vars.found.0.id}}",
+                  "qty": 1
+                }
+              ]
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ]
+        },
+        {
+          "type": "db.query",
+          "label": "Stock went from 6 to 5",
+          "params": {
+            "connection": "shop",
+            "sql": "SELECT stock FROM products WHERE sku = ?",
+            "params": [
+              "{{vars.sku}}"
+            ]
+          },
+          "assertions": [
+            {
+              "target": "value",
+              "operator": "equals",
+              "expected": 5
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

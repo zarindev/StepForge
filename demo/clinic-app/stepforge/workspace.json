@@ -6,37 +6,119 @@
   "application": {
     "name": "CareClinic",
     "slug": "careclinic",
-    "description": "Demo clinic app (patients, appointments, sign-up with email). Some tests fail on purpose: the demo app has real defects for StepForge to find and diagnose.",
+    "description": "Demo clinic app (patients, appointments, billing, sign-up with email). Some tests fail on purpose: the demo app has real defects for StepForge to find and diagnose.",
     "icon": "stethoscope",
     "color": "#14B8A6",
     "category": "web",
-    "tags": ["demo"]
+    "tags": [
+      "demo"
+    ]
   },
   "environments": [
     {
       "name": "Local",
       "baseUrl": "http://127.0.0.1:8101",
-      "variables": { "receptionEmail": "reception@careclinic.test", "adminEmail": "admin@careclinic.test" },
-      "secretKeys": ["password", "adminPassword"]
+      "variables": {
+        "receptionEmail": "reception@careclinic.test",
+        "adminEmail": "admin@careclinic.test"
+      },
+      "secretKeys": [
+        "password",
+        "adminPassword"
+      ]
     }
   ],
   "tags": [
-    { "name": "smoke", "color": "#22C55E" },
-    { "name": "regression", "color": "#6366F1" },
-    { "name": "api", "color": "#0EA5E9" },
-    { "name": "database", "color": "#A855F7" },
-    { "name": "email", "color": "#F59E0B" },
-    { "name": "performance", "color": "#EF4444" }
+    {
+      "name": "smoke",
+      "color": "#22C55E"
+    },
+    {
+      "name": "regression",
+      "color": "#6366F1"
+    },
+    {
+      "name": "api",
+      "color": "#0EA5E9"
+    },
+    {
+      "name": "database",
+      "color": "#A855F7"
+    },
+    {
+      "name": "email",
+      "color": "#F59E0B"
+    },
+    {
+      "name": "performance",
+      "color": "#EF4444"
+    },
+    {
+      "name": "mobile",
+      "color": "#14B8A6"
+    }
   ],
   "modules": [
-    { "ref": "m-auth", "parentRef": null, "name": "Sign in", "sortOrder": 0 },
-    { "ref": "m-patients", "parentRef": null, "name": "Patients", "sortOrder": 1 },
-    { "ref": "m-appointments", "parentRef": null, "name": "Appointments", "sortOrder": 2 },
-    { "ref": "m-api", "parentRef": null, "name": "API", "sortOrder": 3 },
-    { "ref": "m-db", "parentRef": null, "name": "Database", "sortOrder": 4 },
-    { "ref": "m-email", "parentRef": null, "name": "Email", "sortOrder": 5 },
-    { "ref": "m-perf", "parentRef": null, "name": "Performance", "sortOrder": 6 },
-    { "ref": "m-e2e", "parentRef": null, "name": "End to end", "sortOrder": 7 }
+    {
+      "ref": "m-auth",
+      "parentRef": null,
+      "name": "Sign in",
+      "sortOrder": 0
+    },
+    {
+      "ref": "m-dash",
+      "parentRef": null,
+      "name": "Dashboard",
+      "sortOrder": 1
+    },
+    {
+      "ref": "m-patients",
+      "parentRef": null,
+      "name": "Patients",
+      "sortOrder": 2
+    },
+    {
+      "ref": "m-appointments",
+      "parentRef": null,
+      "name": "Appointments",
+      "sortOrder": 3
+    },
+    {
+      "ref": "m-billing",
+      "parentRef": null,
+      "name": "Billing",
+      "sortOrder": 4
+    },
+    {
+      "ref": "m-api",
+      "parentRef": null,
+      "name": "API",
+      "sortOrder": 5
+    },
+    {
+      "ref": "m-db",
+      "parentRef": null,
+      "name": "Database",
+      "sortOrder": 6
+    },
+    {
+      "ref": "m-email",
+      "parentRef": null,
+      "name": "Email",
+      "sortOrder": 7
+    },
+    {
+      "ref": "m-perf",
+      "parentRef": null,
+      "name": "Performance",
+      "sortOrder": 8
+    },
+    {
+      "ref": "m-e2e",
+      "parentRef": null,
+      "name": "End to end",
+      "sortOrder": 9
+    }
   ],
   "blocks": [
     {
@@ -44,10 +126,59 @@
       "name": "Sign in as the receptionist",
       "description": "Opens the login page and signs in with the receptionist account.",
       "steps": [
-        { "type": "ui.navigate", "label": "Open the login page", "params": { "url": "/login" } },
-        { "type": "ui.fill", "label": "Email", "params": { "value": "{{env.receptionEmail}}" }, "locators": [{ "strategy": "label", "value": "Email" }] },
-        { "type": "ui.fill", "label": "Password", "params": { "value": "{{secret.password}}" }, "locators": [{ "strategy": "testId", "value": "password" }, { "strategy": "label", "value": "Password" }] },
-        { "type": "ui.click", "label": "Sign in", "params": {}, "locators": [{ "strategy": "role", "value": "button", "name": "Sign in" }, { "strategy": "testId", "value": "login-submit" }] }
+        {
+          "type": "ui.navigate",
+          "label": "Open the login page",
+          "params": {
+            "url": "/login"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Email",
+          "params": {
+            "value": "{{env.receptionEmail}}"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Email"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Password",
+          "params": {
+            "value": "{{secret.password}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "password"
+            },
+            {
+              "strategy": "label",
+              "value": "Password"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Sign in",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Sign in"
+            },
+            {
+              "strategy": "testId",
+              "value": "login-submit"
+            }
+          ]
+        }
       ]
     },
     {
@@ -58,8 +189,21 @@
         {
           "type": "api.request",
           "label": "Log in as admin",
-          "params": { "method": "POST", "url": "/api/auth/login", "body": { "email": "{{env.adminEmail}}", "password": "{{secret.adminPassword}}" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 200 }],
+          "params": {
+            "method": "POST",
+            "url": "/api/auth/login",
+            "body": {
+              "email": "{{env.adminEmail}}",
+              "password": "{{secret.adminPassword}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            }
+          ],
           "captureAs": "admin"
         }
       ]
@@ -73,11 +217,49 @@
       "name": "Sign in with valid credentials",
       "priority": "P1",
       "status": "ready",
-      "tags": ["smoke"],
+      "tags": [
+        "smoke"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "Sign in", "params": { "blockId": "b-signin" } },
-        { "type": "ui.assert", "label": "The dashboard greets the user", "params": { "check": "textContains", "expected": "Welcome, Riley Reception" }, "locators": [{ "strategy": "role", "value": "heading", "name": "Welcome, Riley Reception" }, { "strategy": "css", "value": "h1" }] },
-        { "type": "ui.assert", "label": "Patients are counted", "params": { "check": "visible" }, "locators": [{ "strategy": "testId", "value": "kpi-patients" }] }
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "ui.assert",
+          "label": "The dashboard greets the user",
+          "params": {
+            "check": "textContains",
+            "expected": "Welcome, Riley Reception"
+          },
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "heading",
+              "name": "Welcome, Riley Reception"
+            },
+            {
+              "strategy": "css",
+              "value": "h1"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Patients are counted",
+          "params": {
+            "check": "visible"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "kpi-patients"
+            }
+          ]
+        }
       ],
       "testCases": []
     },
@@ -87,18 +269,97 @@
       "name": "A wrong password is refused",
       "priority": "P2",
       "status": "ready",
-      "tags": ["regression"],
+      "tags": [
+        "regression"
+      ],
       "steps": [
-        { "type": "ui.navigate", "label": "Open the login page", "params": { "url": "/login" } },
-        { "type": "ui.fill", "label": "Email", "params": { "value": "{{data.email}}" }, "locators": [{ "strategy": "label", "value": "Email" }] },
-        { "type": "ui.fill", "label": "Wrong password", "params": { "value": "{{data.password}}" }, "locators": [{ "strategy": "testId", "value": "password" }] },
-        { "type": "ui.click", "label": "Sign in", "params": {}, "locators": [{ "strategy": "role", "value": "button", "name": "Sign in" }] },
-        { "type": "ui.assert", "label": "An error is shown", "params": { "check": "text", "expected": "Invalid email or password" }, "locators": [{ "strategy": "testId", "value": "login-error" }] },
-        { "type": "ui.assert", "label": "Still on the login page", "params": { "check": "urlContains", "expected": "/login" } }
+        {
+          "type": "ui.navigate",
+          "label": "Open the login page",
+          "params": {
+            "url": "/login"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Email",
+          "params": {
+            "value": "{{data.email}}"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Email"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Wrong password",
+          "params": {
+            "value": "{{data.password}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "password"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Sign in",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Sign in"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "An error is shown",
+          "params": {
+            "check": "text",
+            "expected": "Invalid email or password"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "login-error"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Still on the login page",
+          "params": {
+            "check": "urlContains",
+            "expected": "/login"
+          }
+        }
       ],
       "testCases": [
-        { "code": "TC-SIG-001", "title": "Wrong password", "data": { "email": "reception@careclinic.test", "password": "not-the-password" }, "technique": "negative" },
-        { "code": "TC-SIG-002", "title": "Unknown user", "data": { "email": "nobody@careclinic.test", "password": "Reception123!" }, "technique": "negative" }
+        {
+          "code": "TC-SIG-001",
+          "title": "Wrong password",
+          "data": {
+            "email": "reception@careclinic.test",
+            "password": "not-the-password"
+          },
+          "technique": "negative"
+        },
+        {
+          "code": "TC-SIG-002",
+          "title": "Unknown user",
+          "data": {
+            "email": "nobody@careclinic.test",
+            "password": "Reception123!"
+          },
+          "technique": "negative"
+        }
       ]
     },
     {
@@ -107,19 +368,159 @@
       "name": "Register a patient",
       "priority": "P1",
       "status": "ready",
-      "tags": ["smoke"],
+      "tags": [
+        "smoke"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "Sign in", "params": { "blockId": "b-signin" } },
-        { "type": "ui.click", "label": "Open the registration form", "params": {}, "locators": [{ "strategy": "testId", "value": "quick-new-patient" }, { "strategy": "role", "value": "link", "name": "Register patient" }] },
-        { "type": "util.generateData", "label": "A patient name", "params": { "kind": "name" }, "captureAs": "patient" },
-        { "type": "ui.fill", "label": "Full name", "params": { "value": "{{vars.patient}}" }, "locators": [{ "strategy": "label", "value": "Full name" }, { "strategy": "testId", "value": "patient-name" }] },
-        { "type": "ui.fill", "label": "Date of birth", "params": { "value": "1990-05-17" }, "locators": [{ "strategy": "label", "value": "Date of birth" }] },
-        { "type": "ui.fill", "label": "Phone", "params": { "value": "+1-555-777-1234" }, "locators": [{ "strategy": "testId", "value": "patient-phone" }, { "strategy": "label", "value": "Phone" }] },
-        { "type": "ui.fill", "label": "Insurance", "params": { "value": "BlueCross" }, "locators": [{ "strategy": "label", "value": "Insurance provider" }] },
-        { "type": "ui.click", "label": "Save", "params": {}, "locators": [{ "strategy": "testId", "value": "save-patient" }, { "strategy": "role", "value": "button", "name": "Save patient" }] },
-        { "type": "ui.assert", "label": "Patient saved", "params": { "check": "textMatches", "expected": "Patient PAT-\\d+ registered" }, "locators": [{ "strategy": "role", "value": "status" }] },
-        { "type": "ui.assert", "label": "The patient page shows the name", "params": { "check": "text", "expected": "{{vars.patient}}" }, "locators": [{ "strategy": "testId", "value": "patient-title" }] },
-        { "type": "ui.assert", "label": "Insurance is kept", "params": { "check": "text", "expected": "BlueCross" }, "locators": [{ "strategy": "testId", "value": "patient-insurance-value" }] }
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "ui.click",
+          "label": "Open the registration form",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "quick-new-patient"
+            },
+            {
+              "strategy": "role",
+              "value": "link",
+              "name": "Register patient"
+            }
+          ]
+        },
+        {
+          "type": "util.generateData",
+          "label": "A patient name",
+          "params": {
+            "kind": "name"
+          },
+          "captureAs": "patient"
+        },
+        {
+          "type": "ui.fill",
+          "label": "Full name",
+          "params": {
+            "value": "{{vars.patient}}"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Full name"
+            },
+            {
+              "strategy": "testId",
+              "value": "patient-name"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Date of birth",
+          "params": {
+            "value": "1990-05-17"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Date of birth"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Phone",
+          "params": {
+            "value": "+1-555-777-1234"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "patient-phone"
+            },
+            {
+              "strategy": "label",
+              "value": "Phone"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Insurance",
+          "params": {
+            "value": "BlueCross"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Insurance provider"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Save",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "save-patient"
+            },
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Save patient"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Patient saved",
+          "params": {
+            "check": "textMatches",
+            "expected": "Patient PAT-\\d+ registered"
+          },
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "status"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "The patient page shows the name",
+          "params": {
+            "check": "text",
+            "expected": "{{vars.patient}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "patient-title"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Insurance is kept",
+          "params": {
+            "check": "text",
+            "expected": "BlueCross"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "patient-insurance-value"
+            }
+          ]
+        }
       ],
       "testCases": []
     },
@@ -129,18 +530,94 @@
       "name": "Search patients",
       "priority": "P2",
       "status": "ready",
-      "tags": ["regression"],
+      "tags": [
+        "regression"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "Sign in", "params": { "blockId": "b-signin" } },
-        { "type": "ui.navigate", "label": "Open the patient list", "params": { "url": "/patients" } },
-        { "type": "ui.fill", "label": "Search", "params": { "value": "{{data.query}}" }, "locators": [{ "strategy": "testId", "value": "patient-search" }, { "strategy": "label", "value": "Search patients" }] },
-        { "type": "ui.press", "label": "Search", "params": { "key": "Enter" }, "locators": [{ "strategy": "testId", "value": "patient-search" }] },
-        { "type": "ui.assert", "label": "The patient is listed", "params": { "check": "textContains", "expected": "{{data.expected}}" }, "locators": [{ "strategy": "testId", "value": "patients-table" }] }
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the patient list",
+          "params": {
+            "url": "/patients"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Search",
+          "params": {
+            "value": "{{data.query}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "patient-search"
+            },
+            {
+              "strategy": "label",
+              "value": "Search patients"
+            }
+          ]
+        },
+        {
+          "type": "ui.press",
+          "label": "Search",
+          "params": {
+            "key": "Enter"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "patient-search"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "The patient is listed",
+          "params": {
+            "check": "textContains",
+            "expected": "{{data.expected}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "patients-table"
+            }
+          ]
+        }
       ],
       "testCases": [
-        { "code": "TC-PAT-101", "title": "By name", "data": { "query": "Ana", "expected": "Ana Lopez" } },
-        { "code": "TC-PAT-102", "title": "By patient code", "data": { "query": "PAT-1002", "expected": "Ben Carter" } },
-        { "code": "TC-PAT-103", "title": "By phone", "data": { "query": "201-0004", "expected": "David Okafor" } }
+        {
+          "code": "TC-PAT-101",
+          "title": "By name",
+          "data": {
+            "query": "Ana",
+            "expected": "Ana Lopez"
+          }
+        },
+        {
+          "code": "TC-PAT-102",
+          "title": "By patient code",
+          "data": {
+            "query": "PAT-1002",
+            "expected": "Ben Carter"
+          }
+        },
+        {
+          "code": "TC-PAT-103",
+          "title": "By phone",
+          "data": {
+            "query": "201-0004",
+            "expected": "David Okafor"
+          }
+        }
       ]
     },
     {
@@ -150,21 +627,73 @@
       "description": "The API documents 409 Conflict for a duplicate patient (same name and date of birth).",
       "priority": "P1",
       "status": "ready",
-      "tags": ["api", "regression"],
+      "tags": [
+        "api",
+        "regression"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "API login", "params": { "blockId": "b-api-admin" } },
-        { "type": "util.generateData", "label": "A patient name", "params": { "kind": "name" }, "captureAs": "patient" },
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A patient name",
+          "params": {
+            "kind": "name"
+          },
+          "captureAs": "patient"
+        },
         {
           "type": "api.request",
           "label": "Register the patient",
-          "params": { "method": "POST", "url": "/api/patients", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" }, "body": { "full_name": "{{vars.patient}}", "dob": "1979-03-14", "phone": "+1-555-300-0000" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 201 }]
+          "params": {
+            "method": "POST",
+            "url": "/api/patients",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "full_name": "{{vars.patient}}",
+              "dob": "1979-03-14",
+              "phone": "+1-555-300-0000"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ]
         },
         {
           "type": "api.request",
           "label": "Register the same patient again",
-          "params": { "method": "POST", "url": "/api/patients", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" }, "body": { "full_name": "{{vars.patient}}", "dob": "1979-03-14", "phone": "+1-555-300-0000" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 409 }]
+          "params": {
+            "method": "POST",
+            "url": "/api/patients",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "full_name": "{{vars.patient}}",
+              "dob": "1979-03-14",
+              "phone": "+1-555-300-0000"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 409
+            }
+          ]
         }
       ],
       "testCases": []
@@ -175,19 +704,142 @@
       "name": "Book an appointment",
       "priority": "P1",
       "status": "ready",
-      "tags": ["smoke"],
+      "tags": [
+        "smoke"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "Sign in", "params": { "blockId": "b-signin" } },
-        { "type": "ui.navigate", "label": "Open the booking form", "params": { "url": "/appointments/new" } },
-        { "type": "util.generateData", "label": "A free date", "params": { "kind": "date", "direction": "future", "days": 3000 }, "captureAs": "day" },
-        { "type": "ui.select", "label": "Patient", "params": { "label": "Chloe Nguyen (PAT-1003)" }, "locators": [{ "strategy": "label", "value": "Patient" }] },
-        { "type": "ui.select", "label": "Doctor", "params": { "label": "Dr. Mei Lin · Pediatrics" }, "locators": [{ "strategy": "label", "value": "Doctor" }] },
-        { "type": "ui.fill", "label": "Date", "params": { "value": "{{vars.day}}" }, "locators": [{ "strategy": "testId", "value": "appointment-date" }, { "strategy": "label", "value": "Date" }] },
-        { "type": "ui.select", "label": "Time", "params": { "label": "14:30" }, "locators": [{ "strategy": "label", "value": "Time" }] },
-        { "type": "ui.fill", "label": "Reason", "params": { "value": "Vaccination" }, "locators": [{ "strategy": "label", "value": "Reason for visit" }] },
-        { "type": "ui.click", "label": "Book", "params": {}, "locators": [{ "strategy": "testId", "value": "book-appointment" }] },
-        { "type": "ui.assert", "label": "Booked", "params": { "check": "text", "expected": "Appointment booked" }, "locators": [{ "strategy": "role", "value": "status" }] },
-        { "type": "ui.assert", "label": "Listed", "params": { "check": "textContains", "expected": "{{vars.day}}" }, "locators": [{ "strategy": "css", "value": "#appointments-table" }] }
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the booking form",
+          "params": {
+            "url": "/appointments/new"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A free date",
+          "params": {
+            "kind": "date",
+            "direction": "future",
+            "days": 3000
+          },
+          "captureAs": "day"
+        },
+        {
+          "type": "ui.select",
+          "label": "Patient",
+          "params": {
+            "label": "Chloe Nguyen (PAT-1003)"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Patient"
+            }
+          ]
+        },
+        {
+          "type": "ui.select",
+          "label": "Doctor",
+          "params": {
+            "label": "Dr. Mei Lin · Pediatrics"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Doctor"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Date",
+          "params": {
+            "value": "{{vars.day}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "appointment-date"
+            },
+            {
+              "strategy": "label",
+              "value": "Date"
+            }
+          ]
+        },
+        {
+          "type": "ui.select",
+          "label": "Time",
+          "params": {
+            "label": "14:30"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Time"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Reason",
+          "params": {
+            "value": "Vaccination"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Reason for visit"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Book",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "book-appointment"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Booked",
+          "params": {
+            "check": "text",
+            "expected": "Appointment booked"
+          },
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "status"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Listed",
+          "params": {
+            "check": "textContains",
+            "expected": "{{vars.day}}"
+          },
+          "locators": [
+            {
+              "strategy": "css",
+              "value": "#appointments-table"
+            }
+          ]
+        }
       ],
       "testCases": []
     },
@@ -197,21 +849,89 @@
       "name": "A doctor cannot be double-booked",
       "priority": "P1",
       "status": "ready",
-      "tags": ["api", "regression"],
+      "tags": [
+        "api",
+        "regression"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "API login", "params": { "blockId": "b-api-admin" } },
-        { "type": "util.generateData", "label": "A free date", "params": { "kind": "date", "direction": "future", "days": 3000 }, "captureAs": "day" },
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A free date",
+          "params": {
+            "kind": "date",
+            "direction": "future",
+            "days": 3000
+          },
+          "captureAs": "day"
+        },
         {
           "type": "api.request",
           "label": "Book a slot",
-          "params": { "method": "POST", "url": "/api/appointments", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" }, "body": { "patient_id": 1, "doctor_id": 2, "date": "{{vars.day}}", "time": "09:30", "reason": "Check-up" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 201 }, { "target": "$.status", "operator": "equals", "expected": "booked" }]
+          "params": {
+            "method": "POST",
+            "url": "/api/appointments",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "patient_id": 1,
+              "doctor_id": 2,
+              "date": "{{vars.day}}",
+              "time": "09:30",
+              "reason": "Check-up"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            },
+            {
+              "target": "$.status",
+              "operator": "equals",
+              "expected": "booked"
+            }
+          ]
         },
         {
           "type": "api.request",
           "label": "Book the same slot for another patient",
-          "params": { "method": "POST", "url": "/api/appointments", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" }, "body": { "patient_id": 2, "doctor_id": 2, "date": "{{vars.day}}", "time": "09:30", "reason": "Check-up" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 409 }, { "target": "$.message", "operator": "contains", "expected": "already booked" }]
+          "params": {
+            "method": "POST",
+            "url": "/api/appointments",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "patient_id": 2,
+              "doctor_id": 2,
+              "date": "{{vars.day}}",
+              "time": "09:30",
+              "reason": "Check-up"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 409
+            },
+            {
+              "target": "$.message",
+              "operator": "contains",
+              "expected": "already booked"
+            }
+          ]
         }
       ],
       "testCases": []
@@ -222,13 +942,35 @@
       "name": "Health check",
       "priority": "P1",
       "status": "ready",
-      "tags": ["api", "smoke"],
+      "tags": [
+        "api",
+        "smoke"
+      ],
       "steps": [
         {
           "type": "api.request",
           "label": "GET /api/health",
-          "params": { "method": "GET", "url": "/api/health" },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 200 }, { "target": "$.ok", "operator": "equals", "expected": true }, { "target": "time", "operator": "lt", "expected": 1000 }]
+          "params": {
+            "method": "GET",
+            "url": "/api/health"
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "$.ok",
+              "operator": "equals",
+              "expected": true
+            },
+            {
+              "target": "time",
+              "operator": "lt",
+              "expected": 1000
+            }
+          ]
         }
       ],
       "testCases": []
@@ -240,20 +982,65 @@
       "description": "The OpenAPI document says a doctor's fee is a number.",
       "priority": "P2",
       "status": "ready",
-      "tags": ["api", "regression"],
+      "tags": [
+        "api",
+        "regression"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "API login", "params": { "blockId": "b-api-admin" } },
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
         {
           "type": "api.request",
           "label": "List doctors",
-          "params": { "method": "GET", "url": "/api/doctors", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" } },
+          "params": {
+            "method": "GET",
+            "url": "/api/doctors",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
           "assertions": [
-            { "target": "status", "operator": "equals", "expected": 200 },
-            { "target": "$", "operator": "lengthEquals", "expected": 3 },
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "$",
+              "operator": "lengthEquals",
+              "expected": 3
+            },
             {
               "target": "body",
               "operator": "matchesSchema",
-              "expected": { "type": "array", "items": { "type": "object", "required": ["id", "name", "fee"], "properties": { "id": { "type": "integer" }, "name": { "type": "string" }, "fee": { "type": "number" } } } }
+              "expected": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "fee"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "fee": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
             }
           ]
         }
@@ -266,19 +1053,40 @@
       "name": "Appointments require a login",
       "priority": "P1",
       "status": "ready",
-      "tags": ["api", "regression"],
+      "tags": [
+        "api",
+        "regression"
+      ],
       "steps": [
         {
           "type": "api.request",
           "label": "List appointments without a token",
-          "params": { "method": "GET", "url": "/api/appointments" },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 401 }]
+          "params": {
+            "method": "GET",
+            "url": "/api/appointments"
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 401
+            }
+          ]
         },
         {
           "type": "api.request",
           "label": "List patients without a token",
-          "params": { "method": "GET", "url": "/api/patients" },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 401 }]
+          "params": {
+            "method": "GET",
+            "url": "/api/patients"
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 401
+            }
+          ]
         }
       ],
       "testCases": []
@@ -289,14 +1097,36 @@
       "name": "Deleting an unknown patient returns 404",
       "priority": "P3",
       "status": "ready",
-      "tags": ["api", "regression"],
+      "tags": [
+        "api",
+        "regression"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "API login", "params": { "blockId": "b-api-admin" } },
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
         {
           "type": "api.request",
           "label": "Delete a patient that does not exist",
-          "params": { "method": "DELETE", "url": "/api/patients/999999", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 404 }]
+          "params": {
+            "method": "DELETE",
+            "url": "/api/patients/999999",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 404
+            }
+          ]
         }
       ],
       "testCases": []
@@ -307,35 +1137,123 @@
       "name": "Deleting a patient removes their appointments",
       "priority": "P1",
       "status": "ready",
-      "tags": ["database", "regression"],
+      "tags": [
+        "database",
+        "regression"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "API login", "params": { "blockId": "b-api-admin" } },
-        { "type": "util.generateData", "label": "A patient name", "params": { "kind": "name" }, "captureAs": "patient" },
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A patient name",
+          "params": {
+            "kind": "name"
+          },
+          "captureAs": "patient"
+        },
         {
           "type": "api.request",
           "label": "Create a patient",
-          "params": { "method": "POST", "url": "/api/patients", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" }, "body": { "full_name": "{{vars.patient}}", "dob": "2001-07-07", "phone": "+1-555-400-0000" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 201 }],
+          "params": {
+            "method": "POST",
+            "url": "/api/patients",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "full_name": "{{vars.patient}}",
+              "dob": "2001-07-07",
+              "phone": "+1-555-400-0000"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ],
           "captureAs": "created"
         },
-        { "type": "util.generateData", "label": "A free date", "params": { "kind": "date", "direction": "future", "days": 3000 }, "captureAs": "day" },
+        {
+          "type": "util.generateData",
+          "label": "A free date",
+          "params": {
+            "kind": "date",
+            "direction": "future",
+            "days": 3000
+          },
+          "captureAs": "day"
+        },
         {
           "type": "api.request",
           "label": "Book an appointment for them",
-          "params": { "method": "POST", "url": "/api/appointments", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" }, "body": { "patient_id": "{{vars.created.id}}", "doctor_id": 3, "date": "{{vars.day}}", "time": "15:00", "reason": "Follow-up" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 201 }]
+          "params": {
+            "method": "POST",
+            "url": "/api/appointments",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "patient_id": "{{vars.created.id}}",
+              "doctor_id": 3,
+              "date": "{{vars.day}}",
+              "time": "15:00",
+              "reason": "Follow-up"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ]
         },
         {
           "type": "api.request",
           "label": "Delete the patient",
-          "params": { "method": "DELETE", "url": "/api/patients/{{vars.created.id}}", "auth": { "type": "bearer", "token": "{{vars.admin.token}}" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 204 }]
+          "params": {
+            "method": "DELETE",
+            "url": "/api/patients/{{vars.created.id}}",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 204
+            }
+          ]
         },
         {
           "type": "db.query",
           "label": "No appointments are left for the deleted patient",
-          "params": { "connection": "clinic", "sql": "SELECT COUNT(*) AS n FROM appointments WHERE patient_id = ?", "params": ["{{vars.created.id}}"] },
-          "assertions": [{ "target": "value", "operator": "equals", "expected": 0 }]
+          "params": {
+            "connection": "clinic",
+            "sql": "SELECT COUNT(*) AS n FROM appointments WHERE patient_id = ?",
+            "params": [
+              "{{vars.created.id}}"
+            ]
+          },
+          "assertions": [
+            {
+              "target": "value",
+              "operator": "equals",
+              "expected": 0
+            }
+          ]
         }
       ],
       "testCases": []
@@ -346,24 +1264,53 @@
       "name": "Patient data is complete",
       "priority": "P2",
       "status": "ready",
-      "tags": ["database"],
+      "tags": [
+        "database"
+      ],
       "steps": [
         {
           "type": "db.query",
           "label": "Every patient has a code, a name and a date of birth",
-          "params": { "connection": "clinic", "sql": "SELECT code, full_name, dob FROM patients" },
+          "params": {
+            "connection": "clinic",
+            "sql": "SELECT code, full_name, dob FROM patients"
+          },
           "assertions": [
-            { "target": "rowCount", "operator": "gte", "expected": 4 },
-            { "target": "column:code", "operator": "unique" },
-            { "target": "column:full_name", "operator": "noNulls" },
-            { "target": "column:dob", "operator": "noNulls" }
+            {
+              "target": "rowCount",
+              "operator": "gte",
+              "expected": 4
+            },
+            {
+              "target": "column:code",
+              "operator": "unique"
+            },
+            {
+              "target": "column:full_name",
+              "operator": "noNulls"
+            },
+            {
+              "target": "column:dob",
+              "operator": "noNulls"
+            }
           ]
         },
         {
           "type": "db.query",
           "label": "Doctor fees are positive",
-          "params": { "connection": "clinic", "sql": "SELECT fee FROM doctors" },
-          "assertions": [{ "target": "column:fee", "operator": "inRange", "expected": { "min": 1 } }]
+          "params": {
+            "connection": "clinic",
+            "sql": "SELECT fee FROM doctors"
+          },
+          "assertions": [
+            {
+              "target": "column:fee",
+              "operator": "inRange",
+              "expected": {
+                "min": 1
+              }
+            }
+          ]
         }
       ],
       "testCases": []
@@ -374,20 +1321,134 @@
       "name": "Sign up with email verification",
       "priority": "P1",
       "status": "ready",
-      "tags": ["email", "smoke"],
+      "tags": [
+        "email",
+        "smoke"
+      ],
       "steps": [
-        { "type": "util.setVariable", "label": "A unique address for this run", "params": { "name": "email", "value": "qa+{{run.id}}@example.test" } },
-        { "type": "ui.navigate", "label": "Open the sign-up page", "params": { "url": "/signup" } },
-        { "type": "ui.fill", "label": "Full name", "params": { "value": "Quinn QA" }, "locators": [{ "strategy": "label", "value": "Full name" }] },
-        { "type": "ui.fill", "label": "Email", "params": { "value": "{{vars.email}}" }, "locators": [{ "strategy": "testId", "value": "signup-email" }] },
-        { "type": "ui.fill", "label": "Password", "params": { "value": "Quinn-QA-2026" }, "locators": [{ "strategy": "label", "value": "Password" }] },
-        { "type": "ui.click", "label": "Create the account", "params": {}, "locators": [{ "strategy": "testId", "value": "signup-submit" }] },
-        { "type": "email.waitForEmail", "label": "Wait for the verification email", "params": { "to": "{{vars.email}}", "subject": "Verify your CareClinic account", "timeoutMs": 20000 } },
-        { "type": "email.assertEmail", "label": "It has a code and a link", "params": { "bodyContains": "verification code", "hasLink": "verify" } },
-        { "type": "email.extractFromEmail", "label": "Read the code", "params": { "kind": "otp" }, "captureAs": "otp" },
-        { "type": "ui.fill", "label": "Enter the code", "params": { "value": "{{vars.otp}}" }, "locators": [{ "strategy": "testId", "value": "verify-code" }] },
-        { "type": "ui.click", "label": "Verify", "params": {}, "locators": [{ "strategy": "role", "value": "button", "name": "Verify email" }] },
-        { "type": "ui.assert", "label": "Verified", "params": { "check": "urlContains", "expected": "verified=1" } }
+        {
+          "type": "util.setVariable",
+          "label": "A unique address for this run",
+          "params": {
+            "name": "email",
+            "value": "qa+{{run.id}}@example.test"
+          }
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the sign-up page",
+          "params": {
+            "url": "/signup"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Full name",
+          "params": {
+            "value": "Quinn QA"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Full name"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Email",
+          "params": {
+            "value": "{{vars.email}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "signup-email"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Password",
+          "params": {
+            "value": "Quinn-QA-2026"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Password"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Create the account",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "signup-submit"
+            }
+          ]
+        },
+        {
+          "type": "email.waitForEmail",
+          "label": "Wait for the verification email",
+          "params": {
+            "to": "{{vars.email}}",
+            "subject": "Verify your CareClinic account",
+            "timeoutMs": 20000
+          }
+        },
+        {
+          "type": "email.assertEmail",
+          "label": "It has a code and a link",
+          "params": {
+            "bodyContains": "verification code",
+            "hasLink": true
+          }
+        },
+        {
+          "type": "email.extractFromEmail",
+          "label": "Read the code",
+          "params": {
+            "kind": "otp"
+          },
+          "captureAs": "otp"
+        },
+        {
+          "type": "ui.fill",
+          "label": "Enter the code",
+          "params": {
+            "value": "{{vars.otp}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "verify-code"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Verify",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Verify email"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Verified",
+          "params": {
+            "check": "urlContains",
+            "expected": "verified=1"
+          }
+        }
       ],
       "testCases": []
     },
@@ -397,10 +1458,28 @@
       "name": "The dashboard loads quickly",
       "priority": "P2",
       "status": "ready",
-      "tags": ["performance"],
+      "tags": [
+        "performance"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "Sign in", "params": { "blockId": "b-signin" } },
-        { "type": "perf.pageMetrics", "label": "Web Vitals of the dashboard", "params": { "thresholds": { "lcpMs": 2500, "cls": 0.1, "ttfbMs": 800 } } }
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "perf.pageMetrics",
+          "label": "Web Vitals of the dashboard",
+          "params": {
+            "thresholds": {
+              "lcpMs": 2500,
+              "cls": 0.1,
+              "ttfbMs": 800
+            }
+          }
+        }
       ],
       "testCases": []
     },
@@ -410,9 +1489,24 @@
       "name": "Looking up a patient uses the primary key",
       "priority": "P3",
       "status": "ready",
-      "tags": ["performance", "database"],
+      "tags": [
+        "performance",
+        "database"
+      ],
       "steps": [
-        { "type": "perf.queryPlan", "label": "Query plan of the patient lookup", "params": { "connection": "clinic", "sql": "SELECT * FROM patients WHERE id = ?", "params": [1], "maxMs": 50, "noFullScan": true } }
+        {
+          "type": "perf.queryPlan",
+          "label": "Query plan of the patient lookup",
+          "params": {
+            "connection": "clinic",
+            "sql": "SELECT * FROM patients WHERE id = ?",
+            "params": [
+              1
+            ],
+            "maxMs": 50,
+            "noFullScan": true
+          }
+        }
       ],
       "testCases": []
     },
@@ -423,31 +1517,853 @@
       "description": "One flow across three layers: the browser, the REST API and the database.",
       "priority": "P1",
       "status": "ready",
-      "tags": ["smoke", "api", "database"],
+      "tags": [
+        "smoke",
+        "api",
+        "database"
+      ],
       "steps": [
-        { "type": "util.useBlock", "label": "Sign in", "params": { "blockId": "b-signin" } },
-        { "type": "ui.click", "label": "Open the registration form", "params": {}, "locators": [{ "strategy": "testId", "value": "quick-new-patient" }] },
-        { "type": "util.generateData", "label": "A patient name", "params": { "kind": "name" }, "captureAs": "patient" },
-        { "type": "ui.fill", "label": "Full name", "params": { "value": "{{vars.patient}}" }, "locators": [{ "strategy": "label", "value": "Full name" }] },
-        { "type": "ui.fill", "label": "Date of birth", "params": { "value": "1984-08-21" }, "locators": [{ "strategy": "label", "value": "Date of birth" }] },
-        { "type": "ui.fill", "label": "Phone", "params": { "value": "+1-555-555-0199" }, "locators": [{ "strategy": "testId", "value": "patient-phone" }] },
-        { "type": "ui.click", "label": "Save", "params": {}, "locators": [{ "strategy": "testId", "value": "save-patient" }] },
-        { "type": "ui.extract", "label": "Read the new patient code", "params": { "from": "text" }, "locators": [{ "strategy": "css", "value": "#patient-code" }], "captureAs": "code" },
-        { "type": "util.useBlock", "label": "API login", "params": { "blockId": "b-api-admin" } },
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "ui.click",
+          "label": "Open the registration form",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "quick-new-patient"
+            }
+          ]
+        },
+        {
+          "type": "util.generateData",
+          "label": "A patient name",
+          "params": {
+            "kind": "name"
+          },
+          "captureAs": "patient"
+        },
+        {
+          "type": "ui.fill",
+          "label": "Full name",
+          "params": {
+            "value": "{{vars.patient}}"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Full name"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Date of birth",
+          "params": {
+            "value": "1984-08-21"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Date of birth"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Phone",
+          "params": {
+            "value": "+1-555-555-0199"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "patient-phone"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Save",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "save-patient"
+            }
+          ]
+        },
+        {
+          "type": "ui.extract",
+          "label": "Read the new patient code",
+          "params": {
+            "from": "text"
+          },
+          "locators": [
+            {
+              "strategy": "css",
+              "value": "#patient-code"
+            }
+          ],
+          "captureAs": "code"
+        },
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
         {
           "type": "api.request",
           "label": "Find the patient through the API",
-          "params": { "method": "GET", "url": "/api/patients", "query": { "q": "{{vars.code}}" }, "auth": { "type": "bearer", "token": "{{vars.admin.token}}" } },
-          "assertions": [{ "target": "status", "operator": "equals", "expected": 200 }, { "target": "$", "operator": "lengthEquals", "expected": 1 }, { "target": "$[0].full_name", "operator": "equals", "expected": "{{vars.patient}}" }]
+          "params": {
+            "method": "GET",
+            "url": "/api/patients",
+            "query": {
+              "q": "{{vars.code}}"
+            },
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "$",
+              "operator": "lengthEquals",
+              "expected": 1
+            },
+            {
+              "target": "$[0].full_name",
+              "operator": "equals",
+              "expected": "{{vars.patient}}"
+            }
+          ]
         },
         {
           "type": "db.query",
           "label": "The row is in the database",
-          "params": { "connection": "clinic", "sql": "SELECT full_name, phone FROM patients WHERE code = ?", "params": ["{{vars.code}}"] },
-          "assertions": [{ "target": "rowCount", "operator": "equals", "expected": 1 }, { "target": "phone", "operator": "equals", "expected": "+1-555-555-0199" }]
+          "params": {
+            "connection": "clinic",
+            "sql": "SELECT full_name, phone FROM patients WHERE code = ?",
+            "params": [
+              "{{vars.code}}"
+            ]
+          },
+          "assertions": [
+            {
+              "target": "rowCount",
+              "operator": "equals",
+              "expected": 1
+            },
+            {
+              "target": "phone",
+              "operator": "equals",
+              "expected": "+1-555-555-0199"
+            }
+          ]
         }
       ],
       "testCases": []
+    },
+    {
+      "ref": "s-kpi-label",
+      "moduleRef": "m-dash",
+      "name": "Dashboard labels the appointment count",
+      "priority": "P3",
+      "status": "ready",
+      "tags": [
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "ui.assert",
+          "label": "The KPI is labelled correctly",
+          "params": {
+            "check": "text",
+            "expected": "Upcoming appointments"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "kpi-appointments-label"
+            }
+          ],
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "ref": "s-next-appts",
+      "moduleRef": "m-dash",
+      "name": "Dashboard lists the next appointments",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "ui.assert",
+          "label": "Appointments are listed",
+          "params": {
+            "check": "textContains",
+            "expected": " with Dr. "
+          },
+          "locators": [
+            {
+              "strategy": "css",
+              "value": "#next-appointments"
+            }
+          ],
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "ref": "s-book-mobile",
+      "moduleRef": "m-appointments",
+      "name": "Book an appointment on a phone",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "mobile",
+        "regression"
+      ],
+      "description": "Run with the mobile viewport (tag \"mobile\").",
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A free date",
+          "params": {
+            "kind": "date",
+            "direction": "future",
+            "days": 3000
+          },
+          "captureAs": "day"
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the booking form",
+          "params": {
+            "url": "/appointments/new"
+          }
+        },
+        {
+          "type": "ui.select",
+          "label": "Patient",
+          "params": {
+            "label": "Ben Carter (PAT-1002)"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Patient"
+            }
+          ]
+        },
+        {
+          "type": "ui.select",
+          "label": "Doctor",
+          "params": {
+            "label": "Dr. Dana Reyes · General Practice"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Doctor"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Date",
+          "params": {
+            "value": "{{vars.day}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "appointment-date"
+            }
+          ]
+        },
+        {
+          "type": "ui.select",
+          "label": "Time",
+          "params": {
+            "label": "14:00"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Time"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Book",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "book-appointment"
+            },
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Book appointment"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "Booked",
+          "params": {
+            "check": "text",
+            "expected": "Appointment booked"
+          },
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "status"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-form-double",
+      "moduleRef": "m-appointments",
+      "name": "The booking form refuses a double booking",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "Sign in",
+          "params": {
+            "blockId": "b-signin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A free date",
+          "params": {
+            "kind": "date",
+            "direction": "future",
+            "days": 3000
+          },
+          "captureAs": "day"
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the booking form",
+          "params": {
+            "url": "/appointments/new"
+          }
+        },
+        {
+          "type": "ui.select",
+          "label": "Patient",
+          "params": {
+            "label": "Ana Lopez (PAT-1001)"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Patient"
+            }
+          ]
+        },
+        {
+          "type": "ui.select",
+          "label": "Doctor",
+          "params": {
+            "label": "Dr. Omar Haddad · Cardiology"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Doctor"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Date",
+          "params": {
+            "value": "{{vars.day}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "appointment-date"
+            }
+          ]
+        },
+        {
+          "type": "ui.select",
+          "label": "Time",
+          "params": {
+            "label": "11:00"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Time"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Book",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "book-appointment"
+            },
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Book appointment"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "First booking accepted",
+          "params": {
+            "check": "text",
+            "expected": "Appointment booked"
+          },
+          "locators": [
+            {
+              "strategy": "role",
+              "value": "status"
+            }
+          ]
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the booking form",
+          "params": {
+            "url": "/appointments/new"
+          }
+        },
+        {
+          "type": "ui.select",
+          "label": "Patient",
+          "params": {
+            "label": "Ben Carter (PAT-1002)"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Patient"
+            }
+          ]
+        },
+        {
+          "type": "ui.select",
+          "label": "Doctor",
+          "params": {
+            "label": "Dr. Omar Haddad · Cardiology"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Doctor"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Date",
+          "params": {
+            "value": "{{vars.day}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "appointment-date"
+            }
+          ]
+        },
+        {
+          "type": "ui.select",
+          "label": "Time",
+          "params": {
+            "label": "11:00"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Time"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Book",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "book-appointment"
+            },
+            {
+              "strategy": "role",
+              "value": "button",
+              "name": "Book appointment"
+            }
+          ]
+        },
+        {
+          "type": "ui.assert",
+          "label": "The second booking is refused",
+          "params": {
+            "check": "textContains",
+            "expected": "already booked"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "booking-error"
+            }
+          ],
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "ref": "s-bill",
+      "moduleRef": "m-billing",
+      "name": "Insured patients get 20% off",
+      "priority": "P1",
+      "status": "ready",
+      "tags": [
+        "api",
+        "regression"
+      ],
+      "testCases": [],
+      "description": "Ana Lopez is insured (BlueCross); Dr. Dana Reyes charges 60.00, so the bill is 48.00.",
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "util.generateData",
+          "label": "A free date",
+          "params": {
+            "kind": "date",
+            "direction": "future",
+            "days": 3000
+          },
+          "captureAs": "day"
+        },
+        {
+          "type": "api.request",
+          "label": "Book Ana Lopez with Dr. Reyes",
+          "params": {
+            "method": "POST",
+            "url": "/api/appointments",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            },
+            "body": {
+              "patient_id": 1,
+              "doctor_id": 1,
+              "date": "{{vars.day}}",
+              "time": "10:00",
+              "reason": "Check-up"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 201
+            }
+          ],
+          "captureAs": "appt"
+        },
+        {
+          "type": "api.request",
+          "label": "Get the bill",
+          "params": {
+            "method": "GET",
+            "url": "/api/appointments/{{vars.appt.id}}/bill",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "$.fee",
+              "operator": "equals",
+              "expected": 60
+            },
+            {
+              "target": "$.discount",
+              "operator": "equals",
+              "expected": 12
+            },
+            {
+              "target": "$.total",
+              "operator": "equals",
+              "expected": 48
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-email-link",
+      "moduleRef": "m-email",
+      "name": "Verify with the link in the email",
+      "priority": "P2",
+      "status": "ready",
+      "tags": [
+        "email",
+        "regression"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.setVariable",
+          "label": "A unique address for this run",
+          "params": {
+            "name": "email",
+            "value": "qa.link+{{run.id}}@example.test"
+          }
+        },
+        {
+          "type": "ui.navigate",
+          "label": "Open the sign-up page",
+          "params": {
+            "url": "/signup"
+          }
+        },
+        {
+          "type": "ui.fill",
+          "label": "Full name",
+          "params": {
+            "value": "Lee Link"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Full name"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Email",
+          "params": {
+            "value": "{{vars.email}}"
+          },
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "signup-email"
+            }
+          ]
+        },
+        {
+          "type": "ui.fill",
+          "label": "Password",
+          "params": {
+            "value": "Lee-Link-2026"
+          },
+          "locators": [
+            {
+              "strategy": "label",
+              "value": "Password"
+            }
+          ]
+        },
+        {
+          "type": "ui.click",
+          "label": "Create the account",
+          "params": {},
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "signup-submit"
+            }
+          ]
+        },
+        {
+          "type": "email.waitForEmail",
+          "label": "Wait for the verification email",
+          "params": {
+            "to": "{{vars.email}}",
+            "subject": "Verify your CareClinic account",
+            "timeoutMs": 20000
+          }
+        },
+        {
+          "type": "email.openEmailLink",
+          "label": "Open the link in the email",
+          "params": {
+            "contains": "code="
+          }
+        },
+        {
+          "type": "ui.assert",
+          "label": "Verified",
+          "params": {
+            "check": "urlContains",
+            "expected": "verified=1"
+          },
+          "timeoutMs": 5000
+        }
+      ]
+    },
+    {
+      "ref": "s-perf-visits",
+      "moduleRef": "m-perf",
+      "name": "The visits report answers quickly",
+      "priority": "P3",
+      "status": "ready",
+      "tags": [
+        "performance",
+        "api"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "api.request",
+          "label": "Visits report",
+          "params": {
+            "method": "GET",
+            "url": "/api/reports/visits",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "time",
+              "operator": "lt",
+              "expected": 800
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "s-perf-schedule",
+      "moduleRef": "m-perf",
+      "name": "The doctors' schedule answers quickly",
+      "priority": "P3",
+      "status": "ready",
+      "tags": [
+        "performance",
+        "api"
+      ],
+      "testCases": [],
+      "steps": [
+        {
+          "type": "util.useBlock",
+          "label": "API login",
+          "params": {
+            "blockId": "b-api-admin"
+          }
+        },
+        {
+          "type": "api.request",
+          "label": "Doctors' schedule",
+          "params": {
+            "method": "GET",
+            "url": "/api/doctors/schedule",
+            "auth": {
+              "type": "bearer",
+              "token": "{{vars.admin.token}}"
+            }
+          },
+          "assertions": [
+            {
+              "target": "status",
+              "operator": "equals",
+              "expected": 200
+            },
+            {
+              "target": "time",
+              "operator": "lt",
+              "expected": 150
+            }
+          ]
+        }
+      ]
     }
   ]
 }

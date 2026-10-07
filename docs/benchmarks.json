@@ -1,0 +1,546 @@
+{
+  "$comment": "Measured by scripts/benchmark.ts. These are the only numbers the README, case study and Upwork assets may use.",
+  "generatedAt": "2026-10-07T03:00:30.952Z",
+  "stepforgeVersion": "0.1.0",
+  "machine": {
+    "os": "darwin 25.5.0",
+    "arch": "arm64",
+    "cpu": "Apple M3 Pro",
+    "cores": 11,
+    "memoryGb": 18,
+    "node": "v23.6.0"
+  },
+  "method": "Each demo app runs its whole demo-workspace suite at desktop size and its phone scenarios at mobile size, one test at a time. Planted bugs are scored afterwards against demo/manifests/planted_bugs.json, which StepForge never reads.",
+  "totals": {
+    "plantedBugs": 25,
+    "detected": 25,
+    "detectionRatePct": 100,
+    "diagnosedCorrectly": 24,
+    "diagnosisAccuracyPct": 96,
+    "falseAlarms": 0,
+    "scenarios": 45,
+    "testRuns": 51,
+    "runTimeSeconds": 83.6,
+    "layers": [
+      "api",
+      "db",
+      "ui",
+      "email",
+      "logic",
+      "performance"
+    ]
+  },
+  "apps": [
+    {
+      "app": "CareClinic",
+      "scenarios": 25,
+      "testRuns": 29,
+      "passed": 16,
+      "failed": 13,
+      "plantedBugs": 13,
+      "detected": 13,
+      "diagnosedCorrectly": 12,
+      "runTimeMs": {
+        "desktop": 33459,
+        "mobile": 16227
+      }
+    },
+    {
+      "app": "ShopDesk",
+      "scenarios": 20,
+      "testRuns": 22,
+      "passed": 10,
+      "failed": 12,
+      "plantedBugs": 12,
+      "detected": 12,
+      "diagnosedCorrectly": 12,
+      "runTimeMs": {
+        "desktop": 17864,
+        "mobile": 16085
+      }
+    }
+  ],
+  "bugs": [
+    {
+      "id": "CC-API-01",
+      "app": "careclinic",
+      "layer": "api",
+      "title": "Doctor fee is returned as a string",
+      "scenario": "Doctors match the documented schema",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "schema_mismatch",
+        "title": "The response does not match its schema: 0.fee should be number; 1.fee should be number; 2.fee should be number",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "schema_mismatch"
+      ]
+    },
+    {
+      "id": "CC-API-02",
+      "app": "careclinic",
+      "layer": "api",
+      "title": "Appointments can be listed without logging in",
+      "scenario": "Appointments require a login",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "missing_auth",
+        "title": "The API accepted a request it should have rejected (200 instead of 401)",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "missing_auth",
+        "auth_required"
+      ]
+    },
+    {
+      "id": "CC-API-03",
+      "app": "careclinic",
+      "layer": "api",
+      "title": "Deleting an unknown patient returns 204",
+      "scenario": "Deleting an unknown patient returns 404",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "wrong_status",
+        "title": "The API answered 204 No Content for something that does not exist",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "wrong_status",
+        "not_found"
+      ]
+    },
+    {
+      "id": "CC-DB-01",
+      "app": "careclinic",
+      "layer": "db",
+      "title": "Deleting a patient leaves their appointments behind",
+      "scenario": "Deleting a patient removes their appointments",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "data_integrity",
+        "title": "The database holds 1 where 0 was expected",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "data_integrity",
+        "data_quality"
+      ]
+    },
+    {
+      "id": "CC-DB-02",
+      "app": "careclinic",
+      "layer": "db",
+      "title": "The same patient can be registered twice",
+      "scenario": "The same patient cannot be registered twice",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "validation_missing",
+        "title": "The API accepted a duplicate (201 instead of 409 Conflict)",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "validation_missing",
+        "db_constraint",
+        "data_integrity"
+      ]
+    },
+    {
+      "id": "CC-UI-01",
+      "app": "careclinic",
+      "layer": "ui",
+      "title": "The upcoming-appointments KPI is labelled \"Cancelled appointments\"",
+      "scenario": "Dashboard labels the appointment count",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "js_exception",
+        "title": "A JavaScript error broke the page: TypeError: Cannot read properties of undefined (reading 'name')",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": false,
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ]
+    },
+    {
+      "id": "CC-UI-02",
+      "app": "careclinic",
+      "layer": "ui",
+      "title": "The Book button cannot be clicked on mobile",
+      "scenario": "Book an appointment on a phone",
+      "run": "mobile",
+      "detected": true,
+      "diagnosis": {
+        "category": "element_covered",
+        "title": "Another element covers testId=book-appointment",
+        "owner": "test"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "element_covered",
+        "element_hidden",
+        "timeout"
+      ]
+    },
+    {
+      "id": "CC-UI-03",
+      "app": "careclinic",
+      "layer": "ui",
+      "title": "The next-appointments widget throws a TypeError",
+      "scenario": "Dashboard lists the next appointments",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "js_exception",
+        "title": "A JavaScript error broke the page: TypeError: Cannot read properties of undefined (reading 'name')",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "js_exception"
+      ]
+    },
+    {
+      "id": "CC-EMAIL-01",
+      "app": "careclinic",
+      "layer": "email",
+      "title": "The verification email links to /verfy",
+      "scenario": "Verify with the link in the email",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "assertion_mismatch",
+        "title": "The page did not meet the check: Expected urlContains \"verified=1\", but got \"http://127.0.0.1:64609/verfy?email=qa.link%2B01m4a4st2tehnm9q6rf3ynh34n%40example.test&code=355459\"",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "email_link_missing",
+        "not_found",
+        "assertion_mismatch",
+        "wrong_status"
+      ]
+    },
+    {
+      "id": "CC-BIZ-01",
+      "app": "careclinic",
+      "layer": "logic",
+      "title": "The bill ignores insurance",
+      "scenario": "Insured patients get 20% off",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "assertion_mismatch",
+        "title": "The response has 0 where the test expects 12",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ]
+    },
+    {
+      "id": "CC-BIZ-02",
+      "app": "careclinic",
+      "layer": "logic",
+      "title": "The booking form allows double-booking a doctor",
+      "scenario": "The booking form refuses a double booking",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "element_not_found",
+        "title": "The element testId=booking-error was not found",
+        "owner": "test"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "element_not_found",
+        "assertion_mismatch",
+        "validation_missing",
+        "timeout"
+      ]
+    },
+    {
+      "id": "CC-PERF-01",
+      "app": "careclinic",
+      "layer": "performance",
+      "title": "The visits report takes about 1.5 s",
+      "scenario": "The visits report answers quickly",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "slow_api",
+        "title": "The API answered in 1504 ms; the limit is 800 ms",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "slow_api",
+        "perf_threshold",
+        "slow_down"
+      ]
+    },
+    {
+      "id": "CC-PERF-02",
+      "app": "careclinic",
+      "layer": "performance",
+      "title": "The doctors' schedule runs one query per row (N+1)",
+      "scenario": "The doctors' schedule answers quickly",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "slow_api",
+        "title": "The API answered in 509 ms; the limit is 150 ms",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "slow_api",
+        "perf_threshold",
+        "slow_down"
+      ]
+    },
+    {
+      "id": "SD-UI-01",
+      "app": "shopdesk",
+      "layer": "ui",
+      "title": "Products with no stock are shown as \"In stock\"",
+      "scenario": "Out-of-stock products are marked",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "assertion_mismatch",
+        "title": "The page did not meet the check: Expected textContains \"Out of stock\", but got \"SKU\\tNAME\\tPRICE\\tSTOCK\\tSTATUS\\nSKU-1004\\tPaper filters (100)\\t4.50\\t0\\tIn stock\"",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ]
+    },
+    {
+      "id": "SD-UI-02",
+      "app": "shopdesk",
+      "layer": "ui",
+      "title": "\"Complete sale\" cannot be clicked on mobile",
+      "scenario": "Complete a sale on a phone",
+      "run": "mobile",
+      "detected": true,
+      "diagnosis": {
+        "category": "element_covered",
+        "title": "Another element covers role=button \"Add to cart\"",
+        "owner": "test"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "element_covered",
+        "element_hidden",
+        "timeout"
+      ]
+    },
+    {
+      "id": "SD-UI-03",
+      "app": "shopdesk",
+      "layer": "ui",
+      "title": "The cart total throws a TypeError",
+      "scenario": "The cart shows the running total",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "js_exception",
+        "title": "A JavaScript error broke the page: TypeError: Cannot read properties of undefined (reading 'toFixed')",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "js_exception"
+      ]
+    },
+    {
+      "id": "SD-API-01",
+      "app": "shopdesk",
+      "layer": "api",
+      "title": "A product without a name is accepted with 200",
+      "scenario": "A product without a name is rejected",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "validation_missing",
+        "title": "The API accepted invalid input (200 instead of 422)",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "wrong_status",
+        "validation_missing"
+      ]
+    },
+    {
+      "id": "SD-API-02",
+      "app": "shopdesk",
+      "layer": "api",
+      "title": "Prices are strings",
+      "scenario": "Products match the documented schema",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "schema_mismatch",
+        "title": "The response does not match its schema: 0.price should be number; 0.cost should be number; 1.price should be number; 1.cost should be number; 2.price should be number",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "schema_mismatch"
+      ]
+    },
+    {
+      "id": "SD-API-03",
+      "app": "shopdesk",
+      "layer": "api",
+      "title": "The profit report is public",
+      "scenario": "The profit report requires a login",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "missing_auth",
+        "title": "The API accepted a request it should have rejected (200 instead of 401)",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "missing_auth",
+        "auth_required"
+      ]
+    },
+    {
+      "id": "SD-DB-01",
+      "app": "shopdesk",
+      "layer": "db",
+      "title": "Stock can go negative",
+      "scenario": "Stock never goes negative",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "data_integrity",
+        "title": "The database holds -3 where 0 was expected",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "data_quality",
+        "assertion_mismatch",
+        "data_integrity",
+        "validation_missing"
+      ]
+    },
+    {
+      "id": "SD-DB-02",
+      "app": "shopdesk",
+      "layer": "db",
+      "title": "Deleting a product leaves its sale lines behind",
+      "scenario": "Deleting a product removes its sale lines",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "data_integrity",
+        "title": "The database holds 1 where 0 was expected",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "data_integrity",
+        "data_quality"
+      ]
+    },
+    {
+      "id": "SD-BIZ-01",
+      "app": "shopdesk",
+      "layer": "logic",
+      "title": "Profit is always 0",
+      "scenario": "Profit is revenue minus cost",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "assertion_mismatch",
+        "title": "The response has [0] where the test expects [6]",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ]
+    },
+    {
+      "id": "SD-BIZ-02",
+      "app": "shopdesk",
+      "layer": "logic",
+      "title": "The sale total ignores the quantity",
+      "scenario": "A sale total counts every unit",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "assertion_mismatch",
+        "title": "The response has 9.5 where the test expects 28.5",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "assertion_mismatch"
+      ]
+    },
+    {
+      "id": "SD-PERF-01",
+      "app": "shopdesk",
+      "layer": "performance",
+      "title": "The sales report takes about 1.5 s",
+      "scenario": "The sales report answers quickly",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "slow_api",
+        "title": "The API answered in 1505 ms; the limit is 800 ms",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "slow_api",
+        "perf_threshold",
+        "slow_down"
+      ]
+    },
+    {
+      "id": "SD-PERF-02",
+      "app": "shopdesk",
+      "layer": "performance",
+      "title": "Expanded sales run one query per row (N+1)",
+      "scenario": "Expanded sales answer quickly",
+      "run": "desktop",
+      "detected": true,
+      "diagnosis": {
+        "category": "slow_api",
+        "title": "The API answered in 714 ms; the limit is 150 ms",
+        "owner": "app"
+      },
+      "diagnosedCorrectly": true,
+      "acceptableDiagnoses": [
+        "slow_api",
+        "perf_threshold",
+        "slow_down"
+      ]
+    }
+  ],
+  "falseAlarms": [],
+  "benchmarkDurationSeconds": 86
+}

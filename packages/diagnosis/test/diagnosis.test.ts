@@ -262,6 +262,74 @@ describe('diagnoses (fixtures)', () => {
       'app',
     ],
     [
+      'JS exception on the page that failed',
+      input(
+        step({
+          type: 'ui.assert',
+          errorKind: 'assertion',
+          message: 'Expected visible',
+          diagnostics: { pageUrl: 'http://x/orders?id=1' },
+        }),
+        {
+          console: [
+            { type: 'pageerror', text: 'TypeError: x is undefined', location: 'at http://x/orders:12:5' },
+          ],
+        },
+      ),
+      'js_exception',
+      'app',
+    ],
+    [
+      'JS exception on an earlier page is not blamed',
+      input(
+        step({
+          type: 'ui.assert',
+          errorKind: 'assertion',
+          message: 'Expected text',
+          assertions: [
+            {
+              target: 'text',
+              operator: 'equals',
+              expected: 'Saved',
+              actual: 'Error',
+              passed: false,
+              message: 'Expected text equals "Saved", but got "Error"',
+            },
+          ],
+          diagnostics: { pageUrl: 'http://x/orders/new' },
+        }),
+        {
+          console: [{ type: 'pageerror', text: 'TypeError: x is undefined', location: 'at http://x/:12:5' }],
+        },
+      ),
+      'assertion_mismatch',
+      'app',
+    ],
+    [
+      'slow API response',
+      input(
+        step({
+          type: 'api.request',
+          errorKind: 'assertion',
+          message: 'Expected time lt 800, but got 1505',
+          request: { method: 'GET', url: 'http://x/api/report' },
+          response: { status: 200 },
+          assertions: [
+            {
+              target: 'time',
+              operator: 'lt',
+              expected: 800,
+              actual: 1505,
+              passed: false,
+              message: 'Expected time lt 800, but got 1505',
+            },
+          ],
+        }),
+      ),
+      'slow_api',
+      'app',
+    ],
+    [
       'text mismatch',
       input(
         step({

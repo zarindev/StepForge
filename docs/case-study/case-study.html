@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StepForge Case Study</title>
+<meta name="description" content="StepForge — a free, local QA studio for UI, API, database, email and performance testing. Case study by Md Zarin Tasnim.">
+<meta name="author" content="Md Zarin Tasnim">
+<!--
+  StepForge case study — by Md Zarin Tasnim. 15 slides, each exactly 1600×1200.
+  Every number marked data-bench is filled from docs/benchmarks.json by scripts/export_case_study.ts, which also
+  exports the PDF, slide PNGs and Upwork/social images. Screenshots are real captures (scripts/capture_showcase.ts).
+-->
+<style>
+  @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+  @font-face { font-family: 'JetBrains Mono'; src: url('fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2'); font-weight: 100 800; font-display: block; }
+  :root {
+    --bg: #0B0D12; --bg2: #111520; --panel: #141926; --line: rgba(255,255,255,.09);
+    --text: #F5F7FA; --muted: #9AA4B2; --dim: #6B7586;
+    --accent: #F97316; --accent2: #FB923C; --green: #22C55E; --red: #EF4444; --blue: #60A5FA; --violet: #A78BFA; --yellow: #FACC15; --teal: #2DD4BF;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #05060a; }
+  body { font-family: 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+  @page { size: 1600px 1200px; margin: 0; }
+
+  /* Viewing: slides stacked and scaled to the window. Export (?export): 1:1, no gaps. */
+  .deck { display: flex; flex-direction: column; align-items: center; gap: 32px; padding: 32px 16px; }
+  .frame { width: calc(1600px * var(--s, 1)); height: calc(1200px * var(--s, 1)); }
+  .frame > .slide { transform: scale(var(--s, 1)); transform-origin: top left; }
+  body.export .deck { gap: 0; padding: 0; }
+  body.export .frame { width: 1600px; height: 1200px; break-after: page; }
+  body.export .frame > .slide { transform: none; }
+
+  .slide {
+    width: 1600px; height: 1200px; position: relative; overflow: hidden;
+    padding: 88px 104px 120px; display: flex; flex-direction: column;
+    background:
+      radial-gradient(900px 600px at 85% -10%, rgba(249,115,22,.16), transparent 60%),
+      radial-gradient(700px 500px at -10% 110%, rgba(96,165,250,.08), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+  }
+  .slide::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: 48px 48px; mask-image: linear-gradient(180deg, #000 0%, transparent 70%); }
+  .slide > * { position: relative; }
+
+  .foot { position: absolute; left: 104px; right: 104px; bottom: 48px; display: flex; justify-content: space-between; align-items: center; color: var(--dim); font-size: 18px; }
+  .foot .brand { display: flex; align-items: center; gap: 10px; }
+  .foot .brand svg { width: 26px; height: 26px; }
+  .foot .num { font-family: var(--mono); }
+
+  .eyebrow { font-family: var(--mono); font-size: 20px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent2); margin-bottom: 18px; }
+  h1 { font-size: 112px; line-height: 1; letter-spacing: -.04em; font-weight: 800; }
+  h2 { font-size: 64px; line-height: 1.05; letter-spacing: -.03em; font-weight: 750; max-width: 1300px; }
+  .lead { font-size: 28px; line-height: 1.45; color: var(--muted); margin-top: 22px; max-width: 1240px; }
+  .hl { color: var(--accent2); }
+  .grow { flex: 1; min-height: 0; }
+
+  /* Browser mockup around real screenshots */
+  .browser { border-radius: 16px; overflow: hidden; background: #0f121a; border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 40px 100px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4); }
+  .browser .bar { position: relative; z-index: 1; height: 42px; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: #171b26; border-bottom: 1px solid var(--line); }
+  .browser .bar i { width: 12px; height: 12px; border-radius: 50%; background: #3a4150; }
+  .browser .bar i:nth-child(1) { background: #FF5F57; } .browser .bar i:nth-child(2) { background: #FEBC2E; } .browser .bar i:nth-child(3) { background: #28C840; }
+  .browser .bar span { margin-left: 14px; flex: 1; max-width: 520px; height: 26px; border-radius: 7px; background: #0f121a; color: var(--dim); font: 14px/26px var(--mono); padding: 0 12px; white-space: nowrap; overflow: hidden; }
+  .browser img { display: block; width: 100%; height: auto; }
+  .browser.crop img { object-fit: cover; object-position: top left; }
+  /* Zoom into part of a screenshot: --w is the image width, --ml/--mt shift it (percent of the frame width). */
+  .browser.zoom img { width: var(--w); max-width: none; margin-left: var(--ml, 0); margin-top: var(--mt, 0); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 12px; }
+  .chip { font-size: 20px; padding: 10px 18px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid var(--line); color: #D5DBE5; white-space: nowrap; }
+  .chip b { color: var(--accent2); font-weight: 600; }
+
+  .cards { display: grid; gap: 24px; }
+  .card { background: rgba(20,25,38,.85); border: 1px solid var(--line); border-radius: 20px; padding: 32px 34px; }
+  .card h3 { font-size: 30px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 12px; display: flex; align-items: center; gap: 14px; }
+  .card p { font-size: 22px; line-height: 1.5; color: var(--muted); }
+  .ico { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; flex: none; font-size: 24px; }
+  .ico svg { width: 26px; height: 26px; }
+
+  .list { list-style: none; display: grid; gap: 22px; }
+  .list li { font-size: 24px; line-height: 1.45; color: #D5DBE5; padding-left: 40px; position: relative; }
+  .list li::before { content: ''; position: absolute; left: 0; top: 9px; width: 20px; height: 20px; border-radius: 6px; background: var(--accent); box-shadow: 0 0 18px rgba(249,115,22,.5); }
+  .list li b { color: var(--text); }
+  .mono { font-family: var(--mono); }
+
+  .row { display: flex; gap: 56px; min-height: 0; }
+  .col { display: flex; flex-direction: column; min-width: 0; }
+
+  .stat { background: rgba(20,25,38,.85); border: 1px solid var(--line); border-radius: 22px; padding: 30px 32px; }
+  .stat .v { font-size: 92px; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
+  .stat .v small { font-size: 46px; color: var(--muted); font-weight: 700; letter-spacing: -.02em; }
+  .stat .l { font-size: 22px; color: var(--muted); margin-top: 14px; line-height: 1.35; }
+  table { border-collapse: collapse; width: 100%; font-size: 22px; }
+  th, td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  th { color: var(--dim); font-weight: 600; font-size: 18px; text-transform: uppercase; letter-spacing: .08em; }
+  td.n { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="sfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FB923C"/><stop offset="1" stop-color="#EA580C"/></linearGradient>
+    <symbol id="logo" viewBox="0 0 64 64">
+      <path d="M8 22h40c0 6-4 10-10 11v7h6v6H20v-6h6v-7C15 32 8 28 8 22z" fill="url(#sfg)"/>
+      <path d="M48 22h8c0 3-3 5-8 5z" fill="#EA580C"/>
+      <rect x="16" y="46" width="32" height="6" rx="2" fill="#C2410C"/>
+      <circle cx="30" cy="25" r="6.5" fill="#0B0D12"/>
+      <path d="M28 21.8v6.4l5-3.2z" fill="#F97316"/>
+      <path d="M50 6l1.6 4.4L56 12l-4.4 1.6L50 18l-1.6-4.4L44 12l4.4-1.6z" fill="#FDE68A"/>
+    </symbol>
+  </defs>
+</svg>
+
+<main class="deck">
+
+<!-- 01 Cover -->
+<div class="frame"><section class="slide" id="s01" data-title="Cover">
+  <div style="display:flex;align-items:center;gap:22px;margin-bottom:40px">
+    <svg width="84" height="84"><use href="#logo"/></svg>
+    <span style="font-size:40px;font-weight:750;letter-spacing:-.02em">StepForge</span>
+    <span class="chip" style="margin-left:12px">Free &amp; open source · MIT</span>
+  </div>
+  <h1>Record once.<br><span class="hl">Test every layer.</span><br>Export anywhere.</h1>
+  <p class="lead" style="max-width:1100px">A local QA studio for UI, API, database, email and performance testing — with failures it explains itself. A case study by <b style="color:var(--text)">Md Zarin Tasnim</b>.</p>
+  <div class="grow" style="margin-top:48px;position:relative">
+    <div class="browser crop" style="position:absolute;inset:0">
+      <div class="bar"><i></i><i></i><i></i><span>127.0.0.1:4400/runs</span></div>
+      <img src="../assets/screenshots/diagnosis.png" alt="StepForge run results with an automatic diagnosis" style="height:calc(100% - 42px)">
+    </div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">01 / 15</span></div>
+</section></div>
+
+<!-- 02 Problem -->
+<div class="frame"><section class="slide" id="s02" data-title="Problem">
+  <div class="eyebrow">The problem</div>
+  <h2>Testing one feature means juggling a different tool for every layer.</h2>
+  <p class="lead">A real user journey crosses the UI, the API, the database and the inbox. The tools that test those layers don't talk to each other — and when a test goes red, nobody knows why.</p>
+  <div class="cards" style="grid-template-columns:repeat(3,1fr);margin-top:56px">
+    <div class="card"><h3><span class="ico" style="background:rgba(96,165,250,.14);color:var(--blue)">◫</span>Scattered tools</h3><p>A recorder for the UI, a client for the API, a SQL tool for the data, a mail catcher, a load tester — each with its own login and no shared variables.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(239,68,68,.14);color:var(--red)">✕</span>Red, but why?</h3><p>A failed run says <span class="mono" style="font-size:19px">TimeoutError</span>. Someone still has to dig out whether it's the app, the test, the data or the environment.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(250,204,21,.14);color:var(--yellow)">↯</span>Brittle scripts</h3><p>Recorded scripts lock onto one CSS path. A class name changes and half the suite turns red overnight.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(167,139,250,.14);color:var(--violet)">⌂</span>Data in the cloud</h3><p>Cloud test platforms want your credentials, screenshots and test data on their servers.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(45,212,191,.14);color:var(--teal)">$</span>Paid per seat</h3><p>The all-in-one options cost money per user, per month, per parallel run.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(249,115,22,.14);color:var(--accent2)">⇄</span>Locked in</h3><p>Tests built in a studio stay in the studio. Moving to code later means starting over.</p></div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">02 / 15</span></div>
+</section></div>
+
+<!-- 03 Solution -->
+<div class="frame"><section class="slide" id="s03" data-title="Solution">
+  <div class="eyebrow">The solution</div>
+  <h2>One local studio for every layer — and it tells you why a test failed.</h2>
+  <div class="row grow" style="margin-top:56px">
+    <div class="col" style="width:470px;flex:none">
+      <ul class="list">
+        <li><b>Record</b> a journey in a real browser, with smart locators and fallbacks.</li>
+        <li><b>Mix layers</b> in one scenario: UI, API, SQL, email, load.</li>
+        <li><b>Run</b> in parallel on Chromium, Firefox and WebKit, desktop or phone.</li>
+        <li><b>Diagnose</b> every failure: where, why, whose issue, how to fix.</li>
+        <li><b>Export</b> clean code to the framework your team already uses.</li>
+      </ul>
+      <div class="chips" style="margin-top:40px"><span class="chip">127.0.0.1 only</span><span class="chip">No cloud</span><span class="chip">No paid services</span></div>
+    </div>
+    <div class="col grow">
+      <div class="browser zoom" style="height:700px"><div class="bar"><i></i><i></i><i></i><span>127.0.0.1:4400</span></div>
+      <img data-bleed src="../assets/screenshots/home.png" alt="StepForge home: applications, pass rates, quality gates" style="--w:140%;--ml:-6.2%"></div>
+    </div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">03 / 15</span></div>
+</section></div>
+
+<!-- 04 Record Once -->
+<div class="frame"><section class="slide" id="s04" data-title="Record Once">
+  <div class="eyebrow">Record once</div>
+  <h2>Click through your app. Get a readable, resilient test.</h2>
+  <p class="lead">A toolbar inside the browser adds checks, extracts values and masks passwords as you go. Every step stores several locators, so a renamed class doesn't break it.</p>
+  <div class="grow" style="position:relative;margin-top:44px">
+    <div class="browser" style="position:absolute;left:0;top:0;width:820px">
+      <div class="bar"><i></i><i></i><i></i><span>careclinic · recording</span></div>
+      <img src="../assets/screenshots/recorder-browser.png" alt="The demo app being recorded, with the StepForge toolbar">
+    </div>
+    <div class="browser zoom" style="position:absolute;right:0;top:110px;width:760px;height:540px">
+      <div class="bar"><i></i><i></i><i></i><span>StepForge · Recorder</span></div>
+      <img data-bleed src="../assets/screenshots/recorder.png" alt="StepForge recorder listing the recorded steps live" style="--w:150%;--ml:-9%;--mt:-15%">
+    </div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">04 / 15</span></div>
+</section></div>
+
+<!-- 05 Every Layer -->
+<div class="frame"><section class="slide" id="s05" data-title="Every Layer">
+  <div class="eyebrow">Every layer</div>
+  <h2>One scenario: fill the form, call the API, check the row.</h2>
+  <div class="chips" style="margin-top:28px">
+    <span class="chip"><b>UI</b> register a patient</span><span class="chip">→</span>
+    <span class="chip"><b>Extract</b> the new patient code</span><span class="chip">→</span>
+    <span class="chip"><b>API</b> find the patient</span><span class="chip">→</span>
+    <span class="chip"><b>DB</b> the row exists</span>
+  </div>
+  <div class="grow" style="margin-top:40px">
+    <div class="browser crop" style="height:100%">
+      <div class="bar"><i></i><i></i><i></i><span>StepForge · Explorer</span></div>
+      <img src="../assets/screenshots/scenario-editor.png" alt="A hybrid scenario mixing UI, API and database steps" style="height:calc(100% - 42px)">
+    </div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">05 / 15</span></div>
+</section></div>
+
+<!-- 06 API & DB -->
+<div class="frame"><section class="slide" id="s06" data-title="API &amp; DB">
+  <div class="eyebrow">API &amp; database</div>
+  <h2>A built-in API client and SQL workbench, safe by default.</h2>
+  <p class="lead">Import OpenAPI or Postman, check every response against the contract, and query five database engines. Connections start read-only, with every write rolled back.</p>
+  <div class="grow" style="position:relative;margin-top:44px">
+    <div class="browser zoom" style="position:absolute;left:0;top:0;width:860px;height:560px">
+      <div class="bar"><i></i><i></i><i></i><span>StepForge · API Client</span></div>
+      <img data-bleed src="../assets/screenshots/api-client.png" alt="API client: a login request with a masked secret, 200 OK" style="--w:150%;--ml:-40%;--mt:-16%">
+    </div>
+    <div class="browser zoom" style="position:absolute;right:0;top:130px;width:760px;height:480px">
+      <div class="bar"><i></i><i></i><i></i><span>StepForge · SQL Workbench</span></div>
+      <img data-bleed src="../assets/screenshots/sql-workbench.png" alt="SQL workbench in read-only, rollback mode" style="--w:150%;--ml:-9%;--mt:-7%">
+    </div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">06 / 15</span></div>
+</section></div>
+
+<!-- 07 Email & OTP -->
+<div class="frame"><section class="slide" id="s07" data-title="Email &amp; OTP">
+  <div class="eyebrow">Email &amp; OTP</div>
+  <h2>Sign-up flows tested end to end, inbox included.</h2>
+  <div class="row grow" style="margin-top:56px">
+    <div class="col" style="width:460px;flex:none">
+      <ul class="list">
+        <li>A <b>local mail catcher</b> (Mailpit) receives every message — nothing is sent out.</li>
+        <li>Steps wait for the email, <b>check the subject and body</b>, and pull out the <b>one-time code</b> or the link.</li>
+        <li>The code goes straight into the next UI step.</li>
+        <li>A broken verification link fails the test and is reported as a bug.</li>
+      </ul>
+    </div>
+    <div class="col grow">
+      <div class="browser zoom" style="height:100%"><div class="bar"><i></i><i></i><i></i><span>StepForge · Run results</span></div>
+      <img data-bleed src="../assets/screenshots/email-run.png" alt="A passing sign-up test that reads the OTP from the email" style="--w:147%;--ml:-45.6%;--mt:-13%"></div>
+    </div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">07 / 15</span></div>
+</section></div>
+
+<!-- 08 Performance -->
+<div class="frame"><section class="slide" id="s08" data-title="Performance">
+  <div class="eyebrow">Performance</div>
+  <h2>Load tests with thresholds, live charts and a k6 export.</h2>
+  <div class="row grow" style="margin-top:56px">
+    <div class="col grow">
+      <div class="browser zoom" style="height:620px"><div class="bar"><i></i><i></i><i></i><span>StepForge · Performance</span></div>
+      <img data-bleed src="../assets/screenshots/performance.png" alt="A load test report with p50/p95/p99 and passed thresholds" style="--w:160%;--ml:-58%;--mt:-20%"></div>
+    </div>
+    <div class="col" style="width:430px;flex:none">
+      <ul class="list">
+        <li>Smoke, load, stress, spike and soak profiles.</li>
+        <li><b>p95, p99, error rate and throughput</b> thresholds that pass or fail a run.</li>
+        <li>Built-in engine, or k6 when installed.</li>
+        <li>Response-time checks and Lighthouse for pages.</li>
+        <li>Asks you to confirm you own the system before any load test.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">08 / 15</span></div>
+</section></div>
+
+<!-- 09 Diagnosis -->
+<div class="frame"><section class="slide" id="s09" data-title="Diagnosis">
+  <div class="eyebrow">Failure diagnosis</div>
+  <h2>Every red test comes with an explanation and a bug report.</h2>
+  <p class="lead">A rule engine reads the failed step, the network log, console errors and the DOM, then says where it broke, why, whose issue it is and how to fix it — no AI required.</p>
+  <div class="grow" style="margin-top:44px">
+    <div class="browser crop" style="height:100%"><div class="bar"><i></i><i></i><i></i><span>StepForge · Run results</span></div>
+    <img src="../assets/screenshots/diagnosis.png" alt="Diagnosis of a billing bug: expected a 20% discount, got 0" style="height:calc(100% - 42px)"></div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">09 / 15</span></div>
+</section></div>
+
+<!-- 10 Analytics & Gates -->
+<div class="frame"><section class="slide" id="s10" data-title="Analytics &amp; Gates">
+  <div class="eyebrow">Analytics &amp; quality gates</div>
+  <h2>Know if you can ship, at a glance.</h2>
+  <p class="lead">Pass rates by module, layer, tag and environment; flaky-test detection; run comparison; and release gates that turn red when the rules aren't met.</p>
+  <div class="grow" style="margin-top:44px">
+    <div class="browser crop" style="height:100%"><div class="bar"><i></i><i></i><i></i><span>StepForge · Analytics</span></div>
+    <img src="../assets/screenshots/analytics.png" alt="Analytics with a failing release-readiness gate" style="height:calc(100% - 42px)"></div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">10 / 15</span></div>
+</section></div>
+
+<!-- 11 Export Anywhere -->
+<div class="frame"><section class="slide" id="s11" data-title="Export Anywhere">
+  <div class="eyebrow">Export anywhere</div>
+  <h2>No lock-in: export clean, runnable code.</h2>
+  <div class="row grow" style="margin-top:48px">
+    <div class="col" style="width:520px;flex:none">
+      <div class="chips" style="gap:10px">
+        <span class="chip">Playwright · TS</span><span class="chip">Playwright · Python</span><span class="chip">Cypress</span>
+        <span class="chip">Selenium · Python</span><span class="chip">Selenium · Java</span><span class="chip">pytest + requests</span>
+        <span class="chip">REST Assured</span><span class="chip">k6</span><span class="chip">Postman</span><span class="chip">cURL</span>
+        <span class="chip">Markdown test cases</span><span class="chip">Gherkin</span><span class="chip">Excel test cases</span>
+      </div>
+      <p class="lead" style="font-size:24px;margin-top:36px">Secrets become environment variables, CI files are included, and the exported Playwright project is run against the demo app in CI.</p>
+    </div>
+    <div class="col grow">
+      <div class="browser zoom" style="height:100%"><div class="bar"><i></i><i></i><i></i><span>StepForge · Export</span></div>
+      <img data-bleed src="../assets/screenshots/exports.png" alt="Export screen previewing a generated Playwright project" style="--w:160%;--ml:-58%;--mt:-17%"></div>
+    </div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">11 / 15</span></div>
+</section></div>
+
+<!-- 12 Engineering Highlights -->
+<div class="frame"><section class="slide" id="s12" data-title="Engineering Highlights">
+  <div class="eyebrow">Engineering highlights</div>
+  <h2>Built like a product, not a demo.</h2>
+  <div class="cards" style="grid-template-columns:repeat(2,1fr);margin-top:56px">
+    <div class="card"><h3><span class="ico" style="background:rgba(249,115,22,.14);color:var(--accent2)">⚿</span>Secrets stay secret</h3><p>AES-256-GCM at rest, never logged or exported, masked as •••• in the UI, reports and generated code.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(96,165,250,.14);color:var(--blue)">⌂</span>Local-first</h3><p>Binds to 127.0.0.1 only, with a per-session token. One SQLite file. Optional local AI through Ollama — never a cloud API.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(34,197,94,.14);color:var(--green)">✓</span>Explainable diagnosis</h3><p>Failures are classified by readable YAML rules over captured facts, with unit tests for the rules.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(167,139,250,.14);color:var(--violet)">⛁</span>Safe database access</h3><p>Read-only and rollback by default. Production environments get a red banner and typed confirmation.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(250,204,21,.14);color:var(--yellow)">◎</span>Self-healing locators</h3><p>Each step keeps ranked locators — test id, role, label, text, CSS — and suggests a one-click fix when the primary one drifts.</p></div>
+    <div class="card"><h3><span class="ico" style="background:rgba(45,212,191,.14);color:var(--teal)">⟲</span>Honest benchmark</h3><p>Planted bugs are listed in a file StepForge never reads; a guard test fails the build if any app code mentions it.</p></div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">12 / 15</span></div>
+</section></div>
+
+<!-- 13 Results -->
+<div class="frame"><section class="slide" id="s13" data-title="Results">
+  <div class="eyebrow">Results</div>
+  <h2>Two demo apps. <span class="hl"><span data-bench="totals.plantedBugs">25</span> planted bugs.</span> Here's what StepForge caught.</h2>
+  <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-top:52px">
+    <div class="stat"><div class="v"><span data-bench="totals.detected">25</span><small>/<span data-bench="totals.plantedBugs">25</span></small></div><div class="l">planted bugs detected (<span data-bench="totals.detectionRatePct">100</span>%)</div></div>
+    <div class="stat"><div class="v"><span data-bench="totals.diagnosedCorrectly">24</span><small>/<span data-bench="totals.detected">25</span></small></div><div class="l">diagnosed correctly (<span data-bench="totals.diagnosisAccuracyPct">96</span>%)</div></div>
+    <div class="stat"><div class="v" data-bench="totals.falseAlarms">0</div><div class="l">false alarms</div></div>
+    <div class="stat"><div class="v"><span data-bench="totals.runTimeSeconds">83.6</span><small> s</small></div><div class="l"><span data-bench="totals.testRuns">51</span> test runs, <span data-bench="totals.scenarios">45</span> scenarios</div></div>
+  </div>
+  <div class="card" style="margin-top:32px;padding:16px 26px">
+    <table>
+      <thead><tr><th>Demo app</th><th>Scenarios</th><th>Test runs</th><th>Planted bugs</th><th>Detected</th><th>Diagnosed correctly</th></tr></thead>
+      <tbody>
+        <tr><td>CareClinic <span style="color:var(--dim)">· clinic</span></td><td class="n" data-bench="apps.0.scenarios">25</td><td class="n" data-bench="apps.0.testRuns">29</td><td class="n" data-bench="apps.0.plantedBugs">13</td><td class="n" data-bench="apps.0.detected">13</td><td class="n" data-bench="apps.0.diagnosedCorrectly">12</td></tr>
+        <tr><td>ShopDesk <span style="color:var(--dim)">· shop</span></td><td class="n" data-bench="apps.1.scenarios">20</td><td class="n" data-bench="apps.1.testRuns">22</td><td class="n" data-bench="apps.1.plantedBugs">12</td><td class="n" data-bench="apps.1.detected">12</td><td class="n" data-bench="apps.1.diagnosedCorrectly">12</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="cards" style="grid-template-columns:repeat(6,1fr);gap:16px;margin-top:28px">
+    <div class="stat" style="padding:22px 24px"><div class="v" style="font-size:52px" data-bench="layer.ui">6/6</div><div class="l" style="font-size:19px">UI bugs caught</div></div>
+    <div class="stat" style="padding:22px 24px"><div class="v" style="font-size:52px" data-bench="layer.api">6/6</div><div class="l" style="font-size:19px">API bugs caught</div></div>
+    <div class="stat" style="padding:22px 24px"><div class="v" style="font-size:52px" data-bench="layer.db">4/4</div><div class="l" style="font-size:19px">database bugs caught</div></div>
+    <div class="stat" style="padding:22px 24px"><div class="v" style="font-size:52px" data-bench="layer.email">1/1</div><div class="l" style="font-size:19px">email bugs caught</div></div>
+    <div class="stat" style="padding:22px 24px"><div class="v" style="font-size:52px" data-bench="layer.logic">4/4</div><div class="l" style="font-size:19px">business-logic bugs caught</div></div>
+    <div class="stat" style="padding:22px 24px"><div class="v" style="font-size:52px" data-bench="layer.performance">4/4</div><div class="l" style="font-size:19px">performance bugs caught</div></div>
+  </div>
+  <p class="lead" style="font-size:21px;margin-top:28px;max-width:none">Bugs span <span data-bench="layersText">API, database, UI, email, business logic and performance</span>. Measured by <span class="mono" style="font-size:19px">scripts/benchmark.ts</span> on <span data-bench="machineText">an Apple M3 Pro</span>; bugs are scored afterwards against a manifest StepForge never reads.</p>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">13 / 15</span></div>
+</section></div>
+
+<!-- 14 Tech Stack -->
+<div class="frame"><section class="slide" id="s14" data-title="Tech Stack">
+  <div class="eyebrow">Tech stack</div>
+  <h2>Modern, boring, free.</h2>
+  <div class="cards" style="grid-template-columns:repeat(2,1fr);margin-top:56px">
+    <div class="card"><h3>Core</h3><div class="chips"><span class="chip">Node.js 20+</span><span class="chip">TypeScript</span><span class="chip">npm workspaces</span><span class="chip">Zod</span></div></div>
+    <div class="card"><h3>Server &amp; data</h3><div class="chips"><span class="chip">Fastify</span><span class="chip">SQLite</span><span class="chip">Drizzle ORM</span><span class="chip">WebSockets</span></div></div>
+    <div class="card"><h3>Dashboard</h3><div class="chips"><span class="chip">React</span><span class="chip">Vite</span><span class="chip">Tailwind CSS</span><span class="chip">Monaco</span><span class="chip">React Flow</span><span class="chip">TanStack</span></div></div>
+    <div class="card"><h3>Testing engines</h3><div class="chips"><span class="chip">Playwright</span><span class="chip">autocannon</span><span class="chip">k6</span><span class="chip">Lighthouse</span><span class="chip">Mailpit</span></div></div>
+    <div class="card"><h3>Databases</h3><div class="chips"><span class="chip">SQLite</span><span class="chip">PostgreSQL</span><span class="chip">MySQL</span><span class="chip">SQL Server</span><span class="chip">MongoDB</span></div></div>
+    <div class="card"><h3>Quality</h3><div class="chips"><span class="chip">Vitest</span><span class="chip">Playwright E2E</span><span class="chip">ESLint</span><span class="chip">Prettier</span><span class="chip">GitHub Actions</span></div></div>
+  </div>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">14 / 15</span></div>
+</section></div>
+
+<!-- 15 Call to Action -->
+<div class="frame"><section class="slide" id="s15" data-title="Call to Action" style="justify-content:center;align-items:center;text-align:center">
+  <svg width="120" height="120" style="margin-bottom:36px"><use href="#logo"/></svg>
+  <div class="eyebrow">Built by</div>
+  <h1 style="font-size:104px">Md Zarin Tasnim</h1>
+  <p class="lead" style="font-size:40px;color:var(--text);margin-top:40px;font-weight:600">Need test automation or QA tooling? <span class="hl">Let's talk.</span></p>
+  <p class="lead" style="margin-top:18px">Playwright · Cypress · Selenium · API &amp; database testing · CI pipelines · custom QA tools</p>
+  <div style="display:flex;gap:20px;margin-top:56px">
+    <a class="chip" style="font-size:24px;padding:18px 30px;background:var(--accent);color:#1a0c02;border:none;font-weight:700;text-decoration:none" href="https://www.upwork.com/freelancers/YOUR_UPWORK_PROFILE">Hire me on Upwork → upwork.com/freelancers/YOUR_UPWORK_PROFILE</a>
+  </div>
+  <p class="lead" style="font-size:22px;margin-top:28px">Source: <span class="mono">github.com/YOUR_GITHUB_USERNAME/stepforge</span></p>
+  <div class="foot"><span class="brand"><svg><use href="#logo"/></svg>StepForge by Md Zarin Tasnim</span><span class="num">15 / 15</span></div>
+</section></div>
+
+</main>
+<script>
+  // Viewing: scale each 1600×1200 slide to the window. ?export renders 1:1 (used by scripts/export_case_study.ts).
+  const exportMode = new URLSearchParams(location.search).has('export');
+  if (exportMode) document.body.classList.add('export');
+  function fit() {
+    if (exportMode) return;
+    const s = Math.min(1, (document.documentElement.clientWidth - 32) / 1600);
+    document.documentElement.style.setProperty('--s', String(s));
+  }
+  fit();
+  addEventListener('resize', fit);
+</script>
+</body>
+</html>

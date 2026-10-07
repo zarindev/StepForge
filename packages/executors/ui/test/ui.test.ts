@@ -15,6 +15,12 @@ const pool = new BrowserPool();
 beforeAll(async () => {
   server = createServer((req, res) => {
     if (req.url === '/api/login') return res.writeHead(500).end('{"error":"db down"}');
+    if (req.url === '/covered.html')
+      return res
+        .writeHead(200, { 'content-type': 'text/html' })
+        .end(
+          '<button data-testid="go">Go</button><div class="sheet" style="position:fixed;inset:0;z-index:9">Rate us</div>',
+        );
     if (req.url === '/other.html')
       return res.writeHead(200, { 'content-type': 'text/html' }).end('<title>Help</title><h1>Help page</h1>');
     res.writeHead(200, { 'content-type': 'text/html' }).end(html);
@@ -216,5 +222,16 @@ describe('UI executor', () => {
     );
     expect(r.errorKind).toBe('element_not_found');
     expect(r.error).toContain('testId=nope | text=Nope');
+  });
+
+  it('says which element covers the one it could not click', async () => {
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/covered.html' } },
+        { type: 'ui.click', locators: [{ strategy: 'testId', value: 'go' }], timeoutMs: 1200 },
+      ),
+    );
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/<div class="sheet"[^>]*>Rate us<\/div> intercepts pointer events/);
   });
 });

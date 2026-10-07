@@ -191,6 +191,22 @@
   explanation: '{{request.method}} {{request.url}} took longer than the step timeout ({{timeoutMs}} ms).'
   fix: 'Investigate the slow endpoint (profiling, query plans), or raise the timeout if this duration is acceptable.'
 
+- id: api-slow-response
+  category: slow_api
+  priority: 72
+  confidence: 0.8
+  owner: app
+  when: { layer: api, errorKind: assertion, assertion.target: time }
+  title: 'The API answered in {{assertion.actual}} ms; the limit is {{assertion.expected}} ms'
+  explanation: '{{request.method}} {{request.url}} took {{assertion.actual}} ms ({{assertion.message}}). Slow endpoints usually come from missing indexes, one query per row (N+1) or slow downstream calls.'
+  fix: 'Profile the endpoint: check its query plans and count its database queries; add an index or load related rows in one query.'
+  evidence:
+    {
+      Time: '{{assertion.actual}} ms',
+      Limit: '{{assertion.expected}} ms',
+      Request: '{{request.method}} {{request.url}}',
+    }
+
 - id: api-value-mismatch
   category: assertion_mismatch
   priority: 30

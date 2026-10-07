@@ -33,10 +33,20 @@ const firstLine = (e: unknown) =>
     .split('\n')[0]!
     .replace(/^(locator|page)\.\w+: /, '');
 
+/** Playwright's call log says why an action never happened; keep the covering element when there is one. */
+function reason(err: unknown): string | undefined {
+  const line = String((err as Error)?.message ?? '')
+    .split('\n')
+    .reverse()
+    .find((l) => /intercepts pointer events|not receiving pointer events/.test(l));
+  return line?.trim().replace(/^-\s*/, '').slice(0, 300);
+}
+
 function mapError(err: unknown): never {
   if ((err as { name?: string })?.name === 'StepError') throw err;
   const name = (err as Error)?.name;
-  const msg = firstLine(err);
+  const why = reason(err);
+  const msg = why ? `${firstLine(err)} ${why}` : firstLine(err);
   if (name === 'TimeoutError') throw new StepError('timeout', msg);
   if (/net::|NS_ERROR|ECONNREFUSED|Could not connect/i.test(msg)) throw new StepError('network', msg);
   throw new StepError('unknown', msg);
@@ -555,6 +565,15 @@ export class UiSession implements ExecutorSession {
       } catch {
         // the page may be gone; the failure itself is what matters
       }
+    }
+    // The page the step failed on: the diagnosis only blames a JavaScript error thrown on this page.
+    try {
+      out.diagnostics = {
+        ...(out.diagnostics ?? { matchCount: 0, candidates: [] }),
+        pageUrl: this.page.url(),
+      } as typeof out.diagnostics;
+    } catch {
+      // no page
     }
     if (this.ctx.options.screenshots !== 'off')
       out.screenshotPath = await this.snap(step.position, 'png', '-failed');

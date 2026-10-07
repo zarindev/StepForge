@@ -263,6 +263,56 @@ export const CLINIC_OPENAPI = {
         },
       },
     },
+    '/api/doctors/schedule': {
+      get: {
+        tags: ['Doctors'],
+        operationId: 'doctorSchedule',
+        summary: "Each doctor's next booked appointments with patient names",
+        responses: {
+          '200': { description: 'Schedule', ...json({ type: 'array', items: { type: 'object' } }) },
+          '401': err('Not logged in'),
+        },
+      },
+    },
+    '/api/reports/visits': {
+      get: {
+        tags: ['Reports'],
+        operationId: 'visitsReport',
+        summary: 'Number of appointments per doctor',
+        responses: {
+          '200': { description: 'Visits per doctor', ...json({ type: 'array', items: { type: 'object' } }) },
+          '401': err('Not logged in'),
+        },
+      },
+    },
+    '/api/appointments/{id}/bill': {
+      get: {
+        tags: ['Billing'],
+        operationId: 'appointmentBill',
+        summary: 'The bill for an appointment',
+        description:
+          "The doctor's fee; patients with an insurance provider get a 20% discount (total = fee × 0.8).",
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: {
+          '200': {
+            description: 'Bill',
+            ...json({
+              type: 'object',
+              required: ['appointment_id', 'fee', 'discount', 'total'],
+              properties: {
+                appointment_id: { type: 'integer' },
+                fee: { type: 'number' },
+                insurance: { type: ['string', 'null'] },
+                discount: { type: 'number' },
+                total: { type: 'number' },
+              },
+            }),
+          },
+          '401': err('Not logged in'),
+          '404': err('Appointment not found'),
+        },
+      },
+    },
   },
   components: {
     securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } },

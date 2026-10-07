@@ -48,13 +48,15 @@ async function main() {
     );
     const ok =
       run.status === 'failed' &&
-      t.total === 20 &&
-      t.passed === 15 &&
-      t.failed === 5 &&
+      t.total === 28 &&
+      t.passed === 16 &&
+      t.failed === 12 &&
       t.broken === 0 &&
       run.qualityGateJson?.status === 'red';
     if (!ok)
-      throw new Error('Expected 15 passed and 5 failed (the demo app’s defects) with a red quality gate');
+      throw new Error(
+        'Expected CareClinic to have 16 passed and 12 failed (the demo app’s planted defects) with a red quality gate',
+      );
     step('passes and failures as expected; quality gate red');
     console.log('Fresh-install smoke test passed');
   } catch (err) {

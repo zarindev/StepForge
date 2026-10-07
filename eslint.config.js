@@ -10,6 +10,7 @@ export default tseslint.config(
       'data/**',
       'packages/db/migrations/**',
       'demo/**/public/**',
+      'docs/samples/**',
     ],
   },
   js.configs.recommended,

@@ -36,6 +36,8 @@ export type StepSnapshot = {
     matchCount?: number;
     visible?: boolean;
     candidates?: { locator: LocatorLike; text?: string; score: number; count: number }[];
+    /** The page the step failed on. */
+    pageUrl?: string;
   };
   /** From the scenario definition. */
   locators?: LocatorLike[];

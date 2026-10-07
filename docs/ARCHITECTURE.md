@@ -38,7 +38,7 @@ flowchart TB
 | `@stepforge/executor-util` | Variables, generated data, sandboxed scripts |
 | `@stepforge/recorder` | Recording browser, injected toolbar, network capture |
 | `@stepforge/importers` | OpenAPI/Swagger, Postman, cURL and HAR → scenarios |
-| `@stepforge/server` | HTTP/WS API, security hooks, static UI hosting, job queue, in-app scheduler (croner) and notifications, demo workspace (starts CareClinic), maintenance (retention, key rotation, danger zone) |
+| `@stepforge/server` | HTTP/WS API, security hooks, static UI hosting, job queue, in-app scheduler (croner) and notifications, demo workspace (starts CareClinic and ShopDesk), maintenance (retention, key rotation, danger zone) |
 | `@stepforge/cli` | `stepforge` command: builds the server in-process (embedded mode, no listener, no scheduler, no crash recovery) to run tests, write reports, export/import applications |
 | `@stepforge/web` | Dashboard |
 
