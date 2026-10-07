@@ -9,7 +9,7 @@ the numbers here to match.
 ## Project title (64 / 70 characters)
 
 ```
-StepForge: Local QA Studio for UI, API, Database & Email Testing
+StepForge – Open-Source QA Studio: Record Once, Test Every Layer
 ```
 
 ## Your role
@@ -18,10 +18,10 @@ StepForge: Local QA Studio for UI, API, Database & Email Testing
 Creator and sole developer — product design, architecture, implementation and tests
 ```
 
-## Project description (484 / 600 characters)
+## Project description (506 / 600 characters)
 
 ```
-StepForge is a free, open-source QA studio I designed and built. Record a user journey once, test it across the UI, API, database, email and performance in one scenario, and export clean Playwright, Cypress or Selenium code. Every failure gets an automatic diagnosis and bug report. Benchmarked on two demo apps with 25 planted bugs: all 25 detected, 24 diagnosed correctly, 0 false alarms, 51 tests in 83.6 s. Runs 100% locally with Node.js, TypeScript, React, Playwright and SQLite.
+I designed and built StepForge, a free, open-source test automation studio. Record a user journey once, then test the UI, API, database, email and performance in a single scenario. Every failure gets a plain-English diagnosis and an automatic bug report, and the tests export as clean Playwright, Cypress or Selenium code. In a benchmark on two demo apps with 25 planted bugs, it caught all 25, diagnosed 24 correctly and raised 0 false alarms. Built with TypeScript, Node.js, React, Playwright and SQLite.
 ```
 
 ## Skills (5)
@@ -54,7 +54,7 @@ All images are 1600×1200 (Upwork's 4:3). Use the PNGs, or the JPGs in `export/u
 ## Project URL
 
 ```
-https://github.com/zarindev/stepforge
+https://github.com/zarindev/StepForge
 ```
 
 The repository must be public at that address before you add it. The case study's last slide links both the
