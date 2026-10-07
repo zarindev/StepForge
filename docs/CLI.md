@@ -130,7 +130,7 @@ jobs:
           path: stepforge-app
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Install StepForge
         working-directory: stepforge-app
         run: npm ci && npx playwright install --with-deps chromium

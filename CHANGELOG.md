@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Changed
+- **Node.js 22 or newer is now required** (was 20). Node 20 reached end of life in April 2026, better-sqlite3 no
+  longer publishes Node 20 binaries (so installing on Windows needed a C++ build), and the SQL Server driver's Azure
+  packages need Node 22. CI and the CI files of exported projects use Node 22.
 - Record from the Test Explorer: the New scenario dialog has **Create & record**, a scenario's Steps tab has
   **Record steps** (the recorded steps are added after the existing ones, reviewed first), and a module's menu and
   empty modules offer **Record a scenario**. The Recorder shows where the recording will go; the sidebar Recorder

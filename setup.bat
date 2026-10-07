@@ -6,12 +6,12 @@ cd /d "%~dp0"
 echo ==^> Checking Node.js
 where node >nul 2>nul
 if errorlevel 1 (
-  echo Node.js 20+ is required. Install it from https://nodejs.org and run this script again.
+  echo Node.js 22+ is required. Install it from https://nodejs.org and run this script again.
   exit /b 1
 )
-node -e "process.exit(Number(process.versions.node.split('.')[0]) < 20 ? 1 : 0)"
+node -e "process.exit(Number(process.versions.node.split('.')[0]) < 22 ? 1 : 0)"
 if errorlevel 1 (
-  echo Node.js 20+ is required. Update it from https://nodejs.org
+  echo Node.js 22+ is required. Update it from https://nodejs.org
   exit /b 1
 )
 

@@ -1,4 +1,4 @@
-// Web Crypto (Node 20+ and browsers) so this module also runs in the dashboard.
+// Web Crypto (Node 22+ and browsers) so this module also runs in the dashboard.
 const randomUUID = (): string => globalThis.crypto.randomUUID();
 const randomInt = (min: number, max: number): number => {
   const buf = new Uint32Array(1);

@@ -5,12 +5,12 @@ cd "$(dirname "$0")"
 
 echo "==> Checking Node.js"
 if ! command -v node >/dev/null 2>&1; then
-  echo "Node.js 20+ is required. Install it from https://nodejs.org and run this script again." >&2
+  echo "Node.js 22+ is required. Install it from https://nodejs.org and run this script again." >&2
   exit 1
 fi
 NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]")
-if [ "$NODE_MAJOR" -lt 20 ]; then
-  echo "Node.js 20+ is required (found $(node -v))." >&2
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  echo "Node.js 22+ is required (found $(node -v))." >&2
   exit 1
 fi
 echo "    Node $(node -v)"
