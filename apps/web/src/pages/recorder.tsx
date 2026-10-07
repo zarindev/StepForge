@@ -1,9 +1,11 @@
 import { describeStep } from '@stepforge/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
   Circle,
   Disc3,
+  FilePlus2,
+  FolderOpen,
   KeyRound,
   MonitorSmartphone,
   Save,
@@ -12,7 +14,7 @@ import {
   Undo2,
   Webhook,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { EditorProvider } from '@/components/editor/context';
 import { fromDrafts, toDrafts, type DraftStep } from '@/components/editor/drafts';
 import { StepList } from '@/components/editor/step-list';
@@ -26,13 +28,20 @@ import { EmptyState, ErrorState } from '@/components/ui/states';
 import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useLiveEvent, type LiveEvent } from '@/lib/live';
-import { qk, useCurrentApp, useEnvironments, useTree } from '@/lib/queries';
+import { qk, useCurrentApp, useEnvironments, useScenario, useTree } from '@/lib/queries';
 import { groupOf, LAYER } from '@/lib/steps';
 import { flattenModules } from '@/lib/tree';
 import type { StepRecord } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type Captured = { id: number; method: string; url: string; status: number; durationMs?: number };
+/** Set when the recording was started from the Test Explorer. */
+type Target = {
+  scenarioId?: string;
+  scenarioName?: string;
+  existingSteps?: number;
+  moduleId?: string;
+} | null;
 type Recording = {
   id: string;
   applicationId: string;
@@ -43,6 +52,7 @@ type Recording = {
   steps: (Partial<Omit<StepRecord, 'id'>> & { type: string; id?: number | string; describe?: string })[];
   network: Captured[];
   secretKeys: string[];
+  target?: Target;
 } | null;
 
 const RECORDER_KEY = ['recorder'] as const;
@@ -89,7 +99,20 @@ export function RecorderPage() {
 }
 
 function StartPanel() {
-  const { app, apps } = useCurrentApp();
+  const { app: current, apps } = useCurrentApp();
+  const search = useSearch({ from: '/recorder' });
+  // Opened from the Test Explorer: record into that scenario, or into that module.
+  const targetScenario = useScenario(search.scenario);
+  const app = apps.data?.find((a) => a.id === targetScenario.data?.applicationId) ?? current;
+  const tree = useTree(app?.id);
+  const targetModule = search.module
+    ? tree.data && flattenModules(tree.data).find((m) => m.id === search.module)
+    : undefined;
+  const target = targetScenario.data
+    ? { scenarioId: targetScenario.data.id }
+    : targetModule
+      ? { moduleId: targetModule.id }
+      : {};
   const envs = useEnvironments(app?.id);
   const [envId, setEnvId] = useState('');
   const [path, setPath] = useState('/');
@@ -101,7 +124,7 @@ function StartPanel() {
     mutationFn: () =>
       api<Recording>('/api/recorder/start', {
         method: 'POST',
-        json: { applicationId: app!.id, environmentId: envId, startPath: path },
+        json: { applicationId: app!.id, environmentId: envId, startPath: path, ...target },
       }),
     onSuccess: (rec) => qc.setQueryData(RECORDER_KEY, rec),
     onError: toastError,
@@ -124,6 +147,19 @@ function StartPanel() {
           <CardTitle>New recording{app ? ` in ${app.name}` : ''}</CardTitle>
         </CardHeader>
         <CardBody className="space-y-4">
+          {targetScenario.data ? (
+            <TargetNote icon={FilePlus2}>
+              Recording steps for <b className="text-fg">{targetScenario.data.name}</b>.{' '}
+              {targetScenario.data.steps.length
+                ? `They are added after its ${targetScenario.data.steps.length} existing step(s); you review them before saving.`
+                : 'You review them before saving.'}
+            </TargetNote>
+          ) : targetModule ? (
+            <TargetNote icon={FolderOpen}>
+              The recording is saved as a new scenario in{' '}
+              <b className="text-fg">{targetModule.label.trim()}</b>.
+            </TargetNote>
+          ) : null}
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Environment">
               <Select aria-label="Environment" value={envId} onChange={(e) => setEnvId(e.target.value)}>
@@ -193,6 +229,15 @@ function StartPanel() {
   );
 }
 
+function TargetNote({ icon: Icon, children }: { icon: typeof Disc3; children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2.5 text-sm text-muted">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
 function StepLine({
   step,
   index,
@@ -242,6 +287,9 @@ function LivePanel({ rec }: { rec: NonNullable<Recording> }) {
             {rec.state === 'paused' ? 'Paused' : 'Recording'}
           </span>
           <span className="truncate font-mono text-xs text-muted">{rec.startUrl}</span>
+          {rec.target?.scenarioName && (
+            <Badge className="shrink-0">Adding to “{rec.target.scenarioName}”</Badge>
+          )}
           <div className="ml-auto flex gap-2">
             <Button
               variant="ghost"
@@ -305,8 +353,11 @@ function LivePanel({ rec }: { rec: NonNullable<Recording> }) {
 function ReviewPanel({ rec }: { rec: NonNullable<Recording> }) {
   const tree = useTree(rec.applicationId);
   const modules = useMemo(() => (tree.data ? flattenModules(tree.data) : []), [tree.data]);
-  const [moduleId, setModuleId] = useState('');
+  const [moduleId, setModuleId] = useState(rec.target?.moduleId ?? '');
   const [name, setName] = useState('Recorded scenario');
+  // Started from a scenario: add the steps to it, unless the user chooses a new scenario instead.
+  const [append, setAppend] = useState(!!rec.target?.scenarioId);
+  const appendTo = append && rec.target?.scenarioId ? rec.target : null;
   const [steps, setSteps] = useState<DraftStep[]>(() =>
     toDrafts(
       rec.steps.map(({ id: _id, describe: _d, ...s }) => ({
@@ -345,20 +396,27 @@ function ReviewPanel({ rec }: { rec: NonNullable<Recording> }) {
       api<{ scenario: { id: string } }>('/api/recorder/save', {
         method: 'POST',
         json: {
-          moduleId,
-          name,
+          ...(appendTo ? { scenarioId: appendTo.scenarioId } : { moduleId, name }),
           steps: fromDrafts(steps),
           saveSecrets,
           ...(makeApi && picked.size
-            ? { apiScenario: { name: `${name} — API calls`, requestIds: [...picked] } }
+            ? {
+                apiScenario: {
+                  name: `${appendTo?.scenarioName ?? name} — API calls`,
+                  requestIds: [...picked],
+                },
+              }
             : {}),
         },
       }),
     onSuccess: (r) => {
       qc.setQueryData(RECORDER_KEY, null);
       qc.invalidateQueries({ queryKey: qk.tree(rec.applicationId) });
-      toast('Recording saved as a scenario');
-      navigate({ to: '/explorer', search: { scenario: r.scenario.id } });
+      qc.invalidateQueries({ queryKey: qk.scenario(r.scenario.id) });
+      toast(
+        appendTo ? `Added ${steps.length} recorded step(s) to the scenario` : 'Recording saved as a scenario',
+      );
+      navigate({ to: '/explorer', search: { scenario: r.scenario.id, tab: 'steps' } });
     },
     onError: toastError,
   });
@@ -383,24 +441,50 @@ function ReviewPanel({ rec }: { rec: NonNullable<Recording> }) {
       <div className="space-y-4">
         <Card>
           <CardBody className="space-y-3 pt-5">
-            <Field label="Scenario name">
-              <Input aria-label="Scenario name" value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            <Field label="Save into module">
-              <Select
-                aria-label="Save into module"
-                value={moduleId}
-                onChange={(e) => setModuleId(e.target.value)}
-              >
-                {modules.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            {modules.length === 0 && (
-              <p className="text-sm text-fail">Create a module in the Test Explorer first.</p>
+            {appendTo ? (
+              <>
+                <TargetNote icon={FilePlus2}>
+                  The {steps.length} recorded step(s) are added to{' '}
+                  <Link
+                    to="/explorer"
+                    search={{ scenario: appendTo.scenarioId }}
+                    className="font-medium text-fg hover:underline"
+                  >
+                    {appendTo.scenarioName}
+                  </Link>
+                  {appendTo.existingSteps ? `, after its ${appendTo.existingSteps} existing step(s)` : ''}.
+                </TargetNote>
+                <button className="text-xs text-muted hover:text-fg" onClick={() => setAppend(false)}>
+                  Save as a new scenario instead
+                </button>
+              </>
+            ) : (
+              <>
+                <Field label="Scenario name">
+                  <Input aria-label="Scenario name" value={name} onChange={(e) => setName(e.target.value)} />
+                </Field>
+                <Field label="Save into module">
+                  <Select
+                    aria-label="Save into module"
+                    value={moduleId}
+                    onChange={(e) => setModuleId(e.target.value)}
+                  >
+                    {modules.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                {modules.length === 0 && (
+                  <p className="text-sm text-fail">Create a module in the Test Explorer first.</p>
+                )}
+                {rec.target?.scenarioId && (
+                  <button className="text-xs text-muted hover:text-fg" onClick={() => setAppend(true)}>
+                    Add to “{rec.target.scenarioName}” instead
+                  </button>
+                )}
+              </>
             )}
             {rec.secretKeys.length > 0 && (
               <label className="flex items-start gap-2 text-sm">
@@ -417,8 +501,11 @@ function ReviewPanel({ rec }: { rec: NonNullable<Recording> }) {
               </label>
             )}
             <div className="flex gap-2 pt-1">
-              <Button disabled={!moduleId || !name.trim() || save.isPending} onClick={() => save.mutate()}>
-                <Save className="h-4 w-4" /> Save scenario
+              <Button
+                disabled={(!appendTo && (!moduleId || !name.trim())) || steps.length === 0 || save.isPending}
+                onClick={() => save.mutate()}
+              >
+                <Save className="h-4 w-4" /> {appendTo ? 'Add to scenario' : 'Save scenario'}
               </Button>
               <Button variant="ghost" onClick={() => discard.mutate()}>
                 Discard

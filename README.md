@@ -116,7 +116,8 @@ Demo sign-ins, if you want to click around yourself: CareClinic `reception@carec
 1. **Create an application** (welcome screen → *Create an application*), then add an environment with your app's base URL.
    A short guided tour walks you through the next steps.
 2. **Recorder** → pick the environment and the start page → **Start recording**. A Chromium window opens with the
-   StepForge toolbar.
+   StepForge toolbar. You can also start from the **Test Explorer**: *Create & record* when you add a scenario,
+   *Record steps* on a scenario (the steps are added to it), or *Record a scenario* in a module's menu.
 
    <img src="docs/assets/screenshots/recorder.png" alt="Recorder" width="720" />
 3. **Click through your app.** Every click and field becomes a step with ranked locators. Use the toolbar to add a

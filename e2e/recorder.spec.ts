@@ -128,6 +128,66 @@ test.describe.serial('recorder and scenario editor (Phase 4)', () => {
     await expect(page.getByRole('list', { name: 'Step timeline' }).getByRole('listitem')).toHaveCount(13);
   });
 
+  test('records from the Test Explorer: "Create & record" adds the steps to the new scenario', async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(90_000);
+    await request.post(`${CLINIC}/api/reset`);
+    await page.goto('/');
+    const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
+      name: 'Clinic Explorer Rec',
+      slug: 'clinic-explorer-rec',
+    });
+    await sfApi(page, 'POST', `/api/applications/${app.id}/environments`, { name: 'Local', baseUrl: CLINIC });
+    await sfApi(page, 'POST', `/api/applications/${app.id}/modules`, { name: 'Sign in' });
+    await page.evaluate((id) => localStorage.setItem('stepforge.currentApp', id), app.id);
+
+    // A module's menu offers recording a new scenario into it
+    await page.goto('/explorer');
+    await page.getByRole('button', { name: 'Actions for Sign in' }).click();
+    await page.getByRole('menuitem', { name: 'Record a scenario' }).click();
+    await expect(page).toHaveURL(/\/recorder\?module=/);
+    await expect(page.getByText('The recording is saved as a new scenario in')).toContainText('Sign in');
+
+    // New scenario → Create & record
+    await page.goto('/explorer');
+    await page.getByRole('button', { name: 'Add a scenario' }).click();
+    const dialog = page.getByRole('dialog', { name: 'New scenario' });
+    await dialog.getByLabel('Name').fill('Receptionist signs in');
+    await dialog.getByRole('button', { name: 'Create & record' }).click();
+    await expect(page).toHaveURL(/\/recorder\?scenario=/);
+    await expect(page.getByText('Recording steps for')).toContainText('Receptionist signs in');
+    await page.getByLabel('Start page').fill('/login');
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await expect(page.getByText('Adding to “Receptionist signs in”')).toBeVisible({ timeout: 20_000 });
+
+    const browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
+    const rec = browser
+      .contexts()
+      .flatMap((c) => c.pages())
+      .find((p) => p.url().includes('/login'))!;
+    await rec.locator('stepforge-recorder').getByRole('button', { name: 'Stop' }).waitFor();
+    await rec.getByLabel('Email').fill('reception@careclinic.test');
+    await rec.getByLabel('Password').fill('Reception123!');
+    await rec.getByRole('button', { name: 'Sign in' }).click();
+    await rec.waitForURL(`${CLINIC}/`);
+    await expect(page.getByRole('list', { name: 'Recorded steps' }).getByRole('listitem')).toHaveCount(4, {
+      timeout: 10_000,
+    });
+    await page.getByRole('button', { name: 'Stop & review' }).click();
+    await browser.close().catch(() => {});
+
+    await expect(page.getByText('The 4 recorded step(s) are added to')).toBeVisible();
+    await page.getByRole('button', { name: 'Add to scenario' }).click();
+    await expect(page.getByText('Added 4 recorded step(s) to the scenario')).toBeVisible();
+    await expect(page).toHaveURL(/\/explorer\?scenario=.*tab=steps/);
+    await expect(page.getByRole('heading', { name: 'Receptionist signs in' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Steps/ })).toContainText('4');
+    // More steps can be recorded into the same scenario later
+    await expect(page.getByRole('button', { name: 'Record steps' })).toBeEnabled();
+  });
+
   test('generate variants, blocks with useBlock, and move a module', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/');

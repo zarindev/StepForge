@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
   AppWindow,
+  Disc3,
   FileUp,
   FolderPlus,
   FolderTree,
@@ -109,6 +110,7 @@ export function ExplorerPage() {
     onSelectScenario: (id, tab) => select(id, tab),
     onNewModule: (parentId) => setPrompt({ kind: 'module', parentId }),
     onNewScenario: (moduleId) => setPrompt({ kind: 'scenario', moduleId }),
+    onRecordScenario: (moduleId) => navigate({ to: '/recorder', search: { module: moduleId } }),
     onRenameModule: (module) => setPrompt({ kind: 'rename', module }),
     onDeleteModule: (module) => setConfirm({ kind: 'module', module }),
     onDuplicateScenario: (id) =>
@@ -159,7 +161,7 @@ export function ExplorerPage() {
     if (a.action !== 'addTag') setChecked(new Set());
   };
 
-  const submitPrompt = (value: string) => {
+  const submitPrompt = (value: string, record = false) => {
     if (!prompt || !app) return;
     if (prompt.kind === 'module') {
       exec(
@@ -184,9 +186,11 @@ export function ExplorerPage() {
           }),
         (r) => {
           setPrompt(null);
-          select((r as ScenarioDetail).id, 'steps');
+          // "Create & record": go straight to the Recorder, which adds the recorded steps to this scenario.
+          if (record) navigate({ to: '/recorder', search: { scenario: (r as ScenarioDetail).id } });
+          else select((r as ScenarioDetail).id, 'steps');
         },
-        'Scenario created',
+        record ? 'Scenario created — record its steps' : 'Scenario created',
       );
     }
   };
@@ -432,7 +436,19 @@ export function ExplorerPage() {
           confirmLabel={prompt.kind === 'rename' ? 'Rename' : 'Create'}
           busy={run.isPending}
           onClose={() => setPrompt(null)}
-          onSubmit={submitPrompt}
+          onSubmit={(v) => submitPrompt(v)}
+          secondary={
+            prompt.kind === 'scenario'
+              ? {
+                  label: (
+                    <>
+                      <Disc3 className="h-4 w-4 text-fail" /> Create &amp; record
+                    </>
+                  ),
+                  onSubmit: (v) => submitPrompt(v, true),
+                }
+              : undefined
+          }
         />
       )}
       {importing && <ImportDialog applicationId={app.id} onClose={() => setImporting(false)} />}

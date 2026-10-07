@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- Record from the Test Explorer: the New scenario dialog has **Create & record**, a scenario's Steps tab has
+  **Record steps** (the recorded steps are added after the existing ones, reviewed first), and a module's menu and
+  empty modules offer **Record a scenario**. The Recorder shows where the recording will go; the sidebar Recorder
+  works as before.
+
 ### Fixed
 - Diagnosis: a failed response-time check on an API step is now diagnosed as a slow API (rule `api-slow-response`)
   instead of a generic assertion mismatch.
