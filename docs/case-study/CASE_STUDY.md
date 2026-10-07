@@ -165,7 +165,7 @@ Vitest, Playwright E2E, ESLint, Prettier and GitHub Actions for quality.
 ## Try it
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/stepforge.git
+git clone https://github.com/zarindev/stepforge.git
 cd stepforge && npm install && npm run build
 npm start -- --demo
 ```

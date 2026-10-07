@@ -8,7 +8,7 @@ users' data.
 ## Setup
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/stepforge.git
+git clone https://github.com/zarindev/stepforge.git
 cd stepforge
 ./setup.sh            # Windows: setup.bat
 npm run dev           # API with auto-restart + dashboard with hot reload (http://127.0.0.1:5173)

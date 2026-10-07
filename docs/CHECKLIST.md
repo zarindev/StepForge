@@ -28,12 +28,12 @@ Status of every item, with the evidence. ✅ verified · 🟡 verified in part (
 
 ## Manual to-dos for the author
 
-- Push the repository, then replace `YOUR_GITHUB_USERNAME` (README badges and clone commands, CONTRIBUTING).
+- Push the repository to `github.com/zarindev/stepforge` (the README badges, clone commands, CONTRIBUTING and the
+  case study already point there).
 - After the first push: check the `fresh-clone` (Ubuntu, Windows) and `exported-code` CI jobs, and how the README
   renders on GitHub.
 - Record `docs/assets/demo.gif` (the README has a comment describing the clip; WebM clips to start from are in
   `docs/assets/clips/`) and set the GitHub social preview to `docs/case-study/export/social/github-social-preview.png`.
-- Replace `YOUR_GITHUB_USERNAME` in `docs/case-study/case-study.html`, then rerun
-  `npx tsx scripts/export_case_study.ts`; fill in the Upwork portfolio from `docs/case-study/UPWORK_LISTING.md`.
-  (The Upwork profile link is already in the README, the case study and its last slide.)
+- Fill in the Upwork portfolio from `docs/case-study/UPWORK_LISTING.md` (the GitHub and Upwork links are already in
+  the README, the case study and its last slide).
 - Optional: an Electron desktop installer (not built; KNOWN_ISSUES #64).
