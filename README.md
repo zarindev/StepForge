@@ -426,7 +426,7 @@ Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.
   <h3>Md Zarin Tasnim</h3>
   <p>Creator of StepForge</p>
   <p>
-    <a href="https://www.upwork.com/freelancers/YOUR_UPWORK_PROFILE"><img alt="Hire me on Upwork" src="https://img.shields.io/badge/Hire%20me-Upwork-6FDA44?style=for-the-badge&logo=upwork&logoColor=white" /></a>
+    <a href="https://www.upwork.com/freelancers/~01b847509724f9e1ff"><img alt="Hire me on Upwork" src="https://img.shields.io/badge/Hire%20me-Upwork-6FDA44?style=for-the-badge&logo=upwork&logoColor=white" /></a>
     <a href="https://github.com/YOUR_GITHUB_USERNAME"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-follow-181717?style=for-the-badge&logo=github&logoColor=white" /></a>
   </p>
 </div>

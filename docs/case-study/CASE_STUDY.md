@@ -172,4 +172,4 @@ npm start -- --demo
 
 ![Call to action](export/slides/slide-15.png)
 
-**Need test automation or QA tooling? Let's talk:** <https://www.upwork.com/freelancers/YOUR_UPWORK_PROFILE>
+**Need test automation or QA tooling? Let's talk:** <https://www.upwork.com/freelancers/~01b847509724f9e1ff>
