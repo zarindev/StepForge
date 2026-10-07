@@ -35,7 +35,7 @@ test('schedules: email channel, cron preview, Run now sends the summary (Phase 1
   await sfApi(page, 'POST', '/api/email/mailpit/start', {});
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
     name: 'Clinic Nightly',
-    slug: 'clinic-nightly',
+    slug: `clinic-nightly-${Date.now()}`, // unique, so a CI retry does not collide with the first attempt
   });
   await sfApi(page, 'POST', `/api/applications/${app.id}/environments`, { name: 'Local', baseUrl: CLINIC });
   const mod = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/modules`, {
@@ -94,7 +94,12 @@ test('schedules: email channel, cron preview, Run now sends the summary (Phase 1
   await row.getByRole('button', { name: 'Run Nightly API now' }).click();
   await expect(row).toContainText(/\d/, { timeout: 30_000 });
   await row.getByRole('button', { name: 'Show history' }).click();
-  await expect(page.getByText('QA inbox: sent')).toBeVisible({ timeout: 30_000 });
+  // The badge shows the delivery result; on failure its tooltip holds the error, reported here.
+  const delivery = page.getByText(/^QA inbox: (sent|failed|skipped)$/).first();
+  await expect(delivery).toBeVisible({ timeout: 30_000 });
+  expect(await delivery.textContent(), `delivery error: ${await delivery.getAttribute('title')}`).toBe(
+    'QA inbox: sent',
+  );
   await shot(page, 'phase11-schedules');
 
   // The summary really arrived by email, with the failure and its diagnosis.
