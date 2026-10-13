@@ -44,12 +44,16 @@ function parseCsv(text: string): { columns: string[]; rows: Record<string, strin
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]!;
     if (quoted) {
-      if (ch === '"' && text[i + 1] === '"') ((field += '"'), i++);
-      else if (ch === '"') quoted = false;
+      if (ch === '"' && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
       else field += ch;
     } else if (ch === '"' && field === '') quoted = true;
-    else if (ch === ',') (record.push(field), (field = ''));
-    else if (ch === '\n' || ch === '\r') {
+    else if (ch === ',') {
+      record.push(field);
+      field = '';
+    } else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && text[i + 1] === '\n') i++;
       record.push(field);
       records.push(record);
@@ -57,7 +61,10 @@ function parseCsv(text: string): { columns: string[]; rows: Record<string, strin
       field = '';
     } else field += ch;
   }
-  if (field || record.length) (record.push(field), records.push(record));
+  if (field || record.length) {
+    record.push(field);
+    records.push(record);
+  }
   const [header, ...body] = records.filter((r) => r.some((c) => c.trim()));
   const columns = (header ?? []).map((h, i) => h.trim() || `column${i + 1}`);
   return { columns, rows: body.map((r) => Object.fromEntries(columns.map((c, i) => [c, r[i] ?? '']))) };

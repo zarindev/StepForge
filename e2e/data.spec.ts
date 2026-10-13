@@ -25,21 +25,6 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-/** Waits for a run and returns its item statuses in order. */
-async function runAndWait(page: Page, body: unknown) {
-  const run = await sfApi<{ id: string }>(page, 'POST', '/api/runs', body);
-  for (;;) {
-    const r = await sfApi<{ status: string; items: { status: string }[] }>(
-      page,
-      'GET',
-      `/api/runs/${run.id}`,
-    );
-    if (!['queued', 'running'].includes(r.status))
-      return { id: run.id, statuses: r.items.map((i) => i.status) };
-    await page.waitForTimeout(500);
-  }
-}
-
 test('test data: a table from pasted CSV, preview, a useData step in the editor, and a run that reads a row (Cerberus-style data library)', async ({
   page,
 }) => {
