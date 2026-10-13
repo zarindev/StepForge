@@ -327,4 +327,103 @@ describe('UI diagnosis', () => {
     const again = await run({ type: 'scenarios', ids: [id] });
     expect(again.items[0]!.status).toBe('passed');
   }, 120_000);
+
+  it('fixes a broken step inside a block once, and every scenario using the block passes again', async () => {
+    // A sign-in block with inputs, and a "save patient" block recorded when the button had another test id.
+    const signIn = await ok<{ id: string }>('POST', `/api/applications/${appId}/blocks`, {
+      name: 'Sign in',
+      inputs: [{ name: 'email', default: 'reception@careclinic.test' }, { name: 'password' }],
+      steps: [
+        { type: 'ui.navigate', params: { url: '/login' } },
+        {
+          type: 'ui.fill',
+          params: { value: '{{vars.email}}' },
+          locators: [{ strategy: 'label', value: 'Email' }],
+        },
+        {
+          type: 'ui.fill',
+          params: { value: '{{vars.password}}' },
+          locators: [{ strategy: 'testId', value: 'password' }],
+        },
+        { type: 'ui.click', locators: [{ strategy: 'role', value: 'button', name: 'Sign in' }] },
+      ],
+    });
+    const save = await ok<{ id: string }>('POST', `/api/applications/${appId}/blocks`, {
+      name: 'Save the patient form',
+      steps: [
+        { type: 'ui.navigate', params: { url: '/patients/new' } },
+        {
+          type: 'ui.click',
+          timeoutMs: 2000,
+          locators: [
+            { strategy: 'testId', value: 'store-patient-btn' },
+            { strategy: 'role', value: 'button', name: 'Store patient' },
+          ],
+        },
+      ],
+    });
+    const uses = (inputs: Record<string, string>) => [
+      { type: 'util.useBlock', params: { blockId: signIn.id, inputs } },
+      { type: 'util.useBlock', params: { blockId: save.id } },
+    ];
+    const a = await scenario('Reception saves a patient', uses({ password: '{{secret.password}}' }));
+    const b = await scenario(
+      'Admin saves a patient',
+      uses({ email: 'admin@careclinic.test', password: '{{secret.adminPassword}}' }),
+    );
+
+    const usage = await ok<{ scenarios: { name: string }[]; affectedScenarios: number }>(
+      'GET',
+      `/api/blocks/${save.id}/usage`,
+    );
+    expect(usage.scenarios.map((x) => x.name)).toEqual([
+      'Admin saves a patient',
+      'Reception saves a patient',
+    ]);
+    expect(usage.affectedScenarios).toBe(2);
+
+    const r = await run({ type: 'scenarios', ids: [a, b] });
+    expect(r.items.map((i) => i.status)).toEqual(['failed', 'failed']);
+    // Both failures point at the same block step: one cause, one fix.
+    const summary = await ok<{
+      blockFailures: {
+        blockName: string;
+        stepNumber: number;
+        itemIds: string[];
+        affectedScenarios: number;
+      }[];
+    }>('GET', `/api/runs/${r.id}`);
+    expect(summary.blockFailures).toEqual([
+      expect.objectContaining({ blockName: 'Save the patient form', stepNumber: 2, affectedScenarios: 2 }),
+    ]);
+    expect(summary.blockFailures[0]!.itemIds).toHaveLength(2);
+    const item = r.items[0]!;
+    const d = await diagnosisOf(item.id);
+    expect(d.category).toBe('locator_changed');
+    const detail = await ok<{ steps: { stepId: string; status: string; message: string | null }[] }>(
+      'GET',
+      `/api/run-items/${item.id}`,
+    );
+    // Sign-in ran with the inputs (the password stays masked in messages).
+    expect(detail.steps.find((s) => s.message?.startsWith('Ran block (4 steps)'))?.message).toBe(
+      'Ran block (4 steps) with email, password',
+    );
+    const failedStep = detail.steps.find((s) => s.status === 'failed' && s.stepId.includes('>'))!;
+    const owner = await ok<{ kind: string; name: string; affectedScenarios: number }>(
+      'GET',
+      `/api/run-items/${item.id}/step-owner?stepId=${encodeURIComponent(failedStep.stepId)}`,
+    );
+    expect(owner).toMatchObject({ kind: 'block', name: 'Save the patient form', affectedScenarios: 2 });
+
+    const fixed = await ok<{ owner: { kind: string }; block: { steps: { locators: unknown[] }[] } }>(
+      'POST',
+      `/api/run-items/${item.id}/accept-locator`,
+      { stepId: failedStep.stepId, locator: d.suggestedLocator },
+    );
+    expect(fixed.owner.kind).toBe('block');
+    expect(fixed.block.steps[1]!.locators[0]).toEqual({ strategy: 'testId', value: 'save-patient' });
+    // One fix in the block: both scenarios pass, including the one whose run was never touched.
+    const again = await run({ type: 'scenarios', ids: [a, b] });
+    expect(again.items.map((i) => i.status)).toEqual(['passed', 'passed']);
+  }, 120_000);
 });

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from '@tanstack/react-router';
+import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { Archive, ArrowLeft, BarChart3, FolderTree, Pencil, ShieldAlert, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { AppAvatar, AppFormDialog, type AppFormValues } from '@/components/applications/app-form';
@@ -25,8 +25,9 @@ type Tab = 'environments' | 'secrets' | 'connections' | 'inboxes' | 'tags' | 'bl
 
 export function ApplicationDetailPage() {
   const { appId } = useParams({ from: '/applications/$appId' });
+  const search = useSearch({ from: '/applications/$appId' });
   const app = useApplication(appId);
-  const [tab, setTab] = useState<Tab>('environments');
+  const [tab, setTab] = useState<Tab>(search.tab ?? 'environments');
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const qc = useQueryClient();
@@ -146,7 +147,7 @@ export function ApplicationDetailPage() {
       {tab === 'connections' && <ConnectionsTab app={a} />}
       {tab === 'inboxes' && <InboxesTab app={a} />}
       {tab === 'tags' && <TagsTab app={a} />}
-      {tab === 'blocks' && <BlocksTab app={a} />}
+      {tab === 'blocks' && <BlocksTab app={a} initialBlock={search.block} />}
       {tab === 'settings' && (
         <div className="max-w-2xl space-y-4">
           <Card className="flex items-center justify-between gap-4 p-4">

@@ -233,7 +233,7 @@ test.describe.serial('recorder and scenario editor (Phase 4)', () => {
     await page.goto(`/applications/${app.id}`);
     await page.getByRole('tab', { name: 'Blocks' }).click();
     await page.getByRole('button', { name: 'New block' }).click();
-    await page.getByPlaceholder('Login as Admin').fill('Say hello');
+    await page.getByPlaceholder('Sign in').fill('Say hello');
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     await page.getByLabel('New step type').selectOption('util.log');
     await page.getByRole('button', { name: 'Add step' }).click();

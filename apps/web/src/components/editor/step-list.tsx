@@ -6,6 +6,7 @@ import { Select } from '@/components/ui/input';
 import { defaultParams, groupOf, LAYER, STEP_TYPE_OPTIONS, summarizeStep } from '@/lib/steps';
 import { cn } from '@/lib/utils';
 import { blankStep, newKey, toDrafts, fromDrafts, type DraftStep } from './drafts';
+import { useEditorCtx } from './context';
 import { StepForm } from './step-form';
 
 export function StepTypeSelect({
@@ -41,6 +42,8 @@ export function StepList({
   openKey,
   onOpen,
   ariaLabel = 'Steps',
+  selected,
+  onSelect,
 }: {
   steps: DraftStep[];
   onChange: (s: DraftStep[]) => void;
@@ -48,7 +51,19 @@ export function StepList({
   openKey?: string | null;
   onOpen?: (k: string | null) => void;
   ariaLabel?: string;
+  /** Top-level selection (e.g. to turn steps into a block); shows a checkbox per step. */
+  selected?: Set<string>;
+  onSelect?: (key: string, checked: boolean) => void;
 }) {
+  const { blocks } = useEditorCtx();
+  /** An unlabeled "use block" step reads as the block it runs. */
+  const summary = (s: DraftStep) => {
+    if (s.type === 'util.useBlock' && !s.label) {
+      const b = blocks.find((x) => x.id === s.params.blockId);
+      if (b) return `Use block "${b.name}"`;
+    }
+    return summarizeStep(s);
+  };
   const [localOpen, setLocalOpen] = useState<string | null>(null);
   const open = onOpen ? (openKey ?? null) : localOpen;
   const setOpen = onOpen ?? setLocalOpen;
@@ -94,6 +109,15 @@ export function StepList({
               )}
             >
               <div className="flex items-center gap-2 px-2 py-1.5">
+                {onSelect && depth === 0 && (
+                  <input
+                    type="checkbox"
+                    className="accent-[#F97316]"
+                    aria-label={`Select step ${i + 1}`}
+                    checked={selected?.has(s._k) ?? false}
+                    onChange={(e) => onSelect(s._k, e.target.checked)}
+                  />
+                )}
                 <span
                   draggable
                   onDragStart={() => setDragIndex(i)}
@@ -115,7 +139,7 @@ export function StepList({
                   aria-expanded={expanded}
                   onClick={() => setOpen(expanded ? null : s._k)}
                 >
-                  <span className="truncate text-sm">{summarizeStep(s)}</span>
+                  <span className="truncate text-sm">{summary(s)}</span>
                   <span className="shrink-0 font-mono text-[11px] text-muted">{s.type}</span>
                   {nested > 0 && <Badge>{nested} nested</Badge>}
                   {s.captureAs && <Badge tone="indigo">→ vars.{s.captureAs}</Badge>}

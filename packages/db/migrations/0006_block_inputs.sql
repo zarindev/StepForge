@@ -1,0 +1,1 @@
+ALTER TABLE `blocks` ADD `inputs_json` text DEFAULT '[]' NOT NULL;

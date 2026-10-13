@@ -6,7 +6,17 @@ import { EmailPreview } from '@/components/email/email-preview';
 import { DiagnosisPanel } from '@/components/diagnosis/diagnosis-panel';
 import { PerfPanel, type StepPerf } from '@/components/perf/perf-panel';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ArrowLeft, Ban, Bandage, ChevronRight, FolderTree, Play, RotateCw, Terminal } from 'lucide-react';
+import {
+  ArrowLeft,
+  Ban,
+  Bandage,
+  Blocks,
+  ChevronRight,
+  FolderTree,
+  Play,
+  RotateCw,
+  Terminal,
+} from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { EvidencePanel, Lightbox } from '@/components/runs/evidence';
 import { openRunDialog } from '@/components/runs/run-dialog';
@@ -219,6 +229,41 @@ export function RunDetailPage() {
         </div>
       </Card>
 
+      {(r.blockFailures ?? []).length > 0 && (
+        <Card className="mb-5 space-y-2 border-indigo/30 p-4" aria-label="Failures inside blocks">
+          {r.blockFailures!.map((g) => (
+            <div key={`${g.blockId}|${g.stepId}`} className="flex flex-wrap items-center gap-2 text-sm">
+              <Blocks className="h-4 w-4 shrink-0 text-indigo" />
+              <span>
+                <b>
+                  {g.itemIds.length} failed test{g.itemIds.length === 1 ? '' : 's'}
+                </b>{' '}
+                {g.itemIds.length === 1 ? 'stops' : 'stop'} at{' '}
+                {g.stepNumber ? `step ${g.stepNumber}` : 'a step'} of block <b>{g.blockName}</b>
+                <span className="text-muted">
+                  {' '}
+                  — used by {g.affectedScenarios} scenario{g.affectedScenarios === 1 ? '' : 's'}; fix it once
+                  there
+                </span>
+              </span>
+              <span className="ml-auto flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setSelected(g.itemIds[0]!)}>
+                  Show the failure
+                </Button>
+                <Link
+                  to="/applications/$appId"
+                  params={{ appId: r.applicationId }}
+                  search={{ tab: 'blocks', block: g.blockId }}
+                  className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs hover:bg-fg/5"
+                >
+                  Open block
+                </Link>
+              </span>
+            </div>
+          ))}
+        </Card>
+      )}
+
       <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
         <Card className="h-fit overflow-hidden">
           <div className="flex gap-1 border-b border-border p-2" role="tablist" aria-label="Filter tests">
@@ -361,7 +406,9 @@ function ItemPanel({
             {d.errorMessage}
           </div>
         )}
-        {d.diagnosisJson && (d.status === 'failed' || d.status === 'broken') && <DiagnosisPanel item={d} />}
+        {d.diagnosisJson && (d.status === 'failed' || d.status === 'broken') && (
+          <DiagnosisPanel item={d} applicationId={appId} />
+        )}
         {running && latestShot && (
           <div className="mb-4">
             <p className="mb-1.5 text-xs text-muted">Live view</p>

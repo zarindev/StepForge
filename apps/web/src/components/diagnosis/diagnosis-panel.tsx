@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Bug, CheckCircle2, History, MapPin, RefreshCw, Sparkles, UserRound, Wrench } from 'lucide-react';
+import {
+  Blocks,
+  Bug,
+  CheckCircle2,
+  History,
+  MapPin,
+  RefreshCw,
+  Sparkles,
+  UserRound,
+  Wrench,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast, toastError } from '@/components/ui/toast';
@@ -25,7 +35,7 @@ const describe = (l: { strategy: string; value: string; name?: string }) =>
   l.strategy === 'role' ? `role=${l.value}${l.name ? ` "${l.name}"` : ''}` : `${l.strategy}=${l.value}`;
 
 /** Where / Why / Whose / How to fix for a failed test, with evidence and the comparison with the last pass. */
-export function DiagnosisPanel({ item }: { item: RunItemDetail }) {
+export function DiagnosisPanel({ item, applicationId }: { item: RunItemDetail; applicationId: string }) {
   const d = item.diagnosisJson as Diagnosis;
   const qc = useQueryClient();
   const ai = useQuery({
@@ -44,13 +54,34 @@ export function DiagnosisPanel({ item }: { item: RunItemDetail }) {
   });
   const failedStep =
     item.steps.find((s) => s.stepId === item.failedStepId) ?? item.steps.find((s) => s.status === 'failed');
+  // A step that failed inside a block belongs to the block: fixing it there fixes every test that uses it.
+  const failedStepId = failedStep?.stepId ?? '';
+  const inBlock = failedStepId.includes('>');
+  const owner = useQuery({
+    queryKey: ['step-owner', item.id, failedStepId],
+    queryFn: () =>
+      api<{ kind: 'scenario' | 'block'; id: string; name: string; affectedScenarios?: number }>(
+        `/api/run-items/${item.id}/step-owner?stepId=${encodeURIComponent(failedStepId)}`,
+      ),
+    enabled: inBlock,
+    retry: false,
+  });
+  const block = owner.data?.kind === 'block' ? owner.data : null;
+  const affected = block?.affectedScenarios ?? 0;
   const accept = useMutation({
     mutationFn: () =>
       api(`/api/run-items/${item.id}/accept-locator`, {
         method: 'POST',
         json: { stepId: failedStep?.stepId, locator: d.suggestedLocator },
       }),
-    onSuccess: () => toast(`Step updated to use ${describe(d.suggestedLocator!)} — run it again to confirm`),
+    onSuccess: () => {
+      toast(
+        block
+          ? `Block "${block.name}" updated to use ${describe(d.suggestedLocator!)} — that fixes ${affected} scenario${affected === 1 ? '' : 's'}; run them again to confirm`
+          : `Step updated to use ${describe(d.suggestedLocator!)} — run it again to confirm`,
+      );
+      if (block) void qc.invalidateQueries({ queryKey: ['block', block.id] });
+    },
     onError: toastError,
   });
 
@@ -93,6 +124,22 @@ export function DiagnosisPanel({ item }: { item: RunItemDetail }) {
         <dd>
           {d.where.path ? `Step ${d.where.path} — ` : ''}
           {d.where.step}
+          {block && (
+            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs" data-testid="failed-in-block">
+              <Blocks className="h-3.5 w-3.5 text-indigo" /> Inside block{' '}
+              <Link
+                to="/applications/$appId"
+                params={{ appId: applicationId }}
+                search={{ tab: 'blocks', block: block.id }}
+                className="font-medium text-brand hover:underline"
+              >
+                {block.name}
+              </Link>
+              <span className="text-muted">
+                — used by {affected} scenario{affected === 1 ? '' : 's'}: one fix there repairs all of them
+              </span>
+            </p>
+          )}
         </dd>
         <dt className="flex items-center gap-1.5 text-muted">
           <Sparkles className="h-3.5 w-3.5" /> Why (likely)
@@ -118,7 +165,13 @@ export function DiagnosisPanel({ item }: { item: RunItemDetail }) {
                 onClick={() => accept.mutate()}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                {accept.isSuccess ? 'Locator updated' : `Use ${describe(d.suggestedLocator)}`}
+                {accept.isSuccess
+                  ? block
+                    ? `Block updated (${affected} scenario${affected === 1 ? '' : 's'})`
+                    : 'Locator updated'
+                  : block
+                    ? `Fix block "${block.name}": use ${describe(d.suggestedLocator)}`
+                    : `Use ${describe(d.suggestedLocator)}`}
               </Button>
             </div>
           )}

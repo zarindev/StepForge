@@ -126,6 +126,15 @@ const runDetailRoute = createRoute({
 const applicationDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/applications/$appId',
+  validateSearch: (s) =>
+    z
+      .object({
+        tab: z
+          .enum(['environments', 'secrets', 'connections', 'inboxes', 'tags', 'blocks', 'settings'])
+          .optional(),
+        block: z.string().optional(),
+      })
+      .parse(s),
   component: ApplicationDetailPage,
 });
 

@@ -73,7 +73,10 @@ export function codegenInput(
   const blocks = Object.fromEntries(
     repo
       .listBlocks(db, applicationId)
-      .map((b) => [b.id, { name: b.name, steps: steps(repo.getBlock(db, b.id).steps) }]),
+      .map((b) => [
+        b.id,
+        { name: b.name, steps: steps(repo.getBlock(db, b.id).steps), inputs: b.inputsJson },
+      ]),
   );
   return {
     application: { name: app.name, slug: app.slug },

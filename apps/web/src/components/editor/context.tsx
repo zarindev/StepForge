@@ -4,10 +4,15 @@ import { api } from '@/lib/api';
 import { useConnections, useInboxes, useTree } from '@/lib/queries';
 
 type Option = { id: string; label: string };
+export type BlockOption = Option & {
+  name: string;
+  usedBy: number;
+  inputs: { name: string; default?: string; description?: string }[];
+};
 type Ctx = {
   applicationId: string;
   scenarios: Option[];
-  blocks: Option[];
+  blocks: BlockOption[];
   /** Database connection names (steps refer to connections by name, per environment). */
   connections: Option[];
   /** Email inbox names of the application. */
@@ -36,7 +41,15 @@ export function EditorProvider({
   const blocks = useQuery({
     queryKey: ['blocks', applicationId],
     queryFn: () =>
-      api<{ id: string; name: string; stepCount: number }[]>(`/api/applications/${applicationId}/blocks`),
+      api<
+        {
+          id: string;
+          name: string;
+          stepCount: number;
+          usedBy: number;
+          inputsJson: BlockOption['inputs'];
+        }[]
+      >(`/api/applications/${applicationId}/blocks`),
   });
   const conns = useConnections(applicationId);
   const inboxes = useInboxes(applicationId);
@@ -48,7 +61,13 @@ export function EditorProvider({
     scenarios: (tree.data?.scenarios ?? [])
       .filter((s) => s.id !== selfId)
       .map((s) => ({ id: s.id, label: s.name })),
-    blocks: (blocks.data ?? []).map((b) => ({ id: b.id, label: `${b.name} (${b.stepCount} steps)` })),
+    blocks: (blocks.data ?? []).map((b) => ({
+      id: b.id,
+      name: b.name,
+      label: `${b.name} (${b.stepCount} steps)`,
+      usedBy: b.usedBy,
+      inputs: b.inputsJson ?? [],
+    })),
     connections: [...byName].map(([name, envs]) => ({ id: name, label: `${name} (${envs.join(', ')})` })),
     inboxes: (inboxes.data ?? []).map((i) => ({
       id: i.name,

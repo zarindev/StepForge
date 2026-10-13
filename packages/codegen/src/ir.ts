@@ -605,6 +605,22 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
         break;
       }
       out.push({ op: 'comment', text: `${isBlock ? 'Block' : 'Scenario'}: ${target.name}` });
+      // Block inputs: the value this use passes (or the default) becomes a variable, as when StepForge runs it.
+      if (isBlock) {
+        const given = (q.inputs && typeof q.inputs === 'object' ? q.inputs : {}) as Record<string, unknown>;
+        const declared = (target as { inputs?: { name: string; default?: string }[] }).inputs ?? [];
+        const names = [
+          ...declared.map((d) => d.name),
+          ...Object.keys(given).filter((k) => !declared.some((d) => d.name === k)),
+        ];
+        for (const name of names) {
+          const value =
+            given[name] !== undefined && given[name] !== ''
+              ? given[name]
+              : declared.find((d) => d.name === name)?.default;
+          if (value !== undefined) out.push({ op: 'setVar', name, value: val(value) });
+        }
+      }
       out.push(...listOps(ctx, target.steps, depth + 1));
       break;
     }

@@ -136,15 +136,15 @@ function TypedField({
     case 'scenario':
     case 'block': {
       const opts = spec.kind === 'scenario' ? scenarios : blocks;
-      return (
+      const picker = (
         <Field
           label={spec.label}
-          className={cls}
+          className={spec.kind === 'block' ? undefined : cls}
           hint={
             opts.length
               ? undefined
               : spec.kind === 'block'
-                ? 'Create blocks on the application’s Blocks tab'
+                ? 'Create blocks on the application’s Blocks tab, or select steps and choose “Make a block”'
                 : 'No other scenarios'
           }
         >
@@ -161,6 +161,47 @@ function TypedField({
             ))}
           </Select>
         </Field>
+      );
+      if (spec.kind !== 'block') return picker;
+      const block = blocks.find((b) => b.id === value);
+      const given = (params.inputs ?? {}) as Record<string, string>;
+      return (
+        <div className={cn('space-y-3', cls)}>
+          {picker}
+          {block && (
+            <p className="text-xs text-muted" data-testid="block-usage-hint">
+              Used by {block.usedBy} scenario{block.usedBy === 1 ? '' : 's'} or block
+              {block.usedBy === 1 ? '' : 's'}. Fix it once on the application’s Blocks tab and every one of
+              them is fixed.
+            </p>
+          )}
+          {block && block.inputs.length > 0 && (
+            <fieldset className="grid gap-3 md:grid-cols-2" aria-label="Block inputs">
+              {block.inputs.map((inp) => (
+                <Field
+                  key={inp.name}
+                  label={`${inp.name}${inp.default === undefined ? ' (required)' : ''}`}
+                  hint={
+                    [inp.description, inp.default !== undefined && `Default: ${inp.default || '(empty)'}`]
+                      .filter(Boolean)
+                      .join(' · ') || `Inside the block: {{vars.${inp.name}}}`
+                  }
+                >
+                  <Input
+                    aria-label={`Input ${inp.name}`}
+                    value={given[inp.name] ?? ''}
+                    placeholder={inp.default}
+                    onChange={(e) => {
+                      const next = { ...given, [inp.name]: e.target.value };
+                      if (!e.target.value) delete next[inp.name];
+                      onParams({ ...params, inputs: Object.keys(next).length ? next : undefined });
+                    }}
+                  />
+                </Field>
+              ))}
+            </fieldset>
+          )}
+        </div>
       );
     }
     case 'code':

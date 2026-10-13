@@ -54,6 +54,24 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
 
   app.post('/api/runs', async (req, reply) => reply.code(201).send(runs.create(req.body as never)));
 
+  /** The block (and its step) that owns a failed run step, when it is inside a block. */
+  const blockFailure = (scenarioId: string, runStepId: string) => {
+    try {
+      const o = repo.stepOwner(db, scenarioId, runStepId);
+      if (o.kind !== 'block') return null;
+      const step = repo.getBlock(db, o.id).steps.findIndex((x) => x.id === o.stepId);
+      return {
+        blockId: o.id,
+        blockName: o.name,
+        stepId: o.stepId,
+        stepNumber: step >= 0 ? step + 1 : null,
+        affectedScenarios: o.affectedScenarios ?? 0,
+      };
+    } catch {
+      return null; // the scenario or block changed since the run
+    }
+  };
+
   app.get<P<'id'>>('/api/runs/:id', async (req) => {
     const run = runs.getRun(req.params.id);
     const items = db
@@ -66,9 +84,22 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
       ? db.select().from(schema.environments).where(eq(schema.environments.id, run.environmentId)).get()
       : undefined;
     const application = repo.getApplication(db, run.applicationId);
+    // Failures inside blocks, grouped by the block step that failed: one fix there repairs all of them.
+    const groups = new Map<string, NonNullable<ReturnType<typeof blockFailure>> & { itemIds: string[] }>();
+    for (const it of items) {
+      if (!['failed', 'broken'].includes(it.status) || !it.scenarioId || !it.failedStepId?.includes('>'))
+        continue;
+      const f = blockFailure(it.scenarioId, it.failedStepId);
+      if (!f) continue;
+      const key = `${f.blockId}|${f.stepId}`;
+      const g = groups.get(key) ?? { ...f, itemIds: [] };
+      g.itemIds.push(it.id);
+      groups.set(key, g);
+    }
     return {
       ...run,
       items,
+      blockFailures: [...groups.values()].sort((a, b) => b.itemIds.length - a.itemIds.length),
       environment: env
         ? { id: env.id, name: env.name, baseUrl: env.baseUrl, isProduction: env.isProduction }
         : null,

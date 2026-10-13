@@ -374,7 +374,11 @@ export class RunManager {
           const block = repo.getBlock(this.db, id);
           if (block.applicationId !== run.applicationId)
             throw new Error('block belongs to another application');
-          return block.steps.map((s) => ({ ...s, id: s.id }));
+          return {
+            name: block.name,
+            steps: block.steps.map((s) => ({ ...s, id: s.id })),
+            inputs: block.inputsJson,
+          };
         },
         onEvent: (e) => {
           if (e.type === 'step.started') this.bus.publish({ ...e, runId: run.id, itemId: item.id, attempt });

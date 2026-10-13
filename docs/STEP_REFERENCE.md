@@ -75,7 +75,7 @@ Generic `assertions` on any UI step can target `url`, `title`, and for steps wit
 | `if` | `condition: { value, operator, expected }`, `steps` (then), `else` | any assertion operator; nested results numbered `3.1` (then) / `3e.1` (else) |
 | `loop` | `count` **or** `over` (an array, e.g. `{{vars.items}}`), `as` (default `item`), `steps` | exposes `{{vars.item}}` and `{{vars.index}}`; max 1000 iterations; results `4[2].1` |
 | `callScenario` | `scenarioId` | runs another scenario of the same application inline; max nesting depth 5 |
-| `useBlock` | `blockId` | runs a reusable block (application → Blocks tab) |
+| `useBlock` | `blockId`, `inputs` (`{ "name": "value" }`, placeholders allowed) | runs a reusable block (application → Blocks tab). Each input becomes `{{vars.<name>}}` for the block's steps (the passed value, else the block's default; a required input without a value stops the test). See [BLOCKS.md](BLOCKS.md) |
 
 ## API steps (`api.*`) — available since Phase 5
 

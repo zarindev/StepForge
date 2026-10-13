@@ -197,8 +197,18 @@ export type RunItem = {
   errorMessage: string | null;
   failedStepId: string | null;
 };
+/** Failed tests whose failing step is inside the same block step: one fix there repairs all of them. */
+export type BlockFailure = {
+  blockId: string;
+  blockName: string;
+  stepId: string;
+  stepNumber: number | null;
+  affectedScenarios: number;
+  itemIds: string[];
+};
 export type RunDetail = Run & {
   items: RunItem[];
+  blockFailures?: BlockFailure[];
   environment: { id: string; name: string; baseUrl: string; isProduction: boolean } | null;
   application: { id: string; name: string; color: string };
 };

@@ -28,6 +28,19 @@ export function registerRecorderRoutes(app: FastifyInstance, ctx: AppContext): v
     reply.code(201).send(repo.createBlock(db, req.params.id, req.body as never)),
   );
   app.get<P<'id'>>('/api/blocks/:id', async (req) => repo.getBlock(db, req.params.id));
+  /** Where a block is used — what a change to it affects. */
+  app.get<P<'id'>>('/api/blocks/:id/usage', async (req) => repo.blockUsage(db, req.params.id));
+  /** Turns consecutive steps of a scenario into a new block (the scenario then uses the block). */
+  app.post<P<'id'>>('/api/scenarios/:id/extract-block', async (req, reply) => {
+    const body = z
+      .object({
+        stepIds: z.array(z.string()).min(1),
+        name: z.string().min(1).max(120),
+        description: z.string().max(2000).optional(),
+      })
+      .parse(req.body);
+    return reply.code(201).send(repo.extractBlock(db, req.params.id, body));
+  });
   app.patch<P<'id'>>('/api/blocks/:id', async (req) =>
     repo.updateBlock(db, req.params.id, req.body as never),
   );

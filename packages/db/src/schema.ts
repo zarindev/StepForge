@@ -149,11 +149,15 @@ export const tags = sqliteTable(
   (t) => [uniqueIndex('tags_app_name_uq').on(t.applicationId, t.name)],
 );
 
+/** An input a block declares; each `util.useBlock` passes a value (or the default) as `{{vars.<name>}}`. */
+export type BlockInputDef = { name: string; default?: string; description?: string };
+
 export const blocks = sqliteTable('blocks', {
   id: id(),
   applicationId: fk('application_id', () => applications.id).notNull(),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
+  inputsJson: json<BlockInputDef[]>('inputs_json').notNull().default([]),
   ...timestamps,
 });
 

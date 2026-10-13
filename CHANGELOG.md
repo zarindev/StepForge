@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+- **Block maintenance** (like Cerberus Testing's step library): blocks declare inputs (defaults or required,
+  `{{vars.<name>}}` inside the block, exported as variables); "Make a block" turns selected scenario steps into a
+  block; the Blocks tab shows where each block is used and what a change affects, and asks before deleting a used
+  block; when a test fails inside a block, the diagnosis names the block and its one-click locator fix updates the
+  block (so every test using it is fixed); run results group failures by the block step they share.
+
 ### Changed
 - **Node.js 22 or newer is now required** (was 20). Node 20 reached end of life in April 2026, better-sqlite3 no
   longer publishes Node 20 binaries (so installing on Windows needed a C++ build), and the SQL Server driver's Azure

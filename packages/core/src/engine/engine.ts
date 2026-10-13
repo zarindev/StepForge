@@ -34,8 +34,15 @@ export type RunTestCaseInput = {
   onEvent?: (e: EngineEvent) => void;
   /** Resolves `util.callScenario` targets. */
   loadScenarioSteps?: (scenarioId: string) => InputStep[] | Promise<InputStep[]>;
-  /** Resolves `util.useBlock` targets. */
-  loadBlockSteps?: (blockId: string) => InputStep[] | Promise<InputStep[]>;
+  /** Resolves `util.useBlock` targets: the block's steps, and the inputs it declares (set as `vars`). */
+  loadBlockSteps?: (blockId: string) => BlockTarget | InputStep[] | Promise<BlockTarget | InputStep[]>;
+};
+
+/** A loaded block: its steps and declared inputs (`{{vars.<name>}}` inside the block). */
+export type BlockTarget = {
+  steps: InputStep[];
+  name?: string;
+  inputs?: { name: string; default?: string }[];
 };
 
 /** Control-flow steps are interpreted by the engine itself, not by an executor. */
@@ -385,16 +392,38 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
       const loader = isBlock ? input.loadBlockSteps : input.loadScenarioSteps;
       if (!loader) throw new StepError('unsupported', `${step.type} is not available in this context`);
       let target: InputStep[];
+      let declared: BlockTarget['inputs'] = [];
       try {
-        target = (await loader(targetId)).map((s) => ({ ...s, id: `${step.id}>${s.id}` }));
+        const loaded = await loader(targetId);
+        const list = Array.isArray(loaded) ? loaded : loaded.steps;
+        if (!Array.isArray(loaded)) declared = loaded.inputs ?? [];
+        target = list.map((s) => ({ ...s, id: `${step.id}>${s.id}` }));
       } catch (err) {
         throw new StepError(
           'invalid_params',
           `Cannot load ${isBlock ? 'block' : 'scenario'} "${targetId}": ${(err as Error).message}`,
         );
       }
+      // Block inputs become variables for the block's steps: the value this step passes, else the default.
+      const given = (isBlock && p.inputs && typeof p.inputs === 'object' ? p.inputs : {}) as Record<
+        string,
+        unknown
+      >;
+      const inputNames: string[] = [];
+      for (const def of declared ?? []) {
+        const value = given[def.name] !== undefined && given[def.name] !== '' ? given[def.name] : def.default;
+        if (value === undefined)
+          throw new StepError('invalid_params', `The block needs a value for its input "${def.name}"`);
+        resolver.setVar(def.name, value);
+        inputNames.push(def.name);
+      }
+      for (const [name, value] of Object.entries(given))
+        if (!inputNames.includes(name) && value !== undefined) {
+          resolver.setVar(name, value);
+          inputNames.push(name);
+        }
       await runList(target, base.path, base.depth + 1, callDepth + 1);
-      const msg = `Ran ${isBlock ? 'block' : 'scenario'} (${target.length} steps)`;
+      const msg = `Ran ${isBlock ? 'block' : 'scenario'} (${target.length} steps)${inputNames.length ? ` with ${inputNames.join(', ')}` : ''}`;
       return childFailed()
         ? done('failed', `${msg}; a nested step failed`, 'assertion')
         : done('passed', msg);

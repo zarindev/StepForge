@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { Disc3, ListPlus, Save, Undo2 } from 'lucide-react';
+import { Blocks, Disc3, ListPlus, Save, Undo2 } from 'lucide-react';
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { EditorProvider } from '@/components/editor/context';
+import { PromptDialog } from '@/components/explorer/prompt-dialog';
 import { fromDrafts, toDrafts, type DraftStep } from '@/components/editor/drafts';
 import { PlainView } from '@/components/editor/plain-view';
 import { StepList } from '@/components/editor/step-list';
@@ -28,6 +29,18 @@ export function StepsEditor({ scenario }: { scenario: ScenarioDetail }) {
         title={scenario.name}
         saveLabel="Save steps"
         onRecord={() => navigate({ to: '/recorder', search: { scenario: scenario.id } })}
+        onMakeBlock={async (stepIds, name, qc) => {
+          const r = await api<{ block: { id: string; name: string }; scenario: ScenarioDetail }>(
+            `/api/scenarios/${scenario.id}/extract-block`,
+            { method: 'POST', json: { stepIds, name } },
+          );
+          qc.setQueryData(qk.scenario(r.scenario.id), r.scenario);
+          qc.invalidateQueries({ queryKey: qk.tree(r.scenario.applicationId) });
+          qc.invalidateQueries({ queryKey: qk.versions(r.scenario.id) });
+          qc.invalidateQueries({ queryKey: ['blocks', r.scenario.applicationId] });
+          toast(`Block "${r.block.name}" created; this scenario now uses it (v${r.scenario.version})`);
+          return r.scenario.steps;
+        }}
         save={(steps) =>
           api<ScenarioDetail>(`/api/scenarios/${scenario.id}/steps`, { method: 'PUT', json: { steps } })
         }
@@ -50,6 +63,7 @@ export function StepsWorkbench({
   onSaved,
   saveLabel,
   onRecord,
+  onMakeBlock,
 }: {
   initial: StepRecord[];
   title?: string;
@@ -58,6 +72,12 @@ export function StepsWorkbench({
   saveLabel: string;
   /** Opens the Recorder to record steps into this scenario (scenarios only, not blocks). */
   onRecord?: () => void;
+  /** Turns the selected top-level steps into a block; returns the scenario's new steps. */
+  onMakeBlock?: (
+    stepIds: string[],
+    name: string,
+    qc: ReturnType<typeof useQueryClient>,
+  ) => Promise<StepRecord[]>;
 }) {
   const original = useMemo(() => toDrafts(initial), [initial]);
   const [steps, setSteps] = useState<DraftStep[]>(original);
@@ -65,6 +85,23 @@ export function StepsWorkbench({
   const [open, setOpen] = useState<string | null>(null);
   const qc = useQueryClient();
   const dirty = JSON.stringify(fromDrafts(steps)) !== JSON.stringify(fromDrafts(original));
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [naming, setNaming] = useState(false);
+  const makeBlock = useMutation({
+    mutationFn: (name: string) =>
+      onMakeBlock!(
+        // Saved steps keep their id as the draft key (Make a block needs saved steps).
+        steps.filter((s) => picked.has(s._k)).map((s) => s.id ?? s._k),
+        name,
+        qc,
+      ),
+    onSuccess: (next) => {
+      setSteps(toDrafts(next));
+      setPicked(new Set());
+      setNaming(false);
+    },
+    onError: toastError,
+  });
   const mutation = useMutation({
     mutationFn: () => save(fromDrafts(steps)),
     onSuccess: (r) => onSaved(qc, r),
@@ -95,6 +132,22 @@ export function StepsWorkbench({
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {onMakeBlock && picked.size > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={dirty}
+              title={
+                dirty
+                  ? 'Save or discard your changes first'
+                  : 'Move the selected steps into a reusable block; this scenario then uses the block'
+              }
+              onClick={() => setNaming(true)}
+            >
+              <Blocks className="h-3.5 w-3.5" /> Make a block from {picked.size} step
+              {picked.size === 1 ? '' : 's'}
+            </Button>
+          )}
           {dirty && <span className="text-xs text-warn">Unsaved changes</span>}
           {onRecord && steps.length > 0 && (
             <Button
@@ -138,10 +191,40 @@ export function StepsWorkbench({
                 )
               }
             />
-            <StepList steps={steps} onChange={setSteps} openKey={open} onOpen={setOpen} />
+            <StepList
+              steps={steps}
+              onChange={setSteps}
+              openKey={open}
+              onOpen={setOpen}
+              {...(onMakeBlock && {
+                selected: picked,
+                onSelect: (k: string, on: boolean) =>
+                  setPicked((p) => {
+                    const next = new Set(p);
+                    if (on) next.add(k);
+                    else next.delete(k);
+                    return next;
+                  }),
+              })}
+            />
           </>
         ) : (
-          <StepList steps={steps} onChange={setSteps} openKey={open} onOpen={setOpen} />
+          <StepList
+            steps={steps}
+            onChange={setSteps}
+            openKey={open}
+            onOpen={setOpen}
+            {...(onMakeBlock && {
+              selected: picked,
+              onSelect: (k: string, on: boolean) =>
+                setPicked((p) => {
+                  const next = new Set(p);
+                  if (on) next.add(k);
+                  else next.delete(k);
+                  return next;
+                }),
+            })}
+          />
         ))}
       {view === 'flow' && (
         <Suspense fallback={<Skeleton className="h-[560px]" />}>
@@ -155,6 +238,17 @@ export function StepsWorkbench({
         </Suspense>
       )}
       {view === 'plain' && <PlainView steps={fromDrafts(steps)} title={title} />}
+      {naming && (
+        <PromptDialog
+          title="Make a block"
+          label="Block name"
+          placeholder="Sign in"
+          confirmLabel="Make block"
+          busy={makeBlock.isPending}
+          onClose={() => setNaming(false)}
+          onSubmit={(n) => makeBlock.mutate(n)}
+        />
+      )}
     </div>
   );
 }

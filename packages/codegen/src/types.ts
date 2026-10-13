@@ -47,7 +47,10 @@ export type CodegenInput = {
   inboxes: { name: string; kind: 'mailpit' | 'imap' }[];
   scenarios: CodegenScenario[];
   /** Targets of `util.useBlock` / `util.callScenario`, inlined into the generated tests. */
-  blocks: Record<string, { name: string; steps: CodegenStep[] }>;
+  blocks: Record<
+    string,
+    { name: string; steps: CodegenStep[]; inputs?: { name: string; default?: string }[] }
+  >;
   library: Record<string, { name: string; steps: CodegenStep[] }>;
   author: string;
   /** ISO time printed in generated headers (fixed in snapshot tests). */

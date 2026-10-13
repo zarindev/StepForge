@@ -38,25 +38,6 @@ function send(reply: FastifyReply, body: string | Buffer, ext: keyof typeof TYPE
     .send(body);
 }
 
-type AnyStep = { id?: string; params?: Record<string, unknown>; locators?: unknown[] };
-function withLocator(steps: AnyStep[], id: string, loc: unknown): boolean {
-  for (const s of steps) {
-    if (s.id === id) {
-      // The suggestion becomes the primary locator; the old ones stay as fallbacks.
-      s.locators = [
-        loc,
-        ...((s.locators ?? []) as unknown[]).filter((l) => JSON.stringify(l) !== JSON.stringify(loc)),
-      ];
-      return true;
-    }
-    for (const key of ['steps', 'else']) {
-      const nested = s.params?.[key];
-      if (Array.isArray(nested) && withLocator(nested as AnyStep[], id, loc)) return true;
-    }
-  }
-  return false;
-}
-
 export function registerBugRoutes(app: FastifyInstance, ctx: AppContext) {
   const { db } = ctx;
   const root = ctx.config.artifactsDir;
@@ -154,16 +135,32 @@ export function registerBugRoutes(app: FastifyInstance, ctx: AppContext) {
     return d;
   });
 
-  /** One-click fix for "locator changed": make the suggested locator the step's primary one. */
+  /** Where a run step lives (the scenario, or the block it ran inside) — a fix there fixes every user. */
+  app.get<P<'id'> & { Querystring: { stepId?: string } }>('/api/run-items/:id/step-owner', async (req) => {
+    const item = db.select().from(schema.runItems).where(eq(schema.runItems.id, req.params.id)).get();
+    if (!item?.scenarioId) throw repo.notFound('Run item', req.params.id);
+    return repo.stepOwner(db, item.scenarioId, z.string().min(1).parse(req.query.stepId));
+  });
+
+  /**
+   * One-click fix for "locator changed": the suggested locator becomes the step's primary one — in the block when
+   * the step ran inside a block, so every test using the block is fixed at once.
+   */
   app.post<P<'id'>>('/api/run-items/:id/accept-locator', async (req) => {
     const { stepId, locator } = z.object({ stepId: z.string(), locator: Locator }).parse(req.body);
     const item = db.select().from(schema.runItems).where(eq(schema.runItems.id, req.params.id)).get();
     if (!item?.scenarioId) throw repo.notFound('Run item', req.params.id);
-    const scenario = repo.getScenario(db, item.scenarioId);
-    const steps = structuredClone(scenario.steps) as unknown as AnyStep[];
-    if (!withLocator(steps, stepId, locator))
-      throw new repo.RepoError(404, 'not_found', 'The step no longer exists in this scenario');
-    return repo.saveSteps(db, scenario.id, steps as never);
+    try {
+      return repo.acceptLocator(db, item.scenarioId, stepId, locator);
+    } catch (err) {
+      if (err instanceof repo.RepoError && err.statusCode === 404)
+        throw new repo.RepoError(
+          404,
+          'not_found',
+          'The step no longer exists in this scenario or its blocks',
+        );
+      throw err;
+    }
   });
 
   // ─── Run reports ─────────────────────────────────────────────────────────
