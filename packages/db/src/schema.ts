@@ -309,9 +309,58 @@ export const runs = sqliteTable(
     qualityGateJson: json<unknown>('quality_gate_json'),
     /** Set for runs started by a schedule (schedule history). */
     scheduleId: text('schedule_id'),
+    /** Set for the runs of a campaign run (one per environment × browser × screen size). */
+    campaignRunId: text('campaign_run_id'),
     ...timestamps,
   },
-  (t) => [index('runs_app_idx').on(t.applicationId, t.createdAt), index('runs_status_idx').on(t.status)],
+  (t) => [
+    index('runs_app_idx').on(t.applicationId, t.createdAt),
+    index('runs_status_idx').on(t.status),
+    index('runs_campaign_run_idx').on(t.campaignRunId),
+  ],
+);
+
+/**
+ * A saved test campaign: which tests (whole application, or modules / tags / scenarios) across which
+ * environments × browsers × screen sizes, with run options and notification channels.
+ */
+export const campaigns = sqliteTable(
+  'campaigns',
+  {
+    id: id(),
+    applicationId: fk('application_id', () => applications.id).notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    /** `{ all: true }` or `{ modules: [], tags: [], scenarios: [] }` (union). */
+    selectionJson: json<Record<string, unknown>>('selection_json').notNull().default({ all: true }),
+    environmentIdsJson: json<string[]>('environment_ids_json').notNull().default([]),
+    browsersJson: json<string[]>('browsers_json').notNull().default(['chromium']),
+    viewportsJson: json<string[]>('viewports_json').notNull().default(['desktop']),
+    optionsJson: json<Record<string, unknown>>('options_json').notNull().default({}),
+    notifyChannelIdsJson: json<string[]>('notify_channel_ids_json').notNull().default([]),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('campaigns_app_name_uq').on(t.applicationId, t.name)],
+);
+
+/** One execution of a campaign: a group of runs. Its status is derived from them. */
+export const campaignRuns = sqliteTable(
+  'campaign_runs',
+  {
+    id: id(),
+    campaignId: fk('campaign_id', () => campaigns.id).notNull(),
+    applicationId: fk('application_id', () => applications.id).notNull(),
+    trigger: text('trigger', { enum: ['manual', 'schedule', 'cli', 'rerun'] })
+      .notNull()
+      .default('manual'),
+    /** For "rerun failed": the campaign run whose failures this one repeats. */
+    parentId: text('parent_id'),
+    scheduleId: text('schedule_id'),
+    /** Set once all runs finished and the summary was sent. */
+    finishedAt: text('finished_at'),
+    ...timestamps,
+  },
+  (t) => [index('campaign_runs_campaign_idx').on(t.campaignId, t.createdAt)],
 );
 
 export const runItems = sqliteTable(
@@ -487,6 +536,8 @@ export const schedules = sqliteTable('schedules', {
   optionsJson: json<Record<string, unknown>>('options_json').notNull().default({}),
   lastRunId: text('last_run_id'),
   nextRunAt: text('next_run_at'),
+  /** When set, the schedule runs this campaign (its environments, browsers and sizes) instead of one run. */
+  campaignId: fk('campaign_id', () => campaigns.id, 'cascade'),
   ...timestamps,
 });
 

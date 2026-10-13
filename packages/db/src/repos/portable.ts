@@ -5,8 +5,9 @@ import type { StepForgeDb } from '../index.ts';
 import { datasets, environments, modules, scenarios, secrets, tags } from '../schema.ts';
 import { createApplication, getApplication, getApplicationBySlug } from './applications.ts';
 import { createBlock, getBlock, listBlocks, saveBlockSteps } from './blocks.ts';
+import { listCampaigns, saveCampaign } from './campaigns.ts';
 import { createElement, listElements } from './elements.ts';
-import { createEnvironment } from './environments.ts';
+import { createEnvironment, listEnvironments } from './environments.ts';
 import { invalid } from './errors.ts';
 import { createModule } from './modules.ts';
 import { createScenario, createTestCase, getScenario, saveSteps } from './scenarios.ts';
@@ -90,6 +91,23 @@ export const ApplicationExport = z.object({
         page: z.string().default(''),
         description: z.string().default(''),
         locators: z.array(z.record(z.string(), z.unknown())).min(1),
+      }),
+    )
+    .default([]),
+  /** Campaigns refer to environments and tags by name, and to modules and scenarios by their export refs. */
+  campaigns: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string().default(''),
+        all: z.boolean().default(true),
+        moduleRefs: z.array(z.string()).default([]),
+        tags: z.array(z.string()).default([]),
+        scenarioRefs: z.array(z.string()).default([]),
+        environments: z.array(z.string()).min(1),
+        browsers: z.array(z.string()).default(['chromium']),
+        viewports: z.array(z.string()).default(['desktop']),
+        options: z.record(z.string(), z.unknown()).default({}),
       }),
     )
     .default([]),
@@ -246,6 +264,27 @@ export function exportApplication(
       inputs: b.inputsJson,
       steps: portableSteps(getBlock(db, b.id).steps as AnyStep[]) as Record<string, unknown>[],
     })),
+    campaigns: listCampaigns(db, applicationId).map((c) => {
+      const sel = c.selectionJson as {
+        all?: boolean;
+        modules?: string[];
+        tags?: string[];
+        scenarios?: string[];
+      };
+      const envName = new Map(envs.map((e) => [e.id, e.name]));
+      return {
+        name: c.name,
+        description: c.description,
+        all: !!sel.all,
+        moduleRefs: sel.modules ?? [],
+        tags: (sel.tags ?? []).map((t) => tagName.get(t)).filter((t): t is string => !!t),
+        scenarioRefs: sel.scenarios ?? [],
+        environments: c.environmentIdsJson.map((id) => envName.get(id)).filter((n): n is string => !!n),
+        browsers: c.browsersJson,
+        viewports: c.viewportsJson,
+        options: c.optionsJson,
+      };
+    }),
     datasets: db
       .select()
       .from(datasets)
@@ -291,6 +330,7 @@ export type ImportResult = {
     testCases: number;
     blocks: number;
     elements: number;
+    campaigns: number;
   };
   /** Secrets to enter again, per environment. */
   missingSecrets: { environment: string; keys: string[] }[];
@@ -413,6 +453,24 @@ export function importApplication(
         testCases++;
       }
     }
+    // Campaigns last: they point at environments, tags, modules and scenarios that now exist.
+    const envIds = new Map(listEnvironments(db, app.id).map((e) => [e.name, e.id]));
+    for (const c of d.campaigns)
+      saveCampaign(db, app.id, {
+        name: c.name,
+        description: c.description,
+        selection: c.all
+          ? { all: true }
+          : {
+              modules: c.moduleRefs.map((r) => moduleIds.get(r)).filter(Boolean),
+              tags: c.tags.map((t) => tagIds.get(t)).filter(Boolean),
+              scenarios: c.scenarioRefs.map((r) => map.scenarios.get(r)).filter(Boolean),
+            },
+        environmentIds: c.environments.map((n) => envIds.get(n)).filter(Boolean),
+        browsers: c.browsers,
+        viewports: c.viewports,
+        options: c.options,
+      });
     // A scenario may call one that was created after it: rewrite those references now that all ids exist.
     for (const s of d.scenarios)
       if (callsScenario(s.steps as AnyStep[]))
@@ -428,6 +486,7 @@ export function importApplication(
         testCases,
         blocks: d.blocks.length,
         elements: d.elements.length,
+        campaigns: d.campaigns.length,
       },
       missingSecrets: d.environments
         .filter((e) => e.secretKeys.length)

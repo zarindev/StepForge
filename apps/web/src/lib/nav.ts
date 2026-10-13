@@ -6,6 +6,7 @@ import {
   Disc3,
   FolderTree,
   Gauge,
+  Grid3x3,
   Home,
   type LucideIcon,
   PackageOpen,
@@ -85,6 +86,14 @@ export const NAV: NavItem[] = [
     shortcut: 'G U',
     description: 'Live and past test runs with evidence',
     phase: 3,
+  },
+  {
+    to: '/campaigns',
+    label: 'Campaigns',
+    icon: Grid3x3,
+    shortcut: 'G C',
+    description: 'Run a test set across environments × browsers × screen sizes, rerun what failed',
+    phase: 15,
   },
   {
     to: '/bugs',

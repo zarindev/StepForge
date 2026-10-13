@@ -27,6 +27,7 @@ Usage: stepforge <command> [options]
 
 Commands
   run       Run tests and wait for the result
+  campaign  Run a saved campaign (every environment × browser × screen size) and wait
   list      List applications, environments, modules, tags and schedules
   report    Write a report for a finished run
   export    Write an application as portable JSON (secrets are never included)
@@ -49,6 +50,10 @@ run
   --pdf <file>          Write the PDF report
   --notify <channel>    Send the summary to a notification channel (repeatable)
   --fail-on-gate        Exit 1 when a blocking quality gate fails, even if all tests passed
+
+campaign  --app <slug> --name <campaign> [--junit <dir>] [--json]
+          One run per combination; --junit writes one JUnit file per combination into <dir>.
+          The campaign's notification channels get one summary at the end.
 
 report    --run <id> --format html|pdf|xlsx|junit --out <file>
 export    --app <slug> --out <file>
@@ -136,6 +141,7 @@ const OPTIONS = {
   notify: { type: 'string', multiple: true },
   'fail-on-gate': { type: 'boolean' },
   run: { type: 'string' },
+  name: { type: 'string' },
   format: { type: 'string' },
   out: { type: 'string' },
   file: { type: 'string' },
@@ -367,6 +373,10 @@ const list: Handler = async (c, v, io) => {
     tags: repo.listTags(db, a.id).map((t) => t.name),
     scenarios: repo.getTree(db, a.id).scenarios.length,
     schedules: repo.listSchedules(db, a.id).map((s) => ({ name: s.name, cron: s.cron, enabled: s.enabled })),
+    campaigns: repo.listCampaigns(db, a.id).map((x) => ({
+      name: x.name,
+      combinations: repo.campaignMatrix(x).length,
+    })),
   }));
   if (v.json) {
     io.out(
@@ -383,10 +393,76 @@ const list: Handler = async (c, v, io) => {
     if (a.modules.length) io.out(`  modules ${a.modules.join(', ')}`);
     if (a.tags.length) io.out(`  tags    ${a.tags.join(', ')}`);
     for (const s of a.schedules) io.out(`  schedule ${s.name}  "${s.cron}"${s.enabled ? '' : ' (off)'}`);
+    for (const x of a.campaigns) io.out(`  campaign ${x.name}  (${x.combinations} combinations)`);
   }
   const channels = repo.listChannels(db);
   if (channels.length) io.out(`Notification channels: ${channels.map((ch) => ch.name).join(', ')}`);
   return EXIT.passed;
+};
+
+/** Runs a saved campaign: one run per environment × browser × screen size; exit 0 only if all of them passed. */
+const campaign: Handler = async (c, v, io) => {
+  const { db } = c.ctx;
+  const a = findApp(c, need(v, 'app'));
+  const name = need(v, 'name');
+  const all = repo.listCampaigns(db, a.id);
+  const camp = all.find((x) => lc(x.name) === lc(name));
+  if (!camp)
+    throw new UsageError(
+      `No campaign "${name}" in ${a.slug}. Known: ${all.map((x) => x.name).join(', ') || 'none'}`,
+    );
+  const started = c.ctx.campaigns.launch(camp.id, { trigger: 'cli' });
+  if (!v.json) io.out(`Campaign "${camp.name}": ${started.runs} run(s)…`);
+  await c.ctx.runs.idle();
+  await c.ctx.campaigns.checkFinished(started.id); // the summary notification, if not sent already
+  const d = c.ctx.campaigns.detail(started.id);
+  const files: string[] = [];
+  if (typeof v.junit === 'string')
+    for (const cell of d.cells) {
+      const r = await inject(c.app, c.ctx.token, 'GET', `/api/runs/${cell.runId}/report?format=junit`);
+      const file = `${cell.environment}-${cell.browser}-${cell.viewport}`.replace(/[^\w.-]+/g, '_');
+      files.push(write(resolve(v.junit, `${file}.xml`), r.body));
+    }
+  const code = d.status === 'passed' ? EXIT.passed : EXIT.failed;
+  if (v.json) {
+    io.out(
+      JSON.stringify(
+        {
+          campaignRunId: d.id,
+          campaign: d.campaignName,
+          status: d.status,
+          totals: d.totals,
+          runs: d.cells.map((x) => ({
+            runId: x.runId,
+            environment: x.environment,
+            browser: x.browser,
+            viewport: x.viewport,
+            status: x.status,
+            totals: x.totals,
+          })),
+          files,
+          exitCode: code,
+        },
+        null,
+        2,
+      ),
+    );
+    return code;
+  }
+  for (const x of d.cells) {
+    const t = x.totals as { passed: number; total: number };
+    io.out(
+      `  ${x.status.padEnd(9)} ${x.environment} · ${x.browser} · ${x.viewport}  ${t.passed}/${t.total} passed`,
+    );
+  }
+  const t = d.totals;
+  io.out('');
+  io.out(
+    `${d.status === 'passed' ? 'PASSED' : d.status.toUpperCase()}: ${t.passed}/${t.total} passed` +
+      `${t.failed ? `, ${t.failed} failed` : ''}${t.broken ? `, ${t.broken} broken` : ''} across ${d.cells.length} combination(s)`,
+  );
+  for (const f of files) io.out(`Wrote ${f}`);
+  return code;
 };
 
 const report: Handler = async (c, v, io) => {
@@ -517,6 +593,7 @@ const COMMANDS: Record<string, Handler> = {
   codegen: wrap(codegenCmd),
   secret: wrap(secretCmd),
   run: wrap(run),
+  campaign: wrap(campaign),
   list: wrap(list),
   report: wrap(report),
   export: wrap(exportCmd),

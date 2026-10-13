@@ -1,3 +1,4 @@
+import { CampaignRunPage, CampaignsPage } from '@/pages/campaigns';
 import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
 import { z } from 'zod';
 import { Layout } from '@/components/shell/layout';
@@ -115,6 +116,19 @@ const explorerRoute = createRoute({
   component: ExplorerPage,
 });
 
+const campaignsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/campaigns',
+  validateSearch: (s) => z.object({ campaign: z.string().optional() }).parse(s),
+  component: CampaignsPage,
+});
+
+const campaignRunRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/campaign-runs/$campaignRunId',
+  component: CampaignRunPage,
+});
+
 const runDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/runs/$runId',
@@ -161,6 +175,8 @@ export const router = createRouter({
     explorerRoute,
     applicationDetailRoute,
     runDetailRoute,
+    campaignsRoute,
+    campaignRunRoute,
   ]),
   defaultNotFoundComponent: () => <p className="text-sm text-muted">Page not found.</p>,
 });

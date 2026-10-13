@@ -6,7 +6,9 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 
 **Schedules** (left rail) runs tests automatically while StepForge is open. A schedule has:
 
-- an application and environment, and which tests to run (all, a tag or a module);
+- an application and environment, and which tests to run (all, a tag or a module) — or a **campaign**, which brings
+  its own environments, browsers and screen sizes (one summary is sent when the whole campaign has finished; see
+  [CAMPAIGNS.md](CAMPAIGNS.md));
 - **when**: a preset (every night at 02:00, weekdays at 06:00, every hour, every 15 minutes, Mondays at 07:00) or
   a cron expression. The editor shows the next five run times, in the computer's time zone, and rejects invalid
   expressions;

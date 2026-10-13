@@ -21,7 +21,8 @@ Use the full path to the launcher when calling it from somewhere else (scheduler
 ## Commands
 
 ```text
-stepforge run     --app <slug> --env <name> [filters] [outputs]
+stepforge run      --app <slug> --env <name> [filters] [outputs]
+stepforge campaign --app <slug> --name <campaign> [--junit <dir>] [--json]
 stepforge list    [--app <slug>] [--json]
 stepforge report  --run <id> --format html|pdf|xlsx|junit --out <file>
 stepforge export  --app <slug> --out <file>
@@ -54,6 +55,19 @@ error (unknown application, environment, tag, channel…).
 
 Runs started by the CLI show up in the dashboard with the trigger **cli**, with all evidence, diagnoses, bugs and
 analytics, exactly like dashboard runs.
+
+### `campaign`
+
+Runs a saved [campaign](CAMPAIGNS.md): one run per environment × browser × screen size, then waits for all of them.
+
+```bash
+stepforge campaign --app careclinic --name "Release check" --junit results/
+```
+
+It prints one line per combination and a total, writes one JUnit file per combination into `--junit <dir>` (e.g.
+`results/Staging-chromium-mobile.xml`, so CI test reporters pick them all up with a glob), and sends one summary to
+the campaign's notification channels. Exit code 0 only when every combination passed. `--json` prints the campaign
+run id, totals and each combination's run.
 
 ### `export` / `import`
 

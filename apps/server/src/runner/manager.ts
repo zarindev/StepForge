@@ -72,7 +72,10 @@ export class RunManager {
     return relative(this.artifactsRoot, abs).split(sep).join('/');
   }
 
-  create(input: z.input<typeof CreateRunInput>, extra: { scheduleId?: string } = {}): Run {
+  create(
+    input: z.input<typeof CreateRunInput>,
+    extra: { scheduleId?: string; campaignRunId?: string } = {},
+  ): Run {
     const d = CreateRunInput.parse(input);
     repo.getApplication(this.db, d.applicationId);
     const env = repo.getEnvironment(this.db, d.environmentId);
@@ -92,6 +95,7 @@ export class RunManager {
           environmentId: d.environmentId,
           trigger: d.trigger,
           scheduleId: extra.scheduleId ?? null,
+          campaignRunId: extra.campaignRunId ?? null,
           scopeJson: d.scope,
           browser: d.options.browser,
           viewport: d.options.viewport,

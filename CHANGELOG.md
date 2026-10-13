@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Campaigns** (like Cerberus Testing's campaigns): a saved selection of tests (all, or modules, tags and scenarios)
+  with the environments, browsers and screen sizes to run them in; one click queues one run per combination as a
+  campaign run; the campaign-run page shows every combination side by side and each test's result per combination;
+  **Rerun failed** repeats only the failed tests, only where they failed; schedules can run a campaign; the
+  `stepforge campaign` CLI command runs one in CI (one JUnit file per combination, exit code); one summary goes to the
+  campaign's notification channels when it finishes; application export/import carries campaigns. Migration 0008.
 - **Element repository** (like Cerberus Testing's application objects): an application's Elements tab holds named
   UI elements with ranked locators; steps point at an element (step form → Saved element, or "Save as element" from
   a step's locators) and run with its current locators; the Elements tab shows where each is used and asks before

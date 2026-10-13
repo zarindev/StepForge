@@ -154,6 +154,15 @@ export function RunDetailPage() {
                 {r.application.name}
               </h1>
               <span className="font-mono text-xs text-muted">#{r.id.slice(-8)}</span>
+              {r.campaignRunId && (
+                <Link
+                  to="/campaign-runs/$campaignRunId"
+                  params={{ campaignRunId: r.campaignRunId }}
+                  className="text-xs text-brand hover:underline"
+                >
+                  Part of a campaign run
+                </Link>
+              )}
             </div>
             <p className="mt-1 text-sm text-muted">
               {r.environment ? `${r.environment.name} · ${r.environment.baseUrl}` : 'Environment deleted'} ·{' '}

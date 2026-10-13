@@ -57,6 +57,13 @@
       "when": 1791903290951,
       "tag": "0007_elements",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791904704212,
+      "tag": "0008_campaigns",
+      "breakpoints": true
     }
   ]
 }

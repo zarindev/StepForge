@@ -44,6 +44,8 @@ export type RunSummary = {
   status: string;
   trigger: string;
   scheduleName?: string;
+  /** Set for a campaign summary (all its environment × browser × screen size runs together). */
+  campaignName?: string;
   totals: { total: number; passed: number; failed: number; broken: number; skipped: number; flaky: number };
   passRate: number | null;
   durationMs: number | null;
@@ -72,7 +74,13 @@ export function formatSummary(s: RunSummary): Message {
   const icon = ok ? '✅' : '❌';
   const head = `${icon} ${s.application} · ${s.environment}: ${ok ? 'passed' : 'failed'}`;
   const counts = `${s.totals.passed}/${s.totals.total} passed${s.totals.failed ? ` · ${s.totals.failed} failed` : ''}${s.totals.broken ? ` · ${s.totals.broken} broken` : ''}${s.totals.flaky ? ` · ${s.totals.flaky} flaky` : ''}${s.totals.skipped ? ` · ${s.totals.skipped} skipped` : ''}`;
-  const meta = `${s.scheduleName ? `Schedule "${s.scheduleName}"` : `Trigger: ${s.trigger}`} · pass rate ${s.passRate ?? '—'}% · ${dur(s.durationMs)}`;
+  const origin = [
+    s.campaignName && `Campaign "${s.campaignName}"`,
+    s.scheduleName ? `Schedule "${s.scheduleName}"` : !s.campaignName && `Trigger: ${s.trigger}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const meta = `${origin} · pass rate ${s.passRate ?? '—'}% · ${dur(s.durationMs)}`;
   const failed = s.failed.slice(0, MAX_LISTED);
   const more = s.failed.length - failed.length;
   const gate = s.gate

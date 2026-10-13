@@ -64,6 +64,17 @@ const exportFile = () => ({
     },
     { ref: 's3', moduleRef: 'm2', name: 'Cart is ready', steps: [step('GET', '/api/health', 200)] },
   ],
+  campaigns: [
+    // Only the Catalogue module (and its Checkout sub-module), at two screen sizes.
+    {
+      name: 'Release',
+      all: false,
+      moduleRefs: ['m1'],
+      environments: ['Staging'],
+      viewports: ['desktop', 'mobile'],
+    },
+    { name: 'Smoke matrix', all: false, tags: ['smoke'], environments: ['Staging'], browsers: ['chromium'] },
+  ],
 });
 
 beforeAll(async () => {
@@ -159,6 +170,25 @@ describe('stepforge CLI', () => {
     expect(
       (await cli('run', '--app', 'shopdesk', '--env', 'Staging', '--tag', 'x', '--module', 'y')).code,
     ).toBe(EXIT.error);
+  }, 60_000);
+
+  it('runs a campaign: every combination, one JUnit file each, exit 1 when any combination fails', async () => {
+    const out = join(dir, 'out/campaign');
+    const r = await cli('campaign', '--app', 'shopdesk', '--name', 'release', '--junit', out);
+    expect(r.code).toBe(EXIT.failed);
+    expect(r.out).toContain('Campaign "Release": 2 run(s)…');
+    expect(r.out).toMatch(/failed\s+Staging · chromium · desktop {2}2\/3 passed/);
+    expect(r.out).toMatch(/failed\s+Staging · chromium · mobile {2}2\/3 passed/);
+    expect(r.out).toContain('FAILED: 4/6 passed, 2 failed across 2 combination(s)');
+    expect(readFileSync(join(out, 'Staging-chromium-mobile.xml'), 'utf8')).toContain('<testsuites');
+
+    const smoke = await cli('campaign', '--app', 'shopdesk', '--name', 'Smoke matrix', '--json');
+    expect(smoke.code).toBe(EXIT.passed);
+    expect(JSON.parse(smoke.out)).toMatchObject({ status: 'passed', totals: { total: 1 }, exitCode: 0 });
+    const unknown = await cli('campaign', '--app', 'shopdesk', '--name', 'Nope');
+    expect(unknown.code).toBe(EXIT.error);
+    expect(unknown.err).toContain('No campaign "Nope" in shopdesk. Known: Release, Smoke matrix');
+    expect((await cli('list', '--app', 'shopdesk')).out).toContain('campaign Release  (2 combinations)');
   }, 60_000);
 
   it('stores a secret from an environment variable, never from an argument', async () => {

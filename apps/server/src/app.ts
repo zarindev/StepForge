@@ -19,6 +19,8 @@ import { RecorderManager } from './recorder/manager.ts';
 import { registerApiRoutes } from './routes/api.ts';
 import { registerRecorderRoutes } from './routes/recorder.ts';
 import { registerElementRoutes } from './routes/elements.ts';
+import { registerCampaignRoutes } from './routes/campaigns.ts';
+import { CampaignService } from './campaigns/service.ts';
 import { registerDatabaseRoutes } from './routes/database.ts';
 import { DatabaseService } from './database/service.ts';
 import { EmailService } from './email/service.ts';
@@ -130,12 +132,21 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     perf,
     diagnosis,
     scheduler: undefined as unknown as SchedulerService,
+    campaigns: undefined as unknown as CampaignService,
     codegen: new CodegenService(db, config.artifactsDir),
     demo: new DemoService(db, masterKey, config, email, bus),
     maintenance: new MaintenanceService(db, sqlite, config, masterKey),
     startedAt: new Date(),
   };
   ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);
+  ctx.campaigns = new CampaignService(
+    db,
+    ctx.runs,
+    ctx.scheduler,
+    bus,
+    () => `http://127.0.0.1:${config.port}`,
+  );
+  ctx.scheduler.campaigns = ctx.campaigns;
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof ZodError) {
@@ -163,6 +174,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   await registerRunRoutes(app, ctx);
   registerRecorderRoutes(app, ctx);
   registerElementRoutes(app, ctx);
+  registerCampaignRoutes(app, ctx);
   registerApiRoutes(app, ctx);
   registerDatabaseRoutes(app, ctx);
   registerEmailRoutes(app, ctx);

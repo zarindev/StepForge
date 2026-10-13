@@ -105,12 +105,14 @@ export function resolveChannel(db: StepForgeDb, masterKey: Buffer, id: string) {
 export type Schedule = typeof schedules.$inferSelect;
 export type ScheduleData = {
   name: string;
-  environmentId: string;
+  /** Null for a campaign schedule (the campaign has its own environments). */
+  environmentId: string | null;
   cron: string;
   scope: Record<string, unknown>;
   options: Record<string, unknown>;
   enabled: boolean;
   channelIds: string[];
+  campaignId?: string | null;
 };
 
 export function listSchedules(db: StepForgeDb, applicationId?: string): Schedule[] {
@@ -135,6 +137,7 @@ export function saveSchedule(db: StepForgeDb, applicationId: string, d: Schedule
     optionsJson: d.options,
     enabled: d.enabled,
     notifyChannelIdsJson: d.channelIds,
+    campaignId: d.campaignId ?? null,
     updatedAt: now(),
   };
   if (id) {

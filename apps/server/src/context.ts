@@ -1,3 +1,4 @@
+import type { CampaignService } from './campaigns/service.ts';
 import type { StepForgeDb } from '@stepforge/db';
 import type Database from 'better-sqlite3';
 import { EventEmitter } from 'node:events';
@@ -38,6 +39,7 @@ export type AppContext = {
   perf: PerfService;
   diagnosis: DiagnosisService;
   scheduler: SchedulerService;
+  campaigns: CampaignService;
   codegen: CodegenService;
   demo: DemoService;
   maintenance: MaintenanceService;

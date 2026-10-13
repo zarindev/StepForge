@@ -160,6 +160,8 @@ export type Run = {
   applicationId: string;
   environmentId: string | null;
   trigger: string;
+  /** Set when the run is one combination of a campaign run. */
+  campaignRunId?: string | null;
   scopeJson: RunScope;
   browser: string;
   viewport: string;
@@ -648,6 +650,7 @@ export type Schedule = {
   optionsJson: Partial<RunOptionsForm>;
   enabled: boolean;
   notifyChannelIdsJson: string[];
+  campaignId: string | null;
   lastRunId: string | null;
   nextRunAt: string | null;
   createdAt: string;

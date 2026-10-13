@@ -50,6 +50,8 @@ type Draft = {
   retries: number;
   enabled: boolean;
   channelIds: string[];
+  /** Set when the schedule runs a campaign (its environments, browsers and sizes) instead of one run. */
+  campaignId: string;
 };
 
 function useChannels() {
@@ -77,6 +79,11 @@ function ScheduleEditor({
   const envs = useEnvironments(d?.applicationId);
   const tags = useTags(d?.applicationId);
   const tree = useTree(d?.applicationId);
+  const campaigns = useQuery({
+    queryKey: ['campaigns', d?.applicationId],
+    queryFn: () => api<{ id: string; name: string }[]>(`/api/applications/${d!.applicationId}/campaigns`),
+    enabled: !!d?.applicationId,
+  });
   const channels = useChannels();
   const custom = d ? !CRON_PRESETS.some((p) => p.cron === d.cron) : false;
   const [customMode, setCustomMode] = useState(false);
@@ -98,7 +105,7 @@ function ScheduleEditor({
     mutationFn: () => {
       const body = {
         name: d!.name,
-        environmentId: d!.environmentId,
+        ...(d!.campaignId ? { campaignId: d!.campaignId } : { environmentId: d!.environmentId }),
         cron: d!.cron.trim(),
         scope: d!.scope,
         options: { browser: d!.browser, retries: d!.retries },
@@ -117,8 +124,13 @@ function ScheduleEditor({
     onError: toastError,
   });
   if (!d) return null;
-  const scopeValue =
-    d.scope.type === 'tag' ? `tag:${d.scope.id}` : d.scope.type === 'module' ? `module:${d.scope.id}` : 'all';
+  const scopeValue = d.campaignId
+    ? `campaign:${d.campaignId}`
+    : d.scope.type === 'tag'
+      ? `tag:${d.scope.id}`
+      : d.scope.type === 'module'
+        ? `module:${d.scope.id}`
+        : 'all';
 
   return (
     <Dialog
@@ -134,7 +146,11 @@ function ScheduleEditor({
           </Button>
           <Button
             disabled={
-              !d.name.trim() || !d.environmentId || !d.cron.trim() || preview.isError || save.isPending
+              !d.name.trim() ||
+              (!d.environmentId && !d.campaignId) ||
+              !d.cron.trim() ||
+              preview.isError ||
+              save.isPending
             }
             onClick={() => save.mutate()}
           >
@@ -158,7 +174,13 @@ function ScheduleEditor({
             value={d.applicationId}
             disabled={!!d.id}
             onChange={(e) =>
-              setD({ ...d, applicationId: e.target.value, environmentId: '', scope: { type: 'application' } })
+              setD({
+                ...d,
+                applicationId: e.target.value,
+                environmentId: '',
+                campaignId: '',
+                scope: { type: 'application' },
+              })
             }
           >
             {apps.data?.map((a) => (
@@ -168,28 +190,32 @@ function ScheduleEditor({
             ))}
           </Select>
         </Field>
-        <Field label="Environment">
-          <Select
-            aria-label="Environment"
-            value={d.environmentId}
-            onChange={(e) => setD({ ...d, environmentId: e.target.value })}
-          >
-            {envs.data?.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-                {e.isProduction ? ' (production)' : ''}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {!d.campaignId && (
+          <Field label="Environment">
+            <Select
+              aria-label="Environment"
+              value={d.environmentId}
+              onChange={(e) => setD({ ...d, environmentId: e.target.value })}
+            >
+              {envs.data?.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                  {e.isProduction ? ' (production)' : ''}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label="Tests">
           <Select
             aria-label="Tests to run"
             value={scopeValue}
             onChange={(e) => {
               const [type, id] = e.target.value.split(':') as [string, string];
+              if (type === 'campaign') return setD({ ...d, campaignId: id, scope: { type: 'application' } });
               setD({
                 ...d,
+                campaignId: '',
                 scope: type === 'all' ? { type: 'application' } : ({ type, id } as RunScope),
               });
             }}
@@ -200,6 +226,15 @@ function ScheduleEditor({
                 {tags.data.map((t) => (
                   <option key={t.id} value={`tag:${t.id}`}>
                     #{t.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+            {campaigns.data?.length ? (
+              <optgroup label="Campaign (its environments, browsers and screen sizes)">
+                {campaigns.data.map((c) => (
+                  <option key={c.id} value={`campaign:${c.id}`}>
+                    {c.name}
                   </option>
                 ))}
               </optgroup>
@@ -260,17 +295,19 @@ function ScheduleEditor({
             </ul>
           )}
         </div>
-        <Field label="Browser">
-          <Select
-            aria-label="Browser"
-            value={d.browser}
-            onChange={(e) => setD({ ...d, browser: e.target.value as Draft['browser'] })}
-          >
-            <option value="chromium">Chromium</option>
-            <option value="firefox">Firefox</option>
-            <option value="webkit">WebKit</option>
-          </Select>
-        </Field>
+        {!d.campaignId && (
+          <Field label="Browser">
+            <Select
+              aria-label="Browser"
+              value={d.browser}
+              onChange={(e) => setD({ ...d, browser: e.target.value as Draft['browser'] })}
+            >
+              <option value="chromium">Chromium</option>
+              <option value="firefox">Firefox</option>
+              <option value="webkit">WebKit</option>
+            </Select>
+          </Field>
+        )}
         <Field label="Retries for failed tests">
           <Select
             aria-label="Retries"
@@ -388,7 +425,7 @@ export function SchedulesPage() {
         method: 'PUT',
         json: {
           name: s.name,
-          environmentId: s.environmentId,
+          ...(s.campaignId ? { campaignId: s.campaignId } : { environmentId: s.environmentId }),
           cron: s.cron,
           scope: s.scopeJson,
           options: s.optionsJson,
@@ -426,6 +463,7 @@ export function SchedulesPage() {
     retries: 0,
     enabled: true,
     channelIds: [],
+    campaignId: '',
   });
   const editDraft = (s: Schedule): Draft & { id: string } => ({
     id: s.id,
@@ -438,6 +476,7 @@ export function SchedulesPage() {
     retries: s.optionsJson.retries ?? 0,
     enabled: s.enabled,
     channelIds: s.notifyChannelIdsJson,
+    campaignId: s.campaignId ?? '',
   });
 
   return (
@@ -507,6 +546,7 @@ export function SchedulesPage() {
                       <div className="font-medium">{s.name}</div>
                       <div className="text-xs text-muted">
                         {appName.get(s.applicationId) ?? '—'}
+                        {s.campaignId && <span className="ml-2">· campaign</span>}
                         {s.notifyChannelIdsJson.length > 0 && (
                           <span className="ml-2 inline-flex items-center gap-1">
                             <BellRing className="h-3 w-3" /> {s.notifyChannelIdsJson.length}

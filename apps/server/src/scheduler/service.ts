@@ -7,12 +7,15 @@ import { Cron } from 'croner';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { EventBus } from '../context.ts';
+import type { CampaignService } from '../campaigns/service.ts';
 import type { RunManager } from '../runner/manager.ts';
 import { runDefaults } from '../routes/system.ts';
 
 export const ScheduleInput = z.object({
   name: z.string().trim().min(1).max(120),
-  environmentId: z.string().min(1),
+  /** Required unless the schedule runs a campaign (which brings its own environments). */
+  environmentId: z.string().min(1).optional(),
+  campaignId: z.string().min(1).optional(),
   cron: z.string().trim().min(1).max(120),
   scope: RunScope.default({ type: 'application' }),
   options: RunOptionsInput.partial().default({}),
@@ -48,6 +51,8 @@ type NotificationResult = {
  */
 export class SchedulerService {
   private jobs = new Map<string, Cron>();
+  /** Set once the campaign service exists (it needs this service for notifications). */
+  campaigns?: CampaignService;
   private notified = new Set<string>();
   /** Recent notification results per run (shown in the schedule history). */
   readonly notifications = new Map<string, NotificationResult[]>();
@@ -60,7 +65,8 @@ export class SchedulerService {
     private readonly dashboardUrl: () => string,
   ) {
     this.bus.on('event', (e: { type: string; run?: typeof schema.runs.$inferSelect }) => {
-      if (e.type !== 'run.updated' || !e.run?.scheduleId) return;
+      // Campaign runs are summarised once, for the whole campaign (CampaignService).
+      if (e.type !== 'run.updated' || !e.run?.scheduleId || e.run.campaignRunId) return;
       if (!['passed', 'failed'].includes(e.run.status) || this.notified.has(e.run.id)) return;
       this.notified.add(e.run.id);
       void this.notifyRun(e.run.id);
@@ -104,7 +110,7 @@ export class SchedulerService {
     }
   }
 
-  /** A cron tick is skipped while the schedule's previous run is queued or running. */
+  /** A cron tick is skipped while the schedule's previous run (or campaign run) is queued or running. */
   private stillRunning(id: string): boolean {
     const last = repo.getSchedule(this.db, id).lastRunId;
     if (!last) return false;
@@ -113,20 +119,38 @@ export class SchedulerService {
       .from(schema.runs)
       .where(eq(schema.runs.id, last))
       .get();
-    return run?.status === 'queued' || run?.status === 'running';
+    if (run) return run.status === 'queued' || run.status === 'running';
+    try {
+      const status = repo.summarizeCampaignRun(this.db, repo.getCampaignRunRow(this.db, last)).status;
+      return status === 'queued' || status === 'running';
+    } catch {
+      return false;
+    }
   }
 
   save(applicationId: string, input: unknown, id?: string): repo.Schedule {
     const d = ScheduleInput.parse(input);
     nextRuns(d.cron, 1);
-    const env = repo.getEnvironment(this.db, d.environmentId);
-    if (env.applicationId !== applicationId)
-      throw new repo.RepoError(400, 'invalid', 'Environment belongs to another application');
+    if (d.campaignId) {
+      if (repo.getCampaign(this.db, d.campaignId).applicationId !== applicationId)
+        throw new repo.RepoError(400, 'invalid', 'The campaign belongs to another application');
+    } else {
+      if (!d.environmentId) throw new repo.RepoError(400, 'invalid', 'Choose an environment or a campaign');
+      const env = repo.getEnvironment(this.db, d.environmentId);
+      if (env.applicationId !== applicationId)
+        throw new repo.RepoError(400, 'invalid', 'Environment belongs to another application');
+    }
     for (const c of d.channelIds) repo.getChannel(this.db, c);
     const s = repo.saveSchedule(
       this.db,
       applicationId,
-      { ...d, scope: d.scope as Record<string, unknown>, options: d.options },
+      {
+        ...d,
+        environmentId: d.campaignId ? null : d.environmentId!,
+        campaignId: d.campaignId ?? null,
+        scope: d.scope as Record<string, unknown>,
+        options: d.options,
+      },
       id,
     );
     this.arm(s);
@@ -139,9 +163,19 @@ export class SchedulerService {
     repo.deleteSchedule(this.db, id);
   }
 
-  /** Starts a run for the schedule now (cron tick or "Run now"). */
+  /** Starts a run for the schedule now (cron tick or "Run now"); a campaign schedule starts the campaign. */
   async trigger(id: string) {
     const s = repo.getSchedule(this.db, id);
+    if (s.campaignId) {
+      if (!this.campaigns) throw new repo.RepoError(500, 'internal', 'Campaigns are not available');
+      const cr = this.campaigns.launch(s.campaignId, { trigger: 'schedule', scheduleId: s.id });
+      repo.setScheduleState(this.db, s.id, {
+        lastRunId: cr.id,
+        nextRunAt: this.jobs.get(s.id)?.nextRun()?.toISOString() ?? null,
+      });
+      this.bus.publish({ type: 'schedule.triggered', scheduleId: s.id, campaignRunId: cr.id });
+      return cr;
+    }
     if (!s.environmentId) throw new repo.RepoError(400, 'invalid', 'The schedule’s environment was deleted');
     const run = this.runs.create(
       {
@@ -218,7 +252,12 @@ export class SchedulerService {
         ? ((this.db.select().from(schema.schedules).where(eq(schema.schedules.id, run.scheduleId)).get()
             ?.notifyChannelIdsJson as string[]) ?? [])
         : []);
-    const summary = this.summary(runId);
+    return this.deliver(this.summary(runId), ids, runId);
+  }
+
+  /** Sends a summary (a run's, or a whole campaign's) to channels; results are kept under `key`. */
+  async deliver(summary: RunSummary, ids: string[], key: string): Promise<NotificationResult[]> {
+    const runId = key;
     const results: NotificationResult[] = [];
     for (const id of ids) {
       let name = id;
