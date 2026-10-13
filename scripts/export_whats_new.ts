@@ -1,13 +1,13 @@
 /// <reference lib="dom" />
 /**
  * Renders the "what's new" post images (StepForge by Md Zarin Tasnim) from docs/case-study/whats-new.html into
- * docs/case-study/whats-new/01-….png … 10-….png, 1200×675 each (LinkedIn and X), and checks that no text leaves its
+ * docs/case-study/whats-new/01-….png … 11-….png, 1200×675 each (LinkedIn and X), and checks that no text leaves its
  * card or runs under the screenshot.
  *
  *   npx tsx scripts/export_whats_new.ts
  */
 import { chromium } from 'playwright';
-import { mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -24,12 +24,14 @@ const NAMES = [
   '07-page-conditions',
   '08-visual-checkpoints',
   '09-any-web-app',
-  '10-free-open-source',
+  '10-manual-runs',
+  '11-free-open-source',
 ];
 
 async function main() {
-  rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
+  // Old images only: the post text (POST.md) lives in the same folder.
+  for (const f of readdirSync(OUT)) if (f.endsWith('.png')) rmSync(join(OUT, f));
   const browser = await chromium.launch();
   const problems: string[] = [];
   try {

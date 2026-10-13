@@ -2,9 +2,9 @@
 
 _By Md Zarin Tasnim · images in this folder (1200×675, made by `scripts/export_whats_new.ts`)_
 
-## LinkedIn (attach all 10 images, in order)
+## LinkedIn (attach all 11 images, in order)
 
-**StepForge just got 8 new features — still free, open source and 100% local.**
+**StepForge just got 9 new features — still free, open source and 100% local.**
 
 I studied Cerberus Testing, an open-source test automation platform, and brought its best ideas into StepForge, my
 QA studio for UI, API, database, email and performance testing:
@@ -18,6 +18,8 @@ QA studio for UI, API, database, email and performance testing:
 7. Visual checkpoints — pixel comparison, a red difference image, accept a change in one click
 8. Any web app — wait for or fake API responses, offline mode, downloads, mobile web with touch, clock control, and
    per-environment language, time zone, location, dark mode, basic auth, proxy and client certificates
+9. Manual test runs — a tester follows each test's steps and records passed / failed / blocked with notes and
+   screenshots, in the same history and reports as automated runs
 
 No accounts, no cloud, no paid APIs. MIT licensed.
 
@@ -28,14 +30,14 @@ GitHub: https://github.com/zarindev/StepForge
 ## X (a thread: X allows 4 images per post)
 
 **Post 1** (images 01, 02, 03, 04)
-StepForge, my free and local QA studio, just got 8 new features, inspired by Cerberus Testing 🧵
+StepForge, my free and local QA studio, just got 9 new features, inspired by Cerberus Testing 🧵
 Reusable blocks, before/after hooks, a shared element repository…
 
 **Post 2** (images 05, 06, 07, 08)
 …campaigns across environments × browsers × sizes, a test data library (tables, CSV, SQL, APIs), page conditions and
 visual checkpoints with one-click "accept".
 
-**Post 3** (images 09, 10)
+**Post 3** (images 09, 10, 11)
 And it now tests any kind of web app: fake API responses, offline, downloads, mobile touch, clock control, basic
-auth, certificates. Free, open source, MIT.
+auth, certificates. Plus manual test runs for checks only a person can do. Free, open source, MIT.
 https://github.com/zarindev/StepForge
