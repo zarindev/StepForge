@@ -89,7 +89,8 @@ const run = (s: ReturnType<typeof steps>, opts: Partial<typeof DEFAULT_RUN_OPTIO
     executors: [createUiExecutor(pool), utilExecutor],
     options: {
       ...DEFAULT_RUN_OPTIONS,
-      defaultTimeoutMs: 4000,
+      // Generous: a cold browser start on a busy Windows CI runner can take several seconds.
+      defaultTimeoutMs: 8000,
       video: 'off',
       trace: 'off',
       screenshots: 'off',

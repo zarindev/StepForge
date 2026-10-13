@@ -15,7 +15,7 @@ import {
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { FtpSrv } from 'ftp-srv';
 import ssh2 from 'ssh2';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -113,8 +113,8 @@ function startSftp(root: string): Promise<number> {
             const entry = handles.get(h.readUInt32BE())!;
             if (!entry.dir!.length) return s.status(reqid, STATUS_CODE.EOF);
             const list = entry.dir!.splice(0).map((f) => ({
-              filename: f.split('/').pop()!,
-              longname: `${statSync(f).isDirectory() ? 'd' : '-'}rw-r--r-- 1 qa qa ${statSync(f).size} Jan 1 00:00 ${f.split('/').pop()}`,
+              filename: basename(f),
+              longname: `${statSync(f).isDirectory() ? 'd' : '-'}rw-r--r-- 1 qa qa ${statSync(f).size} Jan 1 00:00 ${basename(f)}`,
               attrs: attrs(statSync(f)),
             }));
             s.name(reqid, list);

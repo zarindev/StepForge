@@ -125,7 +125,7 @@ describe('diagnosis of the planted CareClinic bugs (done-when)', () => {
       expect(item, `a failure matching ${re}`).toBeDefined();
       return diagnosisOf(item!.id);
     };
-    expect(failed).toHaveLength(3);
+    expect(failed.map((i) => i.errorMessage)).toHaveLength(3); // shows which ones failed if not
 
     const fee = await byError(/fee should be number/); // CC-API-01
     expect([fee.category, fee.owner]).toEqual(['schema_mismatch', 'app']);
