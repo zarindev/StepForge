@@ -94,6 +94,8 @@ type Usage = {
   scenarios: Map<string, { uses: number; setup: boolean; teardown: boolean }>;
   /** block id → uses */
   blocks: Map<string, number>;
+  /** modules that use the block as a hook */
+  modules: Set<string>;
 };
 
 /** Every block of an application → the scenarios and blocks that use it. */
@@ -101,7 +103,7 @@ function usageIndex(db: StepForgeDb, applicationId: string): Map<string, Usage> 
   const index = new Map<string, Usage>();
   const at = (blockId: string) => {
     let u = index.get(blockId);
-    if (!u) index.set(blockId, (u = { scenarios: new Map(), blocks: new Map() }));
+    if (!u) index.set(blockId, (u = { scenarios: new Map(), blocks: new Map(), modules: new Set() }));
     return u;
   };
   const scen = db
@@ -133,6 +135,33 @@ function usageIndex(db: StepForgeDb, applicationId: string): Map<string, Usage> 
       at(blockId).scenarios.set(sc.id, entry);
     }
   }
+  // Module hooks run for every test in the module and its sub-modules.
+  const mods = db.select().from(modules).where(eq(modules.applicationId, applicationId)).all();
+  const subtree = (id: string): string[] => [
+    id,
+    ...mods.filter((m) => m.parentId === id).flatMap((m) => subtree(m.id)),
+  ];
+  const scenOf = new Map<string, string[]>();
+  for (const sc of db
+    .select({ id: scenarios.id, moduleId: scenarios.moduleId })
+    .from(scenarios)
+    .innerJoin(modules, eq(scenarios.moduleId, modules.id))
+    .where(eq(modules.applicationId, applicationId))
+    .all())
+    scenOf.set(sc.moduleId, [...(scenOf.get(sc.moduleId) ?? []), sc.id]);
+  for (const m of mods)
+    for (const [blockId, key] of [
+      [m.setupBlockId, 'setup'],
+      [m.teardownBlockId, 'teardown'],
+    ] as const) {
+      if (!blockId) continue;
+      at(blockId).modules.add(m.id);
+      for (const sid of subtree(m.id).flatMap((x) => scenOf.get(x) ?? [])) {
+        const entry = at(blockId).scenarios.get(sid) ?? { uses: 0, setup: false, teardown: false };
+        entry[key] = true;
+        at(blockId).scenarios.set(sid, entry);
+      }
+    }
   for (const b of db
     .select({ id: blocks.id })
     .from(blocks)
@@ -163,6 +192,8 @@ export type BlockUsage = {
     teardown: boolean;
   }[];
   blocks: { id: string; name: string; uses: number }[];
+  /** Modules whose tests run the block as a before / after hook. */
+  modules: { id: string; name: string; setup: boolean; teardown: boolean }[];
   /** Scenarios that run the block, directly or through another block (what a change to it affects). */
   affectedScenarios: number;
 };
@@ -194,6 +225,14 @@ export function blockUsage(db: StepForgeDb, id: string): BlockUsage {
       .map((s) => ({ id: s.id, name: s.name, moduleId: s.moduleId, ...u!.scenarios.get(s.id)! }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     blocks: blk.map((x) => ({ id: x.id, name: x.name, uses: u!.blocks.get(x.id)! })),
+    modules: [...(u?.modules ?? [])]
+      .map((mid) => db.select().from(modules).where(eq(modules.id, mid)).get()!)
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        setup: m.setupBlockId === id,
+        teardown: m.teardownBlockId === id,
+      })),
     affectedScenarios: affected.size,
   };
 }
@@ -296,7 +335,48 @@ export function updateBlock(db: StepForgeDb, id: string, input: Partial<z.input<
 
 export function deleteBlock(db: StepForgeDb, id: string): void {
   blockRow(db, id);
-  db.delete(blocks).where(eq(blocks.id, id)).run();
+  db.transaction(() => {
+    // Hooks that ran this block are cleared (modules keep no foreign key to blocks).
+    db.update(modules).set({ setupBlockId: null }).where(eq(modules.setupBlockId, id)).run();
+    db.update(modules).set({ teardownBlockId: null }).where(eq(modules.teardownBlockId, id)).run();
+    db.delete(blocks).where(eq(blocks.id, id)).run();
+  });
+}
+
+// ─── Hooks: blocks run before / after each test ────────────────────────────
+
+export type Hook = { blockId: string; blockName: string; from: 'module' | 'scenario'; ownerName: string };
+
+/**
+ * The hooks of a scenario in run order: before — outermost module first, the scenario's own last; after — the
+ * scenario's own first, outermost module last.
+ */
+export function hooksFor(db: StepForgeDb, scenarioId: string): { before: Hook[]; after: Hook[] } {
+  const s = db.select().from(scenarios).where(eq(scenarios.id, scenarioId)).get();
+  if (!s) throw notFound('Scenario', scenarioId);
+  const chain: (typeof modules.$inferSelect)[] = [];
+  for (let id: string | null = s.moduleId; id;) {
+    const m = db.select().from(modules).where(eq(modules.id, id)).get();
+    if (!m || chain.some((x) => x.id === m.id)) break;
+    chain.unshift(m);
+    id = m.parentId;
+  }
+  const name = (id: string) =>
+    db.select({ name: blocks.name }).from(blocks).where(eq(blocks.id, id)).get()?.name;
+  const hook = (blockId: string | null, from: Hook['from'], ownerName: string): Hook[] => {
+    const n = blockId ? name(blockId) : undefined;
+    return blockId && n ? [{ blockId, blockName: n, from, ownerName }] : [];
+  };
+  return {
+    before: [
+      ...chain.flatMap((m) => hook(m.setupBlockId, 'module', m.name)),
+      ...hook(s.setupBlockId, 'scenario', s.name),
+    ],
+    after: [
+      ...hook(s.teardownBlockId, 'scenario', s.name),
+      ...[...chain].reverse().flatMap((m) => hook(m.teardownBlockId, 'module', m.name)),
+    ],
+  };
 }
 
 // ─── Which scenario or block a run step belongs to ─────────────────────────
@@ -346,7 +426,10 @@ export function stepOwner(db: StepForgeDb, scenarioId: string, runStepId: string
   };
   const via: StepOwner['via'] = [];
   for (const seg of segments.slice(0, -1)) {
-    const call = findStep(owner.steps, seg);
+    // Hook steps are generated per run: "@hook:<blockId>:<b|a><n>" calls that block.
+    const call = seg.startsWith('@hook:')
+      ? { type: 'util.useBlock', params: { blockId: seg.split(':')[1] } }
+      : findStep(owner.steps, seg);
     const targetId = String(call?.params?.blockId ?? call?.params?.scenarioId ?? '');
     if (!call || !targetId || !['util.useBlock', 'util.callScenario'].includes(call.type))
       throw notFound('Step', runStepId);

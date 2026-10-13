@@ -81,6 +81,17 @@ export function codegenInput(
       },
     );
   const steps = (list: unknown[]) => expand(list) as CodegenStep[];
+  const hookUses = (scenarioId: string, when: 'before' | 'after') =>
+    repo.hooksFor(db, scenarioId)[when].map((h) => ({
+      type: 'util.useBlock',
+      label: `${when === 'before' ? 'Before' : 'After'} each test: ${h.blockName}`,
+      params: { blockId: h.blockId, hook: when },
+      locators: [],
+      assertions: [],
+      enabled: true,
+      continueOnFail: false,
+      retries: 0,
+    }));
   const library = Object.fromEntries(
     tree.scenarios.map((s) => {
       const d = details.find((x) => x.id === s.id) ?? repo.getScenario(db, s.id);
@@ -119,7 +130,8 @@ export function codegenInput(
       priority: d.priority,
       tags: d.tagIds.map((t) => tags.get(t) ?? '').filter(Boolean),
       preconditions: d.preconditions,
-      steps: steps(d.steps),
+      // Hooks are inlined: before-hooks first, after-hooks last (they run only if the test gets that far).
+      steps: steps([...hookUses(d.id, 'before'), ...d.steps, ...hookUses(d.id, 'after')]),
       testCases: d.testCases
         .filter((t) => t.status === 'active')
         .map((t) => ({

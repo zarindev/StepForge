@@ -2,7 +2,7 @@ import { ModuleInput, ModuleUpdate, newId } from '@stepforge/core';
 import { and, eq, inArray, isNull, max } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { StepForgeDb } from '../index.ts';
-import { applications, modules } from '../schema.ts';
+import { applications, blocks, modules } from '../schema.ts';
 import { invalid, notFound, now } from './errors.ts';
 
 export type Module = typeof modules.$inferSelect;
@@ -98,9 +98,27 @@ export function createModule(
   return getModule(db, id);
 }
 
+/** A hook must be a block of the same application (null clears the hook). */
+export function assertHookBlock(
+  db: StepForgeDb,
+  applicationId: string,
+  blockId: string | null | undefined,
+): void {
+  if (!blockId) return;
+  const b = db
+    .select({ applicationId: blocks.applicationId })
+    .from(blocks)
+    .where(eq(blocks.id, blockId))
+    .get();
+  if (!b) throw notFound('Block', blockId);
+  if (b.applicationId !== applicationId) throw invalid('Hooks must use a block of the same application');
+}
+
 export function updateModule(db: StepForgeDb, id: string, input: z.input<typeof ModuleUpdate>): Module {
   const current = getModule(db, id);
   const d = ModuleUpdate.parse(input);
+  assertHookBlock(db, current.applicationId, d.setupBlockId);
+  assertHookBlock(db, current.applicationId, d.teardownBlockId);
   if (d.parentId !== undefined) assertValidParent(db, current.applicationId, d.parentId, id);
   const parentChanged = d.parentId !== undefined && d.parentId !== current.parentId;
   db.update(modules)
@@ -108,6 +126,8 @@ export function updateModule(db: StepForgeDb, id: string, input: z.input<typeof 
       ...(d.name !== undefined && { name: d.name }),
       ...(d.description !== undefined && { description: d.description }),
       ...(d.parentId !== undefined && { parentId: d.parentId }),
+      ...(d.setupBlockId !== undefined && { setupBlockId: d.setupBlockId }),
+      ...(d.teardownBlockId !== undefined && { teardownBlockId: d.teardownBlockId }),
       ...(d.sortOrder !== undefined
         ? { sortOrder: d.sortOrder }
         : parentChanged

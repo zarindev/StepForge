@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Save } from 'lucide-react';
 import { useState } from 'react';
 import { TagChip } from '@/components/applications/tags-tab';
@@ -6,11 +6,21 @@ import { Button } from '@/components/ui/button';
 import { Field, Input, Select, Textarea } from '@/components/ui/input';
 import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { qk, useTags } from '@/lib/queries';
+import { qk, useTags, useTree } from '@/lib/queries';
 import type { ScenarioDetail } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-type Form = Pick<ScenarioDetail, 'name' | 'description' | 'priority' | 'status' | 'owner' | 'preconditions'>;
+type Form = Pick<
+  ScenarioDetail,
+  | 'name'
+  | 'description'
+  | 'priority'
+  | 'status'
+  | 'owner'
+  | 'preconditions'
+  | 'setupBlockId'
+  | 'teardownBlockId'
+>;
 
 export function OverviewTab({ scenario }: { scenario: ScenarioDetail }) {
   const initial: Form = {
@@ -20,9 +30,26 @@ export function OverviewTab({ scenario }: { scenario: ScenarioDetail }) {
     status: scenario.status,
     owner: scenario.owner,
     preconditions: scenario.preconditions,
+    setupBlockId: scenario.setupBlockId ?? null,
+    teardownBlockId: scenario.teardownBlockId ?? null,
   };
   const [f, setF] = useState<Form>(initial);
   const tags = useTags(scenario.applicationId);
+  const tree = useTree(scenario.applicationId);
+  const blocks = useQuery({
+    queryKey: ['blocks', scenario.applicationId],
+    queryFn: () => api<{ id: string; name: string }[]>(`/api/applications/${scenario.applicationId}/blocks`),
+  });
+  const blockName = (id?: string | null) => blocks.data?.find((b) => b.id === id)?.name ?? 'deleted block';
+  // Hooks inherited from the module chain (outermost first).
+  const chain: { name: string; setupBlockId?: string | null; teardownBlockId?: string | null }[] = [];
+  for (let id: string | null = scenario.moduleId; id;) {
+    const m = tree.data?.modules.find((x) => x.id === id);
+    if (!m) break;
+    chain.unshift(m);
+    id = m.parentId;
+  }
+  const inherited = chain.filter((m) => m.setupBlockId || m.teardownBlockId);
   const qc = useQueryClient();
   const dirty = JSON.stringify(f) !== JSON.stringify(initial);
   const set = (p: Partial<Form>) => setF((c) => ({ ...c, ...p }));
@@ -82,6 +109,57 @@ export function OverviewTab({ scenario }: { scenario: ScenarioDetail }) {
       <Field label="Preconditions" hint="Shown in bug reports, e.g. 'Logged in as Receptionist'">
         <Textarea rows={2} value={f.preconditions} onChange={(e) => set({ preconditions: e.target.value })} />
       </Field>
+      <section aria-label="Hooks" className="space-y-2 rounded-lg border border-border p-3">
+        <p className="text-xs font-medium text-muted">
+          Hooks — blocks that run before this test (a failure skips the test) and after it (always, even after
+          a failure)
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Before this test">
+            <Select
+              aria-label="Before this test"
+              value={f.setupBlockId ?? ''}
+              onChange={(e) => set({ setupBlockId: e.target.value || null })}
+            >
+              <option value="">None</option>
+              {blocks.data?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="After this test">
+            <Select
+              aria-label="After this test"
+              value={f.teardownBlockId ?? ''}
+              onChange={(e) => set({ teardownBlockId: e.target.value || null })}
+            >
+              <option value="">None</option>
+              {blocks.data?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        {inherited.length > 0 && (
+          <ul className="space-y-0.5 text-xs text-muted" data-testid="inherited-hooks">
+            {inherited.map((m) => (
+              <li key={m.name}>
+                From module <b className="text-fg">{m.name}</b>:{' '}
+                {[
+                  m.setupBlockId && `before — ${blockName(m.setupBlockId)}`,
+                  m.teardownBlockId && `after — ${blockName(m.teardownBlockId)}`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <div className="flex justify-end gap-2">
         <Button variant="ghost" disabled={!dirty} onClick={() => setF(initial)}>
           Discard

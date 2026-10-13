@@ -613,7 +613,14 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
         out.push(todo(ctx, step, 'calls are nested too deeply (recursion?)'));
         break;
       }
-      out.push({ op: 'comment', text: `${isBlock ? 'Block' : 'Scenario'}: ${target.name}` });
+      // Hook calls (inlined by the export) say so; they run only when the test gets that far.
+      const hook =
+        q.hook === 'before'
+          ? 'Before each test — block'
+          : q.hook === 'after'
+            ? 'After each test — block'
+            : null;
+      out.push({ op: 'comment', text: `${hook ?? (isBlock ? 'Block' : 'Scenario')}: ${target.name}` });
       // Block inputs: the value this use passes (or the default) becomes a variable, as when StepForge runs it.
       if (isBlock) {
         const given = (q.inputs && typeof q.inputs === 'object' ? q.inputs : {}) as Record<string, unknown>;

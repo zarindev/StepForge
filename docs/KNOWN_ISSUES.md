@@ -71,3 +71,4 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 65 | Showcase | Resolved: the case study, README and CONTRIBUTING link `github.com/zarindev/stepforge` and the real Upwork profile. The links work once the repository is pushed there. | — |
 | 66 | Test data | `util.useData` steps are not translated by code export (rows come from StepForge's data library at run time); exported code marks them `TODO(StepForge)` with a warning. | Set the variables another way in the exported project. |
 | 67 | Test data | "Not used yet" is tracked within one run (across its test cases and workers), not across runs. | By design; use a `match` or `row` pick for fixed assignments. |
+| 68 | Hooks | Code export inlines before/after hooks at the start and end of each test, so in the exported project an after-hook runs only when the test reaches the end (StepForge itself always runs it). | Move cleanup into your framework's afterEach if you need it after failures. |

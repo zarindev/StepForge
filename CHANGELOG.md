@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Setup/teardown hooks** (like Cerberus Testing's pre/post testing): a module's menu sets a block to run before
+  and one after every test of the module and its sub-modules; a scenario's Details tab adds its own and lists the
+  inherited ones. Before-hooks run outermost first and a failure skips the test; after-hooks run innermost first and
+  always run, even after a failure. Hook steps are numbered `before.n`/`after.n` and fixes land in their block.
+  Export/import keeps hooks; code export inlines them. Migration 0010.
 - **Test data library** (like Cerberus Testing's data library): an application's Test data tab holds named data
   sources — a table of rows (typed or pasted as CSV), a CSV file on this computer, a read-only SQL query on one of
   the application's connections, or an API call (rows found with JSONPath) — with a live preview per environment.

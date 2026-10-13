@@ -9,7 +9,7 @@ import { listCampaigns, saveCampaign } from './campaigns.ts';
 import { createElement, listElements } from './elements.ts';
 import { createEnvironment, listEnvironments } from './environments.ts';
 import { invalid } from './errors.ts';
-import { createModule } from './modules.ts';
+import { createModule, updateModule } from './modules.ts';
 import { createScenario, createTestCase, getScenario, saveSteps } from './scenarios.ts';
 import { createTag, setScenarioTags } from './tags.ts';
 
@@ -61,6 +61,8 @@ export const ApplicationExport = z.object({
         name: z.string(),
         description: z.string().default(''),
         sortOrder: z.number().int().default(0),
+        setupBlockRef: z.string().nullable().default(null),
+        teardownBlockRef: z.string().nullable().default(null),
       }),
     )
     .default([]),
@@ -253,6 +255,8 @@ export function exportApplication(
       name: m.name,
       description: m.description,
       sortOrder: m.sortOrder,
+      setupBlockRef: m.setupBlockId,
+      teardownBlockRef: m.teardownBlockId,
     })),
     elements: listElements(db, applicationId).map((e) => ({
       ref: e.id,
@@ -421,6 +425,13 @@ export function importApplication(
     for (const b of d.blocks)
       if (b.steps.length)
         saveBlockSteps(db, map.blocks.get(b.ref)!, portableSteps(b.steps as AnyStep[], map));
+    // Module hooks point at the new blocks.
+    for (const m of d.modules)
+      if (m.setupBlockRef || m.teardownBlockRef)
+        updateModule(db, moduleIds.get(m.ref)!, {
+          setupBlockId: m.setupBlockRef ? (map.blocks.get(m.setupBlockRef) ?? null) : null,
+          teardownBlockId: m.teardownBlockRef ? (map.blocks.get(m.teardownBlockRef) ?? null) : null,
+        });
     for (const ds of d.datasets)
       db.insert(datasets)
         .values({

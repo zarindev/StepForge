@@ -22,7 +22,7 @@ import {
   testCases,
 } from '../schema.ts';
 import { invalid, notFound, now } from './errors.ts';
-import { getModule } from './modules.ts';
+import { assertHookBlock, getModule } from './modules.ts';
 import { tagIdsForScenarios } from './tags.ts';
 
 export type ScenarioRow = typeof scenarios.$inferSelect;
@@ -175,8 +175,10 @@ export function createScenario(
   moduleId: string,
   input: z.input<typeof ScenarioInput> & { steps?: (StepInput & { id?: string })[] },
 ): ScenarioDetail {
-  getModule(db, moduleId);
+  const mod = getModule(db, moduleId);
   const d = ScenarioInput.parse(input);
+  assertHookBlock(db, mod.applicationId, d.setupBlockId);
+  assertHookBlock(db, mod.applicationId, d.teardownBlockId);
   const id = newId();
   db.transaction(() => {
     db.insert(scenarios)
@@ -195,6 +197,9 @@ export function updateScenario(
 ): ScenarioDetail {
   const current = scenarioRow(db, id);
   const { moduleId, ...meta } = ScenarioUpdate.parse(input);
+  const appId = applicationIdForScenario(db, id);
+  assertHookBlock(db, appId, meta.setupBlockId);
+  assertHookBlock(db, appId, meta.teardownBlockId);
   if (moduleId && moduleId !== current.moduleId) moveScenarios(db, [id], moduleId);
   const changed = Object.entries(meta).some(([k, v]) => current[k as keyof ScenarioRow] !== v);
   if (changed) {
@@ -408,6 +413,8 @@ export function getTree(db: StepForgeDb, applicationId: string) {
       name: modules.name,
       description: modules.description,
       sortOrder: modules.sortOrder,
+      setupBlockId: modules.setupBlockId,
+      teardownBlockId: modules.teardownBlockId,
     })
     .from(modules)
     .where(eq(modules.applicationId, applicationId))

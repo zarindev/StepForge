@@ -132,6 +132,9 @@ export const modules = sqliteTable(
     name: text('name').notNull(),
     description: text('description').notNull().default(''),
     sortOrder: integer('sort_order').notNull().default(0),
+    /** Hooks: a block run before / after every test in this module and its sub-modules (blocks.ts clears them). */
+    setupBlockId: text('setup_block_id'),
+    teardownBlockId: text('teardown_block_id'),
     ...timestamps,
   },
   (t) => [index('modules_app_idx').on(t.applicationId), index('modules_parent_idx').on(t.parentId)],

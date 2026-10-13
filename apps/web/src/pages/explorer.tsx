@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ImportDialog } from '@/components/api/import-dialog';
 import { BulkBar, type BulkAction } from '@/components/explorer/bulk-bar';
 import { openRunDialog } from '@/components/runs/run-dialog';
+import { HooksDialog } from '@/components/explorer/hooks-dialog';
 import { MoveModuleDialog } from '@/components/explorer/move-module-dialog';
 import { PromptDialog } from '@/components/explorer/prompt-dialog';
 import { ScenarioPanel, type PanelTab } from '@/components/explorer/scenario-panel';
@@ -60,6 +61,7 @@ export function ExplorerPage() {
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [moving, setMoving] = useState<ModuleTreeNode | null>(null);
+  const [hooksFor, setHooksFor] = useState<ModuleTreeNode | null>(null);
   const [importing, setImporting] = useState(false);
 
   const nodes = useMemo(() => (tree.data ? buildTree(tree.data, filters) : []), [tree.data, filters]);
@@ -111,6 +113,7 @@ export function ExplorerPage() {
     onNewModule: (parentId) => setPrompt({ kind: 'module', parentId }),
     onNewScenario: (moduleId) => setPrompt({ kind: 'scenario', moduleId }),
     onRecordScenario: (moduleId) => navigate({ to: '/recorder', search: { module: moduleId } }),
+    onEditHooks: (m) => setHooksFor(m),
     onRenameModule: (module) => setPrompt({ kind: 'rename', module }),
     onDeleteModule: (module) => setConfirm({ kind: 'module', module }),
     onDuplicateScenario: (id) =>
@@ -452,6 +455,7 @@ export function ExplorerPage() {
         />
       )}
       {importing && <ImportDialog applicationId={app.id} onClose={() => setImporting(false)} />}
+      {hooksFor && <HooksDialog applicationId={app.id} module={hooksFor} onClose={() => setHooksFor(null)} />}
       {moving && tree.data && (
         <MoveModuleDialog
           module={moving}

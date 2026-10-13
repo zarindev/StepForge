@@ -358,6 +358,20 @@ export class RunManager {
       const dir = join(this.artifactsRoot, 'runs', run.id, item.id, `a${attempt}`);
       // Read per attempt, so a fix to an element between retries is used.
       const elementMap = repo.elementLocatorMap(this.db, run.applicationId);
+      // Before/after hooks of the scenario's modules and of the scenario itself, as "use block" steps.
+      const hooks = repo.hooksFor(this.db, scenario.id);
+      const hookSteps = (list: repo.Hook[], when: 'b' | 'a') =>
+        list.map((h, i) => ({
+          id: `@hook:${h.blockId}:${when}${i}`,
+          type: 'util.useBlock',
+          label: `${when === 'b' ? 'Before' : 'After'} each test: ${h.blockName} (${h.from === 'module' ? `module ${h.ownerName}` : 'this scenario'})`,
+          params: { blockId: h.blockId },
+          locators: [],
+          assertions: [],
+          enabled: true,
+          continueOnFail: false,
+          retries: 0,
+        }));
       mkdirSync(dir, { recursive: true });
       this.saveItem(item, {
         status: 'running',
@@ -368,6 +382,8 @@ export class RunManager {
       result = await runTestCase({
         runId: run.id,
         steps: scenario.steps.map((s) => ({ ...s, id: s.id })),
+        before: hookSteps(hooks.before, 'b'),
+        after: hookSteps(hooks.after, 'a'),
         data,
         env: ctx.envScope,
         secrets: ctx.secrets,

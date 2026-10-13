@@ -114,6 +114,9 @@ export const ScenarioInput = z.object({
   status: ScenarioStatus.default('draft'),
   owner: z.string().max(80).default(''),
   preconditions: z.string().max(5000).default(''),
+  /** Hooks: a block run before / after this test (inside the module's hooks). */
+  setupBlockId: z.string().nullable().default(null),
+  teardownBlockId: z.string().nullable().default(null),
 });
 
 export const TestTechnique = z.enum([
@@ -149,6 +152,9 @@ export const ModuleUpdate = z.object({
   description: z.string().max(2000).optional(),
   parentId: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
+  /** Hooks: a block run before / after every test in this module and its sub-modules. */
+  setupBlockId: z.string().nullable().optional(),
+  teardownBlockId: z.string().nullable().optional(),
 });
 export const ScenarioUpdate = patchOf(ScenarioInput).extend({ moduleId: z.string().optional() });
 export const TestCaseUpdate = patchOf(TestCaseInput);

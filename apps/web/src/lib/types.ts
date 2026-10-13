@@ -45,6 +45,9 @@ export type ModuleNode = {
   name: string;
   description: string;
   sortOrder: number;
+  /** Hooks: blocks run before / after every test of the module and its sub-modules. */
+  setupBlockId?: string | null;
+  teardownBlockId?: string | null;
 };
 export type ScenarioStatus = 'draft' | 'ready' | 'deprecated';
 export type ScenarioSummary = {
@@ -90,6 +93,9 @@ export type ScenarioDetail = Omit<ScenarioSummary, 'tagIds' | 'stepCount'> & {
   applicationId: string;
   description: string;
   preconditions: string;
+  /** Hooks: blocks run before / after this test (inside its modules' hooks). */
+  setupBlockId: string | null;
+  teardownBlockId: string | null;
   steps: StepRecord[];
   testCases: TestCase[];
   tagIds: string[];

@@ -34,6 +34,9 @@ export type RunTestCaseInput = {
   onEvent?: (e: EngineEvent) => void;
   /** Resolves `util.callScenario` targets. */
   loadScenarioSteps?: (scenarioId: string) => InputStep[] | Promise<InputStep[]>;
+  /** Hooks: steps run before the test (a failure skips the test) and after it (always, even after a failure). */
+  before?: InputStep[];
+  after?: InputStep[];
   /** Saved elements of the application (id → locators) for steps that use `element` locators. */
   elements?: Record<string, Locator[]>;
   /** Resolves `util.useBlock` targets: the block's steps, and the inputs it declares (set as `vars`). */
@@ -456,7 +459,14 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
     }
   };
 
+  // Before-hooks (paths "before.n"), then the test, then after-hooks ("after.n") — which run even after a failure,
+  // so cleanup happens; a cancelled run skips them.
+  if (input.before?.length) await runList(input.before, 'before', 0, 0);
   await runList(input.steps, '', 0, 0);
+  if (input.after?.length && !signal.aborted) {
+    stopped = false;
+    await runList(input.after, 'after', 0, 0);
+  }
 
   const failed = !!firstFailure;
   const artifacts: ArtifactRef[] = [];

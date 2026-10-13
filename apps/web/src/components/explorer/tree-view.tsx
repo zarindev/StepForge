@@ -1,4 +1,5 @@
 import {
+  Anchor,
   ChevronRight,
   Copy,
   Disc3,
@@ -31,6 +32,8 @@ export type TreeActions = {
   onNewScenario: (moduleId: string) => void;
   /** Opens the Recorder; the recording is saved as a new scenario in this module. */
   onRecordScenario: (moduleId: string) => void;
+  /** Opens the module's before/after-each-test hooks. */
+  onEditHooks: (m: ModuleTreeNode) => void;
   onRenameModule: (m: ModuleTreeNode) => void;
   onDeleteModule: (m: ModuleTreeNode) => void;
   onDuplicateScenario: (id: string) => void;
@@ -193,6 +196,11 @@ function ModuleRow({ node, depth, ctx }: { node: ModuleTreeNode; depth: number; 
         )}
         <span className="truncate font-medium">{node.name}</span>
         <span className="ml-1 text-[11px] text-muted tabular-nums">{node.total}</span>
+        {(node.setupBlockId || node.teardownBlockId) && (
+          <span title="Has before/after-each-test hooks" aria-label={`${node.name} has hooks`}>
+            <Anchor className="ml-1 h-3 w-3 text-indigo" />
+          </span>
+        )}
         <div
           className="ml-auto opacity-0 group-hover:opacity-100 focus-within:opacity-100"
           onClick={(e) => e.stopPropagation()}
@@ -219,6 +227,11 @@ function ModuleRow({ node, depth, ctx }: { node: ModuleTreeNode; depth: number; 
                 label: 'Record a scenario',
                 icon: Disc3,
                 onSelect: () => ctx.actions.onRecordScenario(node.id),
+              },
+              {
+                label: 'Before/after each test…',
+                icon: Anchor,
+                onSelect: () => ctx.actions.onEditHooks(node),
               },
               { label: 'New sub-module', icon: FolderPlus, onSelect: () => ctx.actions.onNewModule(node.id) },
               { label: 'Rename', icon: Pencil, onSelect: () => ctx.actions.onRenameModule(node) },
