@@ -306,6 +306,101 @@ describe('control flow', () => {
     expect(r.steps.find((s) => s.type === 'util.loop')?.message).toBe('Ran 2/2 iteration(s)');
   });
 
+  it('repeats while a condition holds, re-checked before every pass; the count is a safety limit', async () => {
+    const log: string[] = [];
+    const r = await go(
+      steps(
+        { type: 'util.setVariable', params: { name: 'status', value: 0 } },
+        {
+          type: 'util.loop',
+          params: {
+            while: { value: '{{vars.status}}', operator: 'lt', expected: 2 },
+            steps: [
+              { type: 'util.setVariable', params: { name: 'status', value: '{{vars.index}}' } },
+              logStep('pass {{vars.index}}'),
+            ],
+          },
+        },
+      ),
+      {},
+      log,
+    );
+    expect(r.status).toBe('passed');
+    expect(log).toEqual(['pass 0', 'pass 1', 'pass 2']);
+    expect(r.steps.find((s) => s.type === 'util.loop')?.message).toMatch(/^Repeated 3 time\(s\)/);
+
+    const stuck = await go(
+      steps({
+        type: 'util.loop',
+        params: {
+          while: { value: 'x', operator: 'equals', expected: 'x' },
+          count: 4,
+          steps: [logStep('again')],
+        },
+      }),
+    );
+    expect(stuck.status).toBe('failed');
+    expect(stuck.steps.find((s) => s.type === 'util.loop')?.message).toBe(
+      'Stopped after the limit of 4 pass(es); the condition still held',
+    );
+  });
+
+  it('page conditions ask the UI session to probe the step’s element', async () => {
+    const log: string[] = [];
+    const probes: string[] = [];
+    let visibleFor = 2;
+    const ui: Executor = {
+      group: 'ui',
+      async createSession() {
+        return {
+          async execute() {
+            return {};
+          },
+          async probe(req) {
+            probes.push(`${req.check} ${req.locators[0]?.value} ${req.timeoutMs}`);
+            const ok = req.check === 'visible' ? visibleFor-- > 0 : false;
+            return { ok, detail: ok ? 'yes' : 'no' };
+          },
+          async close() {
+            return [];
+          },
+        };
+      },
+    };
+    const more = [{ strategy: 'text' as const, value: 'Load more' }];
+    const r = await go(
+      steps(
+        {
+          type: 'util.loop',
+          locators: more,
+          params: { while: { type: 'element', check: 'visible' }, steps: [logStep('click')] },
+        },
+        {
+          type: 'util.if',
+          locators: more,
+          params: {
+            condition: { type: 'element', check: 'present', timeoutMs: 50 },
+            steps: [logStep('still there')],
+            else: [logStep('gone')],
+          },
+        },
+      ),
+      { executors: [util(log), ui] },
+      log,
+    );
+    expect(r.status).toBe('passed');
+    expect(log).toEqual(['click', 'click', 'gone']);
+    expect(probes).toEqual([
+      'visible Load more 2000',
+      'visible Load more 2000',
+      'visible Load more 2000',
+      'present Load more 50',
+    ]);
+    expect(r.steps.find((s) => s.type === 'util.if')?.message).toBe(
+      'Condition false (present check: no) → else (1 step)',
+    );
+  });
+
   it('a failing nested step fails the parent and stops the test', async () => {
     const log: string[] = [];
     const r = await go(

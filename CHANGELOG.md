@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **Page conditions** (like Cerberus Testing's step and action conditions): `util.if` can check the page instead of
+  comparing values — the step's element is visible, hidden, present, absent, enabled, contains a text, or matches a
+  number of times (with a short wait, default 2 s) — and `util.loop` gains **repeat while** a condition holds (a value
+  or a page check, re-checked before every pass; the count is a safety limit, default 100). The step form shows the
+  condition's fields and the element picker; the plain-English view reads “Repeat while the "Load more" button is
+  visible”. Code export marks these steps TODO for now.
+
 - **Setup/teardown hooks** (like Cerberus Testing's pre/post testing): a module's menu sets a block to run before
   and one after every test of the module and its sub-modules; a scenario's Details tab adds its own and lists the
   inherited ones. Before-hooks run outermost first and a failure skips the test; after-hooks run innermost first and
@@ -43,6 +50,8 @@
   works as before.
 
 ### Fixed
+- Opening an `if`/`loop` step whose nested steps were created through the API (without `locators`) crashed the
+  step editor; missing fields now get their defaults.
 - Diagnosis: a failed response-time check on an API step is now diagnosed as a slow API (rule `api-slow-response`)
   instead of a generic assertion mismatch.
 - Diagnosis: JavaScript errors only count when they happened on the page the step failed on, so an error on an

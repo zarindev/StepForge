@@ -21,6 +21,13 @@ beforeAll(async () => {
         .end(
           '<button data-testid="go">Go</button><div class="sheet" style="position:fixed;inset:0;z-index:9">Rate us</div>',
         );
+    if (req.url === '/more.html')
+      // "Load more" adds an item and disappears once there are 3.
+      return res
+        .writeHead(200, { 'content-type': 'text/html' })
+        .end(
+          `<ul id="list"></ul><button id="more" onclick="const l = document.getElementById('list'); l.insertAdjacentHTML('beforeend', '<li>Item ' + (l.children.length + 1) + '</li>'); if (l.children.length === 3) this.remove();">Load more</button>`,
+        );
     if (req.url === '/other.html')
       return res.writeHead(200, { 'content-type': 'text/html' }).end('<title>Help</title><h1>Help page</h1>');
     res.writeHead(200, { 'content-type': 'text/html' }).end(html);
@@ -233,5 +240,59 @@ describe('UI executor', () => {
     );
     expect(r.status).toBe('failed');
     expect(r.error).toMatch(/<div class="sheet"[^>]*>Rate us<\/div> intercepts pointer events/);
+  });
+
+  it('page conditions: repeat while an element is visible, and branch on what the page shows', async () => {
+    const more = [{ strategy: 'role' as const, value: 'button', name: 'Load more' }];
+    const items = [{ strategy: 'css' as const, value: '#list li' }];
+    const log = (message: string) => ({ type: 'util.log', params: { message } });
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/more.html' } },
+        {
+          type: 'util.loop',
+          locators: more,
+          params: {
+            while: { type: 'element', check: 'visible', timeoutMs: 500 },
+            count: 10,
+            steps: [{ type: 'ui.click', locators: more }],
+          },
+        },
+        {
+          type: 'util.if',
+          locators: items,
+          params: {
+            condition: { type: 'element', check: 'count', expected: 3 },
+            steps: [log('three items')],
+            else: [log('wrong count')],
+          },
+        },
+        {
+          type: 'util.if',
+          locators: more,
+          params: {
+            condition: { type: 'element', check: 'present', timeoutMs: 300 },
+            steps: [log('button still there')],
+            else: [log('button gone')],
+          },
+        },
+        {
+          type: 'util.if',
+          locators: [{ strategy: 'css', value: '#list' }],
+          params: {
+            condition: { type: 'element', check: 'textContains', expected: 'Item 3' },
+            steps: [log('has item 3')],
+          },
+        },
+      ),
+    );
+    const byType = r.steps.map(
+      (s) => `${s.type}:${s.status}${s.type.startsWith('util.') ? ` ${s.message}` : ''}`,
+    );
+    expect(r.status, byType.join('\n')).toBe('passed');
+    const loop = r.steps.find((s) => s.type === 'util.loop')!;
+    expect(loop.message).toMatch(/^Repeated 3 time\(s\) while the condition held/);
+    const notes = r.steps.filter((s) => s.type === 'util.log').map((s) => s.message);
+    expect(notes).toEqual(['three items', 'button gone', 'has item 3']);
   });
 });

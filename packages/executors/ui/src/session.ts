@@ -6,6 +6,7 @@ import {
   type StepContext,
   type StepOutcome,
   type TestContext,
+  type ProbeRequest,
 } from '@stepforge/core';
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -146,6 +147,59 @@ export class UiSession implements ExecutorSession {
 
   private resolve(step: RunnableStep, ctx: StepContext, locators = step.locators): Promise<Resolved> {
     return resolveLocator(this.scope, locators, ctx.timeoutMs, ctx.signal);
+  }
+
+  /** Page conditions for util.if / util.loop: polls until the check holds or the (short) wait runs out. */
+  async probe(req: ProbeRequest, ctx: StepContext): Promise<{ ok: boolean; detail: string }> {
+    if (!req.locators.length) throw new StepError('invalid_params', 'A page condition needs an element');
+    const locs: Locator[] = [];
+    for (const c of req.locators) {
+      const l = buildLocator(this.scope, c);
+      try {
+        await l.count();
+        locs.push(l);
+      } catch {
+        // invalid selector for this strategy
+      }
+    }
+    if (!locs.length) throw new StepError('invalid_params', 'None of the condition’s locators is valid');
+    const el = locs.reduce((a, b) => a.or(b));
+    const expected = req.expected === undefined || req.expected === null ? '' : String(req.expected);
+    const check = async (): Promise<[boolean, string]> => {
+      const n = await el.count();
+      const first = el.first();
+      switch (req.check) {
+        case 'present':
+          return [n > 0, `${n} found`];
+        case 'absent':
+          return [n === 0, `${n} found`];
+        case 'visible': {
+          const v = n > 0 && (await first.isVisible());
+          return [v, v ? 'visible' : n ? 'present but not visible' : 'not found'];
+        }
+        case 'hidden': {
+          const v = n > 0 && (await first.isVisible());
+          return [!v, v ? 'visible' : 'not visible'];
+        }
+        case 'enabled': {
+          const e = n > 0 && (await first.isEnabled());
+          return [e, n ? (e ? 'enabled' : 'disabled') : 'not found'];
+        }
+        case 'textContains': {
+          const text = n ? ((await first.textContent()) ?? '') : '';
+          return [n > 0 && text.includes(expected), n ? `text "${text.trim().slice(0, 80)}"` : 'not found'];
+        }
+        case 'count':
+          return [n === Number(expected), `${n} found`];
+      }
+    };
+    const deadline = Date.now() + Math.max(0, req.timeoutMs);
+    for (;;) {
+      if (ctx.signal.aborted) throw new StepError('aborted', 'Run was cancelled');
+      const [ok, detail] = await check().catch((): [boolean, string] => [false, 'not ready']);
+      if (ok || Date.now() >= deadline) return { ok, detail };
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
 
   async execute(step: RunnableStep, ctx: StepContext): Promise<StepOutcome> {

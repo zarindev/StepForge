@@ -107,7 +107,7 @@ Covers the whole UI catalogue.
 
 | Priority | Tags | Steps |
 |---|---|---|
-| P2 | #api | 25 |
+| P2 | #api | 29 |
 
 **Steps**
 
@@ -131,11 +131,15 @@ Covers the whole UI catalogue.
    - Send GET /ping?i={{vars.index}}
 15. Repeat for each line in {{vars.order.items}}
    - Note: {{vars.line.sku}}
-16. Remember "[object Object]" as payload
-17. Generate a random pattern (save as ref)
-18. Generate a random date (save as due)
-19. Wait 250 ms
-20. Run a script (save as double)
+16. Repeat while the "Load more" button is visible
+   - Note: more
+17. If "Out of stock" is on the page
+   - Note: oos
+18. Remember "[object Object]" as payload
+19. Generate a random pattern (save as ref)
+20. Generate a random date (save as due)
+21. Wait 250 ms
+22. Run a script (save as double)
 
 
 ## Back office

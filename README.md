@@ -62,7 +62,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 | Layer | What you get |
 | --- | --- |
-| **UI** | ✅ Recorder with ranked, self-healing locators · assert/extract/mask from the toolbar · tabs, dialogs, iframes · screenshots, video, Playwright traces |
+| **UI** | ✅ Recorder with ranked, self-healing locators · assert/extract/mask from the toolbar · tabs, dialogs, iframes · conditions on the page (“if the cookie banner is visible”, “repeat while Load more shows”) · screenshots, video, Playwright traces |
 | **API** | ✅ REST and GraphQL steps · auth (bearer, basic, API key, OAuth2) · JSONPath and JSON Schema checks · import OpenAPI, Postman, cURL and HAR · contract checks |
 | **Database** | ✅ SQLite, PostgreSQL, MySQL, SQL Server, MongoDB · read-only and rollback modes · SQL Workbench · data-quality audit |
 | **Email** | ✅ Local Mailpit or IMAP · wait for an email · extract one-time codes and links |

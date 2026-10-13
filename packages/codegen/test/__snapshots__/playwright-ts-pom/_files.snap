@@ -4,7 +4,7 @@ package.json (22 lines)
 pages/LoginPage.ts (19 lines)
 pages/ProductsPage.ts (75 lines)
 playwright.config.ts (18 lines)
-README.md (68 lines)
+README.md (70 lines)
 sql/dataAndEmail/orderCount.sql (6 lines)
 sql/dataAndEmail/procedure.sql (4 lines)
 sql/dataAndEmail/query.sql (4 lines)
@@ -16,7 +16,7 @@ support/db.ts (102 lines)
 support/helpers.ts (269 lines)
 support/mail.ts (169 lines)
 support/tabs.ts (30 lines)
-tests/api/orders-api.spec.ts (176 lines)
+tests/api/orders-api.spec.ts (178 lines)
 tests/back-office/data-and-email.spec.ts (84 lines)
 tests/shop/checkout/checkout-with-every-ui-step.spec.ts (160 lines)
 tsconfig.json (11 lines)
@@ -25,6 +25,8 @@ Warnings:
 - Checkout with every UI step | Receipt looks right | visual checkpoints are not exported; add a screenshot comparison in the target framework
 - Orders API | Create an order | the JSON Schema check on "$" is not exported
 - Orders API | OAuth (not exported) | auth type "oauth2" is not exported; set the header yourself
+- Orders API | util.loop | “repeat while” loops are not exported yet; write the loop by hand
+- Orders API | util.if | page conditions (if the element is …) are not exported yet; write the check by hand
 - Data and email | db.query | SQL Server helpers are not generated; the SQL file is exported for reference
 - Data and email | db.mongoFind | MongoDB steps are not exported; use the MongoDB driver of the target language
 - Data and email | db.dataQualityCheck | the data-quality audit runs only in StepForge

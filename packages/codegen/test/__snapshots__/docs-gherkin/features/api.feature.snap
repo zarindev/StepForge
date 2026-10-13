@@ -27,6 +27,10 @@ Feature: API
     And send GET /ping?i={{vars.index}}
     And repeat for each line in {{vars.order.items}}
     And note: {{vars.line.sku}}
+    And repeat while the "Load more" button is visible
+    And note: more
+    And if "Out of stock" is on the page
+    And note: oos
     And remember "[object Object]" as payload
     And generate a random pattern (save as ref)
     And generate a random date (save as due)

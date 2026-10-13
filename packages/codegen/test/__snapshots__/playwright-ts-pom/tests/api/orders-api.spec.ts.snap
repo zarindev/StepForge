@@ -156,6 +156,8 @@ test.describe('API › Orders API', () => {
       // Note: {{vars.line.sku}}
       console.log(field(vars, 'line.sku'));
     }
+    // TODO(StepForge): util.loop: “repeat while” loops are not exported yet; write the loop by hand
+    // TODO(StepForge): util.if: page conditions (if the element is …) are not exported yet; write the check by hand
     // Remember "[object Object]" as payload
     vars.payload = {
       a: [1, true, null],

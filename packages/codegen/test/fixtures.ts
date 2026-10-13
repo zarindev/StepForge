@@ -282,6 +282,20 @@ export const KITCHEN_SINK: CodegenInput = {
             steps: [s('util.log', { params: { message: '{{vars.line.sku}}' } })],
           },
         }),
+        s('util.loop', {
+          locators: [{ strategy: 'role', value: 'button', name: 'Load more' }],
+          params: {
+            while: { type: 'element', check: 'visible' },
+            steps: [s('util.log', { params: { message: 'more' } })],
+          },
+        }),
+        s('util.if', {
+          locators: [{ strategy: 'text', value: 'Out of stock' }],
+          params: {
+            condition: { type: 'element', check: 'present' },
+            steps: [s('util.log', { params: { message: 'oos' } })],
+          },
+        }),
         s('util.setVariable', {
           params: { name: 'payload', value: { a: [1, true, null], b: '{{run.id}}' } },
         }),

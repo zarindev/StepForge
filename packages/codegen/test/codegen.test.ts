@@ -93,6 +93,8 @@ describe('plan', () => {
         'performance measurements run only in StepForge',
         'load tests are not part of functional tests; export the scenario to k6 instead',
         expect.stringContaining('the "unknown" connection is not set up'),
+        '“repeat while” loops are not exported yet; write the loop by hand',
+        'page conditions (if the element is …) are not exported yet; write the check by hand',
       ]),
     );
     // Page objects: grouped by page, steps after a tab switch or inside a frame stay inline.

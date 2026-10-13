@@ -74,6 +74,46 @@ const DATA_KINDS = [
   'pattern',
 ];
 
+/** Checks a page condition can make on the step's element (the engine's probe). */
+export const PAGE_CHECKS = ['visible', 'hidden', 'present', 'absent', 'enabled', 'textContains', 'count'];
+
+/**
+ * Fields of a condition (`util.if` condition, `util.loop` while): a value comparison, or a check on the page — the
+ * element is the step's own element.
+ */
+function conditionFields(at: string, label: string): FieldSpec[] {
+  // A condition without a type compares values; a loop without one has no "while".
+  const value = { key: `${at}.type`, equals: at === 'while' ? ['value'] : ['', 'value'] };
+  const element = { key: `${at}.type`, equals: ['element'] };
+  return [
+    {
+      key: `${at}.type`,
+      label: `${label} — compare`,
+      kind: 'select',
+      options: ['value', 'element'],
+      hint: at === 'while' ? 'Empty: no “while” (count / for each)' : 'element: check something on the page',
+    },
+    { key: `${at}.value`, label: 'Value', kind: 'text', placeholder: '{{vars.count}}', showWhen: value },
+    { key: `${at}.operator`, label: 'Operator', kind: 'select', options: OPERATORS, showWhen: value },
+    { key: `${at}.check`, label: 'Element is', kind: 'select', options: PAGE_CHECKS, showWhen: element },
+    {
+      key: `${at}.expected`,
+      label: 'Expected',
+      kind: 'text',
+      hint: 'For textContains (text) and count (number)',
+      showWhen: element,
+    },
+    { key: `${at}.expected`, label: 'Expected', kind: 'text', showWhen: value },
+    {
+      key: `${at}.timeoutMs`,
+      label: 'Wait up to (ms)',
+      kind: 'number',
+      hint: 'Default 2000',
+      showWhen: element,
+    },
+  ];
+}
+
 export const STEP_FIELDS: Record<string, FieldSpec[]> = {
   'ui.navigate': [
     { key: 'url', label: 'URL', kind: 'text', placeholder: '/login or {{env.baseUrl}}/login', wide: true },
@@ -376,15 +416,17 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
       wide: true,
     },
   ],
-  'util.if': [
-    { key: 'condition.value', label: 'If value', kind: 'text', placeholder: '{{vars.count}}' },
-    { key: 'condition.operator', label: 'Operator', kind: 'select', options: OPERATORS },
-    { key: 'condition.expected', label: 'Expected', kind: 'text' },
-  ],
+  'util.if': conditionFields('condition', 'If'),
   'util.loop': [
-    { key: 'count', label: 'Repeat N times', kind: 'number' },
+    {
+      key: 'count',
+      label: 'Repeat N times',
+      kind: 'number',
+      hint: 'With “repeat while”: the limit (default 100)',
+    },
     { key: 'over', label: 'or for each item in', kind: 'text', placeholder: '{{vars.items}}' },
     { key: 'as', label: 'Item variable', kind: 'text', placeholder: 'item' },
+    ...conditionFields('while', 'Repeat while'),
   ],
   'util.callScenario': [{ key: 'scenarioId', label: 'Scenario', kind: 'scenario', wide: true }],
   'util.useBlock': [{ key: 'blockId', label: 'Block', kind: 'block', wide: true }],
@@ -429,6 +471,9 @@ export function setPath(obj: Record<string, unknown>, path: string, value: unkno
     else copy[head] = value;
     return copy;
   }
-  copy[head] = setPath((obj[head] as Record<string, unknown>) ?? {}, rest.join('.'), value);
+  const nested = setPath((obj[head] as Record<string, unknown>) ?? {}, rest.join('.'), value);
+  // An emptied object is dropped too (e.g. clearing a loop's "while" turns it back into a plain loop).
+  if (Object.keys(nested).length) copy[head] = nested;
+  else delete copy[head];
   return copy;
 }

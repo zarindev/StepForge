@@ -130,8 +130,19 @@ export type TestContext = {
 
 export type StepContext = TestContext & { timeoutMs: number; stepIndex: number };
 
+/** A condition on the page (util.if / util.loop "while"): does an element meet a check, within a short wait? */
+export type ProbeCheck = 'visible' | 'hidden' | 'present' | 'absent' | 'enabled' | 'textContains' | 'count';
+export type ProbeRequest = {
+  locators: RunnableStep['locators'];
+  check: ProbeCheck;
+  expected?: unknown;
+  timeoutMs: number;
+};
+
 export interface ExecutorSession {
   execute(step: RunnableStep, ctx: StepContext): Promise<StepOutcome>;
+  /** Answers a page condition without failing: true once the check holds, false when the wait runs out. */
+  probe?(req: ProbeRequest, ctx: StepContext): Promise<{ ok: boolean; detail: string }>;
   /** Called when a step fails, to collect failure evidence (screenshot, DOM…). */
   onStepFailed?(step: RunnableStep, ctx: StepContext): Promise<Partial<StepOutcome>>;
   /** Release resources; returns artifacts worth keeping given the final status. */

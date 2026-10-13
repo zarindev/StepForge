@@ -581,6 +581,16 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
       out.push({ op: 'script', code: String(q.code ?? ''), ...(into && { into }) });
       break;
     case 'util.if': {
+      if ((q.condition as { type?: string } | undefined)?.type === 'element') {
+        out.push(
+          todo(
+            ctx,
+            step,
+            'page conditions (if the element is …) are not exported yet; write the check by hand',
+          ),
+        );
+        break;
+      }
       const c = (q.condition as { value?: unknown; operator?: string; expected?: unknown }) ?? {};
       out.push({
         op: 'if',
@@ -593,6 +603,10 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
       break;
     }
     case 'util.loop':
+      if (q.while !== undefined) {
+        out.push(todo(ctx, step, '“repeat while” loops are not exported yet; write the loop by hand'));
+        break;
+      }
       out.push({
         op: 'loop',
         ...(q.over !== undefined ? { over: val(q.over) } : { count: val(q.count ?? 1) }),

@@ -338,7 +338,8 @@ export function StepForm({
         />
       )}
 
-      {NEEDS_LOCATOR.has(step.type) && (
+      {(NEEDS_LOCATOR.has(step.type) ||
+        getPath(params, step.type === 'util.loop' ? 'while.type' : 'condition.type') === 'element') && (
         <ElementField value={step.locators} onChange={(locators: Locator[]) => set({ locators })} />
       )}
 

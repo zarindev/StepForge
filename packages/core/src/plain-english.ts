@@ -55,6 +55,30 @@ export function describeTarget(locators: Locator[] = []): string {
   }
 }
 
+const PAGE_PHRASE: Record<string, (target: string, expected: unknown) => string> = {
+  visible: (t) => `${t} is visible`,
+  hidden: (t) => `${t} is hidden`,
+  present: (t) => `${t} is on the page`,
+  absent: (t) => `${t} is not on the page`,
+  enabled: (t) => `${t} is enabled`,
+  textContains: (t, e) => `${t} contains ${q(e ?? '')}`,
+  count: (t, e) => `there are ${String(e ?? '?')} × ${t}`,
+};
+
+/** A `util.if` / `util.loop` condition: a value comparison, or a check on the step's element. */
+function condition(raw: unknown, target: string): string {
+  const c = (raw ?? {}) as {
+    type?: string;
+    value?: unknown;
+    operator?: string;
+    expected?: unknown;
+    check?: string;
+  };
+  if (c.type === 'element')
+    return (PAGE_PHRASE[c.check ?? 'visible'] ?? PAGE_PHRASE.visible!)(target, c.expected);
+  return `${String(c.value ?? '')} ${c.operator ?? 'equals'} ${c.expected === undefined ? '' : q(c.expected)}`.trim();
+}
+
 const ASSERT_PHRASE: Record<string, (target: string, expected: unknown) => string> = {
   visible: (t) => `Check that ${t} is visible`,
   hidden: (t) => `Check that ${t} is hidden`,
@@ -271,17 +295,16 @@ export function describeStep(step: AnyStep): string {
     case 'util.runScript':
       s = 'Run a script';
       break;
-    case 'util.if': {
-      const c = (p.condition ?? {}) as { value?: unknown; operator?: string; expected?: unknown };
-      s =
-        `If ${String(c.value ?? '')} ${c.operator ?? 'equals'} ${c.expected === undefined ? '' : q(c.expected)}`.trim();
+    case 'util.if':
+      s = `If ${condition(p.condition, t)}`;
       break;
-    }
     case 'util.loop':
       s =
-        p.over !== undefined
-          ? `Repeat for each ${String(p.as ?? 'item')} in ${String(p.over)}`
-          : `Repeat ${String(p.count ?? 1)} times`;
+        p.while !== undefined
+          ? `Repeat while ${condition(p.while, t)}`
+          : p.over !== undefined
+            ? `Repeat for each ${String(p.as ?? 'item')} in ${String(p.over)}`
+            : `Repeat ${String(p.count ?? 1)} times`;
       break;
     case 'util.callScenario':
       s = 'Run another scenario';

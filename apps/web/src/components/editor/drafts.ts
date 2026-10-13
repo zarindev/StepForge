@@ -7,12 +7,22 @@ export const newKey = () => `k${++seq}`;
 
 const NESTED = ['steps', 'else'] as const;
 
+/** Nested steps are stored as written (e.g. created through the API), so missing fields get their defaults. */
 export function toDrafts(steps: StepRecord[]): DraftStep[] {
   return steps.map((s) => {
     const params = { ...s.params };
     for (const key of NESTED)
       if (Array.isArray(params[key])) params[key] = toDrafts(params[key] as StepRecord[]);
-    return { ...s, params, _k: s.id ?? newKey() };
+    return {
+      ...s,
+      locators: s.locators ?? [],
+      assertions: s.assertions ?? [],
+      enabled: s.enabled ?? true,
+      continueOnFail: s.continueOnFail ?? false,
+      retries: s.retries ?? 0,
+      params,
+      _k: s.id ?? newKey(),
+    };
   });
 }
 

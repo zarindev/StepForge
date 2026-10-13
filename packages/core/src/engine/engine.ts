@@ -1,4 +1,5 @@
 import { Step, stepGroupOf, type Locator, type StepGroup } from '../schemas/steps.ts';
+import type { ProbeCheck } from './types.ts';
 import { VariableResolutionError, VariableResolver } from '../variables.ts';
 import { evaluateAssertion } from './assertions.ts';
 import {
@@ -358,19 +359,77 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
           .slice(failedBefore)
           .some((r) => (r.status === 'failed' || r.status === 'broken') && !CONTROL_STEP_TYPES.has(r.type));
 
-      if (step.type === 'util.if') {
-        const c = (p.condition ?? {}) as { value?: unknown; operator?: string; expected?: unknown };
+      /**
+       * A condition is either a value comparison, or (type "element") a check on the page — visible, hidden, present,
+       * absent, enabled, text contains, count — on the control step's own element, with a short wait.
+       */
+      const evaluate = async (raw: unknown): Promise<{ passed: boolean; detail: string }> => {
+        // Resolved now (not when the step started), so a loop sees variables its steps changed.
+        const c = resolver.resolve(raw ?? {}) as {
+          type?: string;
+          value?: unknown;
+          operator?: string;
+          expected?: unknown;
+          check?: string;
+          timeoutMs?: unknown;
+        };
+        if (c.type === 'element') {
+          const session = await sessionFor('ui');
+          if (!session.probe) throw new StepError('unsupported', 'Page conditions need the UI executor');
+          const timeoutMs = Number(c.timeoutMs ?? 2000);
+          const r = await session.probe(
+            {
+              locators: resolved.locators,
+              check: (c.check ?? 'visible') as ProbeCheck,
+              expected: c.expected,
+              timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 2000,
+            },
+            { ...ctx, timeoutMs: step.timeoutMs ?? input.options.defaultTimeoutMs, stepIndex: step.position },
+          );
+          return { passed: r.ok, detail: `${c.check ?? 'visible'} check: ${r.detail}` };
+        }
         const check = evaluateAssertion(
           { target: 'condition', operator: (c.operator ?? 'equals') as never, expected: c.expected },
           c.value,
         );
+        return { passed: check.passed, detail: check.message };
+      };
+
+      if (step.type === 'util.if') {
+        const check = await evaluate((step.params as Record<string, unknown>).condition);
         const branch = check.passed ? childSteps(p.steps, step.id, 't') : childSteps(p.else, step.id, 'e');
         const which = check.passed ? 'then' : 'else';
         await runList(branch, `${base.path}${check.passed ? '' : 'e'}`, base.depth + 1, callDepth);
-        const msg = `Condition ${check.passed ? 'true' : 'false'} → ${which} (${branch.length} step${branch.length === 1 ? '' : 's'})`;
+        const msg = `Condition ${check.passed ? 'true' : 'false'} (${check.detail}) → ${which} (${branch.length} step${branch.length === 1 ? '' : 's'})`;
         return childFailed()
           ? done('failed', `${msg}; a nested step failed`, 'assertion')
           : done('passed', msg);
+      }
+
+      if (step.type === 'util.loop' && p.while !== undefined) {
+        // "Repeat while": checked before every pass; the count (default 100) is a safety limit.
+        const children = childSteps(p.steps, step.id, 'l');
+        const max = Math.min(Number(p.count ?? 100) || 100, MAX_LOOP_ITERATIONS);
+        let ran = 0;
+        let last = { passed: true, detail: '' };
+        while (ran < max && !stopped && !signal.aborted) {
+          last = await evaluate((step.params as Record<string, unknown>).while);
+          if (!last.passed) break;
+          resolver.setVar('index', ran);
+          await runList(children, `${base.path}[${ran + 1}]`, base.depth + 1, callDepth);
+          ran++;
+        }
+        const msg =
+          ran >= max && last.passed
+            ? `Stopped after the limit of ${max} pass(es); the condition still held`
+            : `Repeated ${ran} time(s) while the condition held (${last.detail})`;
+        if (childFailed()) return done('failed', `${msg}; a nested step failed`, 'assertion');
+        if (ran >= max && last.passed) {
+          // The loop itself failed (no nested step did), so it is the test's failure.
+          firstFailure ??= { stepId: step.id, kind: 'assertion', message: msg };
+          return done('failed', msg, 'assertion');
+        }
+        return done('passed', msg);
       }
 
       if (step.type === 'util.loop') {

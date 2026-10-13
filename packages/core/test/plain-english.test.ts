@@ -39,6 +39,22 @@ describe('plain English', () => {
     [s('api.request', { method: 'POST', url: '/api/patients' }), 'Send POST /api/patients'],
     [s('util.loop', { count: 3 }), 'Repeat 3 times'],
     [
+      s('util.loop', { while: { type: 'element', check: 'visible' } }, [
+        { strategy: 'role' as never, value: 'button', name: 'Load more' },
+      ]),
+      'Repeat while the "Load more" button is visible',
+    ],
+    [
+      s('util.if', { condition: { type: 'element', check: 'textContains', expected: 'Saved' } }, [
+        { strategy: 'testId' as never, value: 'flash' },
+      ]),
+      'If the element "flash" contains "Saved"',
+    ],
+    [
+      s('util.loop', { while: { value: '{{vars.page}}', operator: 'lt', expected: 5 } }),
+      'Repeat while {{vars.page}} lt "5"',
+    ],
+    [
       s('email.waitForEmail', { to: '{{vars.email}}', subject: 'Verify' }),
       'Wait for an email to {{vars.email}} with subject "Verify"',
     ],

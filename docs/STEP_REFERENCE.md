@@ -74,8 +74,16 @@ Generic `assertions` on any UI step can target `url`, `title`, and for steps wit
 | `wait` | `ms` | logged as a warning: prefer `ui.waitFor` |
 | `log` | `message` | |
 | `runScript` | `code` (JavaScript; `return` a value) | sees copies of `vars` and may set `vars.x`; no `require`, `process`, `eval`, files or network; 5 s max |
-| `if` | `condition: { value, operator, expected }`, `steps` (then), `else` | any assertion operator; nested results numbered `3.1` (then) / `3e.1` (else) |
-| `loop` | `count` **or** `over` (an array, e.g. `{{vars.items}}`), `as` (default `item`), `steps` | exposes `{{vars.item}}` and `{{vars.index}}`; max 1000 iterations; results `4[2].1` |
+| `if` | `condition`, `steps` (then), `else` | a condition compares values — `{ value, operator, expected }`, any assertion operator — or checks the page — `{ type: "element", check, expected, timeoutMs }` on the step's own element (`locators`); nested results numbered `3.1` (then) / `3e.1` (else) |
+| `loop` | `count` **or** `over` (an array, e.g. `{{vars.items}}`), `as` (default `item`), `steps`; **or** `while` (a condition, as for `if`) with `count` as the limit (default 100) | exposes `{{vars.item}}` and `{{vars.index}}`; max 1000 iterations; results `4[2].1`. `while` is checked before every pass, with variables as they are then; reaching the limit while the condition still holds fails the step |
+
+**Page conditions** (`type: "element"`, like Cerberus Testing's step and action conditions). `check` is one of
+`visible`, `hidden`, `present` (in the page, visible or not), `absent`, `enabled`, `textContains` (`expected` = the
+text) or `count` (`expected` = the number of matches). The check is tried again every 100 ms for up to `timeoutMs`
+(default 2000) before it counts as false, so a condition that is false costs that wait. A page condition never fails
+the step by itself — it only picks the branch, or ends the loop. Examples: *if the cookie banner is visible, click
+“Accept”*; *repeat while “Load more” is visible: click it*.
+
 | `callScenario` | `scenarioId` | runs another scenario of the same application inline; max nesting depth 5 |
 | `useBlock` | `blockId`, `inputs` (`{ "name": "value" }`, placeholders allowed) | runs a reusable block (application → Blocks tab). Each input becomes `{{vars.<name>}}` for the block's steps (the passed value, else the block's default; a required input without a value stops the test). See [BLOCKS.md](BLOCKS.md) |
 
