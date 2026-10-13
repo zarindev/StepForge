@@ -70,7 +70,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | **UI** | ✅ Recorder with ranked, self-healing locators · assert/extract/mask from the toolbar · tabs, dialogs, iframes · conditions on the page (“if the cookie banner is visible”, “repeat while Load more shows”) · screenshots, video, Playwright traces |
 | **Any web app** | ✅ SPAs, PWAs, canvas and map apps, mobile web with touch · wait for and fake API responses, go offline · file downloads · cookies and storage · control the clock · per-environment language, time zone, location, dark mode, basic auth, headers, proxy, client certificates, installed Chrome/Edge — see [docs/WEB_APPS.md](docs/WEB_APPS.md) |
 | **Visual checks** | ✅ Screenshot comparison with an approved baseline · difference image · one-click "Accept as new baseline" · masks for changing parts |
-| **API** | ✅ REST and GraphQL steps · auth (bearer, basic, API key, OAuth2) · JSONPath and JSON Schema checks · import OpenAPI, Postman, cURL and HAR · contract checks |
+| **API** | ✅ REST, GraphQL and SOAP steps (XPath checks, faults) · Kafka produce / wait for a message · FTP, FTPS and SFTP files · auth (bearer, basic, API key, OAuth2) · JSONPath and JSON Schema checks · import OpenAPI, Postman, cURL and HAR · contract checks |
 | **Database** | ✅ SQLite, PostgreSQL, MySQL, SQL Server, MongoDB · read-only and rollback modes · SQL Workbench · data-quality audit |
 | **Email** | ✅ Local Mailpit or IMAP · wait for an email · extract one-time codes and links |
 | **Performance** | ✅ Web Vitals and Lighthouse · load tests with percentiles and threshold verdicts · k6 export · query plans |
@@ -419,7 +419,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | [Testing every kind of web app](docs/WEB_APPS.md) | SPAs, PWAs, canvas, downloads, network mocking, visual checkpoints, browser settings |
 | [Blocks and hooks](docs/BLOCKS.md) · [Elements](docs/ELEMENTS.md) · [Test data](docs/TEST_DATA.md) | Reuse: shared steps, before/after each test, shared elements, data sources |
 | [Campaigns](docs/CAMPAIGNS.md) · [Manual runs](docs/MANUAL_RUNS.md) · [Scheduling](docs/SCHEDULING.md) · [CLI](docs/CLI.md) | Running: test sets across browsers and sizes, tests done by hand, cron, notifications, CI |
-| [Databases](docs/DATABASES.md) · [Email](docs/EMAIL.md) · [Performance](docs/PERFORMANCE.md) | Beyond the page |
+| [Databases](docs/DATABASES.md) · [Email](docs/EMAIL.md) · [Performance](docs/PERFORMANCE.md) · [SOAP, Kafka, FTP](docs/INTEGRATIONS.md) | Beyond the page |
 | [Diagnosis](docs/DIAGNOSIS.md) · [Analytics](docs/ANALYTICS.md) | Understanding failures and trends |
 | [Code export](docs/CODEGEN.md) | The 13 export targets |
 | [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) | How it is built |
@@ -437,10 +437,10 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] A second demo app (ShopDesk) and published benchmarks
 - [x] Showcase material: case study, samples, screenshots and clips
 - [x] Cerberus-inspired features: reusable blocks with inputs, element repository, campaigns, test data library,
-      before/after hooks, page conditions, manual test runs
+      before/after hooks, page conditions, manual test runs, SOAP / Kafka / FTP steps
 - [x] Every kind of web app: visual checkpoints, network waiting and mocking, downloads, mobile web with touch,
       clock control, storage, per-environment browser settings
-- [ ] Kafka/SOAP/FTP steps, Slack/Teams notifications, network breakdowns, run queue priorities
+- [ ] Slack/Teams notifications, network breakdowns, run queue priorities
 - [ ] Native mobile and desktop apps — [plan](docs/NATIVE_APPS_PLAN.md)
 - [ ] An optional desktop installer (Electron)
 

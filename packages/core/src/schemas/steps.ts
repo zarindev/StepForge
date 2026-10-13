@@ -38,7 +38,7 @@ export const STEP_CATALOGUE = {
     'storage',
     'setClock',
   ],
-  api: ['request', 'graphql', 'extract'],
+  api: ['request', 'graphql', 'extract', 'soap', 'kafkaProduce', 'kafkaConsume', 'ftp'],
   db: ['query', 'mongoFind', 'runScript', 'callProcedure', 'extract', 'dataQualityCheck'],
   email: ['waitForEmail', 'assertEmail', 'extractFromEmail', 'openEmailLink'],
   perf: ['pageMetrics', 'lighthouse', 'loadTest', 'queryPlan'],

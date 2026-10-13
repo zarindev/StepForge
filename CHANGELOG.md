@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- **SOAP, Kafka and FTP steps** (like Cerberus Testing's SOAP, Kafka and FTP services), see
+  [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md): `api.soap` (envelope built from the body, SOAP 1.1/1.2, SOAPAction,
+  faults fail the step unless expected), XPath assertion targets and extraction for any XML response,
+  `api.kafkaProduce` / `api.kafkaConsume` (wait for the first matching message since the test started; key, text or
+  JSONPath match; TLS and SASL), and `api.ftp` (upload, download, list, delete, exists over FTP, FTPS or SFTP). CI
+  runs the Kafka tests against Apache Kafka.
+
+### Fixed
+- A step's screenshot is tried once more when the first try times out on a busy machine (a CI run had a step without
+  its screenshot).
 - **Manual test runs** (like Cerberus Testing's manual executions): Run → *How: Manual*. Nothing is executed; a
   tester follows each test's steps in plain English — blocks, hooks and called scenarios expanded, test data and
   environment variables filled in, secrets kept hidden — and records passed / failed / blocked / skipped per step with

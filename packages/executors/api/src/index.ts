@@ -12,9 +12,15 @@ import {
 import { JSONPath } from 'jsonpath-plus';
 import { CookieJar, send, type HttpResponse, type RequestSpec, type SentRequest } from './http.ts';
 import { validateSchema } from './schema.ts';
+import { ftpStep } from './ftp.ts';
+import { kafkaConsume, kafkaProduce } from './kafka.ts';
+import { soapRequest } from './soap.ts';
+import { soapFault, xpathValue } from './xml.ts';
 
 export { send, CookieJar, resolveUrl, type RequestSpec, type HttpResponse, type Auth } from './http.ts';
 export { validateSchema, normalizeOpenApiSchema } from './schema.ts';
+export { xpathValue, soapFault } from './xml.ts';
+export { soapRequest } from './soap.ts';
 
 /** Validates a response against an API contract (OpenAPI operation). Provided by the host. */
 export type ContractCheck = { ok: boolean; operation?: string; errors: string[] };
@@ -24,8 +30,18 @@ export type ContractResolver = (
   res: { status: number; headers: Record<string, string>; body: unknown },
 ) => Promise<ContractCheck | null>;
 
-/** Reads a value from a response for an assertion target. */
-export function responseTarget(res: HttpResponse, target: string): unknown {
+/** Reads a value from a response for an assertion target. XPath targets (`/…`, `//…`, `xpath:…`) read XML bodies. */
+export function responseTarget(
+  res: HttpResponse,
+  target: string,
+  namespaces?: Record<string, string>,
+): unknown {
+  if (
+    target.startsWith('/') ||
+    target.startsWith('xpath:') ||
+    /^(count|string|number|boolean|sum)\(/.test(target)
+  )
+    return xpathValue(res.text, target.replace(/^xpath:/, ''), namespaces, res);
   if (target === 'status') return res.status;
   if (target === 'time' || target === 'timeMs') return res.timeMs;
   if (target === 'size') return res.size;
@@ -47,18 +63,44 @@ class ApiSession implements ExecutorSession {
   private jar = new CookieJar();
   private last: { request: SentRequest; response: HttpResponse } | null = null;
 
-  constructor(private readonly contracts?: ContractResolver) {}
+  private namespaces: Record<string, string> = {};
+
+  constructor(
+    private readonly contracts?: ContractResolver,
+    private readonly artifactsDir = '',
+  ) {}
 
   async execute(step: RunnableStep, ctx: StepContext): Promise<StepOutcome> {
     const p = step.params as Record<string, unknown>;
     const name = step.type.split('.')[1];
     if (name === 'extract') return this.extract(p);
-    if (name !== 'request' && name !== 'graphql')
+    if (name === 'kafkaProduce') return kafkaProduce(p, ctx);
+    if (name === 'kafkaConsume') return kafkaConsume(p, ctx);
+    if (name === 'ftp') return ftpStep(p, ctx, this.artifactsDir);
+    if (name !== 'request' && name !== 'graphql' && name !== 'soap')
       throw new StepError('unsupported', `Unknown API step "${step.type}"`);
     if (!p.url) throw new StepError('invalid_params', `${step.type} needs a "url"`);
 
-    const spec: RequestSpec =
-      name === 'graphql'
+    const soap =
+      name === 'soap'
+        ? soapRequest({
+            body: String(p.body ?? ''),
+            header: p.header ? String(p.header) : undefined,
+            action: p.action ? String(p.action) : undefined,
+            version: p.version ? String(p.version) : undefined,
+          })
+        : undefined;
+    this.namespaces = (p.namespaces as Record<string, string>) ?? {};
+    const spec: RequestSpec = soap
+      ? {
+          method: 'POST',
+          url: String(p.url),
+          headers: { ...soap.headers, ...((p.headers as Record<string, string>) ?? {}) },
+          body: soap.xml,
+          bodyType: 'raw',
+          auth: p.auth as RequestSpec['auth'],
+        }
+      : name === 'graphql'
         ? {
             method: 'POST',
             url: String(p.url),
@@ -103,6 +145,17 @@ class ApiSession implements ExecutorSession {
         });
       }
     }
+    if (soap && p.allowFault !== true) {
+      const fault = soapFault(response.text, response);
+      if (fault)
+        extra.push({
+          target: 'fault',
+          operator: 'notExists',
+          actual: fault,
+          passed: false,
+          message: `SOAP fault${fault.code ? ` ${fault.code}` : ''}: ${fault.message || 'no message'}`,
+        });
+    }
     if (p.contract && this.contracts) {
       const check = await this.contracts(
         p.contract as { specId?: string },
@@ -135,7 +188,10 @@ class ApiSession implements ExecutorSession {
         size: response.size,
       },
       assertions: extra,
-      getTarget: (t) => responseTarget(response, t),
+      getTarget: (t) => {
+        if (t === 'fault') return soapFault(response.text, response)?.message;
+        return responseTarget(response, t, this.namespaces);
+      },
       evaluate: (a) => this.evaluate(a, response),
       metrics: [{ metric: 'api.response_time', value: response.timeMs, unit: 'ms' }],
     };
@@ -166,7 +222,7 @@ class ApiSession implements ExecutorSession {
         ? res.status
         : from === 'header'
           ? res.headers[String(p.name ?? '').toLowerCase()]
-          : responseTarget(res, String(p.path ?? '$'));
+          : responseTarget(res, String(p.path ?? '$'), this.namespaces);
     if (value === undefined && p.required !== false)
       throw new StepError(
         'assertion',
@@ -187,8 +243,8 @@ class ApiSession implements ExecutorSession {
 export function createApiExecutor(opts: { contracts?: ContractResolver } = {}): Executor {
   return {
     group: 'api',
-    async createSession() {
-      return new ApiSession(opts.contracts);
+    async createSession(ctx) {
+      return new ApiSession(opts.contracts, ctx.artifactsDir);
     },
   };
 }

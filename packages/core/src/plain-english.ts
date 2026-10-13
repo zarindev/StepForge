@@ -250,6 +250,34 @@ export function describeStep(step: AnyStep): string {
     case 'api.graphql':
       s = `Send a GraphQL query to ${String(p.url ?? '')}`;
       break;
+    case 'api.soap':
+      s = `Call the SOAP service ${String(p.url ?? '')}${p.action ? ` (${String(p.action).split(/[/#]/).pop()})` : ''}`;
+      break;
+    case 'api.kafkaProduce':
+      s = `Send a Kafka message to ${String(p.topic ?? '')}${p.key ? ` with key ${q(p.key)}` : ''}`;
+      break;
+    case 'api.kafkaConsume':
+      s = `Wait for a Kafka message on ${String(p.topic ?? '')}${
+        p.key
+          ? ` with key ${q(p.key)}`
+          : p.contains
+            ? ` containing ${q(p.contains)}`
+            : p.path
+              ? ` where ${String(p.path)}${p.equals !== undefined ? ` is ${q(p.equals)}` : ''}`
+              : ''
+      }`;
+      break;
+    case 'api.ftp': {
+      const verb = {
+        upload: 'Upload',
+        download: 'Download',
+        list: 'List',
+        delete: 'Delete',
+        exists: 'Check that there is',
+      }[String(p.action ?? 'list')];
+      s = `${verb ?? 'Use'} ${String(p.remotePath ?? '/')} on ${String(p.protocol ?? 'ftp').toUpperCase()} ${String(p.host ?? '')}`;
+      break;
+    }
     case 'db.query':
       s = `Run the SQL query ${q(
         String(p.sql ?? '')

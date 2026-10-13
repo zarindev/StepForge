@@ -574,6 +574,18 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     case 'util.wait':
       out.push({ op: 'wait', ms: num(q.ms, 1000) });
       break;
+    case 'api.soap':
+    case 'api.kafkaProduce':
+    case 'api.kafkaConsume':
+    case 'api.ftp':
+      out.push(
+        todo(
+          ctx,
+          step,
+          'SOAP, Kafka and FTP steps are not exported yet; use a client library of the target language',
+        ),
+      );
+      break;
     case 'util.manual':
       out.push(todo(ctx, step, `a manual check, done by a person: ${String(q.instruction ?? '')}`));
       break;

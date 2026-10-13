@@ -66,6 +66,8 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
 ## Check more than the page
 
+- **SOAP, Kafka and FTP** — call SOAP services (faults, XPath checks), send and wait for Kafka messages, upload,
+  download and check files over FTP, FTPS or SFTP. XPath also checks any XML response. [INTEGRATIONS.md](INTEGRATIONS.md)
 - **Databases** — SQLite, PostgreSQL, MySQL, SQL Server and MongoDB; read-only and rollback modes; a SQL Workbench and a
   data-quality audit (orphans, duplicates, nulls, formats). [DATABASES.md](DATABASES.md)
 - **Email** — a local Mailpit or any IMAP inbox; wait for an email, check it, extract one-time codes and links.
@@ -101,5 +103,5 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 ## Coming next
 
 - Native mobile and desktop apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
-- More features inspired by Cerberus Testing (Kafka/SOAP/FTP steps, Slack/Teams notifications,
+- More features inspired by Cerberus Testing (Slack/Teams notifications,
   network breakdowns, run queue priorities): see the [CHANGELOG](../CHANGELOG.md) as they land.

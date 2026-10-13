@@ -103,7 +103,11 @@ the step by itself — it only picks the branch, or ends the loop. Examples: *if
 |---|---|---|
 | `request` | `method`, `url` (absolute or relative to the environment base URL), `headers`, `query`, `body`, `bodyType` (`json`/`form`/`multipart`/`raw`/`none`), `auth`, `followRedirects`, `cookies` (default true), `contract` (`true` or `{ "specId": "…" }`) | output = response body (use `captureAs`) |
 | `graphql` | `url`, `query`, `variables`, `operationName`, `headers`, `auth`, `allowErrors` | GraphQL `errors` fail the step unless `allowErrors` |
-| `extract` | `from` (`body`/`header`/`status`), `path` (JSONPath), `name` (header) | reads the previous API response of the same test |
+| `extract` | `from` (`body`/`header`/`status`), `path` (JSONPath, or XPath for XML), `name` (header) | reads the previous API response of the same test |
+| `soap` | `url`, `body` (the content of `soap:Body`, or a whole envelope), `action` (SOAPAction), `version` (`1.1`/`1.2`), `header` (SOAP header XML), `headers`, `auth`, `namespaces` (`{ "prefix": "uri" }`), `allowFault` | a SOAP fault fails the step unless `allowFault`; target `fault` = its message. See [INTEGRATIONS.md](INTEGRATIONS.md) |
+| `kafkaProduce` | `brokers` (`host:port,…`), `topic`, `key`, `value` (text or JSON), `headers`, `partition`, `ssl`, `sasl` (`{ mechanism, username, password }`) | output `{ topic, partition, offset }` |
+| `kafkaConsume` | `brokers`, `topic`, `since` (`testStart` default, or `beginning`), match: `key`, `contains`, or `path` (JSONPath in the value) + `equals`; `timeoutMs`, `ssl`, `sasl` | waits for the first matching message; targets `key`, `value`, `$…` (in the value), `header:<name>`, `partition`, `offset` |
+| `ftp` | `protocol` (`ftp`/`ftps`/`sftp`), `host`, `port`, `username`, `password` or `privateKey` (SFTP), `action` (`upload`/`download`/`list`/`delete`/`exists`), `remotePath`, `localPath`, `content` (upload text) | download targets `content`, `size`, `path`; list targets `count`, `names`; exists target `exists` |
 
 `auth` examples: `{"type":"bearer","token":"{{secret.apiToken}}"}`, `{"type":"basic","username":"ana","password":"{{secret.pw}}"}`,
 `{"type":"apiKey","in":"header","name":"x-api-key","value":"{{secret.key}}"}`,
@@ -111,7 +115,8 @@ the step by itself — it only picks the branch, or ends the loop. Examples: *if
 Multipart file fields: `{"doc": {"file": "/path/to/file.pdf"}}`. Cookies set by responses are sent back automatically within a test.
 
 Assertion targets: `status`, `time` (ms), `size` (bytes), `header:<name>`, `body`, `text`, and JSONPath (`$.data.id`,
-`$.items[*].name` returns a list). `matchesSchema` takes a JSON Schema as `expected` and reports field-level errors.
+`$.items[*].name` returns a list), and for XML responses XPath (`//m:Price`, `//order/@id`, `count(//order)`; the
+document's own prefixes work, `namespaces` adds more). `matchesSchema` takes a JSON Schema as `expected` and reports field-level errors.
 
 ## Database steps (`db.*`) — available since Phase 6
 

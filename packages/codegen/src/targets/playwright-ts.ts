@@ -1,13 +1,4 @@
-import {
-  CREDIT,
-  ciFiles,
-  day,
-  envExample,
-  headerLines,
-  readme,
-  runtime,
-  testPath,
-} from '../common.ts';
+import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime, testPath } from '../common.ts';
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
 import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject } from '../types.ts';

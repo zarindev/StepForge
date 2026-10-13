@@ -45,6 +45,26 @@ export function defaultParams(type: string): Record<string, unknown> {
       return { method: 'GET', url: '{{env.baseUrl}}/api/', headers: {} };
     case 'db.query':
       return { connection: '', sql: 'SELECT 1' };
+    case 'api.soap':
+      return {
+        url: '{{env.baseUrl}}/',
+        version: '1.1',
+        action: '',
+        body: '<m:Request xmlns:m="urn:example"></m:Request>',
+      };
+    case 'api.kafkaProduce':
+      return { brokers: '{{env.kafkaBrokers}}', topic: '', key: '', value: {} };
+    case 'api.kafkaConsume':
+      return { brokers: '{{env.kafkaBrokers}}', topic: '', since: 'testStart' };
+    case 'api.ftp':
+      return {
+        protocol: 'sftp',
+        host: '',
+        username: '',
+        password: '{{secret.ftpPassword}}',
+        action: 'list',
+        remotePath: '/',
+      };
     case 'util.manual':
       return { instruction: '', expected: '' };
     case 'util.useData':

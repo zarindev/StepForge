@@ -39,6 +39,23 @@ describe('plain English', () => {
     [s('api.request', { method: 'POST', url: '/api/patients' }), 'Send POST /api/patients'],
     [s('util.loop', { count: 3 }), 'Repeat 3 times'],
     [
+      s('api.soap', { url: '/soap', action: 'http://example.test/GetPrice' }),
+      'Call the SOAP service /soap (GetPrice)',
+    ],
+    [
+      s('api.kafkaConsume', { topic: 'orders', path: '$.status', equals: 'paid' }),
+      'Wait for a Kafka message on orders where $.status is "paid"',
+    ],
+    [
+      s('api.ftp', {
+        protocol: 'sftp',
+        host: 'files.test',
+        action: 'download',
+        remotePath: '/out/report.csv',
+      }),
+      'Download /out/report.csv on SFTP files.test',
+    ],
+    [
       s('util.manual', { instruction: 'Print the invoice', expected: 'The total matches' }),
       'Print the invoice — expect: The total matches',
     ],

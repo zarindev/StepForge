@@ -8,8 +8,19 @@
   },
   "dependencies": {
     "@stepforge/core": "*",
+    "@xmldom/xmldom": "^0.9.12",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "jsonpath-plus": "^10.3.0"
+    "basic-ftp": "^6.2.3",
+    "jsonpath-plus": "^10.3.0",
+    "kafkajs": "^2.2.4",
+    "ssh2-sftp-client": "^12.1.1",
+    "xpath": "^0.0.35"
+  },
+  "devDependencies": {
+    "@types/ssh2": "^1.15.6",
+    "@types/ssh2-sftp-client": "^9.0.6",
+    "ftp-srv": "^4.6.3",
+    "ssh2": "^1.17.0"
   }
 }
