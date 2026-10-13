@@ -562,6 +562,15 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
       out.push({ op: 'gen', kind: String(kind ?? 'word'), opts, into: into ?? String(name ?? 'value') });
       break;
     }
+    case 'util.useData':
+      out.push(
+        todo(
+          ctx,
+          step,
+          `rows of the test data source "${String(q.source ?? '')}" are read by StepForge at run time; set vars.${String(q.as || 'row')} from your own data`,
+        ),
+      );
+      break;
     case 'util.wait':
       out.push({ op: 'wait', ms: num(q.ms, 1000) });
       break;

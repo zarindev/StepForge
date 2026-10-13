@@ -115,8 +115,12 @@ export const ApplicationExport = z.object({
     .array(
       z.object({
         name: z.string(),
-        columns: z.array(z.string()),
-        rows: z.array(z.record(z.string(), z.unknown())),
+        kind: z.enum(['table', 'csv', 'sql', 'api']).default('table'),
+        description: z.string().default(''),
+        /** csv / sql / api settings (no credentials: secrets stay as {{secret.…}} placeholders). */
+        config: z.record(z.string(), z.unknown()).default({}),
+        columns: z.array(z.string()).default([]),
+        rows: z.array(z.record(z.string(), z.unknown())).default([]),
       }),
     )
     .default([]),
@@ -290,7 +294,14 @@ export function exportApplication(
       .from(datasets)
       .where(eq(datasets.applicationId, applicationId))
       .all()
-      .map((d) => ({ name: d.name, columns: d.columnsJson, rows: d.rowsJson })),
+      .map((d) => ({
+        name: d.name,
+        kind: d.kind,
+        description: d.description,
+        config: d.configJson,
+        columns: d.columnsJson,
+        rows: d.rowsJson,
+      })),
     scenarios: scenarioIds.map((id) => {
       const s = getScenario(db, id);
       return {
@@ -416,6 +427,9 @@ export function importApplication(
           id: newId(),
           applicationId: app.id,
           name: ds.name,
+          kind: ds.kind,
+          description: ds.description,
+          configJson: ds.config,
           columnsJson: ds.columns,
           rowsJson: ds.rows,
         })

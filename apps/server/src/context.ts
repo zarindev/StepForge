@@ -1,3 +1,4 @@
+import type { DataService } from './data/service.ts';
 import type { CampaignService } from './campaigns/service.ts';
 import type { StepForgeDb } from '@stepforge/db';
 import type Database from 'better-sqlite3';
@@ -40,6 +41,7 @@ export type AppContext = {
   diagnosis: DiagnosisService;
   scheduler: SchedulerService;
   campaigns: CampaignService;
+  data: DataService;
   codegen: CodegenService;
   demo: DemoService;
   maintenance: MaintenanceService;

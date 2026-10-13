@@ -245,6 +245,20 @@ export function describeStep(step: AnyStep): string {
     case 'util.setVariable':
       s = `Remember ${q(p.value)} as ${String(p.name)}`;
       break;
+    case 'util.useData': {
+      const pick =
+        p.pick === 'random'
+          ? 'a random row'
+          : p.pick === 'unused'
+            ? 'a row not used yet in this run'
+            : p.pick === 'row'
+              ? `row ${String(p.row ?? 1)}`
+              : p.pick === 'match'
+                ? `the row whose ${q(p.column)} is ${q(p.equals)}`
+                : 'the first row';
+      s = `Take ${pick} of the test data ${q(p.source)} as ${String(p.as || dataVarName(String(p.source ?? 'data')))}`;
+      break;
+    }
     case 'util.generateData':
       s = `Generate a random ${String(p.kind ?? 'value')}`;
       break;
@@ -309,4 +323,16 @@ export function describeSteps(
     }
   }
   return out;
+}
+
+/** The variable a `util.useData` step stores its row in when it has no "as": the source name in camelCase. */
+export function dataVarName(source: string): string {
+  const words = source
+    .trim()
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean);
+  const name = words
+    .map((w, i) => (i ? w[0]!.toUpperCase() + w.slice(1) : w[0]!.toLowerCase() + w.slice(1)))
+    .join('');
+  return /^[A-Za-z_]/.test(name) ? name : `data${name}`;
 }

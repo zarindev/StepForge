@@ -35,7 +35,18 @@ export const STEP_CATALOGUE = {
   db: ['query', 'mongoFind', 'runScript', 'callProcedure', 'extract', 'dataQualityCheck'],
   email: ['waitForEmail', 'assertEmail', 'extractFromEmail', 'openEmailLink'],
   perf: ['pageMetrics', 'lighthouse', 'loadTest', 'queryPlan'],
-  util: ['setVariable', 'generateData', 'wait', 'if', 'loop', 'callScenario', 'useBlock', 'runScript', 'log'],
+  util: [
+    'setVariable',
+    'generateData',
+    'useData',
+    'wait',
+    'if',
+    'loop',
+    'callScenario',
+    'useBlock',
+    'runScript',
+    'log',
+  ],
 } as const;
 
 export type StepGroup = keyof typeof STEP_CATALOGUE;

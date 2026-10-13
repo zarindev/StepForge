@@ -152,6 +152,7 @@ const applicationDetailRoute = createRoute({
             'tags',
             'blocks',
             'elements',
+            'data',
             'settings',
           ])
           .optional(),

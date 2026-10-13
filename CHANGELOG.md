@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Test data library** (like Cerberus Testing's data library): an application's Test data tab holds named data
+  sources — a table of rows (typed or pasted as CSV), a CSV file on this computer, a read-only SQL query on one of
+  the application's connections, or an API call (rows found with JSONPath) — with a live preview per environment.
+  A new `util.useData` step takes the first, a random, a given or a matching row, or one not used yet in the run,
+  into `{{vars.<name>.<column>}}`; rows are read once per run. Application export/import carries data sources.
+  Migration 0009.
 - **Campaigns** (like Cerberus Testing's campaigns): a saved selection of tests (all, or modules, tags and scenarios)
   with the environments, browsers and screen sizes to run them in; one click queues one run per combination as a
   campaign run; the campaign-run page shows every combination side by side and each test's result per combination;

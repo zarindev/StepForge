@@ -20,6 +20,8 @@ import { registerApiRoutes } from './routes/api.ts';
 import { registerRecorderRoutes } from './routes/recorder.ts';
 import { registerElementRoutes } from './routes/elements.ts';
 import { registerCampaignRoutes } from './routes/campaigns.ts';
+import { registerDataRoutes } from './routes/data.ts';
+import { DataService } from './data/service.ts';
 import { CampaignService } from './campaigns/service.ts';
 import { registerDatabaseRoutes } from './routes/database.ts';
 import { DatabaseService } from './database/service.ts';
@@ -104,6 +106,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   const email = new EmailService(db, masterKey, config.dataDir, config.binDir, config.mailpit);
   const diagnosis = new DiagnosisService(db, config.artifactsDir, join(config.dataDir, 'rules'));
   const perf = new PerfService(db, masterKey, bus, config.binDir, config.artifactsDir);
+  const data = new DataService(db, config.dataDir, database);
   const ctx: AppContext = {
     config,
     db,
@@ -124,6 +127,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
       email,
       perf,
       diagnosis,
+      data,
     ),
     recorder: new RecorderManager(db, masterKey, bus),
     specs,
@@ -131,6 +135,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     email,
     perf,
     diagnosis,
+    data,
     scheduler: undefined as unknown as SchedulerService,
     campaigns: undefined as unknown as CampaignService,
     codegen: new CodegenService(db, config.artifactsDir),
@@ -175,6 +180,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerRecorderRoutes(app, ctx);
   registerElementRoutes(app, ctx);
   registerCampaignRoutes(app, ctx);
+  registerDataRoutes(app, ctx);
   registerApiRoutes(app, ctx);
   registerDatabaseRoutes(app, ctx);
   registerEmailRoutes(app, ctx);

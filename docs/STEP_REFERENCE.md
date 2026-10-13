@@ -70,6 +70,7 @@ Generic `assertions` on any UI step can target `url`, `title`, and for steps wit
 |---|---|---|
 | `setVariable` | `name`, `value` | |
 | `generateData` | `kind` (`name`, `firstName`, `lastName`, `email`, `phone`, `date`, `birthdate`, `number`, `uuid`, `word`, `sentence`, `address`, `company`, `pattern`), `pattern` (`#` digit, `?` letter, `*` either), `min`/`max`, `direction` (`past`/`future`), `name` (store as var) | generated emails use the reserved `example.test` domain |
+| `useData` | `source` (a data source name of the application), `pick` (`first`, `random`, `unused` — a row no other test took in this run, `row` + `row` number, `match` + `column`/`equals`), `as` (variable; default: the source name in camelCase) | the row becomes `{{vars.<as>.<column>}}`; assertions can check a column (`target`: column name). See [TEST_DATA.md](TEST_DATA.md) |
 | `wait` | `ms` | logged as a warning: prefer `ui.waitFor` |
 | `log` | `message` | |
 | `runScript` | `code` (JavaScript; `return` a value) | sees copies of `vars` and may set `vars.x`; no `require`, `process`, `eval`, files or network; 5 s max |

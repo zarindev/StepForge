@@ -260,14 +260,29 @@ export const testCases = sqliteTable(
   (t) => [index('test_cases_scenario_idx').on(t.scenarioId)],
 );
 
-export const datasets = sqliteTable('datasets', {
-  id: id(),
-  applicationId: fk('application_id', () => applications.id).notNull(),
-  name: text('name').notNull(),
-  columnsJson: json<string[]>('columns_json').notNull().default([]),
-  rowsJson: json<Record<string, unknown>[]>('rows_json').notNull().default([]),
-  ...timestamps,
-});
+/**
+ * The test data library: named data sources a test reads rows from with `util.useData`. `table` keeps its rows here;
+ * `csv` reads a file, `sql` runs a read-only query on one of the application's connections, `api` calls an endpoint
+ * (all at run time, once per run).
+ */
+export const datasets = sqliteTable(
+  'datasets',
+  {
+    id: id(),
+    applicationId: fk('application_id', () => applications.id).notNull(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: ['table', 'csv', 'sql', 'api'] })
+      .notNull()
+      .default('table'),
+    description: text('description').notNull().default(''),
+    /** csv: { path }; sql: { connection, query }; api: { method, url, headers, rowsPath }. */
+    configJson: json<Record<string, unknown>>('config_json').notNull().default({}),
+    columnsJson: json<string[]>('columns_json').notNull().default([]),
+    rowsJson: json<Record<string, unknown>[]>('rows_json').notNull().default([]),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('datasets_app_name_uq').on(t.applicationId, t.name)],
+);
 
 export const scenarioVersions = sqliteTable(
   'scenario_versions',

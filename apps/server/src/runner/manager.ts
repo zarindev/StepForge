@@ -1,3 +1,4 @@
+import type { DataService } from '../data/service.ts';
 import {
   CreateRunInput,
   DEFAULT_RUN_OPTIONS,
@@ -18,7 +19,7 @@ import { applicationGates, refreshDaily } from '@stepforge/analytics';
 import { createPerfExecutor } from '@stepforge/executor-perf';
 import type { LoadReport } from '@stepforge/perf';
 import { createUiExecutor, BrowserPool } from '@stepforge/executor-ui';
-import { utilExecutor } from '@stepforge/executor-util';
+import { createUtilExecutor } from '@stepforge/executor-util';
 import { and, eq, inArray } from 'drizzle-orm';
 import { mkdirSync, rmSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -65,6 +66,7 @@ export class RunManager {
     private readonly email?: EmailService,
     private readonly perf?: PerfService,
     private readonly diagnosis?: DiagnosisService,
+    private readonly data?: DataService,
   ) {}
 
   /** Path relative to the artifacts root with forward slashes (used in URLs). */
@@ -272,7 +274,9 @@ export class RunManager {
       ...(this.database ? [createDbExecutor({ resolve: this.database.resolverFor(env.id) })] : []),
       ...(this.email ? [createEmailExecutor({ resolve: this.email.resolverFor(run.applicationId) })] : []),
       ...(this.perf ? [this.perfExecutor(run, env)] : []),
-      utilExecutor,
+      createUtilExecutor({
+        data: this.data?.forRun(run.applicationId, env.id, { env: envScope, secrets }),
+      }),
     ];
     const startedAt = run.startedAt ?? now();
     this.db

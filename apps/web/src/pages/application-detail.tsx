@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { AppAvatar, AppFormDialog, type AppFormValues } from '@/components/applications/app-form';
 import { BlocksTab } from '@/components/applications/blocks-tab';
 import { ElementsTab } from '@/components/applications/elements-tab';
+import { DataTab } from '@/components/applications/data-tab';
 import { ConnectionsTab } from '@/components/applications/connections-tab';
 import { InboxesTab } from '@/components/applications/inboxes-tab';
 import { EnvironmentsTab } from '@/components/applications/environments-tab';
@@ -23,7 +24,15 @@ import { setCurrentAppId } from '@/lib/current-app';
 import { qk, useApplication } from '@/lib/queries';
 
 type Tab =
-  'environments' | 'secrets' | 'connections' | 'inboxes' | 'tags' | 'blocks' | 'elements' | 'settings';
+  | 'environments'
+  | 'secrets'
+  | 'connections'
+  | 'inboxes'
+  | 'tags'
+  | 'blocks'
+  | 'elements'
+  | 'data'
+  | 'settings';
 
 export function ApplicationDetailPage() {
   const { appId } = useParams({ from: '/applications/$appId' });
@@ -138,6 +147,7 @@ export function ApplicationDetailPage() {
           { value: 'tags', label: 'Tags' },
           { value: 'blocks', label: 'Blocks' },
           { value: 'elements', label: 'Elements' },
+          { value: 'data', label: 'Test data' },
           { value: 'settings', label: 'Settings' },
         ]}
       />
@@ -152,6 +162,7 @@ export function ApplicationDetailPage() {
       {tab === 'tags' && <TagsTab app={a} />}
       {tab === 'blocks' && <BlocksTab app={a} initialBlock={search.block} />}
       {tab === 'elements' && <ElementsTab app={a} initialElement={search.element} />}
+      {tab === 'data' && <DataTab app={a} />}
       {tab === 'settings' && (
         <div className="max-w-2xl space-y-4">
           <Card className="flex items-center justify-between gap-4 p-4">

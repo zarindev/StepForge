@@ -12,12 +12,15 @@ export type FieldSpec = {
     | 'scenario'
     | 'block'
     | 'connection'
-    | 'inbox';
+    | 'inbox'
+    | 'dataSource';
   options?: string[];
   language?: 'json' | 'sql' | 'javascript';
   placeholder?: string;
   hint?: string;
   wide?: boolean;
+  /** Only shown when another field has one of these values (e.g. the row number for pick = row). */
+  showWhen?: { key: string; equals: string[] };
 };
 
 const ASSERT_CHECKS = [
@@ -345,6 +348,20 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
     { key: 'kind', label: 'Kind', kind: 'select', options: DATA_KINDS },
     { key: 'pattern', label: 'Pattern (# digit, ? letter)', kind: 'text', placeholder: 'PAT-####' },
     { key: 'name', label: 'Store as variable', kind: 'text' },
+  ],
+  'util.useData': [
+    { key: 'source', label: 'Data source', kind: 'dataSource' },
+    {
+      key: 'pick',
+      label: 'Which row',
+      kind: 'select',
+      options: ['first', 'random', 'unused', 'row', 'match'],
+      hint: 'unused: a row no other test took in this run',
+    },
+    { key: 'as', label: 'Store as variable', kind: 'text', placeholder: 'defaults to the source name' },
+    { key: 'row', label: 'Row number', kind: 'number', showWhen: { key: 'pick', equals: ['row'] } },
+    { key: 'column', label: 'Column', kind: 'text', showWhen: { key: 'pick', equals: ['match'] } },
+    { key: 'equals', label: 'Equals', kind: 'text', showWhen: { key: 'pick', equals: ['match'] } },
   ],
   'util.wait': [
     { key: 'ms', label: 'Milliseconds', kind: 'number', hint: 'Prefer ui.waitFor on a condition' },

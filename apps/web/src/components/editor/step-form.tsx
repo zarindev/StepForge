@@ -58,7 +58,7 @@ function TypedField({
   params: Record<string, unknown>;
   onParams: (p: Record<string, unknown>) => void;
 }) {
-  const { scenarios, blocks, connections, inboxes } = useEditorCtx();
+  const { scenarios, blocks, connections, inboxes, dataSources } = useEditorCtx();
   const value = getPath(params, spec.key);
   const set = (v: unknown) => onParams(setPath(params, spec.key, v));
   const cls = spec.wide ? 'md:col-span-3' : '';
@@ -105,6 +105,28 @@ function TypedField({
               </option>
             ))}
             {current && !known && <option value={current}>{current} (not configured)</option>}
+          </Select>
+        </Field>
+      );
+    }
+    case 'dataSource': {
+      const current = String(value ?? '');
+      return (
+        <Field
+          label={spec.label}
+          className={cls}
+          hint={dataSources.length ? undefined : 'Add data sources on the application’s Test data tab'}
+        >
+          <Select aria-label={spec.label} value={current} onChange={(e) => set(e.target.value || undefined)}>
+            <option value="">Choose…</option>
+            {dataSources.map((d) => (
+              <option key={d.name} value={d.name}>
+                {d.name} ({d.kind})
+              </option>
+            ))}
+            {current && !dataSources.some((d) => d.name === current) && (
+              <option value={current}>{current} (not found)</option>
+            )}
           </Select>
         </Field>
       );
@@ -298,9 +320,15 @@ export function StepForm({
 
       {specs ? (
         <div className="grid gap-3 md:grid-cols-3">
-          {specs.map((spec) => (
-            <TypedField key={spec.key} spec={spec} params={params} onParams={(p) => set({ params: p })} />
-          ))}
+          {specs
+            .filter(
+              (spec) =>
+                !spec.showWhen ||
+                spec.showWhen.equals.includes(String(getPath(params, spec.showWhen.key) ?? '')),
+            )
+            .map((spec) => (
+              <TypedField key={spec.key} spec={spec} params={params} onParams={(p) => set({ params: p })} />
+            ))}
         </div>
       ) : (
         <JsonEditor

@@ -25,6 +25,8 @@ type Ctx = {
   scenarios: Option[];
   blocks: BlockOption[];
   elements: ElementOption[];
+  /** Test data library sources (steps refer to them by name). */
+  dataSources: { name: string; kind: string; columns: string[] }[];
   /** Database connection names (steps refer to connections by name, per environment). */
   connections: Option[];
   /** Email inbox names of the application. */
@@ -36,6 +38,7 @@ const EditorCtx = createContext<Ctx>({
   scenarios: [],
   blocks: [],
   elements: [],
+  dataSources: [],
   connections: [],
   inboxes: [],
 });
@@ -69,6 +72,14 @@ export function EditorProvider({
     queryFn: () => api<ElementOption[]>(`/api/applications/${applicationId}/elements`),
     enabled: !!applicationId,
   });
+  const dataSources = useQuery({
+    queryKey: ['data-sources', applicationId],
+    queryFn: () =>
+      api<{ name: string; kind: string; columnsJson: string[] }[]>(
+        `/api/applications/${applicationId}/data-sources`,
+      ),
+    enabled: !!applicationId,
+  });
   const conns = useConnections(applicationId);
   const inboxes = useInboxes(applicationId);
   const byName = new Map<string, string[]>();
@@ -87,6 +98,11 @@ export function EditorProvider({
       inputs: b.inputsJson ?? [],
     })),
     elements: elements.data ?? [],
+    dataSources: (dataSources.data ?? []).map((d) => ({
+      name: d.name,
+      kind: d.kind,
+      columns: d.columnsJson,
+    })),
     connections: [...byName].map(([name, envs]) => ({ id: name, label: `${name} (${envs.join(', ')})` })),
     inboxes: (inboxes.data ?? []).map((i) => ({
       id: i.name,

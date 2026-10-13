@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
 import {
   StepError,
+  dataVarName,
   type Executor,
   type ExecutorSession,
   type RunnableStep,
@@ -102,7 +103,21 @@ export function runSandboxed(
   }
 }
 
+/** How a `util.useData` step asks for a row of the test data library (provided by the runner). */
+export type DataPick = {
+  source: string;
+  pick: 'first' | 'random' | 'unused' | 'row' | 'match';
+  row?: number;
+  column?: string;
+  equals?: string;
+};
+export type DataProvider = (
+  req: DataPick,
+) => Promise<{ row: Record<string, unknown>; rowNumber: number; total: number }>;
+
 class UtilSession implements ExecutorSession {
+  constructor(private readonly data?: DataProvider) {}
+
   async execute(step: RunnableStep, ctx: StepContext): Promise<StepOutcome> {
     const p = step.params as Record<string, unknown>;
     const name = step.type.split('.')[1];
@@ -140,6 +155,28 @@ class UtilSession implements ExecutorSession {
           getTarget: () => value,
         };
       }
+      case 'useData': {
+        if (typeof p.source !== 'string' || !p.source.trim())
+          throw new StepError('invalid_params', 'useData needs the name of a data source');
+        if (!this.data) throw new StepError('unsupported', 'The test data library is not available here');
+        const pick = (p.pick ?? 'first') as DataPick['pick'];
+        if (pick === 'match' && (typeof p.column !== 'string' || !p.column))
+          throw new StepError('invalid_params', 'Choose the column to match');
+        const { row, rowNumber, total } = await this.data({
+          source: p.source.trim(),
+          pick,
+          row: p.row === undefined ? undefined : Number(p.row),
+          column: typeof p.column === 'string' ? p.column : undefined,
+          equals: p.equals === undefined ? undefined : String(p.equals),
+        });
+        const as = typeof p.as === 'string' && p.as.trim() ? p.as.trim() : dataVarName(p.source);
+        ctx.resolver.setVar(as, row);
+        return {
+          output: row,
+          message: `Row ${rowNumber} of ${total} from "${p.source}" → vars.${as}`,
+          getTarget: (t) => row[t],
+        };
+      }
       case 'runScript': {
         if (typeof p.code !== 'string') throw new StepError('invalid_params', 'runScript needs "code"');
         const snapshot = ctx.resolver.snapshotVars();
@@ -173,9 +210,14 @@ class UtilSession implements ExecutorSession {
   }
 }
 
-export const utilExecutor: Executor = {
-  group: 'util',
-  async createSession() {
-    return new UtilSession();
-  },
-};
+/** The utility executor; `data` serves `util.useData` steps from the test data library. */
+export function createUtilExecutor(opts: { data?: DataProvider } = {}): Executor {
+  return {
+    group: 'util',
+    async createSession() {
+      return new UtilSession(opts.data);
+    },
+  };
+}
+
+export const utilExecutor: Executor = createUtilExecutor();
