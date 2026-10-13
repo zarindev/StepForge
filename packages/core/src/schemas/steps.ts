@@ -55,8 +55,20 @@ export function stepGroupOf(type: string): StepGroup {
   return group;
 }
 
-/** One locator strategy for a UI element. Recorder stores several, ranked (Section 7.2). */
-export const LocatorStrategy = z.enum(['testId', 'role', 'label', 'placeholder', 'text', 'css', 'xpath']);
+/**
+ * One locator strategy for a UI element. Recorder stores several, ranked (Section 7.2). `element` points at a saved
+ * element of the application (value = its id): at run time it is replaced by that element's current locators.
+ */
+export const LocatorStrategy = z.enum([
+  'testId',
+  'role',
+  'label',
+  'placeholder',
+  'text',
+  'css',
+  'xpath',
+  'element',
+]);
 export const Locator = z.object({
   strategy: LocatorStrategy,
   value: z.string().min(1),

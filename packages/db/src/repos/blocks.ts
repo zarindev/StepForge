@@ -3,6 +3,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { StepForgeDb } from '../index.ts';
 import { applications, blocks, blockSteps, modules, scenarios, steps as scenarioSteps } from '../schema.ts';
+import { acceptElementLocator, elementUsage, getElement, type ElementRow } from './elements.ts';
 import { invalid, notFound, now } from './errors.ts';
 import {
   getScenario,
@@ -326,6 +327,8 @@ export type StepOwner = {
   via: { kind: 'scenario' | 'block'; id: string; name: string }[];
   /** For a block: how many scenarios a change to it affects. */
   affectedScenarios?: number;
+  /** When the step targets a saved element: fixing the element fixes every step that uses it. */
+  element?: { id: string; name: string; steps: number; scenarios: number; blocks: number };
 };
 
 /**
@@ -358,8 +361,27 @@ export function stepOwner(db: StepForgeDb, scenarioId: string, runStepId: string
     }
   }
   const stepId = segments.at(-1)!;
-  if (!findStep(owner.steps, stepId)) throw notFound('Step', runStepId);
+  const step = findStep(owner.steps, stepId);
+  if (!step) throw notFound('Step', runStepId);
+  const ref = (step.locators as { strategy?: string; value?: string }[] | undefined)?.[0];
+  let element: StepOwner['element'];
+  if (ref?.strategy === 'element' && ref.value) {
+    try {
+      const el = getElement(db, ref.value);
+      const u = elementUsage(db, el.id);
+      element = {
+        id: el.id,
+        name: el.name,
+        steps: u.steps,
+        scenarios: u.scenarios.length,
+        blocks: u.blocks.length,
+      };
+    } catch {
+      element = undefined; // deleted
+    }
+  }
   return {
+    ...(element && { element }),
     kind: owner.kind,
     id: owner.id,
     name: owner.name,
@@ -378,8 +400,10 @@ export function acceptLocator(
   scenarioId: string,
   runStepId: string,
   locator: unknown,
-): { owner: StepOwner; scenario?: ScenarioDetail; block?: Block } {
+): { owner: StepOwner; scenario?: ScenarioDetail; block?: Block; element?: ElementRow } {
   const owner = stepOwner(db, scenarioId, runStepId);
+  // The step uses a saved element: the fix goes into the element, so every step using it follows.
+  if (owner.element) return { owner, element: acceptElementLocator(db, owner.element.id, locator) };
   const list = structuredClone(
     owner.kind === 'block' ? getBlock(db, owner.id).steps : getScenario(db, owner.id).steps,
   ) as unknown as OwnedStep[];

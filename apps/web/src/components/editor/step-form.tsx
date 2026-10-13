@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { CodeEditor } from './code-editor';
 import { useEditorCtx } from './context';
 import type { DraftStep } from './drafts';
-import { LocatorEditor } from './locator-editor';
+import { ElementField } from './element-field';
 import { getPath, NEEDS_LOCATOR, setPath, STEP_FIELDS, type FieldSpec } from './step-fields';
 import { StepList, StepTypeSelect } from './step-list';
 
@@ -311,12 +311,7 @@ export function StepForm({
       )}
 
       {NEEDS_LOCATOR.has(step.type) && (
-        <div className="space-y-1.5">
-          <span className="text-xs font-medium text-muted">
-            Element (ranked locators — the first one is used, the rest heal it)
-          </span>
-          <LocatorEditor value={step.locators} onChange={(locators: Locator[]) => set({ locators })} />
-        </div>
+        <ElementField value={step.locators} onChange={(locators: Locator[]) => set({ locators })} />
       )}
 
       {(step.type === 'util.if' || step.type === 'util.loop') && (

@@ -68,6 +68,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | **Email** | ✅ Local Mailpit or IMAP · wait for an email · extract one-time codes and links |
 | **Performance** | ✅ Web Vitals and Lighthouse · load tests with percentiles and threshold verdicts · k6 export · query plans |
 | **Reusable blocks** | ✅ Shared step groups ("Sign in") with inputs · make a block from selected steps · "used by" list · a fix inside a block repairs every test using it (one-click locator fix lands in the block) · failures grouped by block — see [docs/BLOCKS.md](docs/BLOCKS.md) |
+| **Element repository** | ✅ Named, shared UI elements ("Save patient button") · steps point at them · fix a locator once and every step follows (the one-click diagnosis fix updates the element) · recordings reuse matching elements — see [docs/ELEMENTS.md](docs/ELEMENTS.md) |
 | **Diagnosis** | ✅ Rule-based "where / why / whose issue / how to fix" · last-green diff · locator suggestions · automatic bug reports (PDF, Jira/Trello CSV, Markdown) |
 | **Analytics** | ✅ Trends, quality gates, flaky detection, run comparison, top failing and slowest tests |
 | **Scheduling** | ✅ Cron schedules · Telegram and email summaries · CLI with JUnit and HTML reports |

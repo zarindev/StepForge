@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **Element repository** (like Cerberus Testing's application objects): an application's Elements tab holds named
+  UI elements with ranked locators; steps point at an element (step form → Saved element, or "Save as element" from
+  a step's locators) and run with its current locators; the Elements tab shows where each is used and asks before
+  deleting one in use; when a step that uses an element fails on a changed locator, the diagnosis names the element
+  and its one-click fix updates the element, fixing every step; recordings reuse an element whose best locator
+  matches; exported code gets the element's locators; application export/import carries elements (and block inputs,
+  which were missing).
 - **Block maintenance** (like Cerberus Testing's step library): blocks declare inputs (defaults or required,
   `{{vars.<name>}}` inside the block, exported as variables); "Make a block" turns selected scenario steps into a
   block; the Blocks tab shows where each block is used and what a change affects, and asks before deleting a used

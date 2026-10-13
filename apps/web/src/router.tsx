@@ -130,9 +130,19 @@ const applicationDetailRoute = createRoute({
     z
       .object({
         tab: z
-          .enum(['environments', 'secrets', 'connections', 'inboxes', 'tags', 'blocks', 'settings'])
+          .enum([
+            'environments',
+            'secrets',
+            'connections',
+            'inboxes',
+            'tags',
+            'blocks',
+            'elements',
+            'settings',
+          ])
           .optional(),
         block: z.string().optional(),
+        element: z.string().optional(),
       })
       .parse(s),
   component: ApplicationDetailPage,

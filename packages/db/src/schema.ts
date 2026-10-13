@@ -161,6 +161,23 @@ export const blocks = sqliteTable('blocks', {
   ...timestamps,
 });
 
+/** A named UI element ("Save patient button") shared by steps: fix its locators once, every step follows. */
+export const elements = sqliteTable(
+  'elements',
+  {
+    id: id(),
+    applicationId: fk('application_id', () => applications.id).notNull(),
+    name: text('name').notNull(),
+    /** Optional grouping, e.g. the page or screen it belongs to. */
+    page: text('page').notNull().default(''),
+    description: text('description').notNull().default(''),
+    /** Ranked locators, best first (same shape as a step's locators). */
+    locatorsJson: json<Record<string, unknown>[]>('locators_json').notNull().default([]),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('elements_app_name_uq').on(t.applicationId, t.name)],
+);
+
 export const scenarios = sqliteTable(
   'scenarios',
   {

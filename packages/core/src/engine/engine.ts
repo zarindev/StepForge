@@ -1,4 +1,4 @@
-import { Step, stepGroupOf, type StepGroup } from '../schemas/steps.ts';
+import { Step, stepGroupOf, type Locator, type StepGroup } from '../schemas/steps.ts';
 import { VariableResolutionError, VariableResolver } from '../variables.ts';
 import { evaluateAssertion } from './assertions.ts';
 import {
@@ -34,6 +34,8 @@ export type RunTestCaseInput = {
   onEvent?: (e: EngineEvent) => void;
   /** Resolves `util.callScenario` targets. */
   loadScenarioSteps?: (scenarioId: string) => InputStep[] | Promise<InputStep[]>;
+  /** Saved elements of the application (id → locators) for steps that use `element` locators. */
+  elements?: Record<string, Locator[]>;
   /** Resolves `util.useBlock` targets: the block's steps, and the inputs it declares (set as `vars`). */
   loadBlockSteps?: (blockId: string) => BlockTarget | InputStep[] | Promise<BlockTarget | InputStep[]>;
 };
@@ -78,7 +80,26 @@ function withTimeout<T>(p: Promise<T>, ms: number, signal: AbortSignal): Promise
 }
 
 /** Resolves placeholders in everything an executor reads (nested step lists are resolved when they run). */
-function resolveStep(step: RunnableStep, r: VariableResolver): RunnableStep {
+/** Replaces `element` locators with the saved element's current locators (best first). */
+function expandElements(locators: RunnableStep['locators'], elements?: Record<string, Locator[]>) {
+  if (!locators.some((l) => l.strategy === 'element')) return locators;
+  return locators.flatMap((l) => {
+    if (l.strategy !== 'element') return [l];
+    const found = elements?.[l.value];
+    if (!found?.length)
+      throw new StepError(
+        'invalid_params',
+        'The saved element this step uses was deleted; choose another element',
+      );
+    return found;
+  });
+}
+
+function resolveStep(
+  step: RunnableStep,
+  r: VariableResolver,
+  elements?: Record<string, Locator[]>,
+): RunnableStep {
   const { steps: nested, else: elseSteps, ...rest } = step.params as Record<string, unknown>;
   return {
     ...step,
@@ -87,7 +108,7 @@ function resolveStep(step: RunnableStep, r: VariableResolver): RunnableStep {
       ...(nested !== undefined && { steps: nested }),
       ...(elseSteps !== undefined && { else: elseSteps }),
     },
-    locators: step.locators.map((l) => ({
+    locators: expandElements(step.locators, elements).map((l) => ({
       ...l,
       value: String(r.resolve(l.value)),
       ...(l.name && { name: String(r.resolve(l.name)) }),
@@ -232,7 +253,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
       // Kept for failures after the action itself succeeded (e.g. an API assertion): its request/response matter most.
       let outcome: StepOutcome | undefined;
       try {
-        resolved = resolveStep(step, resolver);
+        resolved = resolveStep(step, resolver, input.elements);
         session = await sessionFor(stepGroupOf(step.type));
         // Guard slightly above the step timeout: executors enforce their own timeouts first.
         outcome = await withTimeout(session.execute(resolved, stepCtx), timeoutMs + 5_000, signal);
@@ -326,7 +347,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
       assertions,
     });
     try {
-      const resolved = resolveStep(step, resolver);
+      const resolved = resolveStep(step, resolver, input.elements);
       const p = resolved.params as Record<string, unknown>;
       const failedBefore = results.length;
       const childFailed = () =>

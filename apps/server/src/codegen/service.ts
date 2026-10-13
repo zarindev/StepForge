@@ -63,7 +63,24 @@ export function codegenInput(
     .map((s) => repo.getScenario(db, s.id))
     .filter((s) => scope.type !== 'tag' || s.tagIds.includes(scope.id));
   if (!details.length) throw new repo.RepoError(400, 'invalid', 'No scenarios match this selection');
-  const steps = (list: unknown[]) => list as CodegenStep[];
+  // Saved elements become their locators (best first), so exported code needs no StepForge at run time.
+  const elementMap = repo.elementLocatorMap(db, applicationId);
+  const expand = (list: unknown[]): unknown[] =>
+    (list as { params?: Record<string, unknown>; locators?: { strategy: string; value: string }[] }[]).map(
+      (s) => {
+        const params = { ...(s.params ?? {}) };
+        for (const key of ['steps', 'else'])
+          if (Array.isArray(params[key])) params[key] = expand(params[key] as unknown[]);
+        return {
+          ...s,
+          params,
+          locators: (s.locators ?? []).flatMap((l) =>
+            l.strategy === 'element' ? (elementMap[l.value] ?? []) : [l],
+          ),
+        };
+      },
+    );
+  const steps = (list: unknown[]) => expand(list) as CodegenStep[];
   const library = Object.fromEntries(
     tree.scenarios.map((s) => {
       const d = details.find((x) => x.id === s.id) ?? repo.getScenario(db, s.id);

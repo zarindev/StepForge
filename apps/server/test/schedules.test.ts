@@ -226,11 +226,13 @@ describe.skipIf(!existsSync(mailpitBinary(BIN_DIR)))('scheduled run sends a summ
     });
     const since = new Date(Date.now() - 1000);
     const sent = nextNotification();
-    // Every second (6-field cron), so the test doesn't wait for a real nightly slot.
+    // Fires once, 3 s from now (6-field cron: a given second of every minute), so the test doesn't wait for a
+    // real nightly slot — and a slow machine cannot squeeze in a second run (and email) before it is turned off.
+    const second = (new Date().getSeconds() + 3) % 60;
     const s = await ok<{ id: string; nextRunAt: string; enabled: boolean }>(
       'POST',
       `/api/applications/${appId}/schedules`,
-      { name: 'Nightly', environmentId: envId, cron: '* * * * * *', channelIds: [email.id, tg.id] },
+      { name: 'Nightly', environmentId: envId, cron: `${second} * * * * *`, channelIds: [email.id, tg.id] },
     );
     expect(s.enabled).toBe(true);
     expect(Date.parse(s.nextRunAt)).toBeGreaterThan(Date.now() - 1000);

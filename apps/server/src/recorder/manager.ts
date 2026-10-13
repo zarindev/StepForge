@@ -202,10 +202,15 @@ export class RecorderManager {
     }
     const moduleId = existing?.moduleId ?? d.moduleId!;
     const name = existing?.name ?? d.name!;
-    const steps = (d.steps ?? rec.steps).map((s) => {
-      const { id: _id, describe: _d, ...rest } = s as Record<string, unknown>;
-      return rest as StepInput;
-    });
+    // Steps whose best locator matches a saved element use the element, so they share its future fixes.
+    const steps = repo.linkKnownElements(
+      this.db,
+      rec.applicationId,
+      (d.steps ?? rec.steps).map((s) => {
+        const { id: _id, describe: _d, ...rest } = s as Record<string, unknown>;
+        return rest as StepInput;
+      }),
+    );
     let scenario!: repo.ScenarioDetail;
     let apiScenario: repo.ScenarioDetail | undefined;
     this.db.transaction(() => {

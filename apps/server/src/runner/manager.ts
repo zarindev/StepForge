@@ -348,6 +348,8 @@ export class RunManager {
     while (attempt < maxAttempts) {
       attempt++;
       const dir = join(this.artifactsRoot, 'runs', run.id, item.id, `a${attempt}`);
+      // Read per attempt, so a fix to an element between retries is used.
+      const elementMap = repo.elementLocatorMap(this.db, run.applicationId);
       mkdirSync(dir, { recursive: true });
       this.saveItem(item, {
         status: 'running',
@@ -365,6 +367,7 @@ export class RunManager {
         options: ctx.options,
         artifactsDir: dir,
         signal: ctx.signal,
+        elements: elementMap,
         loadScenarioSteps: (id) => {
           if (repo.applicationIdForScenario(this.db, id) !== run.applicationId)
             throw new Error('scenario belongs to another application');

@@ -1,9 +1,20 @@
+import type { Locator } from '@stepforge/core';
 import { useQuery } from '@tanstack/react-query';
 import { createContext, useContext, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useConnections, useInboxes, useTree } from '@/lib/queries';
 
 type Option = { id: string; label: string };
+/** A saved element of the application (the element repository). */
+export type ElementOption = {
+  id: string;
+  name: string;
+  page: string;
+  description: string;
+  locatorsJson: Locator[];
+  usedBy: number;
+  usedBySteps: number;
+};
 export type BlockOption = Option & {
   name: string;
   usedBy: number;
@@ -13,6 +24,7 @@ type Ctx = {
   applicationId: string;
   scenarios: Option[];
   blocks: BlockOption[];
+  elements: ElementOption[];
   /** Database connection names (steps refer to connections by name, per environment). */
   connections: Option[];
   /** Email inbox names of the application. */
@@ -23,6 +35,7 @@ const EditorCtx = createContext<Ctx>({
   applicationId: '',
   scenarios: [],
   blocks: [],
+  elements: [],
   connections: [],
   inboxes: [],
 });
@@ -51,6 +64,11 @@ export function EditorProvider({
         }[]
       >(`/api/applications/${applicationId}/blocks`),
   });
+  const elements = useQuery({
+    queryKey: ['elements', applicationId],
+    queryFn: () => api<ElementOption[]>(`/api/applications/${applicationId}/elements`),
+    enabled: !!applicationId,
+  });
   const conns = useConnections(applicationId);
   const inboxes = useInboxes(applicationId);
   const byName = new Map<string, string[]>();
@@ -68,6 +86,7 @@ export function EditorProvider({
       usedBy: b.usedBy,
       inputs: b.inputsJson ?? [],
     })),
+    elements: elements.data ?? [],
     connections: [...byName].map(([name, envs]) => ({ id: name, label: `${name} (${envs.join(', ')})` })),
     inboxes: (inboxes.data ?? []).map((i) => ({
       id: i.name,
@@ -78,3 +97,31 @@ export function EditorProvider({
 }
 
 export const useEditorCtx = () => useContext(EditorCtx);
+
+/**
+ * For display only: element references show their element. `forSummary` names the element (step list rows);
+ * otherwise the element's own locators are used, so plain-English sentences read naturally.
+ */
+export function withElements<T extends { locators?: Locator[]; params?: Record<string, unknown> }>(
+  steps: T[],
+  elements: ElementOption[],
+  forSummary = false,
+): T[] {
+  const byId = new Map(elements.map((e) => [e.id, e]));
+  return steps.map((s) => {
+    const params = { ...(s.params ?? {}) };
+    for (const key of ['steps', 'else'])
+      if (Array.isArray(params[key])) params[key] = withElements(params[key] as T[], elements, forSummary);
+    return {
+      ...s,
+      params,
+      // Nested steps (inside conditions and loops) may have no locators at all.
+      locators: (s.locators ?? []).flatMap((l) => {
+        if (l.strategy !== 'element') return [l];
+        const e = byId.get(l.value);
+        if (!e) return [{ ...l, name: 'deleted element' }];
+        return forSummary ? [{ ...l, name: e.name }] : e.locatorsJson;
+      }),
+    };
+  });
+}

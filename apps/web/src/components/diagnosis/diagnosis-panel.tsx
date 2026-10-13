@@ -4,6 +4,7 @@ import {
   Blocks,
   Bug,
   CheckCircle2,
+  Crosshair,
   History,
   MapPin,
   RefreshCw,
@@ -60,14 +61,21 @@ export function DiagnosisPanel({ item, applicationId }: { item: RunItemDetail; a
   const owner = useQuery({
     queryKey: ['step-owner', item.id, failedStepId],
     queryFn: () =>
-      api<{ kind: 'scenario' | 'block'; id: string; name: string; affectedScenarios?: number }>(
-        `/api/run-items/${item.id}/step-owner?stepId=${encodeURIComponent(failedStepId)}`,
-      ),
-    enabled: inBlock,
+      api<{
+        kind: 'scenario' | 'block';
+        id: string;
+        name: string;
+        affectedScenarios?: number;
+        element?: { id: string; name: string; steps: number };
+      }>(`/api/run-items/${item.id}/step-owner?stepId=${encodeURIComponent(failedStepId)}`),
+    // Always asked: the step may use a saved element even outside a block.
+    enabled: !!failedStepId,
     retry: false,
   });
-  const block = owner.data?.kind === 'block' ? owner.data : null;
+  const block = inBlock && owner.data?.kind === 'block' ? owner.data : null;
   const affected = block?.affectedScenarios ?? 0;
+  // A step that targets a saved element: the locator fix goes into the element, for every step that uses it.
+  const element = owner.data?.element ?? null;
   const accept = useMutation({
     mutationFn: () =>
       api(`/api/run-items/${item.id}/accept-locator`, {
@@ -76,11 +84,14 @@ export function DiagnosisPanel({ item, applicationId }: { item: RunItemDetail; a
       }),
     onSuccess: () => {
       toast(
-        block
-          ? `Block "${block.name}" updated to use ${describe(d.suggestedLocator!)} — that fixes ${affected} scenario${affected === 1 ? '' : 's'}; run them again to confirm`
-          : `Step updated to use ${describe(d.suggestedLocator!)} — run it again to confirm`,
+        element
+          ? `Element "${element.name}" updated to use ${describe(d.suggestedLocator!)} — that fixes ${element.steps} step${element.steps === 1 ? '' : 's'}; run them again to confirm`
+          : block
+            ? `Block "${block.name}" updated to use ${describe(d.suggestedLocator!)} — that fixes ${affected} scenario${affected === 1 ? '' : 's'}; run them again to confirm`
+            : `Step updated to use ${describe(d.suggestedLocator!)} — run it again to confirm`,
       );
       if (block) void qc.invalidateQueries({ queryKey: ['block', block.id] });
+      void qc.invalidateQueries({ queryKey: ['elements'] });
     },
     onError: toastError,
   });
@@ -124,6 +135,23 @@ export function DiagnosisPanel({ item, applicationId }: { item: RunItemDetail; a
         <dd>
           {d.where.path ? `Step ${d.where.path} — ` : ''}
           {d.where.step}
+          {element && (
+            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs" data-testid="failed-element">
+              <Crosshair className="h-3.5 w-3.5 text-brand" /> Uses saved element{' '}
+              <Link
+                to="/applications/$appId"
+                params={{ appId: applicationId }}
+                search={{ tab: 'elements', element: element.id }}
+                className="font-medium text-brand hover:underline"
+              >
+                {element.name}
+              </Link>
+              <span className="text-muted">
+                — used by {element.steps} step{element.steps === 1 ? '' : 's'}: one fix there repairs all of
+                them
+              </span>
+            </p>
+          )}
           {block && (
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs" data-testid="failed-in-block">
               <Blocks className="h-3.5 w-3.5 text-indigo" /> Inside block{' '}
@@ -166,12 +194,16 @@ export function DiagnosisPanel({ item, applicationId }: { item: RunItemDetail; a
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 {accept.isSuccess
-                  ? block
-                    ? `Block updated (${affected} scenario${affected === 1 ? '' : 's'})`
-                    : 'Locator updated'
-                  : block
-                    ? `Fix block "${block.name}": use ${describe(d.suggestedLocator)}`
-                    : `Use ${describe(d.suggestedLocator)}`}
+                  ? element
+                    ? `Element updated (${element.steps} step${element.steps === 1 ? '' : 's'})`
+                    : block
+                      ? `Block updated (${affected} scenario${affected === 1 ? '' : 's'})`
+                      : 'Locator updated'
+                  : element
+                    ? `Fix element "${element.name}": use ${describe(d.suggestedLocator)}`
+                    : block
+                      ? `Fix block "${block.name}": use ${describe(d.suggestedLocator)}`
+                      : `Use ${describe(d.suggestedLocator)}`}
               </Button>
             </div>
           )}

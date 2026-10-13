@@ -5,6 +5,7 @@ import type { StepForgeDb } from '../index.ts';
 import { datasets, environments, modules, scenarios, secrets, tags } from '../schema.ts';
 import { createApplication, getApplication, getApplicationBySlug } from './applications.ts';
 import { createBlock, getBlock, listBlocks, saveBlockSteps } from './blocks.ts';
+import { createElement, listElements } from './elements.ts';
 import { createEnvironment } from './environments.ts';
 import { invalid } from './errors.ts';
 import { createModule } from './modules.ts';
@@ -64,7 +65,32 @@ export const ApplicationExport = z.object({
     .default([]),
   blocks: z
     .array(
-      z.object({ ref: z.string(), name: z.string(), description: z.string().default(''), steps: StepList }),
+      z.object({
+        ref: z.string(),
+        name: z.string(),
+        description: z.string().default(''),
+        inputs: z
+          .array(
+            z.object({
+              name: z.string(),
+              default: z.string().optional(),
+              description: z.string().optional(),
+            }),
+          )
+          .default([]),
+        steps: StepList,
+      }),
+    )
+    .default([]),
+  elements: z
+    .array(
+      z.object({
+        ref: z.string(),
+        name: z.string(),
+        page: z.string().default(''),
+        description: z.string().default(''),
+        locators: z.array(z.record(z.string(), z.unknown())).min(1),
+      }),
     )
     .default([]),
   datasets: z
@@ -120,10 +146,9 @@ const callsScenario = (list: AnyStep[]): boolean =>
       ),
   );
 
-function portableSteps(
-  list: AnyStep[],
-  map?: { blocks: Map<string, string>; scenarios: Map<string, string> },
-) {
+type RefMap = { blocks: Map<string, string>; scenarios: Map<string, string>; elements: Map<string, string> };
+
+function portableSteps(list: AnyStep[], map?: RefMap) {
   return list.map((raw): AnyStep => {
     const { id: _id, ...s } = raw;
     const params = { ...(s.params ?? {}) };
@@ -133,7 +158,14 @@ function portableSteps(
       params.blockId = map.blocks.get(params.blockId) ?? params.blockId;
     if (map && s.type === 'util.callScenario' && typeof params.scenarioId === 'string')
       params.scenarioId = map.scenarios.get(params.scenarioId) ?? params.scenarioId;
-    return { ...s, params };
+    const locators = Array.isArray(s.locators)
+      ? s.locators.map((l) =>
+          map && l.strategy === 'element' && l.value
+            ? { ...l, value: map.elements.get(l.value) ?? l.value }
+            : l,
+        )
+      : s.locators;
+    return { ...s, params, ...(locators !== undefined && { locators }) };
   });
 }
 
@@ -200,10 +232,18 @@ export function exportApplication(
       description: m.description,
       sortOrder: m.sortOrder,
     })),
+    elements: listElements(db, applicationId).map((e) => ({
+      ref: e.id,
+      name: e.name,
+      page: e.page,
+      description: e.description,
+      locators: e.locatorsJson,
+    })),
     blocks: listBlocks(db, applicationId).map((b) => ({
       ref: b.id,
       name: b.name,
       description: b.description,
+      inputs: b.inputsJson,
       steps: portableSteps(getBlock(db, b.id).steps as AnyStep[]) as Record<string, unknown>[],
     })),
     datasets: db
@@ -244,7 +284,14 @@ export function exportApplication(
 export type ImportResult = {
   applicationId: string;
   slug: string;
-  counts: { environments: number; modules: number; scenarios: number; testCases: number; blocks: number };
+  counts: {
+    environments: number;
+    modules: number;
+    scenarios: number;
+    testCases: number;
+    blocks: number;
+    elements: number;
+  };
   /** Secrets to enter again, per environment. */
   missingSecrets: { environment: string; keys: string[] }[];
 };
@@ -303,10 +350,23 @@ export function importApplication(
       pending = pending.filter((m) => !ready.includes(m));
     }
 
-    // Blocks first, so steps can point at their new ids.
-    const map = { blocks: new Map<string, string>(), scenarios: new Map<string, string>() };
+    // Elements and blocks first, so steps can point at their new ids.
+    const map: RefMap = { blocks: new Map(), scenarios: new Map(), elements: new Map() };
+    for (const e of d.elements)
+      map.elements.set(
+        e.ref,
+        createElement(db, app.id, {
+          name: e.name,
+          page: e.page,
+          description: e.description,
+          locators: e.locators as never,
+        }).id,
+      );
     for (const b of d.blocks)
-      map.blocks.set(b.ref, createBlock(db, app.id, { name: b.name, description: b.description }).id);
+      map.blocks.set(
+        b.ref,
+        createBlock(db, app.id, { name: b.name, description: b.description, inputs: b.inputs }).id,
+      );
     for (const b of d.blocks)
       if (b.steps.length)
         saveBlockSteps(db, map.blocks.get(b.ref)!, portableSteps(b.steps as AnyStep[], map));
@@ -367,6 +427,7 @@ export function importApplication(
         scenarios: d.scenarios.length,
         testCases,
         blocks: d.blocks.length,
+        elements: d.elements.length,
       },
       missingSecrets: d.environments
         .filter((e) => e.secretKeys.length)

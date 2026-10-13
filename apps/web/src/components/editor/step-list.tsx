@@ -6,7 +6,7 @@ import { Select } from '@/components/ui/input';
 import { defaultParams, groupOf, LAYER, STEP_TYPE_OPTIONS, summarizeStep } from '@/lib/steps';
 import { cn } from '@/lib/utils';
 import { blankStep, newKey, toDrafts, fromDrafts, type DraftStep } from './drafts';
-import { useEditorCtx } from './context';
+import { useEditorCtx, withElements } from './context';
 import { StepForm } from './step-form';
 
 export function StepTypeSelect({
@@ -55,14 +55,14 @@ export function StepList({
   selected?: Set<string>;
   onSelect?: (key: string, checked: boolean) => void;
 }) {
-  const { blocks } = useEditorCtx();
+  const { blocks, elements } = useEditorCtx();
   /** An unlabeled "use block" step reads as the block it runs. */
   const summary = (s: DraftStep) => {
     if (s.type === 'util.useBlock' && !s.label) {
       const b = blocks.find((x) => x.id === s.params.blockId);
       if (b) return `Use block "${b.name}"`;
     }
-    return summarizeStep(s);
+    return summarizeStep(withElements([s], elements, true)[0]!);
   };
   const [localOpen, setLocalOpen] = useState<string | null>(null);
   const open = onOpen ? (openKey ?? null) : localOpen;

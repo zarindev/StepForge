@@ -45,6 +45,8 @@ export function describeTarget(locators: Locator[] = []): string {
       return `the field with placeholder ${q(l.value)}`;
     case 'text':
       return q(l.value);
+    case 'element':
+      return 'a saved element';
     case 'testId':
       return `the element ${q(l.value)}`;
     case 'css':

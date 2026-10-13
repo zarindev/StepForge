@@ -24,6 +24,9 @@ export function buildLocator(scope: Scope, l: StepLocator): Locator {
       return scope.locator(l.value);
     case 'xpath':
       return scope.locator(`xpath=${l.value}`);
+    case 'element':
+      // The engine replaces element references with the element's locators before a step runs.
+      throw new StepError('invalid_params', `The saved element ${l.value} was not found`);
   }
 }
 

@@ -3,10 +3,12 @@ import { Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import type { StepRecord } from '@/lib/types';
+import { useEditorCtx, withElements } from './context';
 
 /** The scenario as readable, numbered sentences (also used for docs and bug reports). */
 export function PlainView({ steps, title }: { steps: StepRecord[]; title?: string }) {
-  const lines = describeSteps(steps);
+  const { elements } = useEditorCtx();
+  const lines = describeSteps(withElements(steps, elements));
   const text = [title, ...lines.map((l) => `${'  '.repeat(l.depth)}${l.number}. ${l.text}`)]
     .filter(Boolean)
     .join('\n');

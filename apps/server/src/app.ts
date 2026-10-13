@@ -18,6 +18,7 @@ import { SpecService } from './api/specs.ts';
 import { RecorderManager } from './recorder/manager.ts';
 import { registerApiRoutes } from './routes/api.ts';
 import { registerRecorderRoutes } from './routes/recorder.ts';
+import { registerElementRoutes } from './routes/elements.ts';
 import { registerDatabaseRoutes } from './routes/database.ts';
 import { DatabaseService } from './database/service.ts';
 import { EmailService } from './email/service.ts';
@@ -161,6 +162,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerTestRoutes(app, ctx);
   await registerRunRoutes(app, ctx);
   registerRecorderRoutes(app, ctx);
+  registerElementRoutes(app, ctx);
   registerApiRoutes(app, ctx);
   registerDatabaseRoutes(app, ctx);
   registerEmailRoutes(app, ctx);
