@@ -39,6 +39,10 @@ describe('plain English', () => {
     [s('api.request', { method: 'POST', url: '/api/patients' }), 'Send POST /api/patients'],
     [s('util.loop', { count: 3 }), 'Repeat 3 times'],
     [
+      s('util.manual', { instruction: 'Print the invoice', expected: 'The total matches' }),
+      'Print the invoice — expect: The total matches',
+    ],
+    [
       s('ui.waitForResponse', { url: '/api/orders', method: 'POST' }),
       'Wait for the POST response from /api/orders',
     ],

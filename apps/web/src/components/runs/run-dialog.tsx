@@ -76,6 +76,7 @@ function RunDialog({ req }: { req: Request }) {
     }
   }, [settings.data, settled]);
   const [scopeChoice, setScopeChoice] = useState('application');
+  const [mode, setMode] = useState<'auto' | 'manual'>('auto');
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -102,7 +103,7 @@ function RunDialog({ req }: { req: Request }) {
       }
       return api<Run>('/api/runs', {
         method: 'POST',
-        json: { applicationId: req.applicationId, environmentId: envId, scope, options: opts },
+        json: { applicationId: req.applicationId, environmentId: envId, scope, options: opts, mode },
       });
     },
     onSuccess: (run) => {
@@ -124,12 +125,29 @@ function RunDialog({ req }: { req: Request }) {
             Cancel
           </Button>
           <Button disabled={!envId || start.isPending} onClick={() => start.mutate()}>
-            <Play className="h-4 w-4 fill-current" /> Start run
+            <Play className="h-4 w-4 fill-current" /> {mode === 'manual' ? 'Start manual run' : 'Start run'}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
+        <Field
+          label="How"
+          hint={
+            mode === 'manual'
+              ? 'Nothing runs automatically: you follow each test’s steps and record passed, failed or blocked'
+              : undefined
+          }
+        >
+          <Select
+            aria-label="How"
+            value={mode}
+            onChange={(e) => setMode(e.target.value as 'auto' | 'manual')}
+          >
+            <option value="auto">Automated — StepForge runs the steps</option>
+            <option value="manual">Manual — a person follows the steps and records results</option>
+          </Select>
+        </Field>
         {!req.scope && (
           <Field label="Scope">
             <Select aria-label="Scope" value={scopeChoice} onChange={(e) => setScopeChoice(e.target.value)}>
@@ -176,104 +194,108 @@ function RunDialog({ req }: { req: Request }) {
             <ShieldAlert className="h-4 w-4" /> You are about to run against production.
           </div>
         )}
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Browser">
-            <Select
-              aria-label="Browser"
-              value={opts.browser}
-              onChange={(e) => set({ browser: e.target.value as RunOptionsForm['browser'] })}
-            >
-              <option value="chromium">Chromium</option>
-              <option value="firefox">Firefox</option>
-              <option value="webkit">WebKit</option>
-            </Select>
-          </Field>
-          <Field label="Viewport">
-            <Select
-              aria-label="Viewport"
-              value={opts.viewport}
-              onChange={(e) => set({ viewport: e.target.value as RunOptionsForm['viewport'] })}
-            >
-              <option value="desktop">Desktop 1440</option>
-              <option value="tablet">Tablet 768</option>
-              <option value="mobile">Mobile 390</option>
-            </Select>
-          </Field>
-          <Field label="Workers">
-            <Select
-              aria-label="Workers"
-              value={opts.workers}
-              onChange={(e) => set({ workers: Number(e.target.value) })}
-            >
-              {[1, 2, 3, 4, 6, 8].map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Retries">
-            <Select
-              aria-label="Retries"
-              value={opts.retries}
-              onChange={(e) => set({ retries: Number(e.target.value) })}
-            >
-              {[0, 1, 2, 3].map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Video">
-            <Select
-              aria-label="Video"
-              value={opts.video}
-              onChange={(e) => set({ video: e.target.value as RunOptionsForm['video'] })}
-            >
-              <option value="off">Off</option>
-              <option value="onFailure">On failure</option>
-              <option value="always">Always</option>
-            </Select>
-          </Field>
-          <Field label="Trace">
-            <Select
-              aria-label="Trace"
-              value={opts.trace}
-              onChange={(e) => set({ trace: e.target.value as RunOptionsForm['trace'] })}
-            >
-              <option value="off">Off</option>
-              <option value="onFailure">On failure</option>
-              <option value="always">Always</option>
-            </Select>
-          </Field>
-        </div>
-        <div className="flex flex-wrap gap-5 text-sm">
-          <label className="flex items-center gap-2">
-            <Switch checked={opts.headed} onChange={(headed) => set({ headed })} label="Show browser" /> Show
-            browser (headed)
-          </label>
-          <label className="flex items-center gap-2">
-            <Switch
-              checked={opts.stopOnFirstFailure}
-              onChange={(stopOnFirstFailure) => set({ stopOnFirstFailure })}
-              label="Stop on first failure"
-            />{' '}
-            Stop on first failure
-          </label>
-          <label className="flex items-center gap-2">
-            <Switch
-              checked={!!opts.pageMetrics}
-              onChange={(pageMetrics) => set({ pageMetrics })}
-              label="Collect page metrics"
-            />
-            Collect page metrics (Web Vitals)
-          </label>
-          <label className="flex items-center gap-2">
-            <Switch
-              checked={opts.screenshots === 'everyStep'}
-              onChange={(on) => set({ screenshots: on ? 'everyStep' : 'onFailure' })}
-              label="Screenshot every step"
-            />
-            Screenshot every step
-          </label>
-        </div>
+        {mode === 'auto' && (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Browser">
+                <Select
+                  aria-label="Browser"
+                  value={opts.browser}
+                  onChange={(e) => set({ browser: e.target.value as RunOptionsForm['browser'] })}
+                >
+                  <option value="chromium">Chromium</option>
+                  <option value="firefox">Firefox</option>
+                  <option value="webkit">WebKit</option>
+                </Select>
+              </Field>
+              <Field label="Viewport">
+                <Select
+                  aria-label="Viewport"
+                  value={opts.viewport}
+                  onChange={(e) => set({ viewport: e.target.value as RunOptionsForm['viewport'] })}
+                >
+                  <option value="desktop">Desktop 1440</option>
+                  <option value="tablet">Tablet 768</option>
+                  <option value="mobile">Mobile 390</option>
+                </Select>
+              </Field>
+              <Field label="Workers">
+                <Select
+                  aria-label="Workers"
+                  value={opts.workers}
+                  onChange={(e) => set({ workers: Number(e.target.value) })}
+                >
+                  {[1, 2, 3, 4, 6, 8].map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Retries">
+                <Select
+                  aria-label="Retries"
+                  value={opts.retries}
+                  onChange={(e) => set({ retries: Number(e.target.value) })}
+                >
+                  {[0, 1, 2, 3].map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Video">
+                <Select
+                  aria-label="Video"
+                  value={opts.video}
+                  onChange={(e) => set({ video: e.target.value as RunOptionsForm['video'] })}
+                >
+                  <option value="off">Off</option>
+                  <option value="onFailure">On failure</option>
+                  <option value="always">Always</option>
+                </Select>
+              </Field>
+              <Field label="Trace">
+                <Select
+                  aria-label="Trace"
+                  value={opts.trace}
+                  onChange={(e) => set({ trace: e.target.value as RunOptionsForm['trace'] })}
+                >
+                  <option value="off">Off</option>
+                  <option value="onFailure">On failure</option>
+                  <option value="always">Always</option>
+                </Select>
+              </Field>
+            </div>
+            <div className="flex flex-wrap gap-5 text-sm">
+              <label className="flex items-center gap-2">
+                <Switch checked={opts.headed} onChange={(headed) => set({ headed })} label="Show browser" />{' '}
+                Show browser (headed)
+              </label>
+              <label className="flex items-center gap-2">
+                <Switch
+                  checked={opts.stopOnFirstFailure}
+                  onChange={(stopOnFirstFailure) => set({ stopOnFirstFailure })}
+                  label="Stop on first failure"
+                />{' '}
+                Stop on first failure
+              </label>
+              <label className="flex items-center gap-2">
+                <Switch
+                  checked={!!opts.pageMetrics}
+                  onChange={(pageMetrics) => set({ pageMetrics })}
+                  label="Collect page metrics"
+                />
+                Collect page metrics (Web Vitals)
+              </label>
+              <label className="flex items-center gap-2">
+                <Switch
+                  checked={opts.screenshots === 'everyStep'}
+                  onChange={(on) => set({ screenshots: on ? 'everyStep' : 'onFailure' })}
+                  label="Screenshot every step"
+                />
+                Screenshot every step
+              </label>
+            </div>
+          </>
+        )}
         {start.error && <p className="text-sm text-fail">{start.error.message}</p>}
       </div>
     </Dialog>

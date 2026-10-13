@@ -217,6 +217,19 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         record({ ...base, status: 'skipped', attempts: 0, durationMs: 0, message, assertions: [] });
         continue;
       }
+      if (step.type === 'util.manual') {
+        // Done by a person in a manual run; an automated run notes it and goes on.
+        const p = step.params as { instruction?: unknown };
+        record({
+          ...base,
+          status: 'skipped',
+          attempts: 0,
+          durationMs: 0,
+          message: `Manual check, done in a manual run: ${resolver.mask(String(p.instruction ?? ''))}`,
+          assertions: [],
+        });
+        continue;
+      }
       emit({
         type: 'step.started',
         stepId: step.id,

@@ -1,7 +1,8 @@
+import { ManualRunService } from './runner/manual.ts';
 import fastifyWebsocket from '@fastify/websocket';
 import { loadOrCreateKey } from '@stepforge/crypto';
 import { getSetting, openDatabase, schema } from '@stepforge/db';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import Fastify, { type FastifyInstance, LogController } from 'fastify';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -80,7 +81,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     const interrupted = db
       .update(schema.runs)
       .set({ status: 'interrupted', updatedAt: new Date().toISOString() })
-      .where(inArray(schema.runs.status, ['queued', 'running']))
+      // Manual runs are done by people, not by this process: they stay open across restarts.
+      .where(and(inArray(schema.runs.status, ['queued', 'running']), eq(schema.runs.mode, 'auto')))
       .run();
     if (interrupted.changes > 0)
       app.log.warn(`Marked ${interrupted.changes} unfinished run(s) as interrupted`);
@@ -129,6 +131,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
       diagnosis,
       data,
     ),
+    manual: undefined as unknown as ManualRunService,
     recorder: new RecorderManager(db, masterKey, bus),
     specs,
     database,
@@ -143,6 +146,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     maintenance: new MaintenanceService(db, sqlite, config, masterKey),
     startedAt: new Date(),
   };
+  ctx.manual = new ManualRunService(db, bus, ctx.runs, config.artifactsDir);
   ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);
   ctx.campaigns = new CampaignService(
     db,

@@ -1,3 +1,4 @@
+import type { ManualRunService } from './runner/manual.ts';
 import type { DataService } from './data/service.ts';
 import type { CampaignService } from './campaigns/service.ts';
 import type { StepForgeDb } from '@stepforge/db';
@@ -33,6 +34,7 @@ export type AppContext = {
   token: string;
   bus: EventBus;
   runs: RunManager;
+  manual: ManualRunService;
   recorder: RecorderManager;
   specs: SpecService;
   database: DatabaseService;

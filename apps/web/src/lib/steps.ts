@@ -45,6 +45,8 @@ export function defaultParams(type: string): Record<string, unknown> {
       return { method: 'GET', url: '{{env.baseUrl}}/api/', headers: {} };
     case 'db.query':
       return { connection: '', sql: 'SELECT 1' };
+    case 'util.manual':
+      return { instruction: '', expected: '' };
     case 'util.useData':
       return { source: '', pick: 'first' };
     case 'db.mongoFind':

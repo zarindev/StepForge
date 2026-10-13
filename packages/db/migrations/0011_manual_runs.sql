@@ -1,0 +1,1 @@
+ALTER TABLE `runs` ADD `mode` text DEFAULT 'auto' NOT NULL;

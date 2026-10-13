@@ -52,6 +52,9 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 - **Run dialog** — browser (Chromium, Firefox, WebKit; or installed Chrome/Edge per environment), size (desktop,
   tablet, mobile), workers, retries, headed or headless, evidence settings.
 - **Live view** — steps appear as they run, with the latest screenshot.
+- **Manual runs** — a tester follows each test's steps in plain English (blocks expanded, test data filled in) and
+  records passed / failed / blocked / skipped with notes and screenshots; results join the run history and reports.
+  `util.manual` steps describe checks only a person can do. [MANUAL_RUNS.md](MANUAL_RUNS.md)
 - **Evidence** — screenshots, video, Playwright traces (opened in the local Trace Viewer), console and network logs,
   downloads, API requests and responses, database results, received emails.
 - **Campaigns** — a saved test set across environments × browsers × sizes in one click, a combined report, and
@@ -98,5 +101,5 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 ## Coming next
 
 - Native mobile and desktop apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
-- More features inspired by Cerberus Testing (manual test runs, Kafka/SOAP/FTP steps, Slack/Teams notifications,
+- More features inspired by Cerberus Testing (Kafka/SOAP/FTP steps, Slack/Teams notifications,
   network breakdowns, run queue priorities): see the [CHANGELOG](../CHANGELOG.md) as they land.

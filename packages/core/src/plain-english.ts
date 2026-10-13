@@ -342,6 +342,9 @@ export function describeStep(step: AnyStep): string {
     case 'util.log':
       s = `Note: ${String(p.message ?? '')}`;
       break;
+    case 'util.manual':
+      s = `${String(p.instruction ?? 'Do this by hand')}${p.expected ? ` — expect: ${String(p.expected)}` : ''}`;
+      break;
     case 'util.runScript':
       s = 'Run a script';
       break;

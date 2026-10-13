@@ -20,6 +20,7 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import { EvidencePanel, Lightbox } from '@/components/runs/evidence';
 import { openRunDialog } from '@/components/runs/run-dialog';
+import { ManualChecklist } from '@/components/runs/manual-checklist';
 import { VisualPanel, type StepVisual } from '@/components/runs/visual-panel';
 import { formatDuration, StatusIcon, StatusPill, timeAgo, TotalsBar } from '@/components/runs/status';
 import { Badge } from '@/components/ui/badge';
@@ -101,6 +102,10 @@ export function RunDetailPage() {
   );
   useLiveEvent(onEvent);
 
+  const finishManual = useMutation({
+    mutationFn: () => api(`/api/runs/${runId}/manual/finish`, { method: 'POST' }),
+    onError: toastError,
+  });
   const cancel = useMutation({
     mutationFn: () => api(`/api/runs/${runId}/cancel`, { method: 'POST' }),
     onError: toastError,
@@ -124,7 +129,10 @@ export function RunDetailPage() {
   );
   const firstFailed = items.find((i) => i.status === 'failed' || i.status === 'broken');
   const runningItem = items.find((i) => i.status === 'running');
-  const selectedId = selected ?? runningItem?.id ?? firstFailed?.id ?? items[0]?.id ?? null;
+  const manual = run.data?.mode === 'manual';
+  const openItem = items.find((i) => i.status === 'queued' || i.status === 'running');
+  const selectedId =
+    selected ?? (manual ? openItem?.id : runningItem?.id) ?? firstFailed?.id ?? items[0]?.id ?? null;
 
   if (run.isError) return <ErrorState error={run.error} onRetry={() => run.refetch()} />;
   if (run.isPending) return <Skeleton className="h-96" />;
@@ -155,6 +163,7 @@ export function RunDetailPage() {
                 {r.application.name}
               </h1>
               <span className="font-mono text-xs text-muted">#{r.id.slice(-8)}</span>
+              {manual && <Badge>Manual run</Badge>}
               {r.campaignRunId && (
                 <Link
                   to="/campaign-runs/$campaignRunId"
@@ -167,11 +176,18 @@ export function RunDetailPage() {
             </div>
             <p className="mt-1 text-sm text-muted">
               {r.environment ? `${r.environment.name} · ${r.environment.baseUrl}` : 'Environment deleted'} ·{' '}
-              {r.browser} · {r.viewport} · {r.workers} worker{r.workers > 1 ? 's' : ''} · started{' '}
-              {timeAgo(r.startedAt ?? r.createdAt)} · {formatDuration(r.durationMs)}
+              {manual
+                ? 'done by hand'
+                : `${r.browser} · ${r.viewport} · ${r.workers} worker${r.workers > 1 ? 's' : ''}`}{' '}
+              · started {timeAgo(r.startedAt ?? r.createdAt)} · {formatDuration(r.durationMs)}
             </p>
           </div>
           <div className="flex gap-2">
+            {manual && r.status === 'running' && (
+              <Button onClick={() => finishManual.mutate()} disabled={finishManual.isPending}>
+                Finish run
+              </Button>
+            )}
             {isLive && (
               <Button variant="danger" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
                 <Ban className="h-4 w-4" /> Cancel
@@ -320,7 +336,22 @@ export function RunDetailPage() {
         </Card>
 
         <div className="min-w-0 space-y-5">
-          {selectedId ? (
+          {selectedId &&
+          manual &&
+          r.status === 'running' &&
+          ['queued', 'running'].includes(items.find((i) => i.id === selectedId)?.status ?? '') ? (
+            <ManualChecklist
+              key={selectedId}
+              runId={r.id}
+              itemId={selectedId}
+              onDone={() => {
+                const next = items.find(
+                  (i) => i.id !== selectedId && (i.status === 'queued' || i.status === 'running'),
+                );
+                setSelected(next?.id ?? null);
+              }}
+            />
+          ) : selectedId ? (
             <ItemPanel
               key={selectedId}
               appId={r.applicationId}
@@ -329,7 +360,7 @@ export function RunDetailPage() {
               live={live[selectedId]}
             />
           ) : null}
-          <Card>
+          <Card className={cn(manual && 'hidden')}>
             <div className="flex items-center gap-2 border-b border-border px-4 py-2.5 text-sm font-medium">
               <Terminal className="h-4 w-4 text-muted" /> Live log
             </div>

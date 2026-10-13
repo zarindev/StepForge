@@ -53,6 +53,7 @@ export const STEP_CATALOGUE = {
     'useBlock',
     'runScript',
     'log',
+    'manual',
   ],
 } as const;
 

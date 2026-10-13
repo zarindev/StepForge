@@ -110,7 +110,10 @@ export function RunsPage() {
                       </Link>
                     </div>
                     <div className="text-xs text-muted">
-                      {r.environmentName ?? 'deleted env'} · {r.browser} · {r.viewport} · {r.trigger}
+                      {r.environmentName ?? 'deleted env'} ·{' '}
+                      {r.mode === 'manual'
+                        ? 'manual run (by hand)'
+                        : `${r.browser} · ${r.viewport} · ${r.trigger}`}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted">{r.scopeJson.type}</td>

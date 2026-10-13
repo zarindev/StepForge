@@ -574,6 +574,9 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     case 'util.wait':
       out.push({ op: 'wait', ms: num(q.ms, 1000) });
       break;
+    case 'util.manual':
+      out.push(todo(ctx, step, `a manual check, done by a person: ${String(q.instruction ?? '')}`));
+      break;
     case 'util.log':
       out.push({ op: 'log', message: val(q.message ?? '') });
       break;

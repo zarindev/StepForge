@@ -18,7 +18,7 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 12 | Code generators + snapshot tests | ✅ Done |
 | 13 | Public-repo polish, onboarding, fresh-clone test | ✅ Done (Windows/Ubuntu via CI after push) |
 | 14 | Showcase package, optional Electron | ✅ Done (Electron skipped: optional) |
-| 15 | Cerberus-inspired features, every kind of web app | 🟢 In progress (6 of 11 features + web-app coverage done) |
+| 15 | Cerberus-inspired features, every kind of web app | 🟢 In progress (7 of 11 features + web-app coverage done) |
 
 ---
 
@@ -38,6 +38,8 @@ free, open source and local.
   [TEST_DATA.md](TEST_DATA.md)
 - **Hooks** — before/after-each-test blocks per module and scenario (migration 0010). [BLOCKS.md](BLOCKS.md#hooks)
 - **Page conditions** — `util.if` checks on the page, `util.loop` "repeat while". [STEP_REFERENCE.md](STEP_REFERENCE.md)
+- **Manual test runs** — a person follows the steps and records results per step; `util.manual` checks (migration
+  0011). [MANUAL_RUNS.md](MANUAL_RUNS.md)
 - **Every kind of web app** — visual checkpoints with baselines and accept, network waiting and mocking, offline,
   downloads, storage, clock, touch and mobile identity, environment browser settings (no migration: they live in
   `environments.browser_defaults_json.settings`). [WEB_APPS.md](WEB_APPS.md)
@@ -45,7 +47,7 @@ free, open source and local.
 
 **Verified**
 - Each feature: unit and server tests, an end-to-end test (`e2e/blocks`, `elements`, `campaigns`, `data`, `hooks`,
-  `web-apps`), lint, typecheck and build; pushed features passed GitHub Actions CI (Ubuntu and Windows).
+  `web-apps`, `manual`), lint, typecheck and build; pushed features passed GitHub Actions CI (Ubuntu and Windows).
 - Web apps: the UI executor tests run every new step against a real page (download, wait for and mock responses,
   offline, storage, clock, canvas clicks, phone identity and touch, basic auth, headers, language, time zone, dark
   mode, location, visual baseline → change → difference); a server test resolves a basic-auth password from a secret
@@ -53,7 +55,7 @@ free, open source and local.
   the run page.
 
 **Next**
-- Manual test runs, Kafka/SOAP/FTP steps, Slack/Teams notifications, network breakdowns, run queue priorities.
+- Kafka/SOAP/FTP steps, Slack/Teams notifications, network breakdowns, run queue priorities.
 - Native apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
 
 ---

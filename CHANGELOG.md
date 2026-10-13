@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Manual test runs** (like Cerberus Testing's manual executions): Run → *How: Manual*. Nothing is executed; a
+  tester follows each test's steps in plain English — blocks, hooks and called scenarios expanded, test data and
+  environment variables filled in, secrets kept hidden — and records passed / failed / blocked / skipped per step with
+  a note and a screenshot. The results are ordinary run results (history, analytics, gates, reports). A new
+  `util.manual` step puts person-only checks into any scenario; automated runs skip it. Manual
+  runs stay open across restarts. Migration 0011 (`runs.mode`). See [docs/MANUAL_RUNS.md](docs/MANUAL_RUNS.md).
 - **Every kind of web app** ([docs/WEB_APPS.md](docs/WEB_APPS.md)):
   - **Visual checkpoints** (`ui.visualCheckpoint`, until now "not available"): the first run saves a baseline; later
     runs compare pixels (allowed difference and colour tolerance, masks for changing parts) and fail with a

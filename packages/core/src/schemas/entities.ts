@@ -268,5 +268,7 @@ export const CreateRunInput = z.object({
   scope: RunScope,
   options: RunOptionsInput.default(RunOptionsInput.parse({})),
   trigger: RunTrigger.default('manual'),
+  /** manual: nothing is executed; a person follows the steps and records each one's result. */
+  mode: z.enum(['auto', 'manual']).default('auto'),
 });
 export type CreateRunInput = z.infer<typeof CreateRunInput>;

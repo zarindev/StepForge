@@ -401,6 +401,27 @@ describe('control flow', () => {
     );
   });
 
+  it('an automated run skips manual checks without failing', async () => {
+    const log: string[] = [];
+    const r = await go(
+      steps(
+        {
+          type: 'util.manual',
+          params: { instruction: 'Check the printed receipt', expected: 'Logo is sharp' },
+        },
+        logStep('after'),
+      ),
+      {},
+      log,
+    );
+    expect(r.status).toBe('passed');
+    expect(log).toEqual(['after']);
+    expect(r.steps[0]).toMatchObject({
+      status: 'skipped',
+      message: 'Manual check, done in a manual run: Check the printed receipt',
+    });
+  });
+
   it('a failing nested step fails the parent and stops the test', async () => {
     const log: string[] = [];
     const r = await go(

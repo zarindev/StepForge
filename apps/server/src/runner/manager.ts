@@ -115,7 +115,10 @@ export class RunManager {
           viewport: d.options.viewport,
           workers: d.options.workers,
           optionsJson: d.options,
-          status: 'queued',
+          mode: d.mode,
+          // A manual run starts at once: nothing is queued, people record the results.
+          status: d.mode === 'manual' ? 'running' : 'queued',
+          startedAt: d.mode === 'manual' ? now() : null,
           totalsJson: { total: planned.length, passed: 0, failed: 0, broken: 0, skipped: 0, flaky: 0 },
         })
         .run();
@@ -134,7 +137,8 @@ export class RunManager {
           .run(),
       );
     });
-    this.enqueue(runId);
+    if (d.mode === 'auto') this.enqueue(runId);
+    else this.publishRun(runId);
     return this.getRun(runId);
   }
 
@@ -157,7 +161,11 @@ export class RunManager {
   cancel(runId: string): Run {
     const run = this.getRun(runId);
     if (this.active?.runId === runId) this.active.abort.abort();
-    else if (run.status === 'queued' || run.status === 'interrupted') {
+    else if (
+      run.status === 'queued' ||
+      run.status === 'interrupted' ||
+      (run.mode === 'manual' && run.status === 'running')
+    ) {
       this.queue = this.queue.filter((q) => q !== runId);
       this.db
         .update(schema.runItems)
@@ -171,7 +179,7 @@ export class RunManager {
 
   resume(runId: string): Run {
     const run = this.getRun(runId);
-    if (run.status !== 'interrupted')
+    if (run.status !== 'interrupted' || run.mode === 'manual')
       throw new repo.RepoError(
         409,
         'conflict',
@@ -615,7 +623,7 @@ export class RunManager {
     return t;
   }
 
-  private publishRun(runId: string): void {
+  publishRun(runId: string): void {
     this.db
       .update(schema.runs)
       .set({ totalsJson: this.totals(runId) })
@@ -624,7 +632,7 @@ export class RunManager {
     this.bus.publish({ type: 'run.updated', run: this.getRun(runId) });
   }
 
-  private finish(runId: string, status: 'passed' | 'failed' | 'cancelled'): void {
+  finish(runId: string, status: 'passed' | 'failed' | 'cancelled'): void {
     const run = this.getRun(runId);
     const finishedAt = now();
     this.db

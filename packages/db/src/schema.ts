@@ -329,6 +329,10 @@ export const runs = sqliteTable(
     scheduleId: text('schedule_id'),
     /** Set for the runs of a campaign run (one per environment × browser × screen size). */
     campaignRunId: text('campaign_run_id'),
+    /** auto: StepForge executes the steps; manual: a person does them and records each step's result. */
+    mode: text('mode', { enum: ['auto', 'manual'] })
+      .notNull()
+      .default('auto'),
     ...timestamps,
   },
   (t) => [

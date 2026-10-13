@@ -535,6 +535,23 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
     { key: 'as', label: 'Item variable', kind: 'text', placeholder: 'item' },
     ...conditionFields('while', 'Repeat while'),
   ],
+  'util.manual': [
+    {
+      key: 'instruction',
+      label: 'What the tester does',
+      kind: 'text',
+      placeholder: 'Print the invoice and compare it with the screen',
+      wide: true,
+      hint: 'Done by a person in a manual run; automated runs skip it',
+    },
+    {
+      key: 'expected',
+      label: 'Expected result',
+      kind: 'text',
+      placeholder: 'Both show the same total',
+      wide: true,
+    },
+  ],
   'util.callScenario': [{ key: 'scenarioId', label: 'Scenario', kind: 'scenario', wide: true }],
   'util.useBlock': [{ key: 'blockId', label: 'Block', kind: 'block', wide: true }],
 };

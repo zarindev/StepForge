@@ -130,6 +130,16 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
     return { ...item, steps, artifacts, bug: bug ?? null };
   });
 
+  // Manual runs: the checklist of one test, its results, screenshots, and finishing the run.
+  app.get<P<'id'>>('/api/run-items/:id/manual', async (req) => ctx.manual.checklist(req.params.id));
+  app.put<P<'id'>>('/api/run-items/:id/manual', async (req) => ctx.manual.save(req.params.id, req.body));
+  app.post<P<'id'>>(
+    '/api/run-items/:id/manual/attachments',
+    { bodyLimit: 15 * 1024 * 1024 },
+    async (req, reply) => reply.code(201).send(ctx.manual.attach(req.params.id, req.body)),
+  );
+  app.post<P<'id'>>('/api/runs/:id/manual/finish', async (req) => ctx.manual.finishRun(req.params.id));
+
   /** Visual checkpoint: the screenshot of this result becomes the approved baseline (the page changed on purpose). */
   app.post<P<'id'>>('/api/step-results/:id/accept-baseline', async (req, reply) => {
     const row = db.select().from(schema.stepResults).where(eq(schema.stepResults.id, req.params.id)).get();

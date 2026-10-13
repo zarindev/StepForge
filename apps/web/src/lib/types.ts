@@ -168,6 +168,8 @@ export type Run = {
   trigger: string;
   /** Set when the run is one combination of a campaign run. */
   campaignRunId?: string | null;
+  /** manual: a person follows the steps and records the results. */
+  mode?: 'auto' | 'manual';
   scopeJson: RunScope;
   browser: string;
   viewport: string;
