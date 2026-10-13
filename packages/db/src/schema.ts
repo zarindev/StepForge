@@ -539,7 +539,7 @@ export const bugs = sqliteTable(
 export const notifyChannels = sqliteTable('notify_channels', {
   id: id(),
   name: text('name').notNull().default(''),
-  kind: text('kind', { enum: ['telegram', 'email'] }).notNull(),
+  kind: text('kind', { enum: ['telegram', 'email', 'slack', 'teams', 'webhook'] }).notNull(),
   configJson: json<Record<string, unknown>>('config_json').notNull().default({}),
   secretId: fk('secret_id', () => secrets.id, 'set null'),
   ...timestamps,

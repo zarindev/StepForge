@@ -59,7 +59,8 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
   downloads, API requests and responses, database results, received emails.
 - **Campaigns** — a saved test set across environments × browsers × sizes in one click, a combined report, and
   *Rerun failed* only where it failed. [CAMPAIGNS.md](CAMPAIGNS.md)
-- **Schedules and notifications** — cron schedules for tests or campaigns; summaries by email or Telegram.
+- **Schedules and notifications** — cron schedules for tests or campaigns; summaries to Slack, Microsoft Teams,
+  Mattermost, Rocket.Chat, Telegram, email or any webhook (JSON).
   [SCHEDULING.md](SCHEDULING.md)
 - **CLI and CI** — `stepforge run` / `campaign` with JUnit, HTML and PDF reports and exit codes for any CI.
   [CLI.md](CLI.md)
@@ -103,5 +104,5 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 ## Coming next
 
 - Native mobile and desktop apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
-- More features inspired by Cerberus Testing (Slack/Teams notifications,
-  network breakdowns, run queue priorities): see the [CHANGELOG](../CHANGELOG.md) as they land.
+- More features inspired by Cerberus Testing (network breakdowns, run queue priorities): see the
+  [CHANGELOG](../CHANGELOG.md) as they land.

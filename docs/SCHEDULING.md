@@ -66,6 +66,33 @@ Any SMTP server: your mail provider (host, port 587 or 465 with TLS, username, p
 Mailpit (`127.0.0.1`, the SMTP port from Settings → Email, no login) to try it out. Recipients are separated by
 commas. The password is stored encrypted.
 
+### Slack, Mattermost and Rocket.Chat
+
+1. Create an **Incoming Webhook**: Slack → *Apps* → *Incoming WebHooks* (pick the channel); Mattermost or
+   Rocket.Chat (both free and self-hostable) → *Integrations* → *Incoming webhook*.
+2. Settings → Notifications → **Slack / Mattermost** → paste the URL, choose the app (Slack and Rocket.Chat share a
+   format; Mattermost uses its own bold text and links), optionally a **mention on failure** (`<!here>` in Slack,
+   `@channel` in Mattermost) → **Send test**.
+
+The message is a coloured attachment (green or red) with the counts, gate, failed tests and diagnosis, and a link to
+the run.
+
+### Microsoft Teams
+
+In the Teams channel: **⋯ → Workflows → "Post to a channel when a webhook request is received"**, then paste the URL
+it gives you into a **Teams** channel. The summary arrives as an Adaptive Card with an **Open the run** button.
+(Microsoft has retired the old "Incoming Webhook" connectors; Workflows replace them.)
+
+### Any other service (webhook)
+
+A **Webhook** channel POSTs JSON to your URL — `{ "event": "run.finished", "summary": { … }, "text": "…" }`, where
+`summary` has the application, environment, status, totals, pass rate, duration, failed tests with their diagnosis,
+gate and link — with optional extra headers (e.g. `Authorization`). Use it for Discord (with a small relay), n8n,
+Home Assistant, or your own service.
+
+Webhook URLs contain a token, so they are stored encrypted like passwords, never shown again, and never included in
+error messages.
+
 ### Sending from the CLI
 
 `stepforge run … --notify "QA team"` sends the same summary after a CLI run. A finished run's summary can also be

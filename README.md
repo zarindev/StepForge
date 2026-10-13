@@ -81,7 +81,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | **Test data library** | ✅ Named data sources: tables kept in StepForge, CSV files, read-only SQL queries, API calls · a `util.useData` step picks the first, a random, a given or a matching row, or one not used yet in the run · preview in any environment — see [docs/TEST_DATA.md](docs/TEST_DATA.md) |
 | **Diagnosis** | ✅ Rule-based "where / why / whose issue / how to fix" · last-green diff · locator suggestions · automatic bug reports (PDF, Jira/Trello CSV, Markdown) |
 | **Analytics** | ✅ Trends, quality gates, flaky detection, run comparison, top failing and slowest tests |
-| **Scheduling** | ✅ Cron schedules · Telegram and email summaries · CLI with JUnit and HTML reports |
+| **Scheduling** | ✅ Cron schedules · summaries to Slack, Microsoft Teams, Mattermost, Rocket.Chat, Telegram, email or any webhook · CLI with JUnit and HTML reports |
 | **Export** | ✅ Playwright (TS, Python), Cypress, Selenium (Python, Java), pytest, REST Assured, k6, Postman, cURL, Markdown, Gherkin, Excel |
 
 ## Quick start
@@ -437,10 +437,11 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] A second demo app (ShopDesk) and published benchmarks
 - [x] Showcase material: case study, samples, screenshots and clips
 - [x] Cerberus-inspired features: reusable blocks with inputs, element repository, campaigns, test data library,
-      before/after hooks, page conditions, manual test runs, SOAP / Kafka / FTP steps
+      before/after hooks, page conditions, manual test runs, SOAP / Kafka / FTP steps, Slack / Teams / webhook
+      notifications
 - [x] Every kind of web app: visual checkpoints, network waiting and mocking, downloads, mobile web with touch,
       clock control, storage, per-environment browser settings
-- [ ] Slack/Teams notifications, network breakdowns, run queue priorities
+- [ ] Network breakdowns, run queue priorities
 - [ ] Native mobile and desktop apps — [plan](docs/NATIVE_APPS_PLAN.md)
 - [ ] An optional desktop installer (Electron)
 

@@ -18,6 +18,21 @@ export const EmailConfig = z.object({
   from: z.string().trim().min(3),
   to: z.array(z.string().trim().min(3)).min(1).max(50),
 });
+export const SlackConfig = z.object({
+  /** Slack (default) or Mattermost: they differ in bold text and links. Rocket.Chat reads the Slack format. */
+  flavor: z.enum(['slack', 'mattermost']).default('slack'),
+  /** Added when tests fail, e.g. `<!here>` (Slack) or `@channel` (Mattermost). */
+  mention: z.string().trim().max(100).optional(),
+});
+export const TeamsConfig = z.object({});
+export const WebhookConfig = z.object({
+  /** Extra request headers, e.g. an authorization header your service expects. */
+  headers: z.record(z.string(), z.string()).default({}),
+});
+const Common = {
+  name: z.string().trim().min(1).max(80),
+  on: z.enum(['always', 'failures']).default('always'),
+};
 export const ChannelInput = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('telegram'),
@@ -34,6 +49,25 @@ export const ChannelInput = z.discriminatedUnion('kind', [
     on: z.enum(['always', 'failures']).default('always'),
     /** SMTP password (stored encrypted). */
     secret: z.string().max(500).optional(),
+  }),
+  // Webhook URLs contain a token: they are the stored secret.
+  z.object({
+    ...Common,
+    kind: z.literal('slack'),
+    config: SlackConfig,
+    secret: z.url().max(2000).optional(),
+  }),
+  z.object({
+    ...Common,
+    kind: z.literal('teams'),
+    config: TeamsConfig,
+    secret: z.url().max(2000).optional(),
+  }),
+  z.object({
+    ...Common,
+    kind: z.literal('webhook'),
+    config: WebhookConfig,
+    secret: z.url().max(2000).optional(),
   }),
 ]);
 export type ChannelInput = z.infer<typeof ChannelInput>;
@@ -190,8 +224,127 @@ export async function sendEmail(
   }
 }
 
+/** Pieces of a summary that every format shares. */
+function parts(s: RunSummary) {
+  const ok = s.status === 'passed';
+  const m = formatSummary(s);
+  const [head, counts, meta, ...rest] = m.text.split('\n');
+  const gate = rest[0]?.startsWith('Quality gate:') ? rest[0] : '';
+  const failed = s.failed.slice(0, MAX_LISTED);
+  return {
+    ok,
+    head: head!,
+    counts: counts!,
+    meta: meta!,
+    gate,
+    failed,
+    more: s.failed.length - failed.length,
+  };
+}
+
+/** Slack, Mattermost and Rocket.Chat: an incoming-webhook message with a coloured attachment. */
+export function formatSlack(
+  s: RunSummary,
+  config: z.input<typeof SlackConfig> = {},
+): Record<string, unknown> {
+  const c = SlackConfig.parse(config);
+  const p = parts(s);
+  // Slack escapes &, < and >; bold is *x* in Slack and **x** in Mattermost.
+  const e = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const b = (t: string) => (c.flavor === 'mattermost' ? `**${t}**` : `*${t}*`);
+  const link = (url: string, label: string) =>
+    c.flavor === 'mattermost' ? `[${label}](${url})` : `<${url}|${label}>`;
+  const body = [
+    e(p.counts),
+    `_${e(p.meta)}_`,
+    ...(p.gate ? [e(p.gate)] : []),
+    ...(p.failed.length
+      ? [
+          '',
+          b('Failed tests'),
+          ...p.failed.map(
+            (f) =>
+              `• ${e(f.name)}${f.diagnosis || f.error ? ` — ${e(String(f.diagnosis ?? f.error).slice(0, 200))}` : ''}`,
+          ),
+        ]
+      : []),
+    ...(p.more > 0 ? [`… and ${p.more} more`] : []),
+    ...(s.url ? ['', link(s.url, 'Open the run')] : []),
+  ].join('\n');
+  const mention = !p.ok && c.mention ? `${c.mention} ` : '';
+  return {
+    text: `${mention}${b(e(p.head))}`,
+    attachments: [
+      { color: p.ok ? '#16a34a' : '#dc2626', text: body, footer: NOTIFY_CREDIT, mrkdwn_in: ['text'] },
+    ],
+  };
+}
+
+/** Microsoft Teams (a "Workflows" webhook): an Adaptive Card. */
+export function formatTeams(s: RunSummary): Record<string, unknown> {
+  const p = parts(s);
+  const text = (t: string, extra: Record<string, unknown> = {}) => ({
+    type: 'TextBlock',
+    text: t,
+    wrap: true,
+    ...extra,
+  });
+  return {
+    type: 'message',
+    attachments: [
+      {
+        contentType: 'application/vnd.microsoft.card.adaptive',
+        contentUrl: null,
+        content: {
+          $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
+          type: 'AdaptiveCard',
+          version: '1.4',
+          body: [
+            text(p.head, { weight: 'Bolder', size: 'Medium', color: p.ok ? 'Good' : 'Attention' }),
+            text(p.counts),
+            text(p.meta, { isSubtle: true, spacing: 'None' }),
+            ...(p.gate ? [text(p.gate, { weight: 'Bolder' })] : []),
+            ...(p.failed.length ? [text('Failed tests', { weight: 'Bolder', spacing: 'Medium' })] : []),
+            ...p.failed.map((f) =>
+              text(
+                `- **${f.name}**${f.diagnosis || f.error ? ` — ${String(f.diagnosis ?? f.error).slice(0, 200)}` : ''}`,
+                {
+                  spacing: 'Small',
+                },
+              ),
+            ),
+            ...(p.more > 0 ? [text(`… and ${p.more} more`)] : []),
+            text(NOTIFY_CREDIT, { isSubtle: true, size: 'Small', spacing: 'Medium' }),
+          ],
+          ...(s.url && { actions: [{ type: 'Action.OpenUrl', title: 'Open the run', url: s.url }] }),
+        },
+      },
+    ],
+  };
+}
+
+/** POSTs JSON to a webhook URL; errors never include the URL (it holds the token). */
+async function postJson(label: string, url: string, payload: unknown, headers: Record<string, string> = {}) {
+  if (!url) throw new Error(`The ${label} webhook URL is missing`);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    throw new Error(`${label} could not be reached: ${(err as Error).message}`);
+  }
+  if (!res.ok) {
+    const body = (await res.text().catch(() => '')).slice(0, 200);
+    throw new Error(`${label} refused the message: ${res.status}${body ? ` ${body}` : ''}`);
+  }
+}
+
 export type Channel = {
-  kind: 'telegram' | 'email';
+  kind: 'telegram' | 'email' | 'slack' | 'teams' | 'webhook';
   config: Record<string, unknown>;
   on: 'always' | 'failures';
   secret?: string;
@@ -205,9 +358,34 @@ export async function notify(
 ): Promise<boolean> {
   if (!opts.force && channel.on === 'failures' && summary.status === 'passed') return false;
   const m = formatSummary(summary);
-  if (channel.kind === 'telegram')
-    await sendTelegram(channel.secret ?? '', channel.config as never, m.telegram);
-  else await sendEmail(channel.secret, channel.config as never, m);
+  switch (channel.kind) {
+    case 'telegram':
+      await sendTelegram(channel.secret ?? '', channel.config as never, m.telegram);
+      break;
+    case 'email':
+      await sendEmail(channel.secret, channel.config as never, m);
+      break;
+    case 'slack': {
+      const c = SlackConfig.parse(channel.config);
+      await postJson(
+        c.flavor === 'mattermost' ? 'Mattermost' : 'Slack',
+        channel.secret ?? '',
+        formatSlack(summary, c),
+      );
+      break;
+    }
+    case 'teams':
+      await postJson('Teams', channel.secret ?? '', formatTeams(summary));
+      break;
+    case 'webhook':
+      await postJson(
+        'The webhook',
+        channel.secret ?? '',
+        { event: 'run.finished', summary, text: m.text },
+        WebhookConfig.parse(channel.config).headers,
+      );
+      break;
+  }
   return true;
 }
 

@@ -1,19 +1,45 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellRing, Mail, Pencil, Plus, Send, Trash2 } from 'lucide-react';
+import { BellRing, Mail, Pencil, Plus, Send, Trash2, Webhook } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm';
 import { Dialog } from '@/components/ui/dialog';
-import { Field, Input, Select, Switch } from '@/components/ui/input';
+import { Field, Input, Select, Switch, Textarea } from '@/components/ui/input';
 import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import type { NotifyChannel } from '@/lib/types';
 
+type Kind = NotifyChannel['kind'];
+export const CHANNEL_LABEL: Record<Kind, string> = {
+  telegram: 'Telegram',
+  email: 'email',
+  slack: 'Slack',
+  teams: 'Teams',
+  webhook: 'webhook',
+};
+const WEBHOOK_KINDS: Kind[] = ['slack', 'teams', 'webhook'];
+const TITLE: Record<Kind, string> = {
+  telegram: 'Add Telegram',
+  email: 'Add email',
+  slack: 'Add Slack, Mattermost or Rocket.Chat',
+  teams: 'Add Microsoft Teams',
+  webhook: 'Add a webhook',
+};
+const HELP: Record<Kind, string> = {
+  telegram: 'Create a bot with @BotFather, add it to your group, and paste its token and the chat ID.',
+  email: 'Any SMTP server works (your mail provider, or the local Mailpit for trying it out).',
+  slack:
+    'Create an Incoming Webhook (Slack: Apps → Incoming WebHooks; Mattermost and Rocket.Chat: Integrations → Incoming webhook) and paste its URL.',
+  teams:
+    'In the channel: Workflows → "Post to a channel when a webhook request is received", then paste the URL it gives you.',
+  webhook: 'StepForge POSTs the run summary as JSON ({ event, summary, text }) to this URL.',
+};
+
 type Draft = {
   id?: string;
-  kind: 'telegram' | 'email';
+  kind: Kind;
   name: string;
   on: 'always' | 'failures';
   chatId: string;
@@ -23,6 +49,10 @@ type Draft = {
   user: string;
   from: string;
   to: string;
+  flavor: 'slack' | 'mattermost';
+  mention: string;
+  /** Webhook headers, one "Name: value" per line. */
+  headers: string;
   /** Empty keeps the stored token/password when editing. */
   secret: string;
   hasSecret: boolean;
@@ -30,7 +60,12 @@ type Draft = {
 
 const blank = (kind: Draft['kind']): Draft => ({
   kind,
-  name: kind === 'telegram' ? 'QA chat' : 'QA team',
+  name: { telegram: 'QA chat', email: 'QA team', slack: '#qa', teams: 'QA channel', webhook: 'Webhook' }[
+    kind
+  ],
+  flavor: 'slack',
+  mention: '',
+  headers: '',
   on: 'always',
   chatId: '',
   host: '',
@@ -58,6 +93,11 @@ function toDraft(c: NotifyChannel): Draft {
     user: String(cfg.user ?? ''),
     from: String(cfg.from ?? ''),
     to: Array.isArray(cfg.to) ? (cfg.to as string[]).join(', ') : '',
+    flavor: cfg.flavor === 'mattermost' ? 'mattermost' : 'slack',
+    mention: String(cfg.mention ?? ''),
+    headers: Object.entries((cfg.headers as Record<string, string>) ?? {})
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('\n'),
   };
 }
 
@@ -75,17 +115,30 @@ function ChannelEditor({ draft, onClose }: { draft: Draft | null; onClose: () =>
       const config =
         v.kind === 'telegram'
           ? { chatId: v.chatId.trim() }
-          : {
-              host: v.host.trim(),
-              port: v.port,
-              secure: v.secure,
-              user: v.user.trim(),
-              from: v.from.trim(),
-              to: v.to
-                .split(/[,;\s]+/)
-                .map((x) => x.trim())
-                .filter(Boolean),
-            };
+          : v.kind === 'slack'
+            ? { flavor: v.flavor, ...(v.mention.trim() && { mention: v.mention.trim() }) }
+            : v.kind === 'teams'
+              ? {}
+              : v.kind === 'webhook'
+                ? {
+                    headers: Object.fromEntries(
+                      v.headers
+                        .split('\n')
+                        .map((l) => l.split(/:(.*)/s).map((x) => x.trim()))
+                        .filter(([k, val]) => k && val),
+                    ),
+                  }
+                : {
+                    host: v.host.trim(),
+                    port: v.port,
+                    secure: v.secure,
+                    user: v.user.trim(),
+                    from: v.from.trim(),
+                    to: v.to
+                      .split(/[,;\s]+/)
+                      .map((x) => x.trim())
+                      .filter(Boolean),
+                  };
       const body = {
         kind: v.kind,
         name: v.name.trim(),
@@ -105,21 +158,20 @@ function ChannelEditor({ draft, onClose }: { draft: Draft | null; onClose: () =>
     onError: toastError,
   });
   if (!d) return null;
+  const webhook = WEBHOOK_KINDS.includes(d.kind);
   const valid =
     d.name.trim() &&
     (d.kind === 'telegram'
       ? d.chatId.trim() && (d.secret || d.hasSecret)
-      : d.host.trim() && d.from.trim() && d.to.trim());
+      : webhook
+        ? /^https?:\/\//.test(d.secret.trim()) || (!d.secret && d.hasSecret)
+        : d.host.trim() && d.from.trim() && d.to.trim());
   return (
     <Dialog
       open={!!draft}
       onClose={onClose}
-      title={d.id ? `Edit ${d.name}` : d.kind === 'telegram' ? 'Add Telegram' : 'Add email'}
-      description={
-        d.kind === 'telegram'
-          ? 'Create a bot with @BotFather, add it to your group, and paste its token and the chat ID.'
-          : 'Any SMTP server works (your mail provider, or the local Mailpit for trying it out).'
-      }
+      title={d.id ? `Edit ${d.name}` : TITLE[d.kind]}
+      description={HELP[d.kind]}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -149,7 +201,60 @@ function ChannelEditor({ draft, onClose }: { draft: Draft | null; onClose: () =>
             <option value="failures">Only when tests fail</option>
           </Select>
         </Field>
-        {d.kind === 'telegram' ? (
+        {webhook ? (
+          <>
+            <Field
+              label="Webhook URL"
+              className="sm:col-span-2"
+              hint={
+                d.hasSecret
+                  ? 'Stored encrypted (it contains a token). Leave empty to keep it.'
+                  : 'Stored encrypted: it contains a token.'
+              }
+            >
+              <Input
+                aria-label="Webhook URL"
+                type="password"
+                autoComplete="off"
+                value={d.secret}
+                placeholder={d.hasSecret ? '••••••••' : 'https://…'}
+                onChange={(e) => setD({ ...d, secret: e.target.value })}
+              />
+            </Field>
+            {d.kind === 'slack' && (
+              <>
+                <Field label="App">
+                  <Select
+                    aria-label="Chat app"
+                    value={d.flavor}
+                    onChange={(e) => setD({ ...d, flavor: e.target.value as Draft['flavor'] })}
+                  >
+                    <option value="slack">Slack or Rocket.Chat</option>
+                    <option value="mattermost">Mattermost</option>
+                  </Select>
+                </Field>
+                <Field label="Mention on failure (optional)" hint="Slack: <!here> · Mattermost: @channel">
+                  <Input
+                    aria-label="Mention on failure"
+                    value={d.mention}
+                    onChange={(e) => setD({ ...d, mention: e.target.value })}
+                  />
+                </Field>
+              </>
+            )}
+            {d.kind === 'webhook' && (
+              <Field label="Headers (optional)" className="sm:col-span-2" hint="One per line: Name: value">
+                <Textarea
+                  aria-label="Webhook headers"
+                  rows={2}
+                  className="font-mono text-xs"
+                  value={d.headers}
+                  onChange={(e) => setD({ ...d, headers: e.target.value })}
+                />
+              </Field>
+            )}
+          </>
+        ) : d.kind === 'telegram' ? (
           <>
             <Field
               label="Bot token"
@@ -266,9 +371,9 @@ export function NotificationsCard() {
       </CardHeader>
       <CardBody className="space-y-3 text-sm">
         <p className="text-muted">
-          Scheduled runs (and <code className="font-mono text-xs">stepforge run --notify</code>) send a
-          summary with the failed tests, their diagnosis, the quality gate and a link to the run. Tokens and
-          passwords are stored encrypted and never shown again.
+          Scheduled runs, campaigns (and <code className="font-mono text-xs">stepforge run --notify</code>)
+          send a summary with the failed tests, their diagnosis, the quality gate and a link to the run.
+          Tokens and passwords are stored encrypted and never shown again.
         </p>
         {channels.data?.length ? (
           <ul
@@ -279,17 +384,26 @@ export function NotificationsCard() {
               <li key={c.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
                 {c.kind === 'telegram' ? (
                   <Send className="h-4 w-4 text-muted" />
-                ) : (
+                ) : c.kind === 'email' ? (
                   <Mail className="h-4 w-4 text-muted" />
+                ) : (
+                  <Webhook className="h-4 w-4 text-muted" />
                 )}
                 <span className="font-medium">{c.name}</span>
                 <span className="text-xs text-muted">
                   {c.kind === 'telegram'
                     ? `Telegram chat ${String(c.config.chatId ?? '')}`
-                    : `${(c.config.to as string[] | undefined)?.join(', ') ?? ''} via ${String(c.config.host ?? '')}`}
+                    : c.kind === 'email'
+                      ? `${(c.config.to as string[] | undefined)?.join(', ') ?? ''} via ${String(c.config.host ?? '')}`
+                      : c.kind === 'slack'
+                        ? `${c.config.flavor === 'mattermost' ? 'Mattermost' : 'Slack'} webhook`
+                        : c.kind === 'teams'
+                          ? 'Microsoft Teams workflow'
+                          : 'JSON webhook'}
                 </span>
                 {c.on === 'failures' && <Badge tone="warn">failures only</Badge>}
                 {c.kind === 'telegram' && !c.hasSecret && <Badge tone="fail">no token</Badge>}
+                {WEBHOOK_KINDS.includes(c.kind) && !c.hasSecret && <Badge tone="fail">no URL</Badge>}
                 <div className="ml-auto flex gap-1">
                   <Button
                     size="sm"
@@ -321,12 +435,21 @@ export function NotificationsCard() {
             ))}
           </ul>
         ) : null}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditing(blank('telegram'))}>
             <Plus className="h-3.5 w-3.5" /> Telegram
           </Button>
           <Button size="sm" variant="outline" onClick={() => setEditing(blank('email'))}>
             <Plus className="h-3.5 w-3.5" /> Email
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEditing(blank('slack'))}>
+            <Plus className="h-3.5 w-3.5" /> Slack / Mattermost
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEditing(blank('teams'))}>
+            <Plus className="h-3.5 w-3.5" /> Teams
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEditing(blank('webhook'))}>
+            <Plus className="h-3.5 w-3.5" /> Webhook
           </Button>
         </div>
       </CardBody>

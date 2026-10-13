@@ -641,7 +641,7 @@ export type CompareRow = {
 export type NotifyChannel = {
   id: string;
   name: string;
-  kind: 'telegram' | 'email';
+  kind: 'telegram' | 'email' | 'slack' | 'teams' | 'webhook';
   config: Record<string, unknown>;
   on: 'always' | 'failures';
   hasSecret: boolean;

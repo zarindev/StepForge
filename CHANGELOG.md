@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Slack, Microsoft Teams, Mattermost, Rocket.Chat and webhook notifications** (like Cerberus Testing's Slack and
+  Teams notifications): new channel kinds in Settings → Notifications. Slack-style incoming webhooks (coloured
+  message, optional mention on failure; Mattermost flavour), Teams Workflows (Adaptive Card with an "Open the run"
+  button) and a generic JSON webhook with optional headers. Webhook URLs are stored encrypted and never returned
+  or shown in errors. See [docs/SCHEDULING.md](docs/SCHEDULING.md#slack-mattermost-and-rocketchat).
 - **SOAP, Kafka and FTP steps** (like Cerberus Testing's SOAP, Kafka and FTP services), see
   [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md): `api.soap` (envelope built from the body, SOAP 1.1/1.2, SOAPAction,
   faults fail the step unless expected), XPath assertion targets and extraction for any XML response,

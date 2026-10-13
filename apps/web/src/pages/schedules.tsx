@@ -26,6 +26,7 @@ import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useLiveEvent, type LiveEvent } from '@/lib/live';
 import { useApplications, useEnvironments, useTags, useTree } from '@/lib/queries';
+import { CHANNEL_LABEL } from '@/components/settings/notifications-card';
 import type { NotifyChannel, RunScope, Schedule, ScheduleRun } from '@/lib/types';
 
 /** Common schedules; anything else is entered as a cron expression. */
@@ -341,7 +342,7 @@ function ScheduleEditor({
                   />
                   {c.name}
                   <span className="text-xs text-muted">
-                    ({c.kind === 'telegram' ? 'Telegram' : 'email'}
+                    ({CHANNEL_LABEL[c.kind]}
                     {c.on === 'failures' ? ', failures only' : ''})
                   </span>
                 </label>

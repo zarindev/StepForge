@@ -5,7 +5,14 @@ import { createServer as netServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { formatSummary, notify, sendTelegram, type RunSummary } from '../src/index.ts';
+import {
+  formatSlack,
+  formatSummary,
+  formatTeams,
+  notify,
+  sendTelegram,
+  type RunSummary,
+} from '../src/index.ts';
 
 const summary: RunSummary = {
   application: 'CareClinic',
@@ -117,6 +124,109 @@ describe('Telegram', () => {
 });
 
 const BIN_DIR = resolve(import.meta.dirname, '../../../data/bin');
+describe('Slack, Mattermost, Teams and webhooks', () => {
+  let hook: Server;
+  let base = '';
+  const got: { path: string; body: Record<string, unknown>; headers: Record<string, unknown> }[] = [];
+  beforeAll(async () => {
+    hook = createServer((req, res) => {
+      let b = '';
+      req.on('data', (c) => (b += c));
+      req.on('end', () => {
+        if (req.url?.includes('revoked')) return res.writeHead(404).end('no_service');
+        got.push({
+          path: req.url ?? '',
+          body: JSON.parse(b) as Record<string, unknown>,
+          headers: req.headers,
+        });
+        res.writeHead(req.url?.startsWith('/teams') ? 202 : 200).end('ok');
+      });
+    });
+    await new Promise<void>((r) => hook.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${(hook.address() as { port: number }).port}`;
+  });
+  afterAll(() => {
+    hook.close();
+  });
+
+  it('Slack: a coloured attachment with the failures, a mention on failure and escaped names', () => {
+    const m = formatSlack(summary, { mention: '<!here>' }) as {
+      text: string;
+      attachments: { color: string; text: string; footer: string }[];
+    };
+    expect(m.text).toBe('<!here> *❌ CareClinic · Staging: failed*');
+    expect(m.attachments[0]!.color).toBe('#dc2626');
+    expect(m.attachments[0]!.text).toContain('• Login &lt;admin&gt; — Timeout 15000ms exceeded');
+    expect(m.attachments[0]!.text).toContain('<http://127.0.0.1:4400/runs/RUN1|Open the run>');
+    expect(m.attachments[0]!.footer).toBe('Sent by StepForge — by Md Zarin Tasnim');
+    const mm = formatSlack(
+      { ...summary, status: 'passed', failed: [] },
+      { flavor: 'mattermost', mention: '@channel' },
+    ) as {
+      text: string;
+      attachments: { color: string; text: string }[];
+    };
+    expect(mm.text).toBe('**✅ CareClinic · Staging: passed**'); // no mention when it passed
+    expect(mm.attachments[0]!.text).toContain('[Open the run](http://127.0.0.1:4400/runs/RUN1)');
+  });
+
+  it('Teams: an Adaptive Card with an "Open the run" button', () => {
+    const card = (
+      formatTeams(summary) as {
+        attachments: {
+          contentType: string;
+          content: { body: { text: string; color?: string }[]; actions: { url: string }[] };
+        }[];
+      }
+    ).attachments[0]!;
+    expect(card.contentType).toBe('application/vnd.microsoft.card.adaptive');
+    expect(card.content.body[0]).toMatchObject({
+      text: '❌ CareClinic · Staging: failed',
+      color: 'Attention',
+    });
+    expect(card.content.body.map((b) => b.text)).toContain(
+      '- **Book appointment** — The API accepted a duplicate (201 instead of 409 Conflict)',
+    );
+    expect(card.content.actions[0]!.url).toBe('http://127.0.0.1:4400/runs/RUN1');
+  });
+
+  it('posts to each webhook; a refusal never shows the URL (it holds the token)', async () => {
+    await notify({ kind: 'slack', config: {}, on: 'always', secret: `${base}/slack/T000/B000/XXX` }, summary);
+    await notify(
+      { kind: 'teams', config: {}, on: 'always', secret: `${base}/teams/workflow?sig=SECRET` },
+      summary,
+    );
+    await notify(
+      {
+        kind: 'webhook',
+        config: { headers: { authorization: 'Bearer abc' } },
+        on: 'always',
+        secret: `${base}/hook`,
+      },
+      summary,
+    );
+    expect(got.map((g) => g.path)).toEqual(['/slack/T000/B000/XXX', '/teams/workflow?sig=SECRET', '/hook']);
+    expect(got[2]!.headers.authorization).toBe('Bearer abc');
+    expect(got[2]!.body).toMatchObject({
+      event: 'run.finished',
+      summary: { application: 'CareClinic', status: 'failed' },
+    });
+
+    const err = await notify(
+      { kind: 'slack', config: {}, on: 'always', secret: `${base}/revoked/SECRET-TOKEN` },
+      summary,
+    ).catch((e: Error) => e);
+    expect(String(err)).toContain('Slack refused the message: 404 no_service');
+    expect(String(err)).not.toContain('SECRET-TOKEN');
+    expect(
+      await notify(
+        { kind: 'teams', config: {}, on: 'failures', secret: `${base}/teams/x` },
+        { ...summary, status: 'passed' },
+      ),
+    ).toBe(false);
+  });
+});
+
 describe.skipIf(!existsSync(mailpitBinary(BIN_DIR)))('email (real SMTP via Mailpit)', () => {
   let mp: MailpitServer;
   beforeAll(async () => {
