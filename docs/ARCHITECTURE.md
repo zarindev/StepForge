@@ -23,7 +23,7 @@ flowchart TB
 | `@stepforge/core` | Zod schemas, unified step model + catalogue, variable resolver, scenario engine, plain English, variants |
 | `@stepforge/db` | Drizzle schema, migrations, open/backup/migrate, repositories |
 | `@stepforge/crypto` | AES-256-GCM secrets, master key management |
-| `@stepforge/executor-ui` | Playwright UI steps, ranked/self-healing locators, evidence |
+| `@stepforge/executor-ui` | Playwright UI steps, ranked/self-healing locators, evidence, environment browser settings, device emulation, network mocking, visual checkpoints (pixelmatch) |
 | `@stepforge/executor-api` | HTTP/GraphQL steps, auth, cookies, JSONPath, JSON Schema, contract hook |
 | `@stepforge/executor-db` | SQLite/PostgreSQL/MySQL/SQL Server/MongoDB drivers, SQL safety guard, rollback mode, data-quality audit |
 | `@stepforge/email` | Mailpit and IMAP mailboxes, OTP/link extraction, Mailpit installer and process control |

@@ -654,6 +654,17 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
       out.push(...listOps(ctx, target.steps, depth + 1));
       break;
     }
+    case 'ui.tap':
+    case 'ui.download':
+    case 'ui.waitForResponse':
+    case 'ui.mockRoute':
+    case 'ui.setOffline':
+    case 'ui.storage':
+    case 'ui.setClock':
+      out.push(
+        todo(ctx, step, 'this browser step is not exported yet; write it with the framework’s own API'),
+      );
+      break;
     default:
       out.push(todo(ctx, step, 'this step type has no exporter'));
   }

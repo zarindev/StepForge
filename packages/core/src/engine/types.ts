@@ -34,6 +34,47 @@ export type ArtifactRef = {
   stepId?: string;
 };
 
+/** A visual checkpoint: the screenshot compared with the approved baseline (absolute paths). */
+export type VisualResult = {
+  /** Baseline file name, per step, browser and screen size. */
+  key: string;
+  baseline: string;
+  actual: string;
+  diff?: string;
+  /** Share of differing pixels, in percent. */
+  diffPercent?: number;
+  maxDiffPercent: number;
+  status: 'new' | 'match' | 'changed' | 'sizeChanged';
+  size?: { width: number; height: number; baselineWidth?: number; baselineHeight?: number };
+};
+
+/**
+ * Browser settings of an environment (applied to every test's browser context): language, time zone, location,
+ * permissions, dark mode, sign-in for HTTP basic auth, extra headers, a proxy, client certificates, a branded browser.
+ */
+export type BrowserSettings = {
+  channel?: 'chrome' | 'msedge';
+  locale?: string;
+  timezoneId?: string;
+  colorScheme?: 'light' | 'dark' | 'no-preference';
+  reducedMotion?: 'reduce' | 'no-preference';
+  geolocation?: { latitude: number; longitude: number; accuracy?: number };
+  permissions?: string[];
+  userAgent?: string;
+  extraHTTPHeaders?: Record<string, string>;
+  httpCredentials?: { username: string; password: string };
+  proxy?: { server: string; bypass?: string; username?: string; password?: string };
+  clientCertificates?: {
+    origin: string;
+    certPath?: string;
+    keyPath?: string;
+    pfxPath?: string;
+    passphrase?: string;
+  }[];
+  serviceWorkers?: 'allow' | 'block';
+  javaScriptEnabled?: boolean;
+};
+
 /** What an executor reports back for one step. */
 export type StepOutcome = {
   message?: string;
@@ -55,6 +96,8 @@ export type StepOutcome = {
   email?: unknown;
   /** A performance report (load test, Lighthouse, page metrics, query plan) shown in results. */
   perf?: unknown;
+  /** A visual checkpoint's images and difference (see VisualResult). */
+  visual?: VisualResult;
   /** Facts collected at failure time for the diagnosis (e.g. element state, locator candidates). */
   diagnostics?: unknown;
   screenshotPath?: string;
@@ -84,6 +127,7 @@ export type StepResult = {
   query?: unknown;
   email?: unknown;
   perf?: unknown;
+  visual?: VisualResult;
   diagnostics?: unknown;
   screenshotPath?: string;
   healedLocator?: StepOutcome['healedLocator'];
@@ -166,6 +210,10 @@ export type RunOptions = {
   captureLogs: boolean;
   /** Record page metrics (Web Vitals) after every ui.navigate. */
   pageMetrics?: boolean;
+  /** Phone or tablet: touch, a mobile browser identity (Chromium/WebKit), so sites serve their mobile version. */
+  device?: 'desktop' | 'tablet' | 'mobile';
+  /** The environment's browser settings. */
+  browserSettings?: BrowserSettings;
   baseUrl?: string;
 };
 

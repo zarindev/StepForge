@@ -8,9 +8,21 @@ import {
   type TestContext,
   type ProbeRequest,
 } from '@stepforge/core';
-import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Browser, BrowserContext, Dialog, Locator, Page } from 'playwright';
+import { JSONPath } from 'jsonpath-plus';
+import {
+  devices,
+  type Browser,
+  type BrowserContext,
+  type Dialog,
+  type Locator,
+  type Page,
+  type Response,
+  type Route,
+} from 'playwright';
+import type { UiExecutorOptions } from './index.ts';
+import { baselineKey, compareWithBaseline, urlMatcher } from './visual.ts';
 import { highlight, inspectFailure } from './inspect.ts';
 import { buildLocator, resolveLocator, type Resolved, type Scope } from './locators.ts';
 import { checkPageMetrics, collectPageMetrics, WEB_VITALS_INIT_SCRIPT } from '@stepforge/perf';
@@ -25,6 +37,14 @@ type NetworkEntry = {
   startedAt: number;
 };
 type ConsoleEntry = { type: string; text: string; location?: string; at: number };
+type SeenResponse = { response: Response; consumed: boolean };
+
+/** Browser identities for phone and tablet runs, so sites that detect mobile browsers serve their mobile version. */
+const DEVICE_PROFILE = {
+  mobile: { chromium: 'Pixel 7', webkit: 'iPhone 14' },
+  tablet: { chromium: 'Galaxy Tab S4', webkit: 'iPad (gen 7)' },
+} as const;
+const MAX_RESPONSES = 300;
 
 const MAX_LOG_ENTRIES = 1000;
 const pad = (n: number) => String(n + 1).padStart(2, '0');
@@ -63,21 +83,41 @@ export class UiSession implements ExecutorSession {
   private pendingDialog: { action: 'accept' | 'dismiss'; promptText?: string } | null = null;
   private failureArtifacts: ArtifactRef[] = [];
   private videoDir: string;
+  /** Responses seen so far; `ui.waitForResponse` takes the first one not taken yet. */
+  private responses: SeenResponse[] = [];
+  /** Active `ui.mockRoute` mocks by URL pattern (a new mock for the same pattern replaces the old one). */
+  private mocks = new Map<string, { matcher: (u: URL) => boolean; handler: (r: Route) => Promise<void> }>();
+  private touch = false;
 
   constructor(
     private readonly browser: Browser,
     private readonly ctx: TestContext,
+    private readonly options: UiExecutorOptions = {},
   ) {
     this.videoDir = join(ctx.artifactsDir, '.video');
   }
 
   async open(): Promise<void> {
     const o = this.ctx.options;
+    const settings = o.browserSettings ?? {};
     mkdirSync(this.ctx.artifactsDir, { recursive: true });
+    // Phones and tablets: touch, and (Chromium/WebKit) a mobile browser identity. Firefox has no mobile mode.
+    const device = o.device && o.device !== 'desktop' ? o.device : undefined;
+    const profile =
+      device && o.browser !== 'firefox' ? devices[DEVICE_PROFILE[device][o.browser]] : undefined;
+    this.touch = !!device;
+    const { channel: _channel, ...contextSettings } = settings;
     this.context = await this.browser.newContext({
       viewport: o.viewport,
       baseURL: o.baseUrl,
       ignoreHTTPSErrors: true,
+      ...(device && { hasTouch: true }),
+      ...(profile && {
+        isMobile: o.browser === 'chromium',
+        userAgent: profile.userAgent,
+        deviceScaleFactor: profile.deviceScaleFactor,
+      }),
+      ...contextSettings,
       ...(o.video !== 'off' && { recordVideo: { dir: this.videoDir, size: o.viewport } }),
     });
     // Web Vitals for perf.pageMetrics and per-navigation metrics; scoped, adds no page globals besides a hidden store.
@@ -124,6 +164,11 @@ export class UiSession implements ExecutorSession {
         durationMs: t.responseEnd > 0 ? Math.round(t.responseEnd) : undefined,
         startedAt: Math.round(t.startTime),
       });
+    });
+    p.on('response', (r) => {
+      this.responses.push({ response: r, consumed: false });
+      if (this.responses.length > MAX_RESPONSES)
+        this.responses.splice(0, this.responses.length - MAX_RESPONSES);
     });
     p.on('requestfailed', (r) => {
       if (this.network.length < MAX_LOG_ENTRIES) {
@@ -233,13 +278,26 @@ export class UiSession implements ExecutorSession {
         }
         case 'click':
         case 'dblclick':
-        case 'hover': {
+        case 'hover':
+        case 'tap': {
           await needs();
-          const opts = { timeout, force: !!p.force, trial: false };
+          // x/y: a point inside the element (canvas apps, maps, charts), from its top-left corner.
+          const position =
+            p.x !== undefined && p.x !== '' && p.y !== undefined && p.y !== ''
+              ? { x: Number(p.x), y: Number(p.y) }
+              : undefined;
+          const opts = { timeout, force: !!p.force, trial: false, ...(position && { position }) };
           if (name === 'click')
             await resolved!.locator.click({ ...opts, button: (p.button as 'left') ?? 'left' });
           else if (name === 'dblclick') await resolved!.locator.dblclick(opts);
-          else await resolved!.locator.hover(opts);
+          else if (name === 'tap') {
+            if (!this.touch)
+              throw new StepError(
+                'invalid_params',
+                'Tapping needs a touch screen: run on the phone or tablet size',
+              );
+            await resolved!.locator.tap(opts);
+          } else await resolved!.locator.hover(opts);
           break;
         }
         case 'rightclick':
@@ -400,7 +458,76 @@ export class UiSession implements ExecutorSession {
           outcome = await this.assert(step, ctx, p, (r) => (resolved = r));
           break;
         case 'visualCheckpoint':
-          throw new StepError('unsupported', 'Visual checkpoints are not available yet');
+          outcome = await this.visualCheckpoint(step, ctx, p, needs, () => resolved);
+          break;
+        case 'download': {
+          await needs();
+          const [download] = await Promise.all([
+            this.page.waitForEvent('download', { timeout }),
+            resolved!.locator.click({ timeout }),
+          ]);
+          const fileName = download.suggestedFilename();
+          const path = join(
+            this.ctx.artifactsDir,
+            `download-${pad(step.position)}-${fileName.replace(/[^\w.-]+/g, '_')}`,
+          );
+          await download.saveAs(path);
+          const failure = await download.failure();
+          if (failure) throw new StepError('network', `The download failed: ${failure}`);
+          const size = statSync(path).size;
+          const info = { fileName, size, path };
+          let text: string | undefined;
+          const content = () => (text ??= size <= 5_000_000 ? readFileSync(path, 'utf8') : '');
+          outcome = {
+            output: info,
+            message: `Downloaded ${fileName} (${size} bytes)`,
+            getTarget: (t) =>
+              t === 'fileName'
+                ? fileName
+                : t === 'size'
+                  ? size
+                  : t === 'content'
+                    ? content()
+                    : this.pageTarget(t),
+          };
+          break;
+        }
+        case 'waitForResponse':
+          outcome = await this.waitForResponse(p, timeout, ctx);
+          break;
+        case 'mockRoute':
+          outcome = await this.mockRoute(p);
+          break;
+        case 'setOffline': {
+          const offline = p.offline === undefined ? true : !!p.offline && p.offline !== 'false';
+          await this.context.setOffline(offline);
+          outcome = { message: offline ? 'The browser is offline' : 'The browser is back online' };
+          break;
+        }
+        case 'storage':
+          outcome = await this.storage(p);
+          break;
+        case 'setClock': {
+          const action = String(p.action ?? 'set');
+          const time =
+            p.time !== undefined && p.time !== ''
+              ? new Date(isNaN(Number(p.time)) ? String(p.time) : Number(p.time))
+              : undefined;
+          if (time && isNaN(time.getTime()))
+            throw new StepError('invalid_params', `Not a date: ${String(p.time)}`);
+          if (action === 'fastForward') {
+            await this.page.clock.fastForward(Number(p.ms ?? 60_000));
+            outcome = { message: `Moved the clock forward ${Number(p.ms ?? 60_000)} ms` };
+          } else if (action === 'install') {
+            await this.page.clock.install(time ? { time } : {});
+            outcome = { message: `The page clock starts at ${(time ?? new Date()).toISOString()} and runs` };
+          } else {
+            if (!time) throw new StepError('invalid_params', 'setClock needs a "time"');
+            await this.page.clock.setFixedTime(time);
+            outcome = { message: `The page clock is fixed at ${time.toISOString()}` };
+          }
+          break;
+        }
         default:
           throw new StepError('unsupported', `Unknown UI step "${step.type}"`);
       }
@@ -426,6 +553,245 @@ export class UiSession implements ExecutorSession {
       outcome.screenshotPath = await this.snap(step.position, 'jpeg');
     }
     return outcome;
+  }
+
+  /** A screenshot compared with the approved baseline; the first run saves the baseline. */
+  private async visualCheckpoint(
+    step: RunnableStep,
+    ctx: StepContext,
+    p: Record<string, unknown>,
+    needs: () => Promise<unknown>,
+    resolved: () => Resolved | undefined,
+  ): Promise<StepOutcome> {
+    const o = this.ctx.options;
+    const actual = join(this.ctx.artifactsDir, `visual-${pad(step.position)}.png`);
+    const masks = (Array.isArray(p.mask) ? p.mask : String(p.mask ?? '').split(','))
+      .map((m) => String(m).trim())
+      .filter(Boolean)
+      .map((css) => this.page.locator(css));
+    // Animations stopped, caret hidden and changing parts masked, so the same page gives the same pixels.
+    const shot = {
+      path: actual,
+      animations: 'disabled' as const,
+      caret: 'hide' as const,
+      mask: masks,
+      timeout: ctx.timeoutMs,
+    };
+    if (step.locators.length) {
+      await needs();
+      await resolved()!.locator.screenshot(shot);
+    } else await this.page.screenshot({ ...shot, fullPage: !!p.fullPage });
+    const key = baselineKey({
+      name: p.name ? String(p.name) : undefined,
+      stepId: step.id,
+      browser: o.browser,
+      width: o.viewport.width,
+      height: o.viewport.height,
+    });
+    const maxDiffPercent =
+      p.maxDiffPercent !== undefined && p.maxDiffPercent !== '' ? Number(p.maxDiffPercent) : 0.1;
+    const v = compareWithBaseline({
+      actual,
+      baseline: join(this.options.baselineDir ?? join(this.ctx.artifactsDir, 'baselines'), key),
+      diff: join(this.ctx.artifactsDir, `visual-${pad(step.position)}-diff.png`),
+      key,
+      threshold: p.threshold !== undefined && p.threshold !== '' ? Number(p.threshold) : 0.1,
+      maxDiffPercent,
+    });
+    const message = {
+      new: 'No baseline yet: this screenshot is now the baseline',
+      match: `Matches the baseline (${v.diffPercent}% of pixels differ, ${maxDiffPercent}% allowed)`,
+      changed: `${v.diffPercent}% of pixels differ from the baseline (${maxDiffPercent}% allowed)`,
+      sizeChanged: `The size changed: ${v.size?.width}×${v.size?.height}, the baseline is ${v.size?.baselineWidth}×${v.size?.baselineHeight}`,
+    }[v.status];
+    return {
+      message,
+      output: v.diffPercent ?? 0,
+      visual: v,
+      screenshotPath: v.diff ?? actual,
+      assertions: [
+        {
+          target: 'visual',
+          operator: 'matchesBaseline',
+          expected: `≤ ${maxDiffPercent}%`,
+          actual: v.diffPercent,
+          passed: v.status === 'new' || v.status === 'match',
+          message,
+        },
+      ],
+    };
+  }
+
+  /** The first response (since the test started) to a matching URL that no earlier step took, or the next one. */
+  private async waitForResponse(
+    p: Record<string, unknown>,
+    timeout: number,
+    ctx: StepContext,
+  ): Promise<StepOutcome> {
+    const pattern = String(p.url ?? '');
+    if (!pattern)
+      throw new StepError('invalid_params', 'waitForResponse needs a "url" (part of it, or a glob)');
+    const match = urlMatcher(pattern);
+    const method = p.method ? String(p.method).toUpperCase() : undefined;
+    const status = p.status !== undefined && p.status !== '' ? Number(p.status) : undefined;
+    const fits = (r: Response) =>
+      match(r.url()) &&
+      (!method || r.request().method() === method) &&
+      (status === undefined || r.status() === status);
+    const deadline = Date.now() + timeout;
+    let found: SeenResponse | undefined;
+    while (!(found = this.responses.find((x) => !x.consumed && fits(x.response)))) {
+      if (ctx.signal.aborted) throw new StepError('aborted', 'Run was cancelled');
+      if (Date.now() >= deadline)
+        throw new StepError(
+          'timeout',
+          `No response from ${pattern}${method ? ` (${method})` : ''}${status !== undefined ? ` with status ${status}` : ''} within ${timeout} ms`,
+        );
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    found.consumed = true;
+    const r = found.response;
+    const text = await r.text().catch(() => '');
+    let body: unknown = text;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // not JSON: keep the text
+    }
+    const t = r.request().timing();
+    const headers = await r.allHeaders().catch(() => ({}) as Record<string, string>);
+    return {
+      output: body,
+      message: `${r.request().method()} ${r.url()} → ${r.status()}`,
+      request: { method: r.request().method(), url: r.url(), headers: {} },
+      response: {
+        status: r.status(),
+        body,
+        timeMs: t.responseEnd > 0 ? Math.round(t.responseEnd) : undefined,
+      },
+      getTarget: (target) => {
+        if (target === 'status') return r.status();
+        if (target === 'body') return body;
+        if (target === 'url') return r.url();
+        if (target.startsWith('header:')) return headers[target.slice(7).toLowerCase()];
+        if (target.startsWith('$'))
+          return JSONPath({ path: target, json: (body ?? null) as object, wrap: false }) as unknown;
+        return this.pageTarget(target);
+      },
+    };
+  }
+
+  /** Answers matching requests with a fixed response, an error or a delay — for the rest of the test. */
+  private async mockRoute(p: Record<string, unknown>): Promise<StepOutcome> {
+    const pattern = String(p.url ?? '');
+    if (!pattern) throw new StepError('invalid_params', 'mockRoute needs a "url" (part of it, or a glob)');
+    const action = String(p.action ?? 'fulfill');
+    const old = this.mocks.get(pattern);
+    if (old) {
+      await this.context.unroute(old.matcher, old.handler);
+      this.mocks.delete(pattern);
+    }
+    if (action === 'remove') return { message: `Requests to ${pattern} reach the server again` };
+    const match = urlMatcher(pattern);
+    const matcher = (u: URL) => match(u.toString());
+    const method = p.method ? String(p.method).toUpperCase() : undefined;
+    const status = Number(p.status ?? 200);
+    const body =
+      p.body === undefined || p.body === null
+        ? ''
+        : typeof p.body === 'string'
+          ? p.body
+          : JSON.stringify(p.body);
+    const contentType = p.contentType
+      ? String(p.contentType)
+      : /^\s*[[{]/.test(body)
+        ? 'application/json'
+        : 'text/plain';
+    const delayMs = Number(p.delayMs ?? 0);
+    const handler = async (route: Route) => {
+      if (method && route.request().method() !== method) return route.fallback();
+      if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+      if (action === 'abort') return route.abort('failed');
+      if (action === 'delay') return route.fallback();
+      return route.fulfill({ status, body, contentType });
+    };
+    const times = p.times !== undefined && p.times !== '' ? Number(p.times) : undefined;
+    await this.context.route(matcher, handler, times ? { times } : undefined);
+    this.mocks.set(pattern, { matcher, handler });
+    const what =
+      action === 'abort'
+        ? 'fail (network error)'
+        : action === 'delay'
+          ? `are delayed ${delayMs} ms`
+          : `are answered with ${status}`;
+    return {
+      message: `Requests to ${pattern}${method ? ` (${method})` : ''} ${what}${times ? `, ${times} time(s)` : ''}`,
+    };
+  }
+
+  /** Cookies, localStorage and sessionStorage: set, get, remove one, or clear. */
+  private async storage(p: Record<string, unknown>): Promise<StepOutcome> {
+    const kind = String(p.kind ?? 'cookie');
+    const action = String(p.action ?? 'get');
+    const name = p.name === undefined ? '' : String(p.name);
+    const value =
+      p.value === undefined || p.value === null
+        ? ''
+        : typeof p.value === 'string'
+          ? p.value
+          : JSON.stringify(p.value);
+    if (!name && action !== 'clear')
+      throw new StepError('invalid_params', `storage ${action} needs a "name"`);
+    if (kind === 'cookie') {
+      if (action === 'set') {
+        const url = /^https?:/.test(this.page.url()) ? this.page.url() : this.ctx.options.baseUrl;
+        if (!url) throw new StepError('invalid_params', 'Open a page before setting a cookie');
+        await this.context.addCookies([{ name, value, url }]);
+        return { message: `Cookie ${name} set` };
+      }
+      if (action === 'clear') {
+        await this.context.clearCookies();
+        return { message: 'All cookies cleared' };
+      }
+      if (action === 'remove') {
+        await this.context.clearCookies({ name });
+        return { message: `Cookie ${name} removed` };
+      }
+      const c = (await this.context.cookies()).find((x) => x.name === name);
+      return {
+        output: c?.value ?? null,
+        message: c ? `Cookie ${name} is set` : `No cookie named ${name}`,
+        getTarget: (t) => (t === 'value' ? (c?.value ?? null) : t === 'exists' ? !!c : this.pageTarget(t)),
+      };
+    }
+    type Store = {
+      setItem(k: string, v: string): void;
+      getItem(k: string): string | null;
+      removeItem(k: string): void;
+      clear(): void;
+    };
+    const area = kind === 'session' || kind === 'sessionStorage' ? 'sessionStorage' : 'localStorage';
+    const got = await this.page.evaluate(
+      ([a, act, k, v]) => {
+        const store = (globalThis as unknown as Record<string, Store>)[a]!;
+        if (act === 'set') store.setItem(k, v);
+        else if (act === 'remove') store.removeItem(k);
+        else if (act === 'clear') store.clear();
+        else return store.getItem(k);
+        return null;
+      },
+      [area, action, name, value] as const,
+    );
+    if (action !== 'get')
+      return {
+        message:
+          action === 'clear' ? `${area} cleared` : `${area} ${name} ${action === 'set' ? 'set' : 'removed'}`,
+      };
+    return {
+      output: got,
+      message: got === null ? `${area} has no ${name}` : `${area} ${name} read`,
+      getTarget: (t) => (t === 'value' ? got : t === 'exists' ? got !== null : this.pageTarget(t)),
+    };
   }
 
   private async pageTarget(t: string): Promise<unknown> {

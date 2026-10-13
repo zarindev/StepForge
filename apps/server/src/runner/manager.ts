@@ -4,11 +4,14 @@ import {
   DEFAULT_RUN_OPTIONS,
   newId,
   runTestCase,
+  VariableResolver,
   VIEWPORT_PRESETS,
+  type BrowserSettings,
   type RunOptions,
   type RunOptionsInput,
   type StepResult,
   type TestCaseResult,
+  type VisualResult,
 } from '@stepforge/core';
 import { schema, type StepForgeDb } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
@@ -70,6 +73,15 @@ export class RunManager {
   ) {}
 
   /** Path relative to the artifacts root with forward slashes (used in URLs). */
+  private relVisual(v: VisualResult): VisualResult {
+    return {
+      ...v,
+      baseline: this.rel(v.baseline),
+      actual: this.rel(v.actual),
+      ...(v.diff && { diff: this.rel(v.diff) }),
+    };
+  }
+
   rel(abs: string): string {
     return relative(this.artifactsRoot, abs).split(sep).join('/');
   }
@@ -239,6 +251,7 @@ export class RunManager {
       ...DEFAULT_RUN_OPTIONS,
       browser: o.browser,
       viewport: VIEWPORT_PRESETS[o.viewport],
+      device: o.viewport,
       headed: o.headed,
       video: o.video,
       trace: o.trace,
@@ -257,12 +270,18 @@ export class RunManager {
     const secrets = repo.resolveSecrets(this.db, this.masterKey, env.id);
     const options = this.toRunOptions(opts, env.baseUrl);
     const envScope = { ...env.variablesJson, baseUrl: env.baseUrl, name: env.name };
+    const settings = (env.browserDefaultsJson as { settings?: BrowserSettings }).settings;
+    // Placeholders (e.g. a basic-auth password from {{secret.x}}) are resolved here; the run never stores them.
+    if (settings)
+      options.browserSettings = new VariableResolver({ env: envScope, secret: secrets }).resolve(
+        settings,
+      ) as BrowserSettings;
     const abort = new AbortController();
     this.active = { runId, abort };
     const pool = new BrowserPool();
     const specs = this.specs;
     const executors = [
-      createUiExecutor(pool),
+      createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines') }),
       createApiExecutor({
         contracts: specs
           ? async (ref, req, res) => {
@@ -513,6 +532,7 @@ export class RunManager {
               healedLocator: s.healedLocator,
               ...(s.email ? { email: s.email } : {}),
               ...(s.perf ? { perf: s.perf } : {}),
+              ...(s.visual ? { visual: this.relVisual(s.visual) } : {}),
               ...(s.diagnostics ? { diagnostics: s.diagnostics } : {}),
             },
             queryJson: s.query ?? null,

@@ -72,7 +72,7 @@ Feature: Shop › Checkout
     And the page title contains "confirmed"
     When click the element "receipt"
     Then text does not contain "Error"
-    When ui visualCheckpoint
+    When the page looks like the approved screenshot
 
     Examples:
       | id         | user          | qty |

@@ -464,6 +464,32 @@ describe('diagnoses (fixtures)', () => {
       for (const bad of ['{{', 'undefined']) if (!raw.includes(bad)) expect(text).not.toContain(bad);
   });
 
+  it('a visual checkpoint that differs is a visual change, not a missing value', () => {
+    const message = '3.2% of pixels differ from the baseline (0.1% allowed)';
+    const d = diagnose(
+      input(
+        step({
+          type: 'ui.visualCheckpoint',
+          errorKind: 'assertion',
+          message,
+          assertions: [
+            {
+              target: 'visual',
+              operator: 'matchesBaseline',
+              expected: '≤ 0.1%',
+              actual: 3.2,
+              passed: false,
+              message,
+            },
+          ],
+        }),
+      ),
+    );
+    expect(d.ruleId).toBe('ui-visual-changed');
+    expect(d.title).toBe('The page looks different from the approved screenshot');
+    expect(d.alternatives.map((a) => a.ruleId)).not.toContain('ui-value-mismatch');
+  });
+
   it('writes explanations with the real values', () => {
     const d = diagnose(input(api(200, 401)));
     expect(d.title).toBe('The API accepted a request it should have rejected (200 instead of 401)');

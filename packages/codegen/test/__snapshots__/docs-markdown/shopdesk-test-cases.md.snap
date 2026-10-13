@@ -91,7 +91,7 @@ Covers the whole UI catalogue.
 55. ✔ Check that the page title is "Order confirmed"
 56. ✔ Check that the page title contains "confirmed"
 57. ✔ Click the element "receipt"
-58. ui visualCheckpoint — Receipt looks right
+58. Check that the page looks like the approved screenshot — Receipt looks right
 
 **Test cases**
 

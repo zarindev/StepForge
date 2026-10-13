@@ -20,6 +20,7 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import { EvidencePanel, Lightbox } from '@/components/runs/evidence';
 import { openRunDialog } from '@/components/runs/run-dialog';
+import { VisualPanel, type StepVisual } from '@/components/runs/visual-panel';
 import { formatDuration, StatusIcon, StatusPill, timeAgo, TotalsBar } from '@/components/runs/status';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -442,7 +443,9 @@ function ItemPanel({
             const dbq = (row.queryJson ?? (s as { query?: unknown }).query) as DbStepQuery | null | undefined;
             const email = extra?.email ?? (s as { email?: StepEmail }).email;
             const perf = (extra?.perf ?? (s as { perf?: unknown }).perf) as StepPerf | undefined;
+            const visual = (extra as { visual?: StepVisual } | null)?.visual;
             const expandable = !!(
+              visual ||
               extra?.assertions?.length ||
               extra?.healedLocator ||
               s.screenshotPath ||
@@ -558,12 +561,13 @@ function ItemPanel({
                         }
                       />
                     )}
+                    {visual && <VisualPanel stepResultId={row.id} visual={visual} onShot={setShot} />}
                     {extra?.assertions?.map((a, i) => (
                       <p key={i} className={a.passed ? 'text-pass' : 'text-fail'}>
                         {a.passed ? '✓' : '✗'} {a.message}
                       </p>
                     ))}
-                    {s.screenshotPath && (
+                    {s.screenshotPath && !visual && (
                       <img
                         src={artifactUrl(s.screenshotPath)}
                         alt={`Step ${s.position + 1}`}

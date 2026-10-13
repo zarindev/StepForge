@@ -38,6 +38,48 @@ export const VIEWPORT_PRESETS = {
   mobile: { width: 390, height: 844 },
 } as const;
 
+/** An environment's browser settings (see BrowserSettings); text values may use {{secret.x}} / {{env.x}}. */
+export const BrowserSettingsInput = z.object({
+  channel: z.enum(['chrome', 'msedge']).optional(),
+  locale: z.string().max(20).optional(),
+  timezoneId: z.string().max(60).optional(),
+  colorScheme: z.enum(['light', 'dark', 'no-preference']).optional(),
+  reducedMotion: z.enum(['reduce', 'no-preference']).optional(),
+  geolocation: z
+    .object({
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      accuracy: z.number().min(0).optional(),
+    })
+    .optional(),
+  permissions: z.array(z.string().max(60)).max(30).optional(),
+  userAgent: z.string().max(500).optional(),
+  extraHTTPHeaders: z.record(z.string(), z.string()).optional(),
+  httpCredentials: z.object({ username: z.string(), password: z.string() }).optional(),
+  proxy: z
+    .object({
+      server: z.string().min(1),
+      bypass: z.string().optional(),
+      username: z.string().optional(),
+      password: z.string().optional(),
+    })
+    .optional(),
+  clientCertificates: z
+    .array(
+      z.object({
+        origin: z.string().min(1),
+        certPath: z.string().optional(),
+        keyPath: z.string().optional(),
+        pfxPath: z.string().optional(),
+        passphrase: z.string().optional(),
+      }),
+    )
+    .max(10)
+    .optional(),
+  serviceWorkers: z.enum(['allow', 'block']).optional(),
+  javaScriptEnabled: z.boolean().optional(),
+});
+
 export const EnvironmentInput = z.object({
   name: z.string().min(1).max(60),
   baseUrl: z.url(),
@@ -48,6 +90,7 @@ export const EnvironmentInput = z.object({
       browser: BrowserName.default('chromium'),
       viewport: Viewport.optional(),
       headless: z.boolean().default(true),
+      settings: BrowserSettingsInput.optional(),
     })
     .default({ browser: 'chromium', headless: true }),
 });

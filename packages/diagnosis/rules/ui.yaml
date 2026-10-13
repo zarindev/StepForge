@@ -135,12 +135,24 @@
   explanation: '{{message}}'
   fix: 'Check the failure screenshot; update the locator or add a wait for the right page state.'
 
+- id: ui-visual-changed
+  category: visual_change
+  priority: 40
+  confidence: 0.7
+  owner: app
+  when: { layer: ui, stepType: ui.visualCheckpoint, errorKind: assertion }
+  title: 'The page looks different from the approved screenshot'
+  explanation: '{{message}}. The run page shows the approved baseline, this run and the difference in red.'
+  fix: 'If the change is intended, press "Accept as new baseline" on the step; if not, it is a visual regression to report. Hide changing parts (dates, ads) with the step''s "Hide" setting.'
+  evidence: { Difference: '{{message}}' }
+
 - id: ui-value-mismatch
   category: assertion_mismatch
   priority: 30
   confidence: 0.55
   owner: app
-  when: { layer: ui, errorKind: assertion, assertion: { exists: true } }
+  when:
+    { layer: ui, errorKind: assertion, assertion: { exists: true }, stepType: { not: ui.visualCheckpoint } }
   title: 'The page shows {{assertion.actual}} where the test expects {{assertion.expected}}'
   explanation: '{{assertion.message}}'
   fix: 'If the page is wrong, it is an application bug; if the text changed on purpose, update the expected value.'
@@ -151,7 +163,7 @@
   priority: 25
   confidence: 0.5
   owner: app
-  when: { layer: ui, errorKind: assertion }
+  when: { layer: ui, errorKind: assertion, stepType: { not: ui.visualCheckpoint } }
   title: 'The page did not meet the check: {{message}}'
   explanation: '{{message}}'
   fix: 'Compare the failure screenshot with the expectation.'

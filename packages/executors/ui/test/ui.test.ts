@@ -1,6 +1,6 @@
 import { DEFAULT_RUN_OPTIONS, newId, runTestCase, type StepInput } from '@stepforge/core';
 import { utilExecutor } from '@stepforge/executor-util';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,6 +21,34 @@ beforeAll(async () => {
         .end(
           '<button data-testid="go">Go</button><div class="sheet" style="position:fixed;inset:0;z-index:9">Rate us</div>',
         );
+    if (req.url === '/secure.html') {
+      // HTTP basic auth (user ana / pw s3cret), and the extra header echoed back.
+      if (req.headers.authorization !== `Basic ${Buffer.from('ana:s3cret').toString('base64')}`)
+        return res.writeHead(401, { 'www-authenticate': 'Basic realm="x"' }).end('no');
+      return res.writeHead(200, { 'content-type': 'text/html' }).end(
+        `<p id="h">${String(req.headers['x-feature'] ?? '')}</p><p id="env"></p><p id="geo"></p>
+<script>document.getElementById('env').textContent = [navigator.language, Intl.DateTimeFormat().resolvedOptions().timeZone, matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'].join(' ');
+navigator.geolocation.getCurrentPosition(p => document.getElementById('geo').textContent = p.coords.latitude + ',' + p.coords.longitude)</script>`,
+      );
+    }
+    if (req.url === '/report.csv')
+      return res
+        .writeHead(200, {
+          'content-type': 'text/csv',
+          'content-disposition': 'attachment; filename="report.csv"',
+        })
+        .end('id,name\n1,Ana\n');
+    if (req.url?.startsWith('/api/items'))
+      return res.writeHead(200, { 'content-type': 'application/json' }).end('{"items":[{"id":7}],"total":1}');
+    if (req.url === '/web.html')
+      return res.writeHead(200, { 'content-type': 'text/html' }).end(
+        `<title>Web</title><a href="/report.csv" download>Export</a>
+<button id="load" onclick="fetch('/api/items?page=1').then(r => r.json()).then(j => document.getElementById('out').textContent = 'total ' + j.total).catch(() => document.getElementById('out').textContent = 'offline')">Load</button>
+<p id="out"></p><p id="now"></p><button id="time" onclick="document.getElementById('now').textContent = new Date().toISOString().slice(0, 10)">Today</button>
+<canvas id="c" width="200" height="100" style="background:#eee" onclick="document.getElementById('out').textContent = 'canvas ' + event.offsetX + ',' + event.offsetY"></canvas>
+<div id="box" style="width:120px;height:60px;background:rgb(30,120,200)"></div>
+<p id="ua"></p><script>document.getElementById('ua').textContent = (navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop') + ('ontouchstart' in window ? ' touch' : '')</script>`,
+      );
     if (req.url === '/more.html')
       // "Load more" adds an item and disappears once there are 3.
       return res
@@ -294,5 +322,161 @@ describe('UI executor', () => {
     expect(loop.message).toMatch(/^Repeated 3 time\(s\) while the condition held/);
     const notes = r.steps.filter((s) => s.type === 'util.log').map((s) => s.message);
     expect(notes).toEqual(['three items', 'button gone', 'has item 3']);
+  });
+
+  it('web app steps: download, wait for / mock API responses, offline, storage, clock, canvas clicks', async () => {
+    const css = (value: string) => [{ strategy: 'css' as const, value }];
+    const r = await run(
+      steps(
+        { type: 'ui.setClock', params: { action: 'install', time: '2030-01-15T10:00:00Z' } },
+        { type: 'ui.navigate', params: { url: '/web.html' } },
+        {
+          type: 'ui.download',
+          locators: [{ strategy: 'text', value: 'Export' }],
+          captureAs: 'file',
+          assertions: [
+            { target: 'fileName', operator: 'equals', expected: 'report.csv' },
+            { target: 'content', operator: 'contains', expected: '1,Ana' },
+          ],
+        },
+        { type: 'ui.click', locators: css('#load') },
+        {
+          type: 'ui.waitForResponse',
+          params: { url: '**/api/items*' },
+          captureAs: 'items',
+          assertions: [
+            { target: 'status', operator: 'equals', expected: 200 },
+            { target: '$.items[0].id', operator: 'equals', expected: 7 },
+          ],
+        },
+        { type: 'ui.assert', params: { check: 'text', expected: 'total 1' }, locators: css('#out') },
+        { type: 'ui.mockRoute', params: { url: '/api/items', status: 200, body: '{"items":[],"total":42}' } },
+        { type: 'ui.click', locators: css('#load') },
+        { type: 'ui.assert', params: { check: 'text', expected: 'total 42' }, locators: css('#out') },
+        { type: 'ui.mockRoute', params: { url: '/api/items', action: 'remove' } },
+        { type: 'ui.setOffline', params: { offline: true } },
+        { type: 'ui.click', locators: css('#load') },
+        { type: 'ui.assert', params: { check: 'text', expected: 'offline' }, locators: css('#out') },
+        { type: 'ui.setOffline', params: { offline: false } },
+        { type: 'ui.storage', params: { kind: 'local', action: 'set', name: 'theme', value: 'dark' } },
+        { type: 'ui.storage', params: { kind: 'local', action: 'get', name: 'theme' }, captureAs: 'theme' },
+        { type: 'ui.storage', params: { kind: 'cookie', action: 'set', name: 'consent', value: 'yes' } },
+        {
+          type: 'ui.storage',
+          params: { kind: 'cookie', action: 'get', name: 'consent' },
+          assertions: [{ target: 'value', operator: 'equals', expected: 'yes' }],
+        },
+        { type: 'ui.click', locators: css('#time') },
+        { type: 'ui.assert', params: { check: 'text', expected: '2030-01-15' }, locators: css('#now') },
+        { type: 'ui.click', params: { x: 30, y: 40 }, locators: css('#c') },
+        { type: 'ui.assert', params: { check: 'text', expected: 'canvas 30,40' }, locators: css('#out') },
+        { type: 'ui.tap', locators: css('#c') },
+      ),
+    );
+    const lines = r.steps.map((s) => `${s.type}:${s.status} ${s.message ?? ''}`);
+    // Tapping needs a touch screen: on the desktop size the last step fails with a clear message.
+    expect(lines.slice(0, -1), lines.join('\n')).toEqual(
+      r.steps.slice(0, -1).map((s) => expect.stringMatching(new RegExp(`^${s.type}:passed`))),
+    );
+    expect(r.steps.at(-1)!.message).toMatch(/Tapping needs a touch screen/);
+    expect((r.vars.file as { fileName: string }).fileName).toBe('report.csv');
+    expect(r.vars.items).toEqual({ items: [{ id: 7 }], total: 1 });
+    expect(r.vars.theme).toBe('dark');
+  });
+
+  it('phone size: touch and a mobile browser identity; tapping works', async () => {
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/web.html' } },
+        {
+          type: 'ui.assert',
+          params: { check: 'text', expected: 'mobile touch' },
+          locators: [{ strategy: 'css', value: '#ua' }],
+        },
+        { type: 'ui.tap', locators: [{ strategy: 'css', value: '#time' }] },
+        {
+          type: 'ui.assert',
+          params: { check: 'text', expected: new Date().toISOString().slice(0, 10) },
+          locators: [{ strategy: 'css', value: '#now' }],
+        },
+      ),
+      { viewport: { width: 390, height: 844 }, device: 'mobile' },
+    );
+    expect(r.status, r.steps.map((s) => `${s.type} ${s.message}`).join('\n')).toBe('passed');
+  });
+
+  it('visual checkpoints: the first run saves the baseline, a changed page fails with a difference image', async () => {
+    const baselineDir = mkdtempSync(join(tmpdir(), 'sf-baselines-'));
+    const id = newId();
+    const check = () =>
+      runTestCase({
+        runId: 'R',
+        steps: [
+          ...steps({ type: 'ui.navigate', params: { url: '/web.html' } }),
+          {
+            ...steps({
+              type: 'ui.visualCheckpoint',
+              locators: [{ strategy: 'css', value: '#box' }],
+              params: { maxDiffPercent: 1 },
+            })[0]!,
+            id, // the same step in every run, so the same baseline
+          },
+        ],
+        env: { baseUrl },
+        executors: [createUiExecutor(pool, { baselineDir }), utilExecutor],
+        options: {
+          ...DEFAULT_RUN_OPTIONS,
+          defaultTimeoutMs: 4000,
+          video: 'off',
+          trace: 'off',
+          screenshots: 'off',
+          baseUrl,
+        },
+        artifactsDir: mkdtempSync(join(tmpdir(), 'sf-ui-')),
+      });
+    const first = await check();
+    expect(first.status).toBe('passed');
+    expect(first.steps.at(-1)!.visual).toMatchObject({ status: 'new' });
+    const second = await check();
+    expect(second.steps.at(-1)!.visual).toMatchObject({ status: 'match', diffPercent: 0 });
+    // Change the approved baseline so the page no longer matches it (as if the page had changed).
+    const baseline = second.steps.at(-1)!.visual!.baseline;
+    const { PNG } = await import('pngjs');
+    const png = PNG.sync.read(readFileSync(baseline));
+    for (let i = 0; i < png.data.length; i += 4) png.data[i] = 255;
+    writeFileSync(baseline, PNG.sync.write(png));
+    const third = await check();
+    expect(third.status).toBe('failed');
+    expect(third.steps.at(-1)!.visual).toMatchObject({ status: 'changed', diffPercent: 100 });
+    expect(existsSync(third.steps.at(-1)!.visual!.diff!)).toBe(true);
+    expect(third.steps.at(-1)!.message).toMatch(/100% of pixels differ from the baseline \(1% allowed\)/);
+  });
+
+  it('environment browser settings: basic auth, extra headers, language, time zone, dark mode, location', async () => {
+    const text = (id: string, expected: string) => ({
+      type: 'ui.assert',
+      params: { check: 'text', expected },
+      locators: [{ strategy: 'css' as const, value: `#${id}` }],
+    });
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/secure.html' } },
+        text('h', 'on'),
+        text('env', 'de-DE Asia/Dhaka dark'),
+        text('geo', '23.81,90.41'),
+      ),
+      {
+        browserSettings: {
+          httpCredentials: { username: 'ana', password: 's3cret' },
+          extraHTTPHeaders: { 'X-Feature': 'on' },
+          locale: 'de-DE',
+          timezoneId: 'Asia/Dhaka',
+          colorScheme: 'dark',
+          geolocation: { latitude: 23.81, longitude: 90.41 },
+          permissions: ['geolocation'],
+        },
+      },
+    );
+    expect(r.status, r.steps.map((s) => `${s.type} ${s.message}`).join('\n')).toBe('passed');
   });
 });

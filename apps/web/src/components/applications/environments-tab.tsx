@@ -1,6 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Globe, MoreHorizontal, Pencil, Plus, ShieldAlert, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import {
+  BrowserSettingsFields,
+  formToSettings,
+  settingsToForm,
+  type BrowserSettingsForm,
+} from '@/components/applications/browser-settings';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,6 +28,7 @@ type EnvForm = {
   variables: string;
   browser: string;
   headless: boolean;
+  settings: BrowserSettingsForm;
 };
 
 const toLines = (vars: Record<string, string>) =>
@@ -54,7 +61,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
         baseUrl: f.baseUrl,
         isProduction: f.isProduction,
         variables: parseVariables(f.variables),
-        browserDefaults: { browser: f.browser, headless: f.headless },
+        browserDefaults: { browser: f.browser, headless: f.headless, settings: formToSettings(f.settings) },
       };
       return editing === 'new' || !editing
         ? api(`/api/applications/${app.id}/environments`, { method: 'POST', json: body })
@@ -181,6 +188,7 @@ function EnvironmentDialog({
     variables: toLines(env?.variablesJson ?? {}),
     browser: String(env?.browserDefaultsJson.browser ?? 'chromium'),
     headless: (env?.browserDefaultsJson.headless as boolean | undefined) ?? true,
+    settings: settingsToForm(env?.browserDefaultsJson.settings),
   });
   const set = (p: Partial<EnvForm>) => setF((c) => ({ ...c, ...p }));
   return (
@@ -239,6 +247,7 @@ function EnvironmentDialog({
             Headless
           </div>
         </div>
+        <BrowserSettingsFields value={f.settings} onChange={(settings) => set({ settings })} />
         <div className="flex items-start gap-3 rounded-lg border border-fail/30 bg-fail/5 p-3">
           <Switch
             checked={f.isProduction}

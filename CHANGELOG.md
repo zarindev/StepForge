@@ -3,6 +3,23 @@
 ## [Unreleased]
 
 ### Added
+- **Every kind of web app** ([docs/WEB_APPS.md](docs/WEB_APPS.md)):
+  - **Visual checkpoints** (`ui.visualCheckpoint`, until now "not available"): the first run saves a baseline; later
+    runs compare pixels (allowed difference and colour tolerance, masks for changing parts) and fail with a
+    difference image; the run page shows baseline, this run and the difference, and **Accept as new baseline**. A
+    diagnosis rule names visual changes.
+  - New steps: `ui.waitForResponse` (status, body, JSONPath checks), `ui.mockRoute` (answer, fail or slow down
+    requests), `ui.setOffline`, `ui.download` (file name, size, content checks), `ui.storage` (cookies,
+    localStorage, sessionStorage), `ui.setClock` (fixed or running clock, jump forward), `ui.tap`; `x`/`y` positions
+    on clicks for canvas, map and chart apps.
+  - Tablet and Mobile runs get a touch screen and a mobile browser identity (Chromium: Pixel 7, WebKit: iPhone 14 /
+    iPad), so sites serve their mobile version.
+  - **Environment browser settings**: language, time zone, dark mode, location and permissions, user agent, HTTP
+    basic auth, extra headers, proxy, client certificates (mTLS), service workers, and the installed Google Chrome or
+    Microsoft Edge instead of the bundled Chromium. Secrets in them are resolved at run time.
+- Docs: [docs/FEATURES.md](docs/FEATURES.md) (every feature in one page), [docs/WEB_APPS.md](docs/WEB_APPS.md),
+  [docs/NATIVE_APPS_PLAN.md](docs/NATIVE_APPS_PLAN.md) (plan for Android, iOS and desktop apps), and a documentation
+  index in the README.
 - **Page conditions** (like Cerberus Testing's step and action conditions): `util.if` can check the page instead of
   comparing values — the step's element is visible, hidden, present, absent, enabled, contains a text, or matches a
   number of times (with a short wait, default 2 s) — and `util.loop` gains **repeat while** a condition holds (a value

@@ -45,7 +45,10 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 - [Configuration](#configuration)
 - [Safety and responsible use](#safety-and-responsible-use)
 - [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
 - [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
+
+**New to StepForge?** [Everything StepForge does](docs/FEATURES.md) lists every feature in one page.
 
 ## Why StepForge
 
@@ -55,6 +58,8 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | API, database, email and performance steps in one test |          —          |       Sometimes        |      ✅       |
 | Plain-English failure diagnosis                        |          —          |       Sometimes        |      ✅       |
 | Runs fully offline, data stays on your machine         |      Sometimes      |           —            |      ✅       |
+| Visual checkpoints with a difference image             |          —          |       Sometimes        |      ✅       |
+| Reusable blocks, shared elements, test data, campaigns |          —          |       Sometimes        |      ✅       |
 | Export to Playwright, Cypress, Selenium, k6, Postman   |    Usually one      |       Sometimes        |      ✅       |
 | Free, no account or subscription                       |      Sometimes      |           —            |      ✅       |
 
@@ -63,6 +68,8 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | Layer | What you get |
 | --- | --- |
 | **UI** | ✅ Recorder with ranked, self-healing locators · assert/extract/mask from the toolbar · tabs, dialogs, iframes · conditions on the page (“if the cookie banner is visible”, “repeat while Load more shows”) · screenshots, video, Playwright traces |
+| **Any web app** | ✅ SPAs, PWAs, canvas and map apps, mobile web with touch · wait for and fake API responses, go offline · file downloads · cookies and storage · control the clock · per-environment language, time zone, location, dark mode, basic auth, headers, proxy, client certificates, installed Chrome/Edge — see [docs/WEB_APPS.md](docs/WEB_APPS.md) |
+| **Visual checks** | ✅ Screenshot comparison with an approved baseline · difference image · one-click "Accept as new baseline" · masks for changing parts |
 | **API** | ✅ REST and GraphQL steps · auth (bearer, basic, API key, OAuth2) · JSONPath and JSON Schema checks · import OpenAPI, Postman, cURL and HAR · contract checks |
 | **Database** | ✅ SQLite, PostgreSQL, MySQL, SQL Server, MongoDB · read-only and rollback modes · SQL Workbench · data-quality audit |
 | **Email** | ✅ Local Mailpit or IMAP · wait for an email · extract one-time codes and links |
@@ -402,6 +409,22 @@ enabled for the mailbox. See [docs/EMAIL.md](docs/EMAIL.md).
 
 More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 
+## Documentation
+
+| Guide | What it covers |
+| --- | --- |
+| [Features](docs/FEATURES.md) | Every feature in one page |
+| [Step reference](docs/STEP_REFERENCE.md) | Every step type, its parameters and checks |
+| [Testing every kind of web app](docs/WEB_APPS.md) | SPAs, PWAs, canvas, downloads, network mocking, visual checkpoints, browser settings |
+| [Blocks and hooks](docs/BLOCKS.md) · [Elements](docs/ELEMENTS.md) · [Test data](docs/TEST_DATA.md) | Reuse: shared steps, before/after each test, shared elements, data sources |
+| [Campaigns](docs/CAMPAIGNS.md) · [Scheduling](docs/SCHEDULING.md) · [CLI](docs/CLI.md) | Running: test sets across browsers and sizes, cron, notifications, CI |
+| [Databases](docs/DATABASES.md) · [Email](docs/EMAIL.md) · [Performance](docs/PERFORMANCE.md) | Beyond the page |
+| [Diagnosis](docs/DIAGNOSIS.md) · [Analytics](docs/ANALYTICS.md) | Understanding failures and trends |
+| [Code export](docs/CODEGEN.md) | The 13 export targets |
+| [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) | How it is built |
+| [Known issues](docs/KNOWN_ISSUES.md) · [Changelog](CHANGELOG.md) | Limits and history |
+| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for Android, iOS and desktop apps |
+
 ## Roadmap
 
 - [x] UI recorder, scenario editor, runner with evidence
@@ -412,8 +435,13 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] Onboarding with a demo workspace
 - [x] A second demo app (ShopDesk) and published benchmarks
 - [x] Showcase material: case study, samples, screenshots and clips
+- [x] Cerberus-inspired features: reusable blocks with inputs, element repository, campaigns, test data library,
+      before/after hooks, page conditions
+- [x] Every kind of web app: visual checkpoints, network waiting and mocking, downloads, mobile web with touch,
+      clock control, storage, per-environment browser settings
+- [ ] Manual test runs, Kafka/SOAP/FTP steps, Slack/Teams notifications, network breakdowns, run queue priorities
+- [ ] Native mobile and desktop apps — [plan](docs/NATIVE_APPS_PLAN.md)
 - [ ] An optional desktop installer (Electron)
-- [ ] Visual checkpoints (screenshot comparison)
 
 ## Contributing
 

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StepForge What's New</title>
+<meta name="description" content="StepForge — what's new: post images for LinkedIn and X, by Md Zarin Tasnim.">
+<meta name="author" content="Md Zarin Tasnim">
+<!--
+  StepForge "what's new" post images — by Md Zarin Tasnim. Rendered by scripts/export_whats_new.ts into
+  docs/case-study/whats-new/: ten cards of 1200×675 (fits LinkedIn and X). Screenshots come from the end-to-end tests
+  (STEPFORGE_SHOTS) and are in docs/assets/screenshots/new/.
+-->
+<style>
+  @font-face { font-family: 'Inter'; src: url('fonts/inter-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+  @font-face { font-family: 'JetBrains Mono'; src: url('fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2'); font-weight: 100 800; font-display: block; }
+  :root { --bg: #0B0D12; --bg2: #111520; --text: #F5F7FA; --muted: #9AA4B2; --accent: #F97316; --accent2: #FB923C; --line: rgba(255,255,255,.1); --mono: 'JetBrains Mono', Menlo, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #05060a; font-family: 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; gap: 32px; padding: 32px 16px; align-items: flex-start; }
+  body.export { padding: 0; gap: 0; }
+  .card { position: relative; overflow: hidden; flex: none; width: 1200px; height: 675px;
+    background: radial-gradient(900px 600px at 90% -10%, rgba(249,115,22,.22), transparent 60%), radial-gradient(700px 500px at -10% 110%, rgba(96,165,250,.08), transparent 60%), linear-gradient(180deg, var(--bg), var(--bg2)); }
+  .card::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(180deg, #000, transparent 75%); }
+  .card > * { position: relative; }
+  .safe { position: absolute; left: 64px; top: 56px; bottom: 52px; width: 520px; display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
+  .step { margin-left: auto; font-size: 15px; font-weight: 600; color: var(--muted); font-family: var(--mono); }
+  .eyebrow { margin-top: 30px; font-size: 17px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent2); }
+  h2 { margin-top: 12px; font-size: 44px; font-weight: 800; letter-spacing: -.035em; line-height: 1.08; }
+  ul { list-style: none; margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+  li { font-size: 20px; line-height: 1.35; color: #D5DBE5; padding-left: 26px; position: relative; }
+  li::before { content: ''; position: absolute; left: 2px; top: 10px; width: 9px; height: 9px; border-radius: 3px; background: var(--accent); }
+  .foot { margin-top: auto; font-size: 17px; color: var(--muted); }
+  .foot b { color: #D5DBE5; }
+  .hl { color: var(--accent2); }
+  .browser { position: absolute; border-radius: 14px; overflow: hidden; background: #0f121a; border: 1px solid rgba(255,255,255,.14); box-shadow: 0 40px 100px rgba(0,0,0,.6); }
+  .browser .bar { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 14px; background: #171b26; border-bottom: 1px solid var(--line); }
+  .browser .bar i { width: 10px; height: 10px; border-radius: 50%; }
+  .browser .bar i:nth-child(1) { background: #FF5F57; } .browser .bar i:nth-child(2) { background: #FEBC2E; } .browser .bar i:nth-child(3) { background: #28C840; }
+  .crop { position: relative; overflow: hidden; }
+  .crop img { position: absolute; display: block; }
+  .tiles { margin-top: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .tile { border: 1px solid var(--line); background: rgba(255,255,255,.04); border-radius: 16px; padding: 18px 18px 20px; }
+  .tile .n { font-family: var(--mono); font-size: 15px; color: var(--accent2); font-weight: 700; }
+  .tile .t { margin-top: 8px; font-size: 21px; font-weight: 750; letter-spacing: -.02em; line-height: 1.15; }
+  .tile .d { margin-top: 6px; font-size: 15px; color: var(--muted); line-height: 1.35; }
+  .chip { font-size: 18px; padding: 9px 16px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid var(--line); color: #D5DBE5; white-space: nowrap; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="sfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FB923C"/><stop offset="1" stop-color="#EA580C"/></linearGradient>
+    <symbol id="logo" viewBox="0 0 64 64">
+      <path d="M8 22h40c0 6-4 10-10 11v7h6v6H20v-6h6v-7C15 32 8 28 8 22z" fill="url(#sfg)"/>
+      <path d="M48 22h8c0 3-3 5-8 5z" fill="#EA580C"/>
+      <rect x="16" y="46" width="32" height="6" rx="2" fill="#C2410C"/>
+      <circle cx="30" cy="25" r="6.5" fill="#0B0D12"/>
+      <path d="M28 21.8v6.4l5-3.2z" fill="#F97316"/>
+      <path d="M50 6l1.6 4.4L56 12l-4.4 1.6L50 18l-1.6-4.4L44 12l4.4-1.6z" fill="#FDE68A"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- 1. Cover -->
+<section class="card" id="w01">
+  <div class="safe" style="width:1072px">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">1/10</span></div>
+    <h2 style="font-size:60px;margin-top:30px">What's new in StepForge: <span class="hl">8 features</span></h2>
+    <div style="font-size:22px;color:var(--muted);margin-top:14px;line-height:1.4">Inspired by Cerberus Testing — free, open source, and running on your own computer.</div>
+    <div class="tiles">
+      <div class="tile"><div class="n">01</div><div class="t">Reusable blocks</div><div class="d">Write "Sign in" once</div></div>
+      <div class="tile"><div class="n">02</div><div class="t">Before / after hooks</div><div class="d">Set-up and clean-up for every test</div></div>
+      <div class="tile"><div class="n">03</div><div class="t">Element repository</div><div class="d">Fix a locator once</div></div>
+      <div class="tile"><div class="n">04</div><div class="t">Campaigns</div><div class="d">Environments × browsers × sizes</div></div>
+      <div class="tile"><div class="n">05</div><div class="t">Test data library</div><div class="d">Tables, CSV, SQL, APIs</div></div>
+      <div class="tile"><div class="n">06</div><div class="t">Page conditions</div><div class="d">If visible… repeat while…</div></div>
+      <div class="tile"><div class="n">07</div><div class="t">Visual checkpoints</div><div class="d">Pixel diffs you can accept</div></div>
+      <div class="tile"><div class="n">08</div><div class="t">Any web app</div><div class="d">Network, mobile, clock, auth</div></div>
+    </div>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+</section>
+
+<!-- 2. Blocks -->
+<section class="card" id="w02">
+  <div class="safe">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">2/10</span></div>
+    <div class="eyebrow">01 · Reusable blocks</div>
+    <h2>Write "Sign in" once. <span class="hl">Use it in every test.</span></h2>
+    <ul>
+      <li>Blocks with inputs and default values</li>
+      <li>Select steps → <b>Make a block</b></li>
+      <li>Fix the block once: every test using it is repaired</li>
+      <li>Failures grouped by block</li>
+    </ul>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-bleed style="left:630px;top:92px;width:640px"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="crop" style="height:470px"><img src="../assets/screenshots/new/blocks-made.png" alt="" data-x="440" data-y="70" data-s="0.62"></div></div>
+</section>
+
+<!-- 3. Hooks -->
+<section class="card" id="w03">
+  <div class="safe">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">3/10</span></div>
+    <div class="eyebrow">02 · Before / after each test</div>
+    <h2>Set-up and clean-up, <span class="hl">automatically.</span></h2>
+    <ul>
+      <li>A block before and after every test of a module</li>
+      <li>Sub-modules inherit them; scenarios add their own</li>
+      <li>Clean-up runs even when the test fails</li>
+    </ul>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-bleed style="left:630px;top:92px;width:640px"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="crop" style="height:440px"><img src="../assets/screenshots/new/hooks-run.png" alt="" data-x="470" data-y="300" data-s="0.75"></div></div>
+</section>
+
+<!-- 4. Elements -->
+<section class="card" id="w04">
+  <div class="safe">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">4/10</span></div>
+    <div class="eyebrow">03 · Element repository</div>
+    <h2>Fix a locator once. <span class="hl">Every step follows.</span></h2>
+    <ul>
+      <li>Named, shared UI elements with ranked locators</li>
+      <li>See every step that uses an element</li>
+      <li>The one-click diagnosis fix updates the element</li>
+      <li>Recordings reuse elements you already have</li>
+    </ul>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-bleed style="left:630px;top:170px;width:640px"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="crop" style="height:250px"><img src="../assets/screenshots/new/elements-tab.png" alt="" data-x="392" data-y="400" data-s="0.63"></div></div>
+</section>
+
+<!-- 5. Campaigns -->
+<section class="card" id="w05">
+  <div class="safe">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">5/10</span></div>
+    <div class="eyebrow">04 · Campaigns</div>
+    <h2>One click: <span class="hl">every environment × browser × size.</span></h2>
+    <ul>
+      <li>Saved test sets: all, modules, tags or scenarios</li>
+      <li>Each test's result per combination, side by side</li>
+      <li>Rerun only what failed, only where it failed</li>
+      <li>From the dashboard, a schedule or the CLI</li>
+    </ul>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-bleed style="left:630px;top:180px;width:640px"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="crop" style="height:232px"><img src="../assets/screenshots/new/campaign-run.png" alt="" data-x="96" data-y="118" data-s="0.55"></div></div>
+</section>
+
+<!-- 6. Test data -->
+<section class="card" id="w06">
+  <div class="safe">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">6/10</span></div>
+    <div class="eyebrow">05 · Test data library</div>
+    <h2>Test data from <span class="hl">tables, CSV, SQL or an API.</span></h2>
+    <ul>
+      <li>Named data sources, previewed in any environment</li>
+      <li>First, random, matching or not-yet-used rows</li>
+      <li>SQL sources always run read-only</li>
+    </ul>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-bleed style="left:630px;top:150px;width:640px"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="crop" style="height:310px"><img src="../assets/screenshots/new/test-data.png" alt="" data-x="372" data-y="400" data-s="0.63"></div></div>
+</section>
+
+<!-- 7. Conditions -->
+<section class="card" id="w07">
+  <div class="safe">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">7/10</span></div>
+    <div class="eyebrow">06 · Page conditions</div>
+    <h2>Tests that <span class="hl">react to the page.</span></h2>
+    <ul>
+      <li>If the cookie banner is visible → accept it</li>
+      <li>Repeat while "Load more" is shown → click it</li>
+      <li>Visible, hidden, present, enabled, text, count</li>
+    </ul>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-bleed style="left:630px;top:92px;width:640px"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="crop" style="height:440px"><img src="../assets/screenshots/new/conditions-editor.png" alt="" data-x="478" data-y="225" data-s="0.66"></div></div>
+</section>
+
+<!-- 8. Visual checkpoints -->
+<section class="card" id="w08">
+  <div class="safe">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">8/10</span></div>
+    <div class="eyebrow">07 · Visual checkpoints</div>
+    <h2>Catch <span class="hl">visual regressions.</span></h2>
+    <ul>
+      <li>The first run saves the approved screenshot</li>
+      <li>Pixel comparison with a red difference image</li>
+      <li><b>Accept as new baseline</b> in one click</li>
+      <li>Hide clocks, ads and avatars before comparing</li>
+    </ul>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-bleed style="left:630px;top:150px;width:640px"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="crop" style="height:300px"><img src="../assets/screenshots/new/visual-accept.png" alt="" data-x="478" data-y="205" data-s="0.82"></div></div>
+</section>
+
+<!-- 9. Any web app -->
+<section class="card" id="w09">
+  <div class="safe">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge<span class="step">9/10</span></div>
+    <div class="eyebrow">08 · Any web app</div>
+    <h2>Test <span class="hl">any kind of web app.</span></h2>
+    <ul>
+      <li>Wait for or fake API responses · go offline</li>
+      <li>Downloads · cookies &amp; storage · control the clock</li>
+      <li>Mobile web with touch · clicks on canvas and maps</li>
+      <li>Per environment: language, time zone, location, dark mode, basic auth, headers, proxy, certificates</li>
+    </ul>
+    <div class="foot">Free &amp; open source — by <b>Md Zarin Tasnim</b></div>
+  </div>
+  <div class="browser" data-bleed style="left:630px;top:92px;width:640px"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="crop" style="height:470px"><img src="../assets/screenshots/new/browser-settings.png" alt="" data-x="440" data-y="300" data-s="0.82"></div></div>
+</section>
+
+<!-- 10. Closing -->
+<section class="card" id="w10">
+  <div class="safe" style="width:1072px;align-items:center;text-align:center">
+    <div class="brand"><svg width="44" height="44"><use href="#logo"/></svg>StepForge</div>
+    <h2 style="font-size:66px;margin-top:70px">Free. Open source.<br><span class="hl">Runs on your computer.</span></h2>
+    <div style="font-size:24px;color:var(--muted);margin-top:24px;line-height:1.45">UI · API · database · email · performance testing in one local QA studio.<br>No accounts, no cloud, no paid APIs.</div>
+    <div style="display:flex;gap:12px;margin-top:36px"><span class="chip">github.com/zarindev/StepForge</span><span class="chip">MIT licence</span><span class="chip">Playwright</span></div>
+    <div class="foot" style="font-size:22px">by <b>Md Zarin Tasnim</b></div>
+  </div>
+</section>
+
+<script>
+  if (new URLSearchParams(location.search).has('export')) document.body.classList.add('export');
+  // Each screenshot shows the part starting at (data-x, data-y) of the 1440×900 original, scaled by data-s.
+  for (const img of document.querySelectorAll('.crop img')) {
+    const s = Number(img.dataset.s);
+    img.style.width = `${1440 * s}px`;
+    img.style.left = `${-Number(img.dataset.x) * s}px`;
+    img.style.top = `${-Number(img.dataset.y) * s}px`;
+  }
+</script>
+</body>
+</html>

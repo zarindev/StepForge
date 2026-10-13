@@ -33,10 +33,13 @@ If the first one fails but a later one matches, the step passes and is marked **
 
 ## UI steps (`ui.*`) — available since Phase 3
 
+How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth staging sites and more: [WEB_APPS.md](WEB_APPS.md).
+
 | type | params | notes |
 |---|---|---|
 | `navigate` | `url` (absolute or relative to the environment base URL), `waitUntil` (`load`/`domcontentloaded`/`networkidle`) | assertion targets: `status`, `url`, `title` |
-| `click` / `dblclick` / `rightclick` / `hover` | `force`, `button` | |
+| `click` / `dblclick` / `rightclick` / `hover` | `force`, `button`, `x` + `y` (a point inside the element, from its top-left corner) | `x`/`y` for canvas, maps and charts |
+| `tap` | `x` + `y` (optional) | touch tap; needs the Tablet or Mobile run size (touch screen) |
 | `fill` | `value` | replaces the content |
 | `type` | `value`, `delay` (ms per key) | types key by key |
 | `clear` | — | |
@@ -54,7 +57,13 @@ If the first one fails but a later one matches, the step passes and is marked **
 | `screenshot` | `fullPage` | with a locator: element screenshot; kept as evidence |
 | `extract` | `from` (`text`/`value`/`attribute`/`count`/`url`/`title`), `attribute`, `regex` (group 1) | use `captureAs` to store it |
 | `assert` | `check`, `expected`, `attribute` | polls until true or timeout; see below |
-| `visualCheckpoint` | — | not available yet (reported as unsupported) |
+| `visualCheckpoint` | `name` (baseline name, optional), `maxDiffPercent` (default 0.1), `threshold` (colour tolerance 0–1, default 0.1), `fullPage`, `mask` (CSS selectors, comma separated) | with a locator: that element, else the page. First run saves the baseline; later runs fail above the allowed difference, with a difference image and **Accept as new baseline** on the run page. See [WEB_APPS.md](WEB_APPS.md#visual-checkpoints) |
+| `download` | — (the locator is clicked) | keeps the file; assertion targets `fileName`, `size`, `content` (text up to 5 MB); output `{ fileName, size, path }` |
+| `waitForResponse` | `url` (part of the URL, or a glob like `**/api/orders*`), `method`, `status` | the first matching response since the test started that no earlier step took, else the next one; targets `status`, `body`, `url`, `header:<name>`, any JSONPath (`$.items[0].id`); output: the body |
+| `mockRoute` | `url`, `action` (`fulfill`/`abort`/`delay`/`remove`), `method`, `status`, `body`, `contentType`, `delayMs`, `times` | until the test ends (or `remove`); a new mock for the same `url` replaces the old one |
+| `setOffline` | `offline` (default true) | `false` goes back online |
+| `storage` | `kind` (`cookie`/`local`/`session`), `action` (`get`/`set`/`remove`/`clear`), `name`, `value` | `get`: targets `value`, `exists`; output: the value |
+| `setClock` | `action` (`set` = fixed time, `install` = runs from `time`, `fastForward` + `ms`), `time` (ISO date or epoch ms) | put `install` before `ui.navigate` so the page's timers use it |
 
 `ui.assert` checks: `visible`, `hidden`, `text`, `textContains`, `textMatches` (regex), `value`, `count`,
 `attribute` (+ `attribute` name), `enabled`, `disabled`, `checked`, `unchecked`, `url`, `urlContains`,

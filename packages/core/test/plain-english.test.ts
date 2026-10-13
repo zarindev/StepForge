@@ -39,6 +39,21 @@ describe('plain English', () => {
     [s('api.request', { method: 'POST', url: '/api/patients' }), 'Send POST /api/patients'],
     [s('util.loop', { count: 3 }), 'Repeat 3 times'],
     [
+      s('ui.waitForResponse', { url: '/api/orders', method: 'POST' }),
+      'Wait for the POST response from /api/orders',
+    ],
+    [s('ui.mockRoute', { url: '/api/orders', status: 500 }), 'Answer requests to /api/orders with 500'],
+    [
+      s('ui.storage', { kind: 'local', action: 'set', name: 'theme', value: 'dark' }),
+      'Set the local storage "theme" to "dark"',
+    ],
+    [s('ui.setClock', { action: 'set', time: '2030-01-15' }), 'Set the page clock to 2030-01-15'],
+    [s('ui.setOffline', {}), 'Go offline'],
+    [
+      s('ui.visualCheckpoint', {}, [{ strategy: 'testId' as never, value: 'chart' }]),
+      'Check that the element "chart" looks like the approved screenshot',
+    ],
+    [
       s('util.loop', { while: { type: 'element', check: 'visible' } }, [
         { strategy: 'role' as never, value: 'button', name: 'Load more' },
       ]),

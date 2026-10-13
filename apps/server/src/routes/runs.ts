@@ -3,9 +3,9 @@ import { schema } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
 import { and, desc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import type { AppContext } from '../context.ts';
 
 type P<T extends string> = { Params: Record<T, string> };
@@ -128,6 +128,29 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
       .where(eq(schema.bugs.runItemId, item.id))
       .get();
     return { ...item, steps, artifacts, bug: bug ?? null };
+  });
+
+  /** Visual checkpoint: the screenshot of this result becomes the approved baseline (the page changed on purpose). */
+  app.post<P<'id'>>('/api/step-results/:id/accept-baseline', async (req, reply) => {
+    const row = db.select().from(schema.stepResults).where(eq(schema.stepResults.id, req.params.id)).get();
+    const visual = (row?.responseJson as { visual?: { baseline: string; actual: string } } | null)?.visual;
+    if (!row || !visual)
+      return reply.code(404).send({ error: 'not_found', message: 'No visual checkpoint here' });
+    const root = resolve(ctx.config.artifactsDir);
+    const from = resolve(root, visual.actual);
+    const to = resolve(root, visual.baseline);
+    // Both paths come from the run, but stay inside the artifacts folder whatever is stored.
+    if (!from.startsWith(root + sep) || !to.startsWith(join(root, 'baselines') + sep) || !existsSync(from))
+      return reply
+        .code(400)
+        .send({ error: 'invalid', message: 'The screenshot of this run is no longer available' });
+    mkdirSync(dirname(to), { recursive: true });
+    copyFileSync(from, to);
+    db.update(schema.stepResults)
+      .set({ responseJson: { ...(row.responseJson as object), visual: { ...visual, accepted: true } } })
+      .where(eq(schema.stepResults.id, row.id))
+      .run();
+    return { ok: true, baseline: visual.baseline };
   });
 
   app.post<P<'id'>>('/api/runs/:id/cancel', async (req) => runs.cancel(req.params.id));

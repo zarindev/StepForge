@@ -14,12 +14,14 @@ export class BrowserPool {
     return this.versions.get(browser);
   }
 
-  get(options: Pick<RunOptions, 'browser' | 'headed'>): Promise<Browser> {
-    const key = `${options.browser}:${options.headed}`;
+  get(options: Pick<RunOptions, 'browser' | 'headed' | 'browserSettings'>): Promise<Browser> {
+    // Google Chrome or Microsoft Edge installed on this computer, instead of the bundled Chromium.
+    const channel = options.browser === 'chromium' ? options.browserSettings?.channel : undefined;
+    const key = `${options.browser}:${channel ?? ''}:${options.headed}`;
     let b = this.browsers.get(key);
     if (!b) {
       const type = { chromium, firefox, webkit }[options.browser];
-      b = type.launch({ headless: !options.headed });
+      b = type.launch({ headless: !options.headed, ...(channel && { channel }) });
       void b
         .then((x) => this.versions.set(options.browser, `${options.browser} ${x.version()}`))
         .catch(() => undefined);
@@ -36,12 +38,17 @@ export class BrowserPool {
   }
 }
 
-export function createUiExecutor(pool: BrowserPool): Executor {
+export type UiExecutorOptions = {
+  /** Where visual checkpoints keep their approved baselines (default: `baselines` in the test's artifacts folder). */
+  baselineDir?: string;
+};
+
+export function createUiExecutor(pool: BrowserPool, options: UiExecutorOptions = {}): Executor {
   return {
     group: 'ui',
     async createSession(ctx: TestContext) {
       const browser = await pool.get(ctx.options);
-      const session = new UiSession(browser, ctx);
+      const session = new UiSession(browser, ctx, options);
       await session.open();
       return session;
     },

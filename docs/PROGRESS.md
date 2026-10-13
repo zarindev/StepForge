@@ -18,6 +18,43 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 12 | Code generators + snapshot tests | ✅ Done |
 | 13 | Public-repo polish, onboarding, fresh-clone test | ✅ Done (Windows/Ubuntu via CI after push) |
 | 14 | Showcase package, optional Electron | ✅ Done (Electron skipped: optional) |
+| 15 | Cerberus-inspired features, every kind of web app | 🟢 In progress (6 of 11 features + web-app coverage done) |
+
+---
+
+## Phase 15 — Cerberus-inspired features and web-app coverage (2026-10-13)
+
+Features inspired by [Cerberus Testing](https://github.com/cerberustesting), added one at a time; everything stays
+free, open source and local.
+
+**Delivered**
+- **Block maintenance** — block inputs, make a block from selected steps, "used by", a fix inside a block repairs every
+  test, failures grouped by block (migration 0006). [BLOCKS.md](BLOCKS.md)
+- **Element repository** — named shared elements, locator strategy `element`, one-click fix updates the element
+  (migration 0007). [ELEMENTS.md](ELEMENTS.md)
+- **Campaigns** — test sets across environments × browsers × sizes, combined report, rerun failed, schedules and
+  `stepforge campaign` (migration 0008). [CAMPAIGNS.md](CAMPAIGNS.md)
+- **Test data library** — table, CSV, read-only SQL and API data sources, `util.useData` (migration 0009).
+  [TEST_DATA.md](TEST_DATA.md)
+- **Hooks** — before/after-each-test blocks per module and scenario (migration 0010). [BLOCKS.md](BLOCKS.md#hooks)
+- **Page conditions** — `util.if` checks on the page, `util.loop` "repeat while". [STEP_REFERENCE.md](STEP_REFERENCE.md)
+- **Every kind of web app** — visual checkpoints with baselines and accept, network waiting and mocking, offline,
+  downloads, storage, clock, touch and mobile identity, environment browser settings (no migration: they live in
+  `environments.browser_defaults_json.settings`). [WEB_APPS.md](WEB_APPS.md)
+- Fixed on the way: the step editor crashed on nested steps saved without locators.
+
+**Verified**
+- Each feature: unit and server tests, an end-to-end test (`e2e/blocks`, `elements`, `campaigns`, `data`, `hooks`,
+  `web-apps`), lint, typecheck and build; pushed features passed GitHub Actions CI (Ubuntu and Windows).
+- Web apps: the UI executor tests run every new step against a real page (download, wait for and mock responses,
+  offline, storage, clock, canvas clicks, phone identity and touch, basic auth, headers, language, time zone, dark
+  mode, location, visual baseline → change → difference); a server test resolves a basic-auth password from a secret
+  and accepts a new baseline through the API; an E2E saves browser settings in the form and accepts a visual change on
+  the run page.
+
+**Next**
+- Manual test runs, Kafka/SOAP/FTP steps, Slack/Teams notifications, network breakdowns, run queue priorities.
+- Native apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
 
 ---
 

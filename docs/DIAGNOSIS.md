@@ -36,7 +36,7 @@ slow API (behind a timeout, or a failed response-time check), HTTP 400/401/403/4
 validation (duplicate or invalid input accepted), wrong status for missing records, CORS, network offline/DNS,
 JSON-schema and contract mismatch (field by field), assertion mismatch (with the value difference), database
 unreachable, constraint violation, empty result, data-integrity mismatch, data-quality audit failures, email not
-received, inbox unreachable, OTP not found, missing email link, JavaScript exception (with source location), flaky
+received, inbox unreachable, OTP not found, missing email link, JavaScript exception (with source location), visual change (a checkpoint differs from its approved screenshot), flaky
 timing, performance threshold exceeded (and regression against the last passing run), missing index (full table
 scan), test-data collision, test configuration errors, and a catch-all.
 

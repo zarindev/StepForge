@@ -58,7 +58,8 @@ database step under `sql/`, and optionally **GitHub Actions** and **GitLab CI** 
   iframe stay inline.
 
 **Never silently broken:** a step a target cannot express exactly becomes a `TODO(StepForge): …` comment and is listed
-in the export dialog, the README (*Needs attention*) and the CLI output. Examples: visual checkpoints, Lighthouse and
+in the export dialog, the README (*Needs attention*) and the CLI output. Examples: visual checkpoints, the newer browser steps (tap, download, wait for response, mock route, offline,
+storage, clock), page conditions and "repeat while" loops, test data (`util.useData`), Lighthouse and
 load tests in functional suites, MongoDB and data-quality steps, IMAP inboxes, OAuth2 auth, JSON Schema checks,
 multi-tab / iframes / drag and drop in Cypress, JavaScript *Run script* steps in Python and Java, browser steps in
 API-only targets.

@@ -113,7 +113,7 @@ export function describeStep(step: AnyStep): string {
       s = `Open ${String(p.url ?? '/')}`;
       break;
     case 'ui.click':
-      s = `Click ${t}`;
+      s = `Click ${t}${p.x !== undefined && p.y !== undefined ? ` at ${String(p.x)},${String(p.y)}` : ''}`;
       break;
     case 'ui.dblclick':
       s = `Double-click ${t}`;
@@ -177,6 +177,56 @@ export function describeStep(step: AnyStep): string {
       break;
     case 'ui.screenshot':
       s = `Take a screenshot of ${t}`;
+      break;
+    case 'ui.tap':
+      s = `Tap ${t}`;
+      break;
+    case 'ui.download':
+      s = `Download the file from ${t}`;
+      break;
+    case 'ui.visualCheckpoint':
+      s = `Check that ${t} looks like the approved screenshot`;
+      break;
+    case 'ui.waitForResponse':
+      s = `Wait for the ${p.method ? `${String(p.method)} ` : ''}response from ${String(p.url ?? '')}`;
+      break;
+    case 'ui.mockRoute': {
+      const u = String(p.url ?? '');
+      const action = String(p.action ?? 'fulfill');
+      s =
+        action === 'remove'
+          ? `Stop faking ${u}`
+          : action === 'abort'
+            ? `Make requests to ${u} fail`
+            : action === 'delay'
+              ? `Slow down requests to ${u} by ${String(p.delayMs ?? 0)} ms`
+              : `Answer requests to ${u} with ${String(p.status ?? 200)}`;
+      break;
+    }
+    case 'ui.setOffline':
+      s = p.offline === false || p.offline === 'false' ? 'Go back online' : 'Go offline';
+      break;
+    case 'ui.storage': {
+      const where =
+        { cookie: 'cookie', local: 'local storage', session: 'session storage' }[
+          String(p.kind ?? 'cookie')
+        ] ?? String(p.kind);
+      const action = String(p.action ?? 'get');
+      s =
+        action === 'set'
+          ? `Set the ${where} ${q(p.name ?? '')} to ${q(p.value ?? '')}`
+          : action === 'clear'
+            ? `Clear ${where === 'cookie' ? 'all cookies' : where}`
+            : action === 'remove'
+              ? `Remove the ${where} ${q(p.name ?? '')}`
+              : `Read the ${where} ${q(p.name ?? '')}`;
+      break;
+    }
+    case 'ui.setClock':
+      s =
+        p.action === 'fastForward'
+          ? `Move the clock forward ${String(p.ms ?? 60000)} ms`
+          : `Set the page clock to ${String(p.time ?? '')}${p.action === 'install' ? ' (running)' : ''}`;
       break;
     case 'ui.extract':
       s = `Read the ${String(p.from ?? 'text')} of ${t}`;
