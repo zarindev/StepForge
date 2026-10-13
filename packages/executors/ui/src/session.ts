@@ -961,12 +961,16 @@ export class UiSession implements ExecutorSession {
       this.ctx.artifactsDir,
       `step-${pad(position)}${suffix}.${type === 'jpeg' ? 'jpg' : 'png'}`,
     );
-    try {
-      await this.page.screenshot({ path, type, ...(type === 'jpeg' && { quality: 60 }), timeout: 5000 });
-      return path;
-    } catch {
-      return undefined;
+    // A busy machine (e.g. a CI runner) can miss the first try while the page is still settling: try once more.
+    for (const timeout of [5000, 10_000]) {
+      try {
+        await this.page.screenshot({ path, type, ...(type === 'jpeg' && { quality: 60 }), timeout });
+        return path;
+      } catch {
+        if (this.page.isClosed()) return undefined;
+      }
     }
+    return undefined;
   }
 
   async onStepFailed(step: RunnableStep): Promise<Partial<StepOutcome>> {
