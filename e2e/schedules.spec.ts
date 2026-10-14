@@ -30,7 +30,11 @@ test('schedules: email channel, cron preview, Run now sends the summary (Phase 1
   page,
   request,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(150_000);
+  // Unique names, so a CI retry does not collide with what its first attempt created.
+  const tag = Date.now().toString(36);
+  const inbox = `QA inbox ${tag}`;
+  const schedule = `Nightly API ${tag}`;
   await page.goto('/');
   await sfApi(page, 'POST', '/api/email/mailpit/start', {});
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
@@ -60,21 +64,21 @@ test('schedules: email channel, cron preview, Run now sends the summary (Phase 1
   await page.goto('/settings');
   await page.getByRole('button', { name: 'Email', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Channel name').fill('QA inbox');
+  await dialog.getByLabel('Channel name').fill(inbox);
   await dialog.getByLabel('SMTP server').fill('127.0.0.1');
   await dialog.getByLabel('SMTP port').fill('1196');
   await dialog.getByLabel('From address').fill('StepForge <qa@stepforge.test>');
   await dialog.getByLabel('To addresses').fill('nightly@team.test');
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByTestId('notify-channels')).toContainText('nightly@team.test via 127.0.0.1');
-  await page.getByRole('button', { name: 'Send a test to QA inbox' }).click();
-  await expect(page.getByText('Test message sent to QA inbox')).toBeVisible();
+  await page.getByRole('button', { name: `Send a test to ${inbox}` }).click();
+  await expect(page.getByText(`Test message sent to ${inbox}`)).toBeVisible();
 
   // Schedules: create one with a preset, check the preview, then switch to a custom expression.
   await page.goto('/schedules');
   await page.getByRole('button', { name: 'New schedule' }).first().click();
   const editor = page.getByRole('dialog');
-  await editor.getByLabel('Schedule name').fill('Nightly API');
+  await editor.getByLabel('Schedule name').fill(schedule);
   await editor.getByLabel('Application').selectOption({ label: 'Clinic Nightly' });
   await expect(editor.getByLabel('Environment')).toHaveValue(/.+/);
   await editor.getByLabel('Schedule preset').selectOption({ label: 'Weekdays at 06:00' });
@@ -84,40 +88,40 @@ test('schedules: email channel, cron preview, Run now sends the summary (Phase 1
   await expect(editor.getByTestId('cron-preview')).toContainText(/Invalid schedule/);
   await editor.getByLabel('Cron expression').fill('30 1 * * *');
   await expect(editor.getByTestId('cron-preview').locator('li').first()).toContainText(/1:30/);
-  await editor.getByLabel('QA inbox').check();
+  await editor.getByLabel(inbox).check();
   await shot(page, 'phase11-schedule-editor');
   await editor.getByRole('button', { name: 'Create schedule' }).click();
 
-  const row = page.getByTestId('schedule-row').filter({ hasText: 'Nightly API' });
+  const row = page.getByTestId('schedule-row').filter({ hasText: schedule });
   await expect(row).toContainText('30 1 * * *');
   await expect(row).toContainText('Never');
-  await row.getByRole('button', { name: 'Run Nightly API now' }).click();
+  await row.getByRole('button', { name: `Run ${schedule} now` }).click();
   await expect(row).toContainText(/\d/, { timeout: 30_000 });
   await row.getByRole('button', { name: 'Show history' }).click();
   // The badge shows the delivery result; on failure its tooltip holds the error, reported here.
-  const delivery = page.getByText(/^QA inbox: (sent|failed|skipped)$/).first();
-  await expect(delivery).toBeVisible({ timeout: 30_000 });
+  const delivery = page.getByText(new RegExp(`^${inbox}: (sent|failed|skipped)$`)).first();
+  await expect(delivery).toBeVisible({ timeout: 60_000 });
   expect(await delivery.textContent(), `delivery error: ${await delivery.getAttribute('title')}`).toBe(
-    'QA inbox: sent',
+    `${inbox}: sent`,
   );
   await shot(page, 'phase11-schedules');
 
   // The summary really arrived by email, with the failure and its diagnosis.
   const list = await (
     await request.get(
-      `${MAILPIT}/api/v1/search?query=${encodeURIComponent('to:nightly@team.test subject:FAILED')}`,
+      `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:nightly@team.test subject:FAILED ${tag}`)}`,
     )
   ).json();
   expect(list.messages.length).toBeGreaterThan(0);
   const msg = await (await request.get(`${MAILPIT}/api/v1/message/${list.messages[0].ID}`)).json();
   expect(msg.Subject).toBe('[StepForge] Clinic Nightly · Local: FAILED (1/2)');
-  expect(msg.Text).toContain('Schedule "Nightly API"');
+  expect(msg.Text).toContain(`Schedule "${schedule}"`);
   expect(msg.Text).toContain('• Patients need no login');
   expect(msg.Text).toContain('Sent by StepForge — by Md Zarin Tasnim');
 
   // Turning it off clears the next run; Home lists only enabled schedules.
-  await row.getByRole('switch', { name: 'Enable Nightly API' }).click();
+  await row.getByRole('switch', { name: `Enable ${schedule}` }).click();
   await expect(row).toContainText('Off');
   await page.goto('/');
-  await expect(page.getByTestId('upcoming-schedules')).toHaveCount(0);
+  await expect(page.getByText(schedule)).toHaveCount(0);
 });

@@ -34,9 +34,11 @@ export function automationMode(): 'enabled' | 'needs-password' | 'disabled' | un
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 15_000,
     });
-    if (/Automation Mode is enabled/i.test(out))
-      return /requires user authentication/i.test(out) ? 'needs-password' : 'enabled';
-    return 'disabled';
+    // "Enabled", or "disabled, does not require user authentication" (XCTest turns it on when a test starts): both
+    // let tests run without a password prompt.
+    if (/does not require user authentication/i.test(out)) return 'enabled';
+    if (/requires user authentication/i.test(out)) return 'needs-password';
+    return /Automation Mode is enabled/i.test(out) ? 'enabled' : 'disabled';
   } catch {
     return undefined;
   }

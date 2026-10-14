@@ -154,7 +154,8 @@ function exec(
   return new Promise<void>((resolve, reject) => {
     const p = spawn(cmd, args, {
       ...opts,
-      shell: process.platform === 'win32',
+      // Only npm.cmd needs the Windows shell; Node itself is run directly (its path may contain spaces).
+      shell: process.platform === 'win32' && cmd.endsWith('.cmd'),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let tail = '';

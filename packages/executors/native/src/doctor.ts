@@ -153,9 +153,9 @@ export async function nativeDoctor(toolsDir: string): Promise<NativeStatus> {
           ok: automation === 'enabled',
           detail:
             automation === 'enabled'
-              ? 'on: tests can drive apps'
+              ? 'ready: tests can drive apps without a password'
               : automation === 'needs-password'
-                ? 'on, but asks for your password each time'
+                ? 'asks for your password each time'
                 : 'off',
           fix: 'sudo automationmodetool enable-automationmode-without-authentication (once; lets tests drive apps on this Mac)',
         },

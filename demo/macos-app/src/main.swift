@@ -159,7 +159,9 @@ final class PatientsView: NSStackView {
         let n = name.stringValue.trimmingCharacters(in: .whitespaces)
         if n.isEmpty { return }
         // PLANTED BUG MAC-01: long names are cut to 12 characters in the list.
-        list.addArrangedSubview(NSTextField(labelWithString: n.count > 12 ? String(n.prefix(12)) : n))
+        let row = NSTextField(labelWithString: n.count > 12 ? String(n.prefix(12)) : n)
+        row.setAccessibilityIdentifier("patient_row")
+        list.addArrangedSubview(row)
         count += 1
         counter.stringValue = count == 1 ? "1 patient" : "\(count) patients"
         name.stringValue = ""

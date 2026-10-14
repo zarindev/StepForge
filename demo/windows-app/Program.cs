@@ -90,7 +90,7 @@ internal sealed class MainForm : Form
         var n = patientName.Text.Trim();
         if (n.Length == 0) return;
         // PLANTED BUG WIN-01: long names are cut to 12 characters in the list.
-        list.Controls.Add(new Label { Text = n.Length > 12 ? n[..12] : n, AutoSize = true });
+        list.Controls.Add(new Label { Name = "patient_row", Text = n.Length > 12 ? n[..12] : n, AutoSize = true });
         count++;
         counter.Text = count == 1 ? "1 patient" : $"{count} patients";
         patientName.Text = "";

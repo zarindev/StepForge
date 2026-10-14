@@ -183,7 +183,8 @@ for (const platform of ['macos', 'windows'] as const) {
           {
             type: 'ui.assert',
             params: { check: 'text', expected: 'Alexandra Johnson' },
-            locators: [{ strategy: 'text', value: 'Alexandra' }],
+            // Each row has the id patient_row.
+            locators: [{ strategy: 'testId', value: 'patient_row' }],
             timeoutMs: 3000,
           },
         ),
