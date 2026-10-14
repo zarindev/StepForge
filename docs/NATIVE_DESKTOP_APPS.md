@@ -71,7 +71,7 @@ Steps for desktop apps:
 | --- | --- |
 | **Menu** (`ui.menu`) | Opens a menu path from the menu bar: `File > Save`, `Patients > Clear List` |
 | **Press** a shortcut | `Meta+S` (⌘S on a Mac), `Control+S`, `Control+Shift+N`, `Alt+F4`, `F5`, `Enter`… (modifiers `Shift`, `Control`, `Alt` / `Option`, `Meta` / `Command`) |
-| **Handle dialog** | Presses a dialog's button: OK or Cancel by default, or name it (`Clear`, `Yes`, `Don't Save`) |
+| **Handle dialog** | Presses a dialog's button: OK or Cancel by default (on macOS, the alert's default or cancel button), or name it (`Clear`, `Yes`, `Don't Save`). If a click leaves a macOS sheet open, it answers with Return or Escape |
 | **App** | `launch` or `close` the app |
 | Click, double-click, fill, type, clear, check, select, assert, extract, wait for, screenshot, scroll | As for other apps |
 

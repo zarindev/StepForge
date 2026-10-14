@@ -20,6 +20,7 @@ import {
   xpathLiteral,
   type Query,
 } from './locators.ts';
+import { parseElements } from './recorder.ts';
 import type { ElementRef, WebDriverSession } from './webdriver.ts';
 
 /** What differs between Android and iOS for the same steps. */
@@ -629,14 +630,39 @@ export function macPlatform(launch: MacLaunch): NativePlatform {
     pushNotification: notOnDesktop('Sending notifications'),
     hideKeyboard: async () => {},
     dialog: async (d, accept, buttonLabel) => {
-      // macOS dialogs (sheets, alerts) are ordinary elements: press their button.
+      // macOS dialogs (sheets, alerts) are ordinary elements: press their button. Sheets can report their frame
+      // wrongly (several displays), so when a click leaves the dialog open, the keyboard answers it: Return presses
+      // the default button, Escape the cancel button.
       const label = buttonLabel ?? (accept ? 'OK' : 'Cancel');
-      const els = await d.findAll(
-        '-ios class chain',
-        `**/XCUIElementTypeButton[\`title == ${predicateLiteral(label)}\`]`,
+      const dialogs = () => d.findAll('-ios class chain', '**/XCUIElementTypeSheet');
+      const byTitle = (t: string) =>
+        d.findAll('-ios class chain', `**/XCUIElementTypeButton[\`title == ${predicateLiteral(t)}\`]`);
+      let target = (await byTitle(label))[0];
+      // No button named OK/Cancel: the dialog's default (first) button, or its cancel button.
+      if (!target && !buttonLabel && (await dialogs()).length)
+        target = (await d.findAll('accessibility id', accept ? 'action-button-1' : 'action-button-2'))[0];
+      if (!target) throw new StepError('timeout', `no such alert: no "${label}" button`);
+      const gone = async () => {
+        for (let i = 0; i < 6; i++) {
+          await new Promise((r) => setTimeout(r, 250));
+          if (!(await dialogs()).length) return true;
+        }
+        return false;
+      };
+      const open = (await dialogs()).length > 0;
+      await d.click(target).catch(() => undefined);
+      if (!open || (await gone())) return;
+      // Which button is the default one: the element tree says (the first button of an alert).
+      const buttons = parseElements(await d.source()).filter((e) =>
+        /^action-button-\d+$/.test(e.attrs.identifier ?? ''),
       );
-      if (!els.length) throw new StepError('timeout', `no such alert: no "${label}" button`);
-      await d.click(els[0]!);
+      const titleOf = (id: string) => buttons.find((b) => b.attrs.identifier === id)?.attrs.title;
+      const wanted = buttonLabel ?? (accept ? titleOf('action-button-1') : titleOf('action-button-2'));
+      if (wanted !== undefined && wanted === titleOf('action-button-1')) await pressShortcut(d, 'Enter');
+      else if ((wanted && /^cancel$/i.test(wanted)) || (!accept && !buttonLabel))
+        await pressShortcut(d, 'Escape');
+      else throw new StepError('unknown', `Pressing "${wanted ?? label}" did not close the dialog`);
+      if (!(await gone())) throw new StepError('timeout', 'The dialog did not close');
     },
     async queryAppState(d) {
       const s = await d.execute('macos: queryAppState', [app()]).catch(() => undefined);
@@ -722,9 +748,9 @@ export function windowsPlatform(launch: WindowsLaunch): NativePlatform {
     hideKeyboard: async () => {},
     dialog: async (d, accept, buttonLabel) => {
       const label = buttonLabel ?? (accept ? 'OK' : 'Cancel');
-      const els = await d.findAll('xpath', `//Window//Button[@Name=${xpathLiteral(label)}]`);
-      if (!els.length) throw new StepError('timeout', `no such alert: no "${label}" button`);
-      await d.click(els[0]!);
+      const find = () => d.findAll('xpath', `//Window//Button[@Name=${xpathLiteral(label)}]`);
+      if (!(await find()).length) throw new StepError('timeout', `no such alert: no "${label}" button`);
+      await pressUntilGone(d, find);
     },
     queryAppState: async () => undefined,
     async menu(d, path) {
@@ -736,4 +762,20 @@ export function windowsPlatform(launch: WindowsLaunch): NativePlatform {
       }
     },
   };
+}
+
+/**
+ * Presses a dialog's button until the dialog has gone: a sheet that is still sliding in ignores the first press.
+ */
+async function pressUntilGone(d: WebDriverSession, find: () => Promise<ElementRef[]>): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const els = await find();
+    if (!els.length) return;
+    await d.click(els[0]!).catch(() => undefined);
+    for (let i = 0; i < 8; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      if (!(await find()).length) return;
+    }
+  }
+  throw new StepError('timeout', 'The dialog did not close after pressing its button');
 }

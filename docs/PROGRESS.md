@@ -36,13 +36,15 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 - `doctor native --platform macos|windows` (Xcode, Automation Mode, PowerShell, drivers); dashboard forms and status.
 - Demo apps: CareClinic for macOS (AppKit, built with swiftc) and for Windows (WinForms, built with .NET in CI).
 - CI jobs `macos-desktop` and `windows-desktop`.
+- macOS dialogs: with several displays a sheet's button can be reported at the wrong place; Handle dialog falls back
+  to Return / Escape.
 - README: the Coming next and Features tables were mixed up by an earlier edit and are repaired.
 - CI fixes from the N4 run: the simulator list overflowed its output buffer on CI Macs (iOS); Android swipes used a
   fixed screen size instead of the window's, and scroll-to now needs two unchanged swipes to give up; the first
   browser test on Windows gets 60 s.
 
 **Tests**: locator mappings, capabilities and shortcuts (always); the same desktop scenario (sign in, a shortcut, a
-menu, a dialog, the planted bug) on macOS and Windows, in CI (not run locally: it takes over the mouse and keyboard); dashboard end-to-end test for the forms.
+menu, a dialog, the planted bug) on macOS (locally, macOS 27, and in CI) and Windows (CI); dashboard end-to-end test for the forms.
 [NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md)
 
 ---
