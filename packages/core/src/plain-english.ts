@@ -178,6 +178,9 @@ export function describeStep(step: AnyStep): string {
     case 'ui.screenshot':
       s = `Take a screenshot of ${t}`;
       break;
+    case 'ui.networkSummary':
+      s = `Check the network traffic${p.since === 'lastNavigation' ? ' of this page' : ' so far'}`;
+      break;
     case 'ui.tap':
       s = `Tap ${t}`;
       break;

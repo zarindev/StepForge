@@ -75,6 +75,9 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
   [EMAIL.md](EMAIL.md)
 - **Performance** — Web Vitals per page, Lighthouse, load tests with percentiles and thresholds, k6 export, database
   query plans. [PERFORMANCE.md](PERFORMANCE.md)
+- **Network traffic** — a breakdown of every test's requests by type and host (third parties marked), slowest and
+  largest requests and failures, and `ui.networkSummary` budgets (page weight, failed requests, third-party hosts).
+  [WEB_APPS.md](WEB_APPS.md#network-traffic)
 - **Visual checkpoints** — screenshot comparison with a difference image and one-click *Accept as new baseline*.
   [WEB_APPS.md](WEB_APPS.md#visual-checkpoints)
 
@@ -104,5 +107,5 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 ## Coming next
 
 - Native mobile and desktop apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
-- More features inspired by Cerberus Testing (network breakdowns, run queue priorities): see the
+- More features inspired by Cerberus Testing (run queue priorities): see the
   [CHANGELOG](../CHANGELOG.md) as they land.

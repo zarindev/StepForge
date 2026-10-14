@@ -38,6 +38,7 @@ describe('plain English', () => {
     ],
     [s('api.request', { method: 'POST', url: '/api/patients' }), 'Send POST /api/patients'],
     [s('util.loop', { count: 3 }), 'Repeat 3 times'],
+    [s('ui.networkSummary', { since: 'lastNavigation' }), 'Check the network traffic of this page'],
     [
       s('api.soap', { url: '/soap', action: 'http://example.test/GetPrice' }),
       'Call the SOAP service /soap (GetPrice)',

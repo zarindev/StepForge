@@ -63,6 +63,7 @@ How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth stagi
 | `mockRoute` | `url`, `action` (`fulfill`/`abort`/`delay`/`remove`), `method`, `status`, `body`, `contentType`, `delayMs`, `times` | until the test ends (or `remove`); a new mock for the same `url` replaces the old one |
 | `setOffline` | `offline` (default true) | `false` goes back online |
 | `storage` | `kind` (`cookie`/`local`/`session`), `action` (`get`/`set`/`remove`/`clear`), `name`, `value` | `get`: targets `value`, `exists`; output: the value |
+| `networkSummary` | `since` (`test` default, or `lastNavigation`: since the last `navigate`) | the page traffic as checks: targets `requests`, `bytes`, `kb`, `failed`, `thirdPartyRequests`, `thirdPartyHosts`, `hosts`, `thirdPartyHostNames`, `requests:<type>`, `bytes:<type>` (type = `script`, `image`, `fetch`, `document`, …) |
 | `setClock` | `action` (`set` = fixed time, `install` = runs from `time`, `fastForward` + `ms`), `time` (ISO date or epoch ms) | put `install` before `ui.navigate` so the page's timers use it |
 
 `ui.assert` checks: `visible`, `hidden`, `text`, `textContains`, `textMatches` (regex), `value`, `count`,

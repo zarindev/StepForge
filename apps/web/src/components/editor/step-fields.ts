@@ -224,6 +224,15 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
       showWhen: { key: 'action', equals: ['fastForward'] },
     },
   ],
+  'ui.networkSummary': [
+    {
+      key: 'since',
+      label: 'Traffic since',
+      kind: 'select',
+      options: ['test', 'lastNavigation'],
+      hint: 'Check with assertions: requests, bytes, kb, failed, thirdPartyHosts, requests:script, bytes:image…',
+    },
+  ],
   'ui.visualCheckpoint': [
     {
       key: 'name',

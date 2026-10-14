@@ -676,6 +676,7 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     case 'ui.setOffline':
     case 'ui.storage':
     case 'ui.setClock':
+    case 'ui.networkSummary':
       out.push(
         todo(ctx, step, 'this browser step is not exported yet; write it with the framework’s own API'),
       );

@@ -7,6 +7,9 @@ import {
   type StepOutcome,
   type TestContext,
   type ProbeRequest,
+  summarizeNetwork,
+  formatBytes,
+  type NetworkEntry as CoreNetworkEntry,
 } from '@stepforge/core';
 import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -27,15 +30,7 @@ import { highlight, inspectFailure } from './inspect.ts';
 import { buildLocator, resolveLocator, type Resolved, type Scope } from './locators.ts';
 import { checkPageMetrics, collectPageMetrics, WEB_VITALS_INIT_SCRIPT } from '@stepforge/perf';
 
-type NetworkEntry = {
-  method: string;
-  url: string;
-  status?: number;
-  resourceType: string;
-  durationMs?: number;
-  failure?: string;
-  startedAt: number;
-};
+type NetworkEntry = CoreNetworkEntry & { startedAt: number };
 type ConsoleEntry = { type: string; text: string; location?: string; at: number };
 type SeenResponse = { response: Response; consumed: boolean };
 
@@ -88,6 +83,9 @@ export class UiSession implements ExecutorSession {
   /** Active `ui.mockRoute` mocks by URL pattern (a new mock for the same pattern replaces the old one). */
   private mocks = new Map<string, { matcher: (u: URL) => boolean; handler: (r: Route) => Promise<void> }>();
   private touch = false;
+  /** The step running now, so each request records which step made it. */
+  private currentStep = -1;
+  private lastNavigation = -1;
 
   constructor(
     private readonly browser: Browser,
@@ -154,7 +152,9 @@ export class UiSession implements ExecutorSession {
     );
     p.on('requestfinished', async (r) => {
       if (this.network.length >= MAX_LOG_ENTRIES) return;
+      const step = this.currentStep;
       const res = await r.response().catch(() => null);
+      const sizes = await r.sizes().catch(() => null);
       const t = r.timing();
       this.network.push({
         method: r.method(),
@@ -162,7 +162,9 @@ export class UiSession implements ExecutorSession {
         status: res?.status(),
         resourceType: r.resourceType(),
         durationMs: t.responseEnd > 0 ? Math.round(t.responseEnd) : undefined,
+        bytes: sizes ? sizes.responseBodySize + sizes.responseHeadersSize : undefined,
         startedAt: Math.round(t.startTime),
+        ...(step >= 0 && { step }),
       });
     });
     p.on('response', (r) => {
@@ -178,6 +180,7 @@ export class UiSession implements ExecutorSession {
           resourceType: r.resourceType(),
           failure: r.failure()?.errorText,
           startedAt: Date.now(),
+          ...(this.currentStep >= 0 && { step: this.currentStep }),
         });
       }
     });
@@ -249,6 +252,7 @@ export class UiSession implements ExecutorSession {
 
   async execute(step: RunnableStep, ctx: StepContext): Promise<StepOutcome> {
     if (!this.pages.includes(this.page)) this.track(this.page);
+    this.currentStep = step.position;
     const p = step.params as Record<string, unknown>;
     const name = step.type.split('.')[1]!;
     const timeout = ctx.timeoutMs;
@@ -259,6 +263,7 @@ export class UiSession implements ExecutorSession {
     try {
       switch (name) {
         case 'navigate': {
+          this.lastNavigation = step.position;
           const url = String(p.url ?? '');
           if (!url) throw new StepError('invalid_params', 'navigate needs a "url"');
           const res = await this.page.goto(url, { waitUntil: (p.waitUntil as 'load') ?? 'load', timeout });
@@ -507,6 +512,48 @@ export class UiSession implements ExecutorSession {
         case 'storage':
           outcome = await this.storage(p);
           break;
+        case 'networkSummary': {
+          // Requests still finishing are counted once their size is known.
+          await this.page
+            .waitForLoadState('networkidle', { timeout: Math.min(timeout, 5000) })
+            .catch(() => {});
+          // Since the test started, or since the last ui.navigate (one page's traffic).
+          const since = p.since === 'lastNavigation' ? this.lastNavigation : -1;
+          const entries = this.network.filter((e) => since < 0 || (e.step ?? -1) >= since);
+          const s = summarizeNetwork(entries, this.ctx.options.baseUrl);
+          const kinds = s.byType.map((g) => `${g.requests} ${g.key}`).join(', ');
+          outcome = {
+            output: {
+              requests: s.requests,
+              bytes: s.bytes,
+              failed: s.failed,
+              thirdPartyHosts: s.thirdPartyHosts,
+            },
+            message: `${s.requests} request${s.requests === 1 ? '' : 's'}, ${formatBytes(s.bytes)}${s.failed ? `, ${s.failed} failed` : ''}${s.thirdPartyHosts ? `, ${s.thirdPartyHosts} third-party host(s)` : ''}${kinds ? ` — ${kinds}` : ''}`,
+            response: { body: s },
+            getTarget: (t) => {
+              const flat: Record<string, unknown> = {
+                requests: s.requests,
+                bytes: s.bytes,
+                kb: Math.round(s.bytes / 100) / 10,
+                failed: s.failed,
+                thirdPartyRequests: s.thirdPartyRequests,
+                thirdPartyHosts: s.thirdPartyHosts,
+                hosts: s.byHost.map((h) => h.key),
+                thirdPartyHostNames: s.byHost.filter((h) => h.thirdParty).map((h) => h.key),
+              };
+              if (t in flat) return flat[t];
+              // requests:script, bytes:image …
+              const m = /^(requests|bytes):(.+)$/.exec(t);
+              if (m) {
+                const g = s.byType.find((x) => x.key === m[2]);
+                return g ? (m[1] === 'requests' ? g.requests : g.bytes) : 0;
+              }
+              return this.pageTarget(t);
+            },
+          };
+          break;
+        }
         case 'setClock': {
           const action = String(p.action ?? 'set');
           const time =

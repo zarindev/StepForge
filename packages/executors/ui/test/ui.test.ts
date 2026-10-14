@@ -31,6 +31,28 @@ beforeAll(async () => {
 navigator.geolocation.getCurrentPosition(p => document.getElementById('geo').textContent = p.coords.latitude + ',' + p.coords.longitude)</script>`,
       );
     }
+    if (req.url === '/app.js')
+      return res
+        .writeHead(200, { 'content-type': 'text/javascript' })
+        .end('window.loaded = true;'.repeat(50));
+    if (req.url === '/pixel.png')
+      return res
+        .writeHead(200, { 'content-type': 'image/png' })
+        .end(
+          Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            'base64',
+          ),
+        );
+    if (req.url === '/net.html') {
+      // A script, an image from another host (localhost vs 127.0.0.1: a "third party"), and a request that fails (500).
+      const port = (server.address() as { port: number }).port;
+      return res
+        .writeHead(200, { 'content-type': 'text/html' })
+        .end(
+          `<script src="/app.js"></script><img src="http://localhost:${port}/pixel.png"><script>fetch('/api/login')</script>`,
+        );
+    }
     if (req.url === '/report.csv')
       return res
         .writeHead(200, {
@@ -479,5 +501,27 @@ describe('UI executor', () => {
       },
     );
     expect(r.status, r.steps.map((s) => `${s.type} ${s.message}`).join('\n')).toBe('passed');
+  });
+
+  it('network summary: requests, bytes, types, third-party hosts and failures, as checks', async () => {
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/net.html' } },
+        {
+          type: 'ui.networkSummary',
+          params: { since: 'lastNavigation' },
+          captureAs: 'traffic',
+          assertions: [
+            { target: 'requests', operator: 'equals', expected: 4 },
+            { target: 'requests:script', operator: 'equals', expected: 1 },
+            { target: 'failed', operator: 'equals', expected: 1 },
+            { target: 'thirdPartyHosts', operator: 'equals', expected: 1 },
+            { target: 'bytes', operator: 'gt', expected: 1000 },
+          ],
+        },
+      ),
+    );
+    expect(r.status, r.steps.map((s) => `${s.type} ${s.message}`).join('\n')).toBe('passed');
+    expect(r.steps[1]!.message).toMatch(/^4 requests, [\d.]+ (B|kB), 1 failed, 1 third-party host\(s\)/);
   });
 });

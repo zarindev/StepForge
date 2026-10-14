@@ -32,7 +32,7 @@ of web applications people test and the StepForge features each one needs. Every
 | Time-dependent apps (bookings, trials, countdowns) | Controlling the clock | `ui.setClock` (fixed time, a running clock from a date, jump forward) |
 | Apps that send emails (sign-up, password reset, OTP) | Reading the email | Email steps (local Mailpit or IMAP) — see [EMAIL.md](EMAIL.md) |
 | Data-heavy apps | Checking the database behind the page | Database steps — see [DATABASES.md](DATABASES.md) |
-| Performance-sensitive apps | Web Vitals, Lighthouse, load | Performance steps — see [PERFORMANCE.md](PERFORMANCE.md) |
+| Performance-sensitive apps | Web Vitals, Lighthouse, load, page weight | Performance steps — see [PERFORMANCE.md](PERFORMANCE.md); network breakdown and `ui.networkSummary` budgets |
 | Cross-browser support | Chromium, Firefox, WebKit (Safari's engine), Chrome, Edge | Run dialog browser, environment browser build, [campaigns](CAMPAIGNS.md) across browsers × sizes |
 
 ## Environment browser settings
@@ -95,6 +95,25 @@ so it fails with a clear message at desktop size). Firefox has no mobile mode: i
 
 This is mobile **web** testing. Native iOS and Android apps are a different technology; see
 [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
+
+## Network traffic
+
+Every test keeps its network log. On the run page, **Evidence → Network → Breakdown** shows the requests, bytes
+transferred, failed requests and third-party hosts, a bar chart **by type** (document, script, image, fetch, font …)
+and **by host** (third parties — hosts outside the application's site — are marked), and the slowest and largest
+requests. **Requests** lists every request with its step, status, type, size and time, filtered by text, type, host or
+errors only.
+
+To make traffic part of the test, add **`ui.networkSummary`** and check it — a page-weight budget:
+
+| Target | Example check |
+|---|---|
+| `kb` / `bytes` | `kb` less than `1500` |
+| `failed` | equals `0` (no 4xx/5xx or failed requests) |
+| `thirdPartyHosts` | at most `3`; `thirdPartyHostNames` not contains `tracker.example` |
+| `requests:<type>` / `bytes:<type>` | `requests:script` at most `20`, `bytes:image` less than `800000` |
+
+`since: lastNavigation` counts only the page opened by the last `ui.navigate`.
 
 ## Time, storage and other helpers
 

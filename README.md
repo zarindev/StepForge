@@ -73,7 +73,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | **API** | ✅ REST, GraphQL and SOAP steps (XPath checks, faults) · Kafka produce / wait for a message · FTP, FTPS and SFTP files · auth (bearer, basic, API key, OAuth2) · JSONPath and JSON Schema checks · import OpenAPI, Postman, cURL and HAR · contract checks |
 | **Database** | ✅ SQLite, PostgreSQL, MySQL, SQL Server, MongoDB · read-only and rollback modes · SQL Workbench · data-quality audit |
 | **Email** | ✅ Local Mailpit or IMAP · wait for an email · extract one-time codes and links |
-| **Performance** | ✅ Web Vitals and Lighthouse · load tests with percentiles and threshold verdicts · k6 export · query plans |
+| **Performance** | ✅ Web Vitals and Lighthouse · network breakdown per test (by type and host, third parties, slowest, largest) and page-weight budgets · load tests with percentiles and threshold verdicts · k6 export · query plans |
 | **Reusable blocks** | ✅ Before/after-each-test hooks per module or scenario (after-hooks run even after a failure) · shared step groups ("Sign in") with inputs · make a block from selected steps · "used by" list · a fix inside a block repairs every test using it (one-click locator fix lands in the block) · failures grouped by block — see [docs/BLOCKS.md](docs/BLOCKS.md) |
 | **Element repository** | ✅ Named, shared UI elements ("Save patient button") · steps point at them · fix a locator once and every step follows (the one-click diagnosis fix updates the element) · recordings reuse matching elements — see [docs/ELEMENTS.md](docs/ELEMENTS.md) |
 | **Manual runs** | ✅ A tester follows each test's steps in plain English and records passed / failed / blocked with notes and screenshots · manual checks inside automated tests · results in the same history and reports — see [docs/MANUAL_RUNS.md](docs/MANUAL_RUNS.md) |
@@ -438,10 +438,10 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] Showcase material: case study, samples, screenshots and clips
 - [x] Cerberus-inspired features: reusable blocks with inputs, element repository, campaigns, test data library,
       before/after hooks, page conditions, manual test runs, SOAP / Kafka / FTP steps, Slack / Teams / webhook
-      notifications
+      notifications, network traffic breakdown
 - [x] Every kind of web app: visual checkpoints, network waiting and mocking, downloads, mobile web with touch,
       clock control, storage, per-environment browser settings
-- [ ] Network breakdowns, run queue priorities
+- [ ] Run queue priorities
 - [ ] Native mobile and desktop apps — [plan](docs/NATIVE_APPS_PLAN.md)
 - [ ] An optional desktop installer (Electron)
 

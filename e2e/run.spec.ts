@@ -168,6 +168,8 @@ test.describe.serial('run scenarios with evidence (Phase 3)', () => {
 
     // Console tab shows the captured browser log; Explorer shows last results
     await page.getByRole('tab', { name: 'Network' }).click();
+    await expect(page.getByTestId('network-view')).toContainText('Transferred'); // the breakdown first
+    await page.getByRole('tab', { name: /^Requests/ }).click();
     await expect(page.getByRole('cell', { name: '/login' }).first()).toBeVisible();
     await page.goto('/explorer');
     await expect(

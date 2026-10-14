@@ -18,7 +18,7 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 12 | Code generators + snapshot tests | ✅ Done |
 | 13 | Public-repo polish, onboarding, fresh-clone test | ✅ Done (Windows/Ubuntu via CI after push) |
 | 14 | Showcase package, optional Electron | ✅ Done (Electron skipped: optional) |
-| 15 | Cerberus-inspired features, every kind of web app | 🟢 In progress (9 of 11 features + web-app coverage done) |
+| 15 | Cerberus-inspired features, every kind of web app | 🟢 In progress (10 of 11 features + web-app coverage done) |
 
 ---
 
@@ -44,6 +44,8 @@ free, open source and local.
   (FTP, FTPS, SFTP); CI runs Apache Kafka as a service container. [INTEGRATIONS.md](INTEGRATIONS.md)
 - **Slack, Teams and webhook notifications** — Slack / Mattermost / Rocket.Chat incoming webhooks, Teams Workflows
   (Adaptive Card), generic JSON webhooks. [SCHEDULING.md](SCHEDULING.md#notifications)
+- **Network traffic breakdown** — sizes and steps per request, Breakdown view, `ui.networkSummary` budgets.
+  [WEB_APPS.md](WEB_APPS.md#network-traffic)
 - **Every kind of web app** — visual checkpoints with baselines and accept, network waiting and mocking, offline,
   downloads, storage, clock, touch and mobile identity, environment browser settings (no migration: they live in
   `environments.browser_defaults_json.settings`). [WEB_APPS.md](WEB_APPS.md)
@@ -51,7 +53,7 @@ free, open source and local.
 
 **Verified**
 - Each feature: unit and server tests, an end-to-end test (`e2e/blocks`, `elements`, `campaigns`, `data`, `hooks`,
-  `web-apps`, `manual`, `integrations`, `notifications`), lint, typecheck and build; pushed features passed GitHub Actions CI (Ubuntu and Windows).
+  `web-apps`, `manual`, `integrations`, `notifications`, `network`), lint, typecheck and build; pushed features passed GitHub Actions CI (Ubuntu and Windows).
 - Web apps: the UI executor tests run every new step against a real page (download, wait for and mock responses,
   offline, storage, clock, canvas clicks, phone identity and touch, basic auth, headers, language, time zone, dark
   mode, location, visual baseline → change → difference); a server test resolves a basic-auth password from a secret
@@ -59,7 +61,7 @@ free, open source and local.
   the run page.
 
 **Next**
-- Network breakdowns, run queue priorities.
+- Run queue priorities.
 - Native apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
 
 ---

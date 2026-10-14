@@ -37,6 +37,7 @@ export const STEP_CATALOGUE = {
     'setOffline',
     'storage',
     'setClock',
+    'networkSummary',
   ],
   api: ['request', 'graphql', 'extract', 'soap', 'kafkaProduce', 'kafkaConsume', 'ftp'],
   db: ['query', 'mongoFind', 'runScript', 'callProcedure', 'extract', 'dataQualityCheck'],

@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Maximize2 } from 'lucide-react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/states';
@@ -9,17 +8,11 @@ import { Tabs } from '@/components/ui/tabs';
 import { artifactUrl, traceViewerUrl } from '@/lib/api';
 import type { Artifact } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { NetworkView } from './network-view';
+import type { NetworkEntry } from '@stepforge/core';
 import { FileVideo } from 'lucide-react';
 
 type ConsoleEntry = { type: string; text: string; location?: string };
-type NetworkEntry = {
-  method: string;
-  url: string;
-  status?: number;
-  resourceType: string;
-  durationMs?: number;
-  failure?: string;
-};
 
 function useJsonArtifact<T>(a: Artifact | undefined) {
   return useQuery({
@@ -128,44 +121,7 @@ export function EvidencePanel({ artifacts }: { artifacts: Artifact[] }) {
           ))}
         </div>
       )}
-      {active === 'network' && (
-        <div className="max-h-96 overflow-auto rounded-lg border border-border">
-          <table className="w-full font-mono text-xs">
-            <thead className="sticky top-0 bg-surface text-left text-muted">
-              <tr>
-                <th className="px-3 py-1.5">Method</th>
-                <th className="px-3 py-1.5">Status</th>
-                <th className="px-3 py-1.5">URL</th>
-                <th className="px-3 py-1.5">Type</th>
-                <th className="px-3 py-1.5 text-right">Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {network.data?.map((n, i) => (
-                <tr
-                  key={i}
-                  className={cn(
-                    'border-t border-border',
-                    ((n.status ?? 0) >= 400 || n.failure) && 'bg-fail/5 text-fail',
-                  )}
-                >
-                  <td className="px-3 py-1">{n.method}</td>
-                  <td className="px-3 py-1">{n.status ?? n.failure ?? '—'}</td>
-                  <td className="max-w-md truncate px-3 py-1" title={n.url}>
-                    {n.url.replace(/^https?:\/\/[^/]+/, '')}
-                  </td>
-                  <td className="px-3 py-1">
-                    <Badge>{n.resourceType}</Badge>
-                  </td>
-                  <td className="px-3 py-1 text-right">
-                    {n.durationMs !== undefined ? `${n.durationMs} ms` : ''}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {active === 'network' && <NetworkView entries={network.data ?? []} />}
     </div>
   );
 }

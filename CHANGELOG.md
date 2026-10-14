@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- **Network traffic breakdown** (like Cerberus Testing's network traffic statistics): each request now records its
+  size and the step that made it; the run page's Network evidence has a **Breakdown** (requests, bytes, failures,
+  third-party hosts; by type; by host with third parties marked; slowest; largest; failed) and a filterable request
+  list with sizes and steps. New step `ui.networkSummary` turns the traffic into checks (page weight, failed
+  requests, third-party hosts, requests or bytes per type). See [docs/WEB_APPS.md](docs/WEB_APPS.md#network-traffic).
 - **Slack, Microsoft Teams, Mattermost, Rocket.Chat and webhook notifications** (like Cerberus Testing's Slack and
   Teams notifications): new channel kinds in Settings → Notifications. Slack-style incoming webhooks (coloured
   message, optional mention on failure; Mattermost flavour), Teams Workflows (Adaptive Card with an "Open the run"
