@@ -95,6 +95,9 @@ export function ApplicationDetailPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight">{a.name}</h1>
             <Badge>{a.category}</Badge>
+            {a.platform !== 'web' && (
+              <Badge tone="indigo">{a.platform === 'android' ? 'Android app' : 'Desktop app'}</Badge>
+            )}
             {a.archived && <Badge tone="skip">Archived</Badge>}
           </div>
           <p className="font-mono text-xs text-muted">{a.slug}</p>

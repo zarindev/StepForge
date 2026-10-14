@@ -29,6 +29,7 @@ stepforge export  --app <slug> --out <file>
 stepforge import  --file <file> [--slug <new-slug>]
 stepforge secret  set --app <slug> --env <name> --key <NAME> (--from-env <VAR> | value on stdin)
 stepforge codegen --app <slug> --target <id> --out <dir> [--env <name>] [--tag|--module|--scenario] [--pom] [--ci github,gitlab]
+stepforge doctor  native [--json]
 ```
 
 Every command accepts `--data-dir <dir>` (default: `./data`, or `STEPFORGE_DATA_DIR`) and `--help`.
@@ -99,6 +100,16 @@ Writes a ready-to-run project (or document) into a folder: `stepforge codegen --
 
 ```bash
 ./stepforge.sh codegen --app careclinic --target playwright-ts --out ../careclinic-tests --ci github
+```
+
+### `doctor native`
+
+Checks this computer for testing Android apps: Java, the Android SDK, adb, the emulator, emulators and connected
+phones, and Appium with its Android driver. Every missing item says how to fix it. The exit code is 0 when ready
+and 2 when not. See [ANDROID_APPS.md](ANDROID_APPS.md).
+
+```bash
+./stepforge.sh doctor native
 ```
 
 ## Scheduling with the operating system

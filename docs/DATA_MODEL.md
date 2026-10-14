@@ -44,9 +44,11 @@ erDiagram
 
 ## Applications
 
-`applications.platform` is `web` (default) or `electron` (migration 0014). For an `electron` application, each
-environment's `browser_defaults_json.electron` holds how to start the app: `executablePath` or `appPath`, `args`,
-`cwd` and `env` (see [DESKTOP_APPS.md](DESKTOP_APPS.md)).
+`applications.platform` is `web` (default), `electron` (migration 0014) or `android`. For an `electron` application,
+each environment's `browser_defaults_json.electron` holds how to start the app: `executablePath` or `appPath`,
+`args`, `cwd` and `env` (see [DESKTOP_APPS.md](DESKTOP_APPS.md)). For an `android` application,
+`browser_defaults_json.android` holds `app` or `appPackage` (+ `appActivity`), `avd`, `udid`, `resetApp`,
+`showEmulator` and extra Appium `capabilities` (see [ANDROID_APPS.md](ANDROID_APPS.md)).
 
 ## Deletion behaviour
 

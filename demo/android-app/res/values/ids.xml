@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item type="id" name="email" />
+    <item type="id" name="password" />
+    <item type="id" name="sign_in" />
+    <item type="id" name="error" />
+    <item type="id" name="patient_name" />
+    <item type="id" name="add_patient" />
+    <item type="id" name="patient_count" />
+    <item type="id" name="patient_list" />
+    <item type="id" name="sign_out" />
+</resources>

@@ -33,6 +33,7 @@
     "demo:clinic": "npm run start -w @stepforge/demo-clinic",
     "demo:shop": "npm run start -w @stepforge/demo-shop",
     "mailpit:install": "tsx scripts/install-mailpit.ts",
+    "appium:install": "tsx scripts/install-appium.ts",
     "k6:install": "tsx scripts/install-k6.ts"
   },
   "devDependencies": {

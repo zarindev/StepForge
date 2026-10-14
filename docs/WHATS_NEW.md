@@ -2,6 +2,16 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — Android apps
+
+StepForge now tests **native Android apps** on an emulator or a USB phone, from Windows, macOS or Linux. Set an
+application's platform to _Android app_. Each environment then names the app (an .apk, or an app already installed)
+and the emulator or phone. StepForge installs Appium and its Android driver into its own folder and starts them
+when needed. Test ids, text, hints, roles and XPath find elements. Every test keeps a screen recording, the device
+log, screenshots and, at a failure, the screen's element tree. `stepforge doctor native` checks this computer and
+says how to fix what is missing. A demo app, CareClinic mobile, has one planted bug to find.
+→ [Android apps](ANDROID_APPS.md)
+
 ## Update — Electron desktop apps
 
 StepForge now tests **Electron desktop apps** on Windows, macOS and Linux. Set an application's platform to

@@ -26,8 +26,11 @@ export const ApplicationInput = z.object({
   icon: z.string().max(40).default('app-window'),
   color: HexColor.default('#F97316'),
   category: z.string().max(60).default('web'),
-  /** web: tested in a browser; electron: an Electron desktop app, launched as configured in each environment. */
-  platform: z.enum(['web', 'electron']).default('web'),
+  /**
+   * web: tested in a browser; electron: an Electron desktop app; android: an Android app (through Appium). Desktop
+   * and Android apps are started as configured in each environment.
+   */
+  platform: z.enum(['web', 'electron', 'android']).default('web'),
   tags: z.array(z.string().max(40)).default([]),
 });
 export type ApplicationInput = z.infer<typeof ApplicationInput>;
@@ -53,6 +56,25 @@ export const ElectronLaunchInput = z
     env: z.record(z.string(), z.string()).default({}),
   })
   .refine((e) => e.executablePath || e.appPath, 'Set the app executable or the app folder');
+
+/**
+ * How an environment starts an Android app: the app file (.apk) or an installed app's package (and activity), on an
+ * emulator (AVD name, started when needed) or a device (adb serial; empty = the only one connected). By default the
+ * app's data is cleared before each test. `capabilities` are extra Appium capabilities. Text values may use
+ * {{env.x}} / {{secret.x}}.
+ */
+export const AndroidLaunchInput = z
+  .object({
+    app: z.string().max(1000).optional(),
+    appPackage: z.string().max(300).optional(),
+    appActivity: z.string().max(300).optional(),
+    avd: z.string().max(200).optional(),
+    udid: z.string().max(200).optional(),
+    resetApp: z.boolean().default(true),
+    showEmulator: z.boolean().default(false),
+    capabilities: z.record(z.string(), z.unknown()).default({}),
+  })
+  .refine((a) => a.app || a.appPackage, "Set the app file (.apk) or the installed app's package");
 
 /** An environment's browser settings (see BrowserSettings); text values may use {{secret.x}} / {{env.x}}. */
 export const BrowserSettingsInput = z.object({
@@ -108,6 +130,7 @@ export const EnvironmentInput = z.object({
       headless: z.boolean().default(true),
       settings: BrowserSettingsInput.optional(),
       electron: ElectronLaunchInput.optional(),
+      android: AndroidLaunchInput.optional(),
     })
     .default({ browser: 'chromium', headless: true }),
 });

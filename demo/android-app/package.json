@@ -1,0 +1,9 @@
+{
+  "name": "@stepforge/demo-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CareClinic mobile: a small Android app for StepForge's Android tests (built APK: careclinic.apk)",
+  "scripts": {
+    "build": "tsx ../../scripts/build-android-demo.ts"
+  }
+}

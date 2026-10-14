@@ -16,8 +16,9 @@ explicitly authorised to test**.
   computer; handle them under the rules that apply to you (e.g. GDPR), and use the retention setting and danger zone
   to remove what you no longer need.
 - **Email testing** reads the inboxes you configure. Use dedicated test mailboxes and app passwords.
-- **Third-party software.** StepForge downloads Playwright's browsers, Mailpit and optionally k6 from their official
-  sources; their own licences apply.
+- **Third-party software.** StepForge downloads Playwright's browsers, Mailpit and optionally k6, Appium with its
+  UiAutomator2 driver (Apache-2.0) and, when needed for Appium, Node.js (MIT) from their official sources; their own
+  licences apply. The Android SDK and emulator are installed by you, under Google's licence.
 
 StepForge is provided under the [MIT License](LICENSE), "as is", without warranty of any kind. You are responsible for
 how you use it.

@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- **Android apps**: a new platform, _Android app_ (no migration needed). An Android app's environment names the app
+  (an .apk, or an installed package and activity), the emulator (started when needed) or phone, whether to reset
+  the app's data before each test (on by default), whether to show the emulator window, and extra Appium
+  capabilities. A new package, `@stepforge/executor-native`, runs the `ui.*` steps through a local Appium 3 server
+  with the UiAutomator2 driver. It talks plain WebDriver, with no client library. Appium and the driver go into
+  `data/tools` (`npm run appium:install` or **Install Appium** on the Environments tab), with a portable Node.js 22
+  LTS when the running Node.js is outside Appium's range. Locators map to resource ids, content descriptions, hints,
+  text, widget classes and XPath. Evidence: screenshots, an MP4 screen recording, the device log (crashes marked as
+  errors) and the element tree (XML) at failures. `stepforge doctor native` and `GET /api/native/status` check
+  Java, the SDK, adb, the emulator, devices and Appium, with fixes. Demo app CareClinic mobile in
+  `demo/android-app` (built APK committed; `scripts/build-android-demo.ts` rebuilds it without Gradle). New CI job
+  on an Android emulator. See [docs/ANDROID_APPS.md](docs/ANDROID_APPS.md).
 - **Electron desktop apps**: applications have a platform, _web_ or _desktop app (Electron)_ (migration 0014). A
   desktop app's environment says how to start it: the packaged executable or the project folder (started with the
   Electron installed there), arguments, the app's environment variables and a working folder; variables and secrets

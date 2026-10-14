@@ -10,8 +10,8 @@ export type Application = {
   icon: string;
   color: string;
   category: string;
-  /** `electron`: a desktop app started from the environment's launch settings. */
-  platform: 'web' | 'electron';
+  /** `electron` / `android`: a desktop or Android app started from the environment's launch settings. */
+  platform: 'web' | 'electron' | 'android';
   tagsJson: string[];
   archived: boolean;
   createdAt: string;
@@ -228,7 +228,7 @@ export type RunDetail = Run & {
   items: RunItem[];
   blockFailures?: BlockFailure[];
   environment: { id: string; name: string; baseUrl: string; isProduction: boolean } | null;
-  application: { id: string; name: string; color: string };
+  application: { id: string; name: string; color: string; platform?: Application['platform'] };
 };
 
 export type AssertionResult = {

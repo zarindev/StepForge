@@ -37,7 +37,7 @@ export const ApplicationExport = z.object({
     icon: z.string().optional(),
     color: z.string().optional(),
     category: z.string().optional(),
-    platform: z.enum(['web', 'electron']).default('web'),
+    platform: z.enum(['web', 'electron', 'android']).default('web'),
     tags: z.array(z.string()).default([]),
   }),
   environments: z

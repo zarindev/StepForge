@@ -47,7 +47,7 @@ test('desktop apps: an Electron app, its launch settings, and a test run in it',
   await dialog.getByLabel('App project folder').fill(DEMO);
   await shot(page, 'desktop-environment');
   await dialog.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('desktop app')).toBeVisible();
+  await expect(page.getByText(/variables · desktop app/)).toBeVisible();
 
   const app = (
     await sfApi<{ id: string; name: string; platform: string }[]>(page, 'GET', '/api/applications')

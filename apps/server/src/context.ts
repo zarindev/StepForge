@@ -1,3 +1,4 @@
+import type { AppiumServer } from '@stepforge/executor-native';
 import type { ManualRunService } from './runner/manual.ts';
 import type { ManualBrowserService } from './runner/manual-browser.ts';
 import type { DataService } from './data/service.ts';
@@ -49,5 +50,7 @@ export type AppContext = {
   codegen: CodegenService;
   demo: DemoService;
   maintenance: MaintenanceService;
+  /** The local Appium server for Android apps. */
+  appium: AppiumServer;
   startedAt: Date;
 };

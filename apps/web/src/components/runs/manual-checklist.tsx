@@ -179,10 +179,13 @@ export function ManualChecklist({
   runId,
   itemId,
   onDone,
+  canOpenBrowser = true,
 }: {
   runId: string;
   itemId: string;
   onDone: () => void;
+  /** False for apps StepForge cannot open with the panel yet (Android): the tester marks steps here. */
+  canOpenBrowser?: boolean;
 }) {
   const qc = useQueryClient();
   const q = useQuery({
@@ -317,7 +320,7 @@ export function ManualChecklist({
               Close browser
             </Button>
           </>
-        ) : (
+        ) : canOpenBrowser ? (
           <Button
             variant="outline"
             size="sm"
@@ -326,7 +329,7 @@ export function ManualChecklist({
           >
             <MonitorPlay className="h-3.5 w-3.5" /> Open browser
           </Button>
-        )}
+        ) : null}
         <Button
           variant="outline"
           size="sm"

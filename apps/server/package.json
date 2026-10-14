@@ -23,6 +23,7 @@
     "@stepforge/executor-api": "*",
     "@stepforge/executor-db": "*",
     "@stepforge/executor-email": "*",
+    "@stepforge/executor-native": "*",
     "@stepforge/executor-perf": "*",
     "@stepforge/executor-ui": "*",
     "@stepforge/executor-util": "*",

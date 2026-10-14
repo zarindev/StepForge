@@ -32,6 +32,10 @@ npm run check:secrets    # no data/ or .env content committed
 Tests against real PostgreSQL/MySQL/SQL Server/MongoDB run when `STEPFORGE_TEST_PG_URL`, `STEPFORGE_TEST_MYSQL_URL`,
 `STEPFORGE_TEST_MSSQL_URL` or `STEPFORGE_TEST_MONGO_URL` are set (CI uses service containers).
 
+Android tests run on an emulator when `STEPFORGE_TEST_ANDROID` is set: an emulator's name, or `1` for the device that
+is already connected. They need `npm run appium:install`. Run their files one at a time, since they share the device:
+`STEPFORGE_TEST_ANDROID=Pixel npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts`.
+
 ## Layout
 
 `packages/core` (step model, engine), `packages/executors/*` (UI, API, DB, email, perf, util), `packages/db`

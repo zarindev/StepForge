@@ -16,6 +16,7 @@
     "@stepforge/codegen": "*",
     "@stepforge/core": "*",
     "@stepforge/db": "*",
+    "@stepforge/executor-native": "*",
     "@stepforge/reports": "*",
     "@stepforge/server": "*",
     "drizzle-orm": "^0.45.3",

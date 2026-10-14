@@ -84,6 +84,18 @@ export type ElectronLaunch = {
   env?: Record<string, string>;
 };
 
+/** How to start an Android app (see AndroidLaunchInput). */
+export type AndroidLaunch = {
+  app?: string;
+  appPackage?: string;
+  appActivity?: string;
+  avd?: string;
+  udid?: string;
+  resetApp?: boolean;
+  showEmulator?: boolean;
+  capabilities?: Record<string, unknown>;
+};
+
 /** What an executor reports back for one step. */
 export type StepOutcome = {
   message?: string;
@@ -225,6 +237,8 @@ export type RunOptions = {
   browserSettings?: BrowserSettings;
   /** Set for an Electron desktop app: the UI steps run in the app's windows instead of a browser. */
   electron?: ElectronLaunch;
+  /** Set for an Android app: the UI steps run in the app through Appium. */
+  android?: AndroidLaunch;
   baseUrl?: string;
 };
 

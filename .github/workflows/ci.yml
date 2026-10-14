@@ -26,8 +26,9 @@ jobs:
       - run: npm run typecheck
       # The unit tests drive Chromium too, so the browser is installed before them.
       - run: npx playwright install --with-deps chromium
-      # The desktop-app tests open Electron windows: Linux runners need Electron's sandbox helper set up and a
-      # virtual display.
+      # The desktop-app tests open Electron windows. Electron downloads its binary on first use: fetch it now.
+      # Linux runners also need Electron's sandbox helper set up and a virtual display.
+      - run: node node_modules/electron/install.js
       - name: Set up Electron (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -170,3 +171,31 @@ jobs:
           STEPFORGE_TEST_MSSQL_URL: Server=127.0.0.1,1433;Database=master;User Id=sa;Password=StepForge#2026;Encrypt=true;TrustServerCertificate=true
           STEPFORGE_TEST_MONGO_URL: mongodb://127.0.0.1:27017
           STEPFORGE_TEST_KAFKA: localhost:9092
+
+  android:
+    # Android apps: the demo app (demo/android-app) on an emulator, through Appium (installed into data/tools).
+    # Linux runners have hardware acceleration (KVM) once it is opened to the runner's user.
+    name: Android app on an emulator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run appium:install
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # One emulator: the test files take turns.
+          script: STEPFORGE_TEST_ANDROID=1 npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts

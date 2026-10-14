@@ -20,6 +20,28 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 14 | Showcase package, optional Electron | ✅ Done (Electron skipped: optional) |
 | 15 | Reuse, scale and integrations; every kind of web app | ✅ Done (11 of 11 features + web-app coverage) |
 | N1 | Native apps, step 1: Electron desktop apps | ✅ Done |
+| N2 | Native apps, step 2: native foundation and Android apps | ✅ Done |
+
+---
+
+## N2 — Native foundation and Android apps (2026-10-14)
+
+**Delivered**
+- Platform `android`; per-environment launch settings: .apk or installed package and activity, emulator or device
+  serial, reset app data, show the emulator, extra Appium capabilities.
+- `@stepforge/executor-native`: a minimal WebDriver client, Android locator mapping, the core `ui.*` steps and
+  page conditions, evidence (screenshots, MP4 recording, logcat, element tree at failures).
+- Appium 3.8.0 + UiAutomator2 8.7.0 installed into `data/tools` (`npm run appium:install` / Install Appium),
+  with a portable Node.js 22 LTS when needed; started on first use, stopped with StepForge.
+- `stepforge doctor native`, `GET /api/native/status`, `POST /api/native/appium/install`; status card on the
+  Environments tab; Android fields in the environment form; the recorder and the manual-test panel explain they
+  are not available for Android yet.
+- Demo app CareClinic mobile (`demo/android-app`, planted bug ANDROID-01), built without Gradle by
+  `scripts/build-android-demo.ts`. CI job `android` on an emulator.
+
+**Tests**: locator mapping and capabilities (always); on an emulator: sign in, add a patient, reset between tests,
+planted bug with screenshot and element tree, missing element (executor); runs, export/import, refusals, status
+and a full run with video (server); dashboard end-to-end test for the Android forms. [ANDROID_APPS.md](ANDROID_APPS.md)
 
 ---
 

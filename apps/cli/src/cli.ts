@@ -4,6 +4,7 @@ import * as repo from '@stepforge/db/repos';
 import { buildApp, runDefaults, type BuildOptions } from '@stepforge/server';
 import { CREDIT } from '@stepforge/reports';
 import { TARGETS } from '@stepforge/codegen';
+import { nativeDoctor } from '@stepforge/executor-native';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -34,6 +35,7 @@ Commands
   import    Create an application from an export
   secret    Store an environment secret (encrypted), e.g. in CI after "import"
   codegen   Export tests as a ready-to-run project (Playwright, Cypress, Selenium, API, docs)
+  doctor    doctor native — check this computer for Android testing (Java, SDK, emulators, Appium)
 
 run
   --app <slug>          Application (required)
@@ -94,9 +96,10 @@ export async function main(argv: string[], io: Io = defaultIo, build: BuildOptio
   }
   let values: Record<string, string | string[] | boolean | undefined>;
   try {
-    // `secret set`: the action is the only positional argument.
-    const positional = command === 'secret' ? rest.slice(0, 1) : [];
+    // `secret set` and `doctor native`: the action is the only positional argument.
+    const positional = command === 'secret' || command === 'doctor' ? rest.slice(0, 1) : [];
     if (command === 'secret' && positional[0] !== 'set') throw new Error('Usage: stepforge secret set …');
+    if (command === 'doctor' && positional[0] !== 'native') throw new Error('Usage: stepforge doctor native');
     ({ values } = parseArgs({
       args: rest.slice(positional.length),
       options: OPTIONS,
@@ -606,7 +609,23 @@ const COMMANDS: Record<string, Handler> = {
   report: wrap(report),
   export: wrap(exportCmd),
   import: wrap(importCmd),
+  doctor: wrap(doctor),
 };
+
+/** `doctor native`: what Android testing needs on this computer, each with how to fix it. Exit 2 when not ready. */
+async function doctor(c: Ctx, v: Values, io: Io): Promise<number> {
+  const status = await nativeDoctor(c.ctx.config.toolsDir);
+  if (v.json) {
+    io.out(JSON.stringify(status, null, 2));
+    return status.ready ? EXIT.passed : EXIT.error;
+  }
+  for (const check of status.checks) {
+    io.out(`${check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`);
+    if (!check.ok && check.fix) io.out(`    → ${check.fix}`);
+  }
+  io.out(status.ready ? '\nReady to test Android apps.' : '\nNot ready yet: fix the items marked ✗.');
+  return status.ready ? EXIT.passed : EXIT.error;
+}
 
 /** Usage errors print a hint; everything else is reported by main(). */
 function wrap(h: Handler): Handler {

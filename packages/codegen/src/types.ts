@@ -34,8 +34,8 @@ export type CodegenScenario = {
 };
 
 export type CodegenInput = {
-  /** `platform` `electron`: a desktop app (the exported tests still open a browser — see the warning). */
-  application: { name: string; slug: string; platform?: 'web' | 'electron' };
+  /** `platform` electron / android: the exported UI tests still open a browser — see the warning. */
+  application: { name: string; slug: string; platform?: 'web' | 'electron' | 'android' };
   environment: {
     name: string;
     baseUrl: string;

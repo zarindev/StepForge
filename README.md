@@ -66,8 +66,13 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 ## What's new
 
-**Just added — desktop apps:** test **Electron desktop apps** on Windows, macOS and Linux with the same steps,
-recorder, manual testing, evidence and diagnosis as web apps ([guide](docs/DESKTOP_APPS.md)).
+**Just added — Android and desktop apps:**
+
+- **Android apps** on an emulator or a USB phone, through Appium, which StepForge installs and runs itself. The same
+  steps, screen recording, device log and element tree, plus `stepforge doctor native`
+  ([guide](docs/ANDROID_APPS.md)).
+- **Electron desktop apps** on Windows, macOS and Linux, with the same steps, recorder, manual testing, evidence and
+  diagnosis as web apps ([guide](docs/DESKTOP_APPS.md)).
 
 **October 2026 — 13 new features** ([full release notes](docs/WHATS_NEW.md)):
 
@@ -97,12 +102,12 @@ Planned work, in order — all of it free, open source and local:
 | | Planned | What it brings |
 | --- | --- | --- |
 | ✅ | **Electron desktop apps** | Done — see [Desktop apps](docs/DESKTOP_APPS.md) |
-| 1 | **Android apps** | Appium-based native Android testing from any computer: emulators or a USB phone |
-| 2 | **iOS apps** | Simulators and iPhones (from a Mac) |
-| 3 | **Mobile gestures and a native recorder** | Swipe, long press, back, rotate, deep links; record by clicking a mirrored screen |
-| 4 | **Windows and macOS desktop apps** | Native desktop testing through each system's accessibility layer |
-| 5 | **Linux desktop apps and image matching** | GTK/Qt apps, and image-based locators as a last resort |
-| 6 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
+| ✅ | **Android apps** | Done — see [Android apps](docs/ANDROID_APPS.md) |
+| 1 | **iOS apps** | Simulators and iPhones (from a Mac) |
+| 2 | **Mobile gestures and a native recorder** | Swipe, long press, back, rotate, deep links; record by clicking a mirrored screen |
+| 3 | **Windows and macOS desktop apps** | Native desktop testing through each system's accessibility layer |
+| 4 | **Linux desktop apps and image matching** | GTK/Qt apps, and image-based locators as a last resort |
+| 5 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
 | — | **More code export** | The newest steps (page conditions, network, SOAP / Kafka / FTP) exported instead of marked TODO |
 | — | **Desktop installer** | Start StepForge with a double-click instead of a terminal |
 
@@ -116,6 +121,7 @@ Every feature, grouped by what you want to do: **[docs/FEATURES.md](docs/FEATURE
 | --- | --- |
 | **UI** | ✅ Recorder with ranked, self-healing locators · assert/extract/mask from the toolbar · tabs, dialogs, iframes · conditions on the page (“if the cookie banner is visible”, “repeat while Load more shows”) · screenshots, video, Playwright traces |
 | **Any web app** | ✅ SPAs, PWAs, canvas and map apps, mobile web with touch · wait for and fake API responses, go offline · file downloads · cookies and storage · control the clock · per-environment language, time zone, location, dark mode, basic auth, headers, proxy, client certificates, installed Chrome/Edge — see [docs/WEB_APPS.md](docs/WEB_APPS.md) |
+| **Android apps** | ✅ Native Android apps on an emulator or a USB phone, from Windows, macOS or Linux · Appium + UiAutomator2 installed and started by StepForge · an .apk or an installed app per environment · ids, text, hints, roles and XPath · screen recording, device log, element tree at failures · `stepforge doctor native` — see [docs/ANDROID_APPS.md](docs/ANDROID_APPS.md) |
 | **Desktop apps** | ✅ Electron apps on Windows, macOS and Linux · start the packaged app or its project folder per environment · every window is a tab · recorder, manual testing, video, traces and diagnosis — see [docs/DESKTOP_APPS.md](docs/DESKTOP_APPS.md) |
 | **Visual checks** | ✅ Screenshot comparison with an approved baseline · difference image · one-click "Accept as new baseline" · masks for changing parts |
 | **API** | ✅ REST, GraphQL and SOAP steps (XPath checks, faults) · Kafka produce / wait for a message · FTP, FTPS and SFTP files · auth (bearer, basic, API key, OAuth2) · JSONPath and JSON Schema checks · import OpenAPI, Postman, cURL and HAR · contract checks |
@@ -467,7 +473,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | [Features](docs/FEATURES.md) | Every feature in one page |
 | [Step reference](docs/STEP_REFERENCE.md) | Every step type, its parameters and checks |
 | [Testing every kind of web app](docs/WEB_APPS.md) | SPAs, PWAs, canvas, downloads, network mocking, visual checkpoints, browser settings |
-| [Desktop apps](docs/DESKTOP_APPS.md) | Electron desktop apps: launch settings, recording, manual testing, CI |
+| [Android apps](docs/ANDROID_APPS.md) · [Desktop apps](docs/DESKTOP_APPS.md) | Native Android apps (emulators and phones) and Electron desktop apps |
 | [Blocks and hooks](docs/BLOCKS.md) · [Elements](docs/ELEMENTS.md) · [Test data](docs/TEST_DATA.md) | Reuse: shared steps, before/after each test, shared elements, data sources |
 | [Campaigns](docs/CAMPAIGNS.md) · [Manual testing](docs/MANUAL_RUNS.md) · [Scheduling](docs/SCHEDULING.md) · [CLI](docs/CLI.md) | Running: test sets across browsers and sizes, tests done by hand, cron, notifications, CI |
 | [Databases](docs/DATABASES.md) · [Email](docs/EMAIL.md) · [Performance](docs/PERFORMANCE.md) · [SOAP, Kafka, FTP](docs/INTEGRATIONS.md) | Beyond the page |
@@ -475,7 +481,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | [Code export](docs/CODEGEN.md) | The 13 export targets |
 | [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) | How it is built |
 | [Known issues](docs/KNOWN_ISSUES.md) · [Changelog](CHANGELOG.md) | Limits and history |
-| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for Android, iOS and native desktop apps (Electron: done) |
+| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for native apps (Electron and Android: done; iOS and native desktop next) |
 
 ## Roadmap
 
@@ -494,6 +500,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
       clock control, storage, per-environment browser settings
 - [x] Manual testing in the browser with recorded sessions, marked-up screenshots and bug reports
 - [x] Electron desktop apps (Windows, macOS, Linux)
+- [x] Android apps (emulators and phones, through Appium)
 - [ ] Next: see [Coming next](#coming-next)
 
 ## Contributing

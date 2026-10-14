@@ -104,7 +104,12 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
       environment: env
         ? { id: env.id, name: env.name, baseUrl: env.baseUrl, isProduction: env.isProduction }
         : null,
-      application: { id: application.id, name: application.name, color: application.color },
+      application: {
+        id: application.id,
+        name: application.name,
+        color: application.color,
+        platform: application.platform,
+      },
     };
   });
 

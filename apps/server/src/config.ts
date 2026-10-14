@@ -29,6 +29,8 @@ export type ServerConfig = {
   mailpit: { httpPort: number; smtpPort: number };
   /** Downloaded tools (Mailpit, later k6). */
   binDir: string;
+  /** Installed tools: Appium and its Android driver (and a Node.js for it when needed). */
+  toolsDir: string;
 };
 
 export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
@@ -49,6 +51,9 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     binDir: process.env.STEPFORGE_BIN_DIR
       ? resolve(REPO_ROOT, process.env.STEPFORGE_BIN_DIR)
       : join(overrides.dataDir ?? dataDir, 'bin'),
+    toolsDir: process.env.STEPFORGE_TOOLS_DIR
+      ? resolve(REPO_ROOT, process.env.STEPFORGE_TOOLS_DIR)
+      : join(overrides.dataDir ?? dataDir, 'tools'),
     mailpit: {
       httpPort: Number(process.env.STEPFORGE_MAILPIT_PORT ?? 8025),
       smtpPort: Number(process.env.STEPFORGE_MAILPIT_SMTP_PORT ?? 1025),

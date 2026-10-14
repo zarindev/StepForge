@@ -8,6 +8,7 @@ import {
   VIEWPORT_PRESETS,
   type BrowserSettings,
   type ElectronLaunch,
+  type AndroidLaunch,
   type RunOptions,
   type RunOptionsInput,
   type StepResult,
@@ -23,6 +24,7 @@ import { applicationGates, refreshDaily } from '@stepforge/analytics';
 import { createPerfExecutor } from '@stepforge/executor-perf';
 import type { LoadReport } from '@stepforge/perf';
 import { createUiExecutor, BrowserPool } from '@stepforge/executor-ui';
+import { createNativeExecutor, type AppiumServer } from '@stepforge/executor-native';
 import { createUtilExecutor } from '@stepforge/executor-util';
 import { and, eq, inArray } from 'drizzle-orm';
 import { mkdirSync, rmSync, statSync } from 'node:fs';
@@ -59,6 +61,9 @@ export class RunManager {
   private queue: string[] = [];
   private active: { runId: string; abort: AbortController } | null = null;
   private draining: Promise<void> | null = null;
+
+  /** The local Appium server, for Android apps (set by the server). */
+  appium?: AppiumServer;
 
   constructor(
     private readonly db: StepForgeDb,
@@ -356,7 +361,14 @@ export class RunManager {
     const settings = (env.browserDefaultsJson as { settings?: BrowserSettings }).settings;
     // Placeholders (e.g. a basic-auth password from {{secret.x}}) are resolved here; the run never stores them.
     // A desktop (Electron) app: tests start the app from the environment's launch settings instead of a browser.
-    if (repo.getApplication(this.db, run.applicationId).platform === 'electron') {
+    const platform = repo.getApplication(this.db, run.applicationId).platform;
+    if (platform === 'android') {
+      const launch = (env.browserDefaultsJson as { android?: AndroidLaunch }).android ?? {};
+      options.android = new VariableResolver({ env: envScope, secret: secrets }).resolve(
+        launch,
+      ) as AndroidLaunch;
+    }
+    if (platform === 'electron') {
       const launch = (env.browserDefaultsJson as { electron?: ElectronLaunch }).electron ?? {};
       options.electron = new VariableResolver({ env: envScope, secret: secrets }).resolve(
         launch,
@@ -370,8 +382,14 @@ export class RunManager {
     this.active = { runId, abort };
     const pool = new BrowserPool();
     const specs = this.specs;
+    const appium = this.appium;
     const executors = [
-      createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines', run.applicationId) }),
+      options.android
+        ? createNativeExecutor({
+            appiumUrl: () =>
+              appium ? appium.url() : Promise.reject(new Error('Android apps are not available here')),
+          })
+        : createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines', run.applicationId) }),
       createApiExecutor({
         contracts: specs
           ? async (ref, req, res) => {

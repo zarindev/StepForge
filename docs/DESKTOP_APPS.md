@@ -70,6 +70,7 @@ Desktop-app tests run from the CLI and in CI like any other tests (`stepforge ru
 runners show the windows on their desktop. Linux runners need a virtual display and Electron's sandbox helper:
 
 ```yaml
+- run: node node_modules/electron/install.js   # Electron downloads its binary on first use: fetch it now
 - name: Set up Electron (Linux)
   run: |
     sudo chown root:root node_modules/electron/dist/chrome-sandbox

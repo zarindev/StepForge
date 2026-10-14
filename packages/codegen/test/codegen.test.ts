@@ -79,6 +79,13 @@ describe('plan', () => {
     expect(buildPlan(KITCHEN_SINK).warnings.map((w) => w.message)).not.toContainEqual(
       expect.stringContaining('_electron.launch()'),
     );
+    const android = buildPlan({
+      ...KITCHEN_SINK,
+      application: { ...KITCHEN_SINK.application, platform: 'android' },
+    });
+    expect(android.warnings.map((w) => w.message)).toContainEqual(
+      expect.stringContaining('This is an Android app'),
+    );
   });
   it('inlines blocks and called scenarios, collects secrets and variables, and reports what cannot be exported', () => {
     const plan = buildPlan(KITCHEN_SINK, { pom: true });

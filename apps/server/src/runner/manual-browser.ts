@@ -114,7 +114,14 @@ export class ManualBrowserService {
     mkdirSync(videoDir, { recursive: true });
 
     // A desktop (Electron) app is opened itself, as its environment says; a web app in a browser.
-    const desktop = repo.getApplication(this.db, run.applicationId).platform === 'electron';
+    const platform = repo.getApplication(this.db, run.applicationId).platform;
+    if (platform === 'android')
+      throw new repo.RepoError(
+        400,
+        'invalid',
+        'Opening an Android app with the panel is planned; use the app on your phone or emulator and mark the steps here',
+      );
+    const desktop = platform === 'electron';
     const launch = desktop
       ? ((env?.browserDefaultsJson as { electron?: ElectronLaunch } | undefined)?.electron ?? {})
       : undefined;

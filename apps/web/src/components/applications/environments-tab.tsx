@@ -2,6 +2,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Globe, MoreHorizontal, Pencil, Plus, ShieldAlert, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
+  AndroidLaunchFields,
+  AndroidStatusCard,
+  androidLaunchSet,
+  androidToForm,
+  formToAndroid,
+  type AndroidForm,
+} from '@/components/applications/android-settings';
+import {
   BrowserSettingsFields,
   formToSettings,
   settingsToForm,
@@ -31,6 +39,8 @@ type EnvForm = {
   settings: BrowserSettingsForm;
   /** Desktop (Electron) apps: how to start the app. */
   desktop: { executablePath: string; appPath: string; args: string; cwd: string; env: string };
+  /** Android apps: which app and device. */
+  android: AndroidForm;
 };
 
 type ElectronLaunch = {
@@ -98,6 +108,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
           headless: f.headless,
           settings: formToSettings(f.settings),
           ...(app.platform === 'electron' && { electron: formToDesktop(f.desktop) }),
+          ...(app.platform === 'android' && { android: formToAndroid(f.android) }),
         },
       };
       return editing === 'new' || !editing
@@ -126,6 +137,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
 
   return (
     <div className="space-y-4">
+      {app.platform === 'android' && <AndroidStatusCard />}
       <div className="flex justify-between">
         <p className="text-sm text-muted">
           Where tests run. Use {'{{env.baseUrl}}'} and {'{{env.<variable>}}'} in steps.
@@ -160,7 +172,9 @@ export function EnvironmentsTab({ app }: { app: Application }) {
                     {Object.keys(env.variablesJson).length} variables ·{' '}
                     {app.platform === 'electron'
                       ? 'desktop app'
-                      : String(env.browserDefaultsJson.browser ?? 'chromium')}
+                      : app.platform === 'android'
+                        ? 'Android app'
+                        : String(env.browserDefaultsJson.browser ?? 'chromium')}
                   </p>
                 </div>
                 <Menu
@@ -189,6 +203,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
         <EnvironmentDialog
           env={editing === 'new' ? undefined : editing}
           desktop={app.platform === 'electron'}
+          android={app.platform === 'android'}
           onClose={() => setEditing(null)}
           onSubmit={(f) => save.mutate(f)}
           busy={save.isPending}
@@ -211,6 +226,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
 function EnvironmentDialog({
   env,
   desktop,
+  android,
   onClose,
   onSubmit,
   busy,
@@ -219,6 +235,8 @@ function EnvironmentDialog({
   env?: Environment;
   /** The application is a desktop (Electron) app: ask how to start it instead of which browser to use. */
   desktop?: boolean;
+  /** The application is an Android app: ask which app and device instead of which browser. */
+  android?: boolean;
   onClose: () => void;
   onSubmit: (f: EnvForm) => void;
   busy: boolean;
@@ -226,13 +244,14 @@ function EnvironmentDialog({
 }) {
   const [f, setF] = useState<EnvForm>({
     name: env?.name ?? '',
-    baseUrl: env?.baseUrl ?? (desktop ? 'app://local' : 'http://localhost:3000'),
+    baseUrl: env?.baseUrl ?? (desktop || android ? 'app://local' : 'http://localhost:3000'),
     isProduction: env?.isProduction ?? false,
     variables: toLines(env?.variablesJson ?? {}),
     browser: String(env?.browserDefaultsJson.browser ?? 'chromium'),
     headless: (env?.browserDefaultsJson.headless as boolean | undefined) ?? true,
     settings: settingsToForm(env?.browserDefaultsJson.settings),
     desktop: desktopToForm(env?.browserDefaultsJson.electron),
+    android: androidToForm(env?.browserDefaultsJson.android),
   });
   const launchSet = !!(f.desktop.executablePath.trim() || f.desktop.appPath.trim());
   const setDesktop = (p: Partial<EnvForm['desktop']>) => set({ desktop: { ...f.desktop, ...p } });
@@ -248,7 +267,13 @@ function EnvironmentDialog({
             Cancel
           </Button>
           <Button
-            disabled={!f.name || !f.baseUrl || (desktop && !launchSet) || busy}
+            disabled={
+              !f.name ||
+              !f.baseUrl ||
+              (desktop && !launchSet) ||
+              (android && !androidLaunchSet(f.android)) ||
+              busy
+            }
             onClick={() => onSubmit(f)}
           >
             Save
@@ -269,7 +294,7 @@ function EnvironmentDialog({
           <Field
             label="Base URL"
             className="col-span-2"
-            {...(desktop && { hint: 'A name for reports; the app itself is started below.' })}
+            {...((desktop || android) && { hint: 'A name for reports; the app itself is started below.' })}
           >
             <Input
               value={f.baseUrl}
@@ -287,7 +312,9 @@ function EnvironmentDialog({
             onChange={(e) => set({ variables: e.target.value })}
           />
         </Field>
-        {desktop ? (
+        {android ? (
+          <AndroidLaunchFields value={f.android} onChange={(a) => set({ android: a })} />
+        ) : desktop ? (
           <div className="space-y-3 rounded-lg border border-border p-3">
             <p className="text-sm font-medium">Start the desktop app</p>
             <p className="text-xs text-muted">

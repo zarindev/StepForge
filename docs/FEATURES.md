@@ -47,6 +47,13 @@ touch, sites behind basic auth or client certificates, localised and time-zone-d
 features and visual regressions — with network waiting and mocking, offline mode, cookies and storage, a controllable
 clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
+## Test Android apps
+
+Native Android apps on an emulator or a USB phone, from any computer, through Appium (installed and started by
+StepForge). Each environment names the app (.apk or an installed package) and the device. You get the same steps
+and checks, plus a screen recording, the device log and the element tree at failures. `stepforge doctor native`
+checks the setup. [ANDROID_APPS.md](ANDROID_APPS.md)
+
 ## Test desktop apps
 
 Electron desktop apps on Windows, macOS and Linux: each environment starts the packaged app or its project folder,
@@ -119,4 +126,5 @@ traces and diagnosis work as on the web. [DESKTOP_APPS.md](DESKTOP_APPS.md)
 The latest additions are in [WHATS_NEW.md](WHATS_NEW.md); planned work is in the README's
 [Coming next](../README.md#coming-next).
 
-- Native mobile apps and Windows / macOS / Linux desktop apps (Electron is done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
+- iOS apps, mobile gestures and a native recorder, and Windows / macOS / Linux desktop apps (Electron and Android are
+  done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).

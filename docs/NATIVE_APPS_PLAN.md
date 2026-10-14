@@ -2,8 +2,9 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
-**Status: N1 (Electron desktop apps) is done — see [DESKTOP_APPS.md](DESKTOP_APPS.md); N2–N7 are planned.**
-StepForge tests web applications (including mobile web, see [WEB_APPS.md](WEB_APPS.md)) and Electron desktop apps. This page is the plan for testing **native** apps — Android, iOS, Windows, macOS and
+**Status: N1 (Electron desktop apps, [DESKTOP_APPS.md](DESKTOP_APPS.md)) and N2 (Android apps,
+[ANDROID_APPS.md](ANDROID_APPS.md)) are done; N3–N7 are planned.** StepForge tests web applications (including
+mobile web, see [WEB_APPS.md](WEB_APPS.md)), Electron desktop apps and Android apps. This page is the plan for testing **native** apps — Android, iOS, Windows, macOS and
 Linux desktop apps — with the same scenarios, steps, runs, evidence, diagnosis, campaigns and exports, while keeping
 StepForge's rules: **free, open source, and running on your own computer** (no device clouds, no paid services).
 
@@ -38,7 +39,7 @@ an Electron app path) or an installed app's id, the device (an emulator name, a 
 computer"), and options such as "reset app data before each test".
 
 **A native executor** (`@stepforge/executor-native`) implements the `ui.*` steps for native platforms. It talks the
-standard WebDriver protocol to a local Appium server through WebdriverIO (MIT). StepForge installs Appium and the
+standard WebDriver protocol to a local Appium server with a small built-in client (no client library to install). StepForge installs Appium and the
 drivers it needs into its own `data/` folder (no global installs) and starts and stops Appium itself, like it does
 with Mailpit. Electron apps go through Playwright instead, so they get traces and the existing recorder too.
 
@@ -74,7 +75,7 @@ fresh-clone check on the operating systems it supports.
 | Phase | Delivers | Runs on | Size |
 |---|---|---|---|
 | N1 — Electron apps ✅ done | Platform "electron"; Playwright Electron launch; all `ui.*` steps, recorder, traces; a small Electron demo app | Windows, macOS, Linux | S |
-| N2 — Native foundation + Android | Platform model, environments for apps/devices; native executor; Appium + UiAutomator2 managed locally; core `ui.*` steps; evidence (screens, recording, logcat, element tree); `stepforge doctor native` checks Java, Android SDK, ADB, emulators; demo Android app (CareClinic mobile) | Windows, macOS, Linux | L |
+| N2 — Native foundation + Android ✅ done | Platform model, environments for apps/devices; native executor; Appium + UiAutomator2 managed locally; core `ui.*` steps; evidence (screens, recording, logcat, element tree); `stepforge doctor native` checks Java, Android SDK, ADB, emulators; demo Android app (CareClinic mobile) | Windows, macOS, Linux | L |
 | N3 — iOS | XCUITest driver, simulator management (`xcrun simctl`), signing guidance for real iPhones, iOS demo build | macOS | M |
 | N4 — Mobile gestures and recorder | The native steps above; native recorder with screen mirror and element tree; native diagnosis rules; device campaigns | as N2/N3 | L |
 | N5 — Windows and macOS desktop | NovaWindows (or FlaUI) and Mac2 drivers; desktop steps (menus, windows, keyboard shortcuts); demo desktop app | Windows / macOS | M |
