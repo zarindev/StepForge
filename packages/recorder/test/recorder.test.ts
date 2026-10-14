@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { DEFAULT_RUN_OPTIONS, newId, runTestCase } from '@stepforge/core';
 import { createClinicApp } from '@stepforge/demo-clinic';
 import { BrowserPool, createUiExecutor } from '@stepforge/executor-ui';
@@ -263,7 +264,7 @@ describe('recorder', () => {
   });
 
   it('records in an Electron desktop app (no "open page" step) and the recording replays in the app', async () => {
-    const appPath = new URL('../../../demo/desktop-app', import.meta.url).pathname;
+    const appPath = fileURLToPath(new URL('../../../demo/desktop-app', import.meta.url));
     const session = await RecordingSession.start({ startUrl: 'app://notes', electron: { appPath } });
     const page = session.page;
     try {

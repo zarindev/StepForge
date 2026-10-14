@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { DEFAULT_RUN_OPTIONS, newId, runTestCase, type StepInput } from '@stepforge/core';
 import { utilExecutor } from '@stepforge/executor-util';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -652,7 +653,7 @@ describe('UI executor', () => {
   });
 
   it('Electron desktop app: the app’s windows are the test’s pages (a new window is like a tab), with video', async () => {
-    const appPath = new URL('../../../../demo/desktop-app', import.meta.url).pathname;
+    const appPath = fileURLToPath(new URL('../../../../demo/desktop-app', import.meta.url));
     const css = (value: string) => [{ strategy: 'css' as const, value }];
     const r = await run(
       steps(

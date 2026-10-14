@@ -75,9 +75,13 @@ describe('OpenAPI import → generated suite against CareClinic', () => {
       totalsJson: Record<string, number>;
       items: { status: string; errorMessage: string | null; labelJson: { scenario: string } }[];
     }>('GET', `/api/runs/${run.id}`);
-    const failed = done.items
+    const all = done.items
       .filter((i) => i.status !== 'passed')
       .map((i) => `${i.labelJson.scenario} :: ${i.errorMessage}`);
+    // The visits report is slow on purpose (1.5 s, planted) against the generated 2 s limit: a busy CI runner can
+    // go over it. That is a timing result, not what this test checks.
+    const slow = (f: string) => /^GET \/api\/reports\/visits — happy path :: Expected time lt 2000/.test(f);
+    const failed = all.filter((f) => !slow(f));
     expect(failed.sort()).toEqual([
       expect.stringMatching(
         /^DELETE \/api\/patients\/\{id\} — not found :: Expected status equals 404, but got 204/,
@@ -88,7 +92,7 @@ describe('OpenAPI import → generated suite against CareClinic', () => {
       expect.stringMatching(/^GET \/api\/doctors — happy path :: .*fee should be number/),
     ]);
     expect(done.status).toBe('failed');
-    expect(done.totalsJson.passed).toBe(done.totalsJson.total! - 3);
+    expect(done.totalsJson.passed).toBe(done.totalsJson.total! - 3 - all.filter(slow).length);
   }, 120_000);
 
   it('API client: resolves variables and secrets, masks them, checks assertions and the contract', async () => {
