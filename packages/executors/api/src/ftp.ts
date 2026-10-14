@@ -1,6 +1,6 @@
 import { StepError, type StepContext, type StepOutcome } from '@stepforge/core';
 import { Client as FtpClient, type FileInfo } from 'basic-ftp';
-import { mkdirSync, readFileSync, statSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { Readable } from 'node:stream';
 import SftpClient from 'ssh2-sftp-client';
@@ -55,7 +55,8 @@ async function connect(p: Record<string, unknown>, timeoutMs: number): Promise<R
     }
     return {
       upload: async (from, to) => void (await sftp.put(typeof from === 'string' ? from : from, to)),
-      download: async (from, to) => void (await sftp.get(from, to)),
+      // Into memory first: get() with a local path can resolve before the file is written out (a 0-byte file).
+      download: async (from, to) => writeFileSync(to, (await sftp.get(from)) as Buffer),
       list: async (dir) =>
         (await sftp.list(dir)).map((f) => ({
           name: f.name,
