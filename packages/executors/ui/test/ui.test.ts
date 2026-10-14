@@ -688,11 +688,12 @@ describe('UI executor', () => {
           locators: css('p'),
         },
       ),
-      { electron: { appPath }, video: 'always' },
+      // Electron under a virtual display on CI starts and paints slowly.
+      { electron: { appPath }, video: 'always', defaultTimeoutMs: 20_000 },
     );
     expect(r.status, r.steps.map((s) => `${s.type} ${s.status} ${s.message}`).join('\n')).toBe('passed');
     expect(r.artifacts.some((a) => a.kind === 'video' && existsSync(a.path))).toBe(true);
-  }, 60_000);
+  }, 120_000);
 
   it('Electron: a missing app gives a clear error', async () => {
     const r = await run(steps({ type: 'ui.click', locators: [{ strategy: 'css', value: '#x' }] }), {

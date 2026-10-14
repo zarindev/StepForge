@@ -142,9 +142,15 @@ describe('iOS apps', () => {
         'GET',
         `/api/runs/${r.id}`,
       );
-      expect(run.status).toBe('failed');
-      expect(run.items[0]!.errorMessage).toContain('but got "Alexandra Jo"');
-      const item = await ok<{ steps: { status: string }[] }>('GET', `/api/run-items/${run.items[0]!.id}`);
+      const item = await ok<{
+        steps: { status: string; type: string; message: string | null; durationMs: number }[];
+      }>('GET', `/api/run-items/${run.items[0]!.id}`);
+      // On failure, every step's result and time (for CI, where the log is not at hand).
+      const trace = item.steps
+        .map((x) => `${x.type} ${x.status} ${x.durationMs}ms ${x.message ?? ''}`)
+        .join(' / ');
+      expect(run.status, trace).toBe('failed');
+      expect(run.items[0]!.errorMessage, trace).toContain('but got "Alexandra Jo"');
       expect(item.steps.filter((x) => x.status === 'passed')).toHaveLength(6);
       expect(JSON.stringify(item)).toContain('video.mp4');
     },

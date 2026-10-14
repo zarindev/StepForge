@@ -67,10 +67,10 @@ function classify(err: unknown): { kind: StepErrorKind; message: string } {
   return { kind: 'unknown', message: e?.message ?? String(err) };
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number, signal: AbortSignal): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms: number, signal: AbortSignal, what = 'Step'): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(
-      () => reject(new StepError('timeout', `Step did not finish within ${ms} ms`)),
+      () => reject(new StepError('timeout', `${what} did not finish within ${ms} ms`)),
       ms,
     );
     const onAbort = () => reject(new StepError('aborted', 'Run was cancelled'));
@@ -292,7 +292,13 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         resolved = resolveStep(step, resolver, input.elements);
         session = await sessionFor(stepGroupOf(step.type));
         // Guard slightly above the step timeout: executors enforce their own timeouts first.
-        outcome = await withTimeout(session.execute(resolved, stepCtx), timeoutMs + 5_000, signal);
+        // The message names the step, so a hang can be traced ("Step 4 (ui.fill) did not finish …").
+        outcome = await withTimeout(
+          session.execute(resolved, stepCtx),
+          timeoutMs + 5_000,
+          signal,
+          `Step ${step.position + 1} (${step.type})`,
+        );
         assertions.push(...(outcome.assertions ?? []));
         for (const a of resolved.assertions) {
           const custom = outcome.evaluate ? await outcome.evaluate(a) : undefined;
