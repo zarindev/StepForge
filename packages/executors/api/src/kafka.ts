@@ -18,7 +18,9 @@ function client(p: Record<string, unknown>, timeoutMs: number): Kafka {
     ssl: !!p.ssl,
     connectionTimeout: Math.min(timeoutMs, 10_000),
     requestTimeout: Math.max(timeoutMs, 5000),
-    retry: { retries: 2 },
+    // A new topic's partition leaders take a moment to be chosen ("not the leader for that topic-partition"):
+    // enough retries to ride that out on a busy broker.
+    retry: { retries: 6, initialRetryTime: 300, maxRetryTime: 5000 },
     logLevel: logLevel.NOTHING,
     ...(sasl?.username && {
       sasl: {
@@ -62,7 +64,8 @@ const unknownTopic = (err: unknown) => {
 export async function kafkaProduce(p: Record<string, unknown>, ctx: StepContext): Promise<StepOutcome> {
   const topic = String(p.topic ?? '');
   if (!topic) throw new StepError('invalid_params', 'kafkaProduce needs a "topic"');
-  const producer = client(p, ctx.timeoutMs).producer({ allowAutoTopicCreation: true });
+  const kafka = client(p, ctx.timeoutMs);
+  const producer = kafka.producer({ allowAutoTopicCreation: true });
   const value =
     p.value === undefined || p.value === null
       ? null
@@ -71,6 +74,18 @@ export async function kafkaProduce(p: Record<string, unknown>, ctx: StepContext)
         : JSON.stringify(p.value);
   try {
     await producer.connect();
+    // A topic that does not exist yet is created first and its leaders awaited, so the message does not race the
+    // broker's own creation. (A topic created meanwhile by someone else, or no permission to create: send anyway.)
+    const admin = kafka.admin();
+    try {
+      await admin.connect();
+      const topics = await admin.listTopics();
+      if (!topics.includes(topic)) await admin.createTopics({ topics: [{ topic }], waitForLeaders: true });
+    } catch {
+      // the send below creates it, or reports the real problem
+    } finally {
+      await admin.disconnect().catch(() => {});
+    }
     const [meta] = await producer.send({
       topic,
       timeout: ctx.timeoutMs,
