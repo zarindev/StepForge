@@ -25,7 +25,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-test('campaigns: one test set across environments × screen sizes, combined report, rerun failed (Cerberus-style campaigns)', async ({
+test('campaigns: one test set across environments × screen sizes, combined report, rerun failed', async ({
   page,
 }) => {
   test.setTimeout(150_000);

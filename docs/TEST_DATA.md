@@ -3,8 +3,7 @@
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
 The **test data library** holds named data sources that any test can read rows from, instead of hard-coding values
-in its steps. It is StepForge's version of the data library in tools such as Cerberus Testing. Everything is read on
-your computer, and nothing is sent anywhere else.
+in its steps. Everything is read on your computer, and nothing is sent anywhere else.
 
 ## Data sources
 

@@ -4,8 +4,7 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 
 A **campaign** runs a saved set of tests in every **environment × browser × screen size** you choose, with one click.
 For example, all smoke tests on Local and Staging, in Chromium and WebKit, at desktop and mobile size, is 8 runs. The
-results come back as one **campaign run** with a combined report. This is StepForge's version of the campaigns in
-tools such as Cerberus Testing. Everything runs locally, one run after another, through StepForge's normal queue.
+results come back as one **campaign run** with a combined report. Everything runs locally, one run after another, through StepForge's normal queue.
 
 ## Creating a campaign
 

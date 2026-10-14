@@ -10,7 +10,7 @@ import { getScenario, getTree } from './scenarios.ts';
 
 /**
  * Campaigns: a saved selection of tests run across environments × browsers × screen sizes in one go (one run per
- * combination), with a combined report and "rerun failed". Like Cerberus Testing's campaigns.
+ * combination), with a combined report and "rerun failed".
  */
 export type Campaign = typeof campaigns.$inferSelect;
 export type CampaignRun = typeof campaignRuns.$inferSelect;

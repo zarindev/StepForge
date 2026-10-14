@@ -88,7 +88,7 @@ Generic `assertions` on any UI step can target `url`, `title`, and for steps wit
 | `if` | `condition`, `steps` (then), `else` | a condition compares values — `{ value, operator, expected }`, any assertion operator — or checks the page — `{ type: "element", check, expected, timeoutMs }` on the step's own element (`locators`); nested results numbered `3.1` (then) / `3e.1` (else) |
 | `loop` | `count` **or** `over` (an array, e.g. `{{vars.items}}`), `as` (default `item`), `steps`; **or** `while` (a condition, as for `if`) with `count` as the limit (default 100) | exposes `{{vars.item}}` and `{{vars.index}}`; max 1000 iterations; results `4[2].1`. `while` is checked before every pass, with variables as they are then; reaching the limit while the condition still holds fails the step |
 
-**Page conditions** (`type: "element"`, like Cerberus Testing's step and action conditions). `check` is one of
+**Page conditions** (`type: "element"`). `check` is one of
 `visible`, `hidden`, `present` (in the page, visible or not), `absent`, `enabled`, `textContains` (`expected` = the
 text) or `count` (`expected` = the number of matches). The check is tried again every 100 ms for up to `timeoutMs`
 (default 2000) before it counts as false, so a condition that is false costs that wait. A page condition never fails

@@ -5,8 +5,7 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 An **element** is a named UI element of an application, such as "Save patient button" or "Email field", with its
 ranked locators (test id, role, label, text, CSS…). Steps can point at an element instead of keeping their own
 locators. At run time a step that uses an element gets the element's **current** locators, so **fixing an element
-fixes every step that uses it**. This is StepForge's version of the application objects in tools such as Cerberus
-Testing, and the element-level counterpart of [reusable blocks](BLOCKS.md).
+fixes every step that uses it**. Elements are the element-level counterpart of [reusable blocks](BLOCKS.md).
 
 Everything stays local: elements live in StepForge's SQLite database next to your scenarios.
 

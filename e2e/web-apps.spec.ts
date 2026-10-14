@@ -25,7 +25,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-test('page conditions: "if the element is visible" picks a branch from what the page shows (Cerberus-style conditions)', async ({
+test('page conditions: "if the element is visible" picks a branch from what the page shows', async ({
   page,
 }) => {
   test.setTimeout(120_000);

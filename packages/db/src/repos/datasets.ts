@@ -14,7 +14,7 @@ import {
 import { invalid, notFound, now } from './errors.ts';
 
 /**
- * The test data library (like Cerberus Testing's data library): named data sources that tests read rows from with
+ * The test data library: named data sources that tests read rows from with
  * `util.useData`. Sources are referenced by name, like database connections.
  */
 export type DataSource = typeof datasets.$inferSelect;

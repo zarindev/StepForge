@@ -30,7 +30,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-test('manual run: a tester follows the steps, records passed / failed with a note and a screenshot (Cerberus-style manual execution)', async ({
+test('manual run: a tester follows the steps, records passed / failed with a note and a screenshot', async ({
   page,
 }) => {
   test.setTimeout(120_000);

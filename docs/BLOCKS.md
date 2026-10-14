@@ -4,8 +4,7 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 
 A **block** is a named group of steps, such as "Sign in" or "Save the patient form", that any scenario of the
 application can run with a **Use block** (`util.useBlock`) step. Blocks are read fresh every time a test runs, so
-**fixing a block fixes every test that uses it**. This is StepForge's version of the step library in tools such as
-Cerberus Testing.
+**fixing a block fixes every test that uses it**.
 
 ## Making blocks
 
@@ -44,7 +43,7 @@ is in use asks first and names what would break.
 
 ## Hooks: before and after each test
 
-A block can also run automatically around tests, like the pre/post testing of Cerberus Testing:
+A block can also run automatically around tests:
 
 - **Module hooks:** in the Test Explorer, open a module's menu and choose **Before/after each test…**. The
   *before* block runs before every test in the module **and its sub-modules**; the *after* block runs after each of

@@ -40,7 +40,7 @@ async function runAndWait(page: Page, body: unknown) {
   }
 }
 
-test('blocks: make blocks from steps, reuse them, and fix a shared failure once (Cerberus-style step library)', async ({
+test('blocks: make blocks from steps, reuse them, and fix a shared failure once', async ({
   page,
   request,
 }) => {

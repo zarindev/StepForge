@@ -25,7 +25,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-test('test data: a table from pasted CSV, preview, a useData step in the editor, and a run that reads a row (Cerberus-style data library)', async ({
+test('test data: a table from pasted CSV, preview, a useData step in the editor, and a run that reads a row', async ({
   page,
 }) => {
   test.setTimeout(120_000);

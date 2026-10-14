@@ -94,7 +94,7 @@ const TRIGGER_LABEL: Record<string, string> = {
 };
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
-/** Saved test sets run across environments × browsers × screen sizes (like Cerberus Testing's campaigns). */
+/** Saved test sets run across environments × browsers × screen sizes. */
 export function CampaignsPage() {
   const { app } = useCurrentApp();
   const qc = useQueryClient();

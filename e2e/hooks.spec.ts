@@ -25,7 +25,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-test('hooks: a module’s before/after-each-test blocks run around its tests, also after a failure (Cerberus-style pre/post testing)', async ({
+test('hooks: a module’s before/after-each-test blocks run around its tests, also after a failure', async ({
   page,
 }) => {
   test.setTimeout(120_000);

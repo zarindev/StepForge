@@ -3,7 +3,7 @@
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
 Many systems talk through more than REST: SOAP web services, message queues and file drops. StepForge has steps for
-them (like Cerberus Testing's SOAP, Kafka and FTP services), in the **API** group, so they share variables, test data
+them, in the **API** group, so they share variables, test data
 and assertions with every other step. Everything is free and runs locally: the libraries are open source (kafkajs,
 basic-ftp, ssh2-sftp-client, xmldom, xpath) and connect straight to your servers.
 

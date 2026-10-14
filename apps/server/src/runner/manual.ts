@@ -41,7 +41,7 @@ export const ManualSave = z.object({
 });
 
 /**
- * Manual test runs (like Cerberus Testing's manual executions): nothing is executed; a person follows each test's
+ * Manual test runs: nothing is executed; a person follows each test's
  * steps — written out in plain English, with blocks, hooks and called scenarios expanded and test data filled in —
  * and records passed / failed / blocked / skipped per step, with a note and a screenshot. The results are ordinary
  * run results, so history, analytics, quality gates and reports include them.

@@ -437,7 +437,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] Onboarding with a demo workspace
 - [x] A second demo app (ShopDesk) and published benchmarks
 - [x] Showcase material: case study, samples, screenshots and clips
-- [x] Cerberus-inspired features: reusable blocks with inputs, element repository, campaigns, test data library,
+- [x] Reusable blocks with inputs, element repository, campaigns, test data library,
       before/after hooks, page conditions, manual test runs, SOAP / Kafka / FTP steps, Slack / Teams / webhook
       notifications, network traffic breakdown, run queue priorities
 - [x] Every kind of web app: visual checkpoints, network waiting and mocking, downloads, mobile web with touch,

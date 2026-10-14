@@ -3,7 +3,7 @@
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
 Some checks need a person: a printout, a phone call, a physical device, a judgement about how something looks, or a
-test nobody has automated yet. A **manual run** (like Cerberus Testing's manual executions) lets a tester follow a
+test nobody has automated yet. A **manual run** lets a tester follow a
 test's steps by hand and record what happened, step by step. The results are ordinary run results, so run history,
 analytics, quality gates and the HTML / PDF / Excel run reports include them.
 

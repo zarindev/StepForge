@@ -40,7 +40,7 @@ async function runAndWait(page: Page, body: unknown) {
   }
 }
 
-test('elements: save a step’s locators as an element, reuse it, and fix it once for every step (Cerberus-style application objects)', async ({
+test('elements: save a step’s locators as an element, reuse it, and fix it once for every step', async ({
   page,
   request,
 }) => {

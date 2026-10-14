@@ -21,9 +21,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-test('run queue: waiting runs in start order, "Run next" and priorities (Cerberus-style queue priorities)', async ({
-  page,
-}) => {
+test('run queue: waiting runs in start order, "Run next" and priorities', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('/');
   const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {

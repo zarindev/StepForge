@@ -18,13 +18,13 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 12 | Code generators + snapshot tests | ✅ Done |
 | 13 | Public-repo polish, onboarding, fresh-clone test | ✅ Done (Windows/Ubuntu via CI after push) |
 | 14 | Showcase package, optional Electron | ✅ Done (Electron skipped: optional) |
-| 15 | Cerberus-inspired features, every kind of web app | ✅ Done (11 of 11 features + web-app coverage) |
+| 15 | Reuse, scale and integrations; every kind of web app | ✅ Done (11 of 11 features + web-app coverage) |
 
 ---
 
-## Phase 15 — Cerberus-inspired features and web-app coverage (2026-10-13)
+## Phase 15 — Reuse, scale, integrations and web-app coverage (2026-10-13)
 
-Features inspired by [Cerberus Testing](https://github.com/cerberustesting), added one at a time; everything stays
+Features added one at a time; everything stays
 free, open source and local.
 
 **Delivered**

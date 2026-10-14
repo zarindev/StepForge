@@ -6,8 +6,7 @@ _By Md Zarin Tasnim · images in this folder (1200×675, made by `scripts/export
 
 **StepForge just got 9 new features — still free, open source and 100% local.**
 
-I studied Cerberus Testing, an open-source test automation platform, and brought its best ideas into StepForge, my
-QA studio for UI, API, database, email and performance testing:
+Here is what's new in StepForge, my QA studio for UI, API, database, email and performance testing:
 
 1. Reusable blocks — write "Sign in" once, fix it once, every test is repaired
 2. Before/after hooks — set-up and clean-up for every test of a module, even after a failure
@@ -30,7 +29,7 @@ GitHub: https://github.com/zarindev/StepForge
 ## X (a thread: X allows 4 images per post)
 
 **Post 1** (images 01, 02, 03, 04)
-StepForge, my free and local QA studio, just got 9 new features, inspired by Cerberus Testing 🧵
+StepForge, my free and local QA studio, just got 9 new features 🧵
 Reusable blocks, before/after hooks, a shared element repository…
 
 **Post 2** (images 05, 06, 07, 08)

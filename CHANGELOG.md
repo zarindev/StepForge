@@ -3,27 +3,26 @@
 ## [Unreleased]
 
 ### Added
-- **Run queue priorities** (like Cerberus Testing's queue priorities): runs have a priority (high, normal, low) set in
+- **Run queue priorities**: runs have a priority (high, normal, low) set in
   the Run dialog, schedules, campaigns or with `stepforge run --priority`; waiting runs start by priority, then oldest
   first. The Runs page shows the queue — the run in progress and the waiting ones in start order — with **Run next**,
   a priority picker and Cancel. `GET /api/runs/queue`, `POST /api/runs/:id/priority`. Migration 0012.
-- **Network traffic breakdown** (like Cerberus Testing's network traffic statistics): each request now records its
+- **Network traffic breakdown**: each request now records its
   size and the step that made it; the run page's Network evidence has a **Breakdown** (requests, bytes, failures,
   third-party hosts; by type; by host with third parties marked; slowest; largest; failed) and a filterable request
   list with sizes and steps. New step `ui.networkSummary` turns the traffic into checks (page weight, failed
   requests, third-party hosts, requests or bytes per type). See [docs/WEB_APPS.md](docs/WEB_APPS.md#network-traffic).
-- **Slack, Microsoft Teams, Mattermost, Rocket.Chat and webhook notifications** (like Cerberus Testing's Slack and
-  Teams notifications): new channel kinds in Settings → Notifications. Slack-style incoming webhooks (coloured
+- **Slack, Microsoft Teams, Mattermost, Rocket.Chat and webhook notifications**: new channel kinds in Settings → Notifications. Slack-style incoming webhooks (coloured
   message, optional mention on failure; Mattermost flavour), Teams Workflows (Adaptive Card with an "Open the run"
   button) and a generic JSON webhook with optional headers. Webhook URLs are stored encrypted and never returned
   or shown in errors. See [docs/SCHEDULING.md](docs/SCHEDULING.md#slack-mattermost-and-rocketchat).
-- **SOAP, Kafka and FTP steps** (like Cerberus Testing's SOAP, Kafka and FTP services), see
+- **SOAP, Kafka and FTP steps**, see
   [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md): `api.soap` (envelope built from the body, SOAP 1.1/1.2, SOAPAction,
   faults fail the step unless expected), XPath assertion targets and extraction for any XML response,
   `api.kafkaProduce` / `api.kafkaConsume` (wait for the first matching message since the test started; key, text or
   JSONPath match; TLS and SASL), and `api.ftp` (upload, download, list, delete, exists over FTP, FTPS or SFTP). CI
   runs the Kafka tests against Apache Kafka.
-- **Manual test runs** (like Cerberus Testing's manual executions): Run → *How: Manual*. Nothing is executed; a
+- **Manual test runs**: Run → *How: Manual*. Nothing is executed; a
   tester follows each test's steps in plain English — blocks, hooks and called scenarios expanded, test data and
   environment variables filled in, secrets kept hidden — and records passed / failed / blocked / skipped per step with
   a note and a screenshot. The results are ordinary run results (history, analytics, gates, reports). A new
@@ -46,37 +45,37 @@
 - Docs: [docs/FEATURES.md](docs/FEATURES.md) (every feature in one page), [docs/WEB_APPS.md](docs/WEB_APPS.md),
   [docs/NATIVE_APPS_PLAN.md](docs/NATIVE_APPS_PLAN.md) (plan for Android, iOS and desktop apps), and a documentation
   index in the README.
-- **Page conditions** (like Cerberus Testing's step and action conditions): `util.if` can check the page instead of
+- **Page conditions**: `util.if` can check the page instead of
   comparing values — the step's element is visible, hidden, present, absent, enabled, contains a text, or matches a
   number of times (with a short wait, default 2 s) — and `util.loop` gains **repeat while** a condition holds (a value
   or a page check, re-checked before every pass; the count is a safety limit, default 100). The step form shows the
   condition's fields and the element picker; the plain-English view reads “Repeat while the "Load more" button is
   visible”. Code export marks these steps TODO for now.
-- **Setup/teardown hooks** (like Cerberus Testing's pre/post testing): a module's menu sets a block to run before
+- **Setup/teardown hooks**: a module's menu sets a block to run before
   and one after every test of the module and its sub-modules; a scenario's Details tab adds its own and lists the
   inherited ones. Before-hooks run outermost first and a failure skips the test; after-hooks run innermost first and
   always run, even after a failure. Hook steps are numbered `before.n`/`after.n` and fixes land in their block.
   Export/import keeps hooks; code export inlines them. Migration 0010.
-- **Test data library** (like Cerberus Testing's data library): an application's Test data tab holds named data
+- **Test data library**: an application's Test data tab holds named data
   sources — a table of rows (typed or pasted as CSV), a CSV file on this computer, a read-only SQL query on one of
   the application's connections, or an API call (rows found with JSONPath) — with a live preview per environment.
   A new `util.useData` step takes the first, a random, a given or a matching row, or one not used yet in the run,
   into `{{vars.<name>.<column>}}`; rows are read once per run. Application export/import carries data sources.
   Migration 0009.
-- **Campaigns** (like Cerberus Testing's campaigns): a saved selection of tests (all, or modules, tags and scenarios)
+- **Campaigns**: a saved selection of tests (all, or modules, tags and scenarios)
   with the environments, browsers and screen sizes to run them in; one click queues one run per combination as a
   campaign run; the campaign-run page shows every combination side by side and each test's result per combination;
   **Rerun failed** repeats only the failed tests, only where they failed; schedules can run a campaign; the
   `stepforge campaign` CLI command runs one in CI (one JUnit file per combination, exit code); one summary goes to the
   campaign's notification channels when it finishes; application export/import carries campaigns. Migration 0008.
-- **Element repository** (like Cerberus Testing's application objects): an application's Elements tab holds named
+- **Element repository**: an application's Elements tab holds named
   UI elements with ranked locators; steps point at an element (step form → Saved element, or "Save as element" from
   a step's locators) and run with its current locators; the Elements tab shows where each is used and asks before
   deleting one in use; when a step that uses an element fails on a changed locator, the diagnosis names the element
   and its one-click fix updates the element, fixing every step; recordings reuse an element whose best locator
   matches; exported code gets the element's locators; application export/import carries elements (and block inputs,
   which were missing).
-- **Block maintenance** (like Cerberus Testing's step library): blocks declare inputs (defaults or required,
+- **Block maintenance**: blocks declare inputs (defaults or required,
   `{{vars.<name>}}` inside the block, exported as variables); "Make a block" turns selected scenario steps into a
   block; the Blocks tab shows where each block is used and what a change affects, and asks before deleting a used
   block; when a test fails inside a block, the diagnosis names the block and its one-click locator fix updates the

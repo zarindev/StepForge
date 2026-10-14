@@ -25,7 +25,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-test('network: a breakdown of the page traffic on the run page, and a budget check step (Cerberus-style network traffic)', async ({
+test('network: a breakdown of the page traffic on the run page, and a budget check step', async ({
   page,
 }) => {
   test.setTimeout(120_000);
