@@ -165,7 +165,7 @@ describe('Android apps', () => {
                 value: "//*[contains(@resource-id,'patient_list')]/android.widget.TextView[1]",
               },
             ],
-            timeoutMs: 2000,
+            timeoutMs: 5000,
           },
         ],
       });

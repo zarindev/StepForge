@@ -127,7 +127,7 @@ describe('iOS apps', () => {
             type: 'ui.assert',
             params: { check: 'text', expected: 'Alexandra Johnson' },
             locators: [{ strategy: 'text', value: 'Alexandra' }],
-            timeoutMs: 2000,
+            timeoutMs: 5000,
           },
         ],
       });

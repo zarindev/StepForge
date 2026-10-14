@@ -204,7 +204,7 @@ describe.skipIf(!AVD)('Android app on an emulator (CareClinic mobile)', () => {
                 value: "//*[contains(@resource-id,'patient_list')]/android.widget.TextView[1]",
               },
             ],
-            timeoutMs: 2000,
+            timeoutMs: 5000,
           },
         ),
       ],

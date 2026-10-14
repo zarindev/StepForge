@@ -275,7 +275,8 @@ describe('UI executor', () => {
           type: 'ui.assert',
           params: { check: 'text', expected: 'Welcome back' },
           locators: [{ strategy: 'css', value: '#msg' }],
-          timeoutMs: 1500,
+          // Long enough for a busy runner (video and trace on) to show the message; the text is what fails.
+          timeoutMs: 5000,
         },
       ),
       { video: 'onFailure', trace: 'onFailure', screenshots: 'everyStep' },
@@ -328,7 +329,7 @@ describe('UI executor', () => {
     const r = await run(
       steps(
         { type: 'ui.navigate', params: { url: '/covered.html' } },
-        { type: 'ui.click', locators: [{ strategy: 'testId', value: 'go' }], timeoutMs: 1200 },
+        { type: 'ui.click', locators: [{ strategy: 'testId', value: 'go' }], timeoutMs: 4000 },
       ),
     );
     expect(r.status).toBe('failed');
