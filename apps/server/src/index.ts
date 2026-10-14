@@ -6,6 +6,12 @@ import { openBrowser } from './open-browser.ts';
 const MAX_PORT_ATTEMPTS = 10;
 
 async function main(): Promise<void> {
+  // A failure in background work (a run, a browser, a child process) is logged; it must not take the whole
+  // StepForge server down with it.
+  process.on('unhandledRejection', (err) =>
+    console.error('StepForge: unhandled error in background work:', err),
+  );
+
   const { app, ctx } = await buildApp({
     logger: {
       level: process.env.STEPFORGE_LOG_LEVEL ?? 'info',

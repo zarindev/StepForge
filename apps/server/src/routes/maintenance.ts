@@ -6,6 +6,12 @@ import type { AppContext } from '../context.ts';
 /** Demo workspace, retention, key rotation and the danger zone (Settings and onboarding). */
 export function registerMaintenanceRoutes(app: FastifyInstance, ctx: AppContext) {
   const { demo, maintenance } = ctx;
+  // Nothing may still be writing what is about to be deleted: runs, manual-test browsers, a recording.
+  const stopAll = async () => {
+    await ctx.runs.cancelAll();
+    await ctx.manualBrowser.closeAll();
+    ctx.recorder.discard();
+  };
   app.get('/api/demo', async () => demo.status());
   app.post('/api/demo/load', async () => demo.load());
   app.post('/api/demo/start', async () => ({ url: await demo.startClinic() }));
@@ -20,10 +26,12 @@ export function registerMaintenanceRoutes(app: FastifyInstance, ctx: AppContext)
   };
   app.post('/api/maintenance/delete-history', async (req) => {
     confirm(req.body, 'DELETE');
+    await stopAll();
     return maintenance.deleteRunHistory();
   });
   app.post('/api/maintenance/delete-everything', async (req) => {
     confirm(req.body, 'DELETE EVERYTHING');
+    await stopAll();
     demo.stop();
     return maintenance.deleteEverything();
   });

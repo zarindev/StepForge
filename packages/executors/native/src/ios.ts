@@ -6,7 +6,7 @@ const run = (cmd: string, args: string[]): string | undefined => {
     return execFileSync(cmd, args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 60_000,
+      timeout: 120_000,
       // The simulator list is large when many iOS versions are installed (CI machines).
       maxBuffer: 256 * 1024 * 1024,
     }).trim();
@@ -46,15 +46,20 @@ export function automationMode(): 'enabled' | 'needs-password' | 'disabled' | un
 
 export type Simulator = { udid: string; name: string; runtime: string; state: string };
 
+let lastSimulators: Simulator[] = [];
+
 /** iOS simulators available on this Mac, booted ones first, newest iOS first. */
 export function listSimulators(): Simulator[] {
-  const json = run('xcrun', ['simctl', 'list', 'devices', 'available', '-j']);
-  if (!json) return [];
+  // simctl can be slow while a simulator is busy: try twice, and keep the last good list.
+  const json =
+    run('xcrun', ['simctl', 'list', 'devices', 'available', '-j']) ??
+    run('xcrun', ['simctl', 'list', 'devices', 'available', '-j']);
+  if (!json) return lastSimulators;
   try {
     const { devices } = JSON.parse(json) as {
       devices: Record<string, { udid: string; name: string; state: string }[]>;
     };
-    return Object.entries(devices)
+    return (lastSimulators = Object.entries(devices)
       .filter(([runtime]) => runtime.includes('.iOS-'))
       .flatMap(([runtime, list]) =>
         list.map((d) => ({
@@ -68,7 +73,7 @@ export function listSimulators(): Simulator[] {
         (a, b) =>
           Number(b.state === 'Booted') - Number(a.state === 'Booted') ||
           b.runtime.localeCompare(a.runtime, undefined, { numeric: true }),
-      );
+      ));
   } catch {
     return [];
   }

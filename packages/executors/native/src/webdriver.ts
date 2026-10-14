@@ -1,3 +1,4 @@
+import { request } from 'node:http';
 import { StepError } from '@stepforge/core';
 
 /** The W3C WebDriver key for an element reference. */
@@ -136,6 +137,45 @@ export class WebDriverSession {
   }
 }
 
+/** One HTTP exchange with Appium (node:http: no built-in time limit, so a slow first session is not cut off). */
+function send(
+  url: URL,
+  method: string,
+  payload: string | undefined,
+  timeoutMs: number,
+): Promise<{ status: number; text: string }> {
+  return new Promise((resolve, reject) => {
+    const req = request(
+      url,
+      {
+        method,
+        headers:
+          payload === undefined
+            ? {}
+            : { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => {
+          clearTimeout(timer);
+          resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf8') });
+        });
+        res.on('error', reject);
+      },
+    );
+    const timer = setTimeout(
+      () => req.destroy(Object.assign(new Error('timeout'), { name: 'TimeoutError' })),
+      timeoutMs,
+    );
+    req.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    req.end(payload);
+  });
+}
+
 async function call(
   base: string,
   method: string,
@@ -143,21 +183,21 @@ async function call(
   body: unknown,
   timeoutMs: number,
 ): Promise<unknown> {
-  let res: Response;
+  let res: { status: number; text: string };
   try {
-    res = await fetch(base + path, {
+    res = await send(
+      new URL(base + path),
       method,
-      headers: body === undefined ? {} : { 'content-type': 'application/json' },
-      ...(body !== undefined && { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+      body === undefined ? undefined : JSON.stringify(body),
+      timeoutMs,
+    );
   } catch (err) {
     const e = err as Error;
     if (e.name === 'TimeoutError')
       throw new StepError('timeout', `Appium did not answer within ${Math.round(timeoutMs / 1000)} s`);
     throw new StepError('network', `Appium is not reachable at ${base}: ${e.message}`);
   }
-  const text = await res.text();
+  const text = res.text;
   let json: { value?: unknown } = {};
   try {
     json = text ? (JSON.parse(text) as { value?: unknown }) : {};
@@ -165,7 +205,8 @@ async function call(
     throw new WebDriverError('unknown error', `Appium answered ${res.status}: ${text.slice(0, 200)}`);
   }
   const v = json.value as { error?: string; message?: string } | undefined;
-  if (!res.ok || (v && typeof v === 'object' && 'error' in v && v.error)) {
+  const ok = res.status >= 200 && res.status < 300;
+  if (!ok || (v && typeof v === 'object' && 'error' in v && v.error)) {
     throw new WebDriverError(v?.error ?? `HTTP ${res.status}`, (v?.message ?? text).split('\n')[0]!);
   }
   return json.value;

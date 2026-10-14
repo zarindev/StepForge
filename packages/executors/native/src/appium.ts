@@ -169,7 +169,11 @@ function exec(
     p.on('close', (code) =>
       code === 0
         ? resolve()
-        : reject(new Error(`${cmd} ${args.join(' ')} failed (${code}): ${tail.trim().split('\n').pop()}`)),
+        : reject(
+            new Error(
+              `${cmd} ${args.join(' ')} failed (${code}): ${tail.trim().split('\n').slice(-8).join(' / ')}`,
+            ),
+          ),
     );
   });
 }

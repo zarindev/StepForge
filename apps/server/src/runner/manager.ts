@@ -175,6 +175,23 @@ export class RunManager {
     while (this.draining) await this.draining;
   }
 
+  /** Cancels every queued and running run and waits until nothing runs (before deleting data). */
+  async cancelAll(): Promise<void> {
+    const open = this.db
+      .select({ id: schema.runs.id })
+      .from(schema.runs)
+      .where(inArray(schema.runs.status, ['queued', 'running', 'interrupted']))
+      .all();
+    for (const r of open) {
+      try {
+        this.cancel(r.id);
+      } catch {
+        // already finished
+      }
+    }
+    await this.idle();
+  }
+
   cancel(runId: string): Run {
     const run = this.getRun(runId);
     if (this.active?.runId === runId) this.active.abort.abort();

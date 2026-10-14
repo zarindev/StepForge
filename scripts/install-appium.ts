@@ -20,6 +20,9 @@ if (appiumInstalled(toolsDir)) {
     console.log(`Appium is installed at ${appiumPaths(toolsDir).root}.`);
   } catch (err) {
     console.error(`Could not install Appium: ${(err as Error).message}`);
+    // In GitHub Actions, also as an annotation (readable without the full log).
+    if (process.env.GITHUB_ACTIONS)
+      console.log(`::error title=Appium install::${(err as Error).message.replace(/\r?\n/g, ' ')}`);
     process.exitCode = 1;
   }
 }

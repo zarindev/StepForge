@@ -126,4 +126,35 @@ describe('maintenance', () => {
     expect(repo.listApplications(ctx.db)).toHaveLength(0);
     expect(ctx.db.select().from(schema.secrets).all()).toHaveLength(0);
   });
+
+  it('deleting everything while a run is in progress stops the run first; the server keeps answering', async () => {
+    const a = (await call('POST', '/api/applications', { name: 'Busy', slug: 'busy-app' })).json();
+    const env = (
+      await call('POST', `/api/applications/${a.id}/environments`, {
+        name: 'Local',
+        baseUrl: 'http://127.0.0.1:1',
+      })
+    ).json();
+    const mod = (await call('POST', `/api/applications/${a.id}/modules`, { name: 'Slow' })).json();
+    const sc = (
+      await call('POST', `/api/modules/${mod.id}/scenarios`, {
+        name: 'Waits',
+        steps: [{ type: 'util.wait', params: { ms: 5000 } }],
+      })
+    ).json();
+    const run = (
+      await call('POST', '/api/runs', {
+        applicationId: a.id,
+        environmentId: env.id,
+        scope: { type: 'scenarios', ids: [sc.id] },
+      })
+    ).json();
+    await new Promise((r) => setTimeout(r, 300)); // the run has started
+    const res = await call('POST', '/api/maintenance/delete-everything', { confirm: 'DELETE EVERYTHING' });
+    expect(res.statusCode).toBe(200);
+    expect(run.id).toBeTruthy();
+    expect(repo.listApplications(ctx.db)).toHaveLength(0);
+    await ctx.runs.idle();
+    expect((await call('GET', '/api/health')).statusCode).toBe(200);
+  });
 });
