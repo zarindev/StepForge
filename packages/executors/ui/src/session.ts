@@ -1046,6 +1046,9 @@ export class UiSession implements ExecutorSession {
     const deadline = Date.now() + ctx.timeoutMs;
     let actual: unknown;
     let pass = false;
+    // Once found, the element keeps at least 1 s to be found again: the last round of polling may have only a few
+    // milliseconds left, and a busy machine would then report a wrong value as a missing element.
+    let seen = false;
     for (;;) {
       try {
         if (pageLevel) {
@@ -1056,8 +1059,13 @@ export class UiSession implements ExecutorSession {
         } else if (check === 'count') {
           actual = await buildLocator(this.scope, step.locators[0]!).count();
         } else {
-          const r = await this.resolve(step, { ...ctx, timeoutMs: Math.max(0, deadline - Date.now()) });
+          const remaining = Math.max(0, deadline - Date.now());
+          const r = await this.resolve(step, {
+            ...ctx,
+            timeoutMs: seen ? Math.max(remaining, 1000) : remaining,
+          });
           onResolved(r);
+          seen = true;
           actual = await this.readForCheck(r.locator, check, p);
         }
         pass = this.compare(check, actual, expected);

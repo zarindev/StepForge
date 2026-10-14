@@ -531,6 +531,7 @@ export class NativeSession implements ExecutorSession {
     const deadline = Date.now() + ctx.timeoutMs;
     let actual: unknown;
     let pass = false;
+    let seen = false;
     for (;;) {
       try {
         if (check === 'hidden') {
@@ -543,8 +544,11 @@ export class NativeSession implements ExecutorSession {
         } else if (check === 'count') {
           actual = await this.count(step.locators[0]!);
         } else {
-          const f = await this.find(step.locators, Math.max(0, deadline - Date.now()), ctx.signal);
+          const remaining = Math.max(0, deadline - Date.now());
+          // Once found, it keeps at least 1 s to be found again (see the browser executor's assert).
+          const f = await this.find(step.locators, seen ? Math.max(remaining, 1000) : remaining, ctx.signal);
           onFound(f);
+          seen = true;
           actual = await this.read(f.el, check, String(p.attribute ?? ''));
         }
         pass = compare(check, actual, expected);
