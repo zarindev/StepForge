@@ -11,6 +11,19 @@ import { H, testServer } from './helpers.ts';
  * browser shows the StepForge panel, and every action there is saved to the test's results.
  */
 process.env.STEPFORGE_MANUAL_HEADLESS = '1';
+/** A small checkout page for the tester's browser (also what the documentation screenshot shows). */
+const CHECKOUT = `<!doctype html><meta charset="utf-8"><title>Shop</title>
+<body style="margin:0;font:15px system-ui,sans-serif;background:#f4f6fa;color:#0f172a">
+<header style="background:#0f766e;color:#fff;padding:14px 28px;font-weight:700">ShopDesk</header>
+<main style="max-width:560px;margin:32px 0 0 420px;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px #0001">
+<h1 style="margin:0 0 16px;font-size:22px">Checkout</h1>
+<table style="width:100%;border-collapse:collapse">
+<tr><td style="padding:6px 0">Desk lamp × 2</td><td style="text-align:right">€ 79.98</td></tr>
+<tr><td style="padding:6px 0">Shipping</td><td style="text-align:right">€ 4.90</td></tr>
+<tr style="font-weight:700;border-top:1px solid #e2e8f0"><td style="padding:10px 0">Total</td><td style="text-align:right">€ 84.88</td></tr>
+</table>
+<button style="margin-top:16px;background:#0f766e;color:#fff;border:0;border-radius:8px;padding:10px 22px;font-weight:600">Pay</button>
+</main></body>`;
 let app: FastifyInstance;
 let ctx: AppContext;
 let site: Server;
@@ -52,11 +65,7 @@ type Checklist = {
 
 beforeAll(async () => {
   ({ app, ctx } = await testServer());
-  site = createServer((_req, res) =>
-    res
-      .writeHead(200, { 'content-type': 'text/html' })
-      .end('<title>Shop</title><h1>Checkout</h1><button>Pay</button>'),
-  );
+  site = createServer((_req, res) => res.writeHead(200, { 'content-type': 'text/html' }).end(CHECKOUT));
   await new Promise<void>((r) => site.listen(0, '127.0.0.1', r));
   appId = (await ok('POST', '/api/applications', { name: 'Manual browser', slug: 'manual-browser' })).id;
   envId = (

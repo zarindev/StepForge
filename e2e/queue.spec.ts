@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
+const shots = process.env.STEPFORGE_SHOTS;
+const shot = async (page: Page, name: string) => {
+  if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
+};
+
 const CLINIC = 'http://127.0.0.1:8191';
 
 async function sfApi<T>(page: Page, method: string, url: string, body?: unknown): Promise<T> {
@@ -61,6 +66,7 @@ test('run queue: waiting runs in start order, "Run next" and priorities', async 
   await queue.getByRole('button', { name: `Run ${second.id.slice(-8)} next` }).click();
   await expect(rows.nth(1)).toContainText(`#${second.id.slice(-8)}`);
   await expect(rows.nth(1)).toContainText('next');
+  await shot(page, 'run-queue');
   await queue.getByLabel(`Priority of run ${first.id.slice(-8)}`).selectOption('high');
   await expect(queue.getByLabel(`Priority of run ${first.id.slice(-8)}`)).toHaveValue('high');
 

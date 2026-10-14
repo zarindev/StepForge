@@ -1,0 +1,99 @@
+# What's new in StepForge
+
+_By Md Zarin Tasnim · part of the StepForge documentation_
+
+**October 2026 — 13 new features**, all free, open source and running on your own computer. The full technical list
+is in the [CHANGELOG](../CHANGELOG.md); every feature below links to its guide.
+
+## Highlights
+
+### 1. Manual testing in the browser
+Tests are now **Automated** or **Manual**. Manual tests stay *pending* until a person runs them, and schedules,
+campaigns and CI leave them out. **Run manually** opens your application in a browser with a StepForge panel on top:
+the current step, the expected result and the next step, **Pass / Fail / Blocked / Skip**, notes, screenshots and
+screen-recording clips. The whole session is recorded as the test's video, and the run page follows along live.
+→ [Manual testing](MANUAL_RUNS.md)
+
+### 2. Marked-up screenshots and bug reports
+Draw on any screenshot — **boxes, circles, arrows, pen and text** in eight colours — and turn a failed step into a bug
+report: how it should behave, how it behaves, severity, steps to reproduce and the screenshot, all filled in for you.
+→ [Manual testing](MANUAL_RUNS.md#reporting-a-bug)
+
+### 3. Visual checkpoints
+The first run saves the approved screenshot; later runs compare pixels and show a red **difference image**. One click
+accepts an intended change as the new baseline. Changing parts (clocks, ads) can be hidden first.
+→ [Visual checkpoints](WEB_APPS.md#visual-checkpoints)
+
+### 4. Any kind of web app
+Wait for or **fake API responses**, go **offline**, check **downloads**, read and set **cookies and storage**,
+**control the clock**, tap on **mobile web** with touch, click points on **canvas and maps** — and give each
+environment its own language, time zone, location, dark mode, HTTP basic auth, headers, proxy, client certificates or
+the installed Chrome / Edge.
+→ [Testing every kind of web app](WEB_APPS.md)
+
+### 5. Campaigns
+A saved set of tests runs in every **environment × browser × screen size** you choose, with one click, one combined
+report, and **Rerun failed** only where it failed — from the dashboard, a schedule or the CLI.
+→ [Campaigns](CAMPAIGNS.md)
+
+### 6. Reusable blocks with inputs
+Write "Sign in" once and use it everywhere. **Make a block** from selected steps; fix the block once and every test that
+uses it is repaired; failures are grouped by block.
+→ [Blocks](BLOCKS.md)
+
+### 7. Before / after each test
+A block can run before and after every test of a module (and its sub-modules) or a single test. Clean-up runs even
+when the test fails.
+→ [Hooks](BLOCKS.md#hooks-before-and-after-each-test)
+
+### 8. Element repository
+Named, shared UI elements ("Save patient button") with ranked locators. Fix a locator once and every step follows; the
+diagnosis's one-click fix updates the element.
+→ [Elements](ELEMENTS.md)
+
+### 9. Test data library
+Rows from **tables, CSV files, read-only SQL queries or API calls** — the first, a random, a matching or a not-yet-used
+row, previewed in any environment.
+→ [Test data](TEST_DATA.md)
+
+### 10. Conditions on the page
+*If the cookie banner is visible → accept it.* *Repeat while "Load more" is shown → click it.* Visible, hidden,
+present, enabled, text and count checks.
+→ [Step reference](STEP_REFERENCE.md#utility-steps-util)
+
+### 11. SOAP, Kafka and FTP
+Call **SOAP** services with XPath checks and fault handling (XPath works on any XML response), send and wait for
+**Kafka** messages, and upload, download and check files over **FTP, FTPS and SFTP** — in the same test as UI and
+database steps.
+→ [SOAP, Kafka and FTP](INTEGRATIONS.md)
+
+### 12. Slack, Microsoft Teams and more
+Run summaries go to **Slack, Microsoft Teams, Mattermost, Rocket.Chat**, Telegram, email or any **webhook**, with the
+failed tests, their diagnosis and a link. Webhook URLs and header values are stored encrypted.
+→ [Notifications](SCHEDULING.md#notifications)
+
+### 13. Network breakdown and run queue priorities
+Every test's traffic by type and host — third parties marked — with the slowest, largest and failed requests, and
+**page-weight budgets** as test checks. Runs wait in a queue with **High / Normal / Low** priority and **Run next**.
+→ [Network traffic](WEB_APPS.md#network-traffic) · [Run queue](FEATURES.md#run-tests)
+
+## Quality
+
+- A full review of the release found and fixed **45 bugs** before publishing, each with a regression test.
+- **450 unit and integration tests** and **33 end-to-end tests** pass. Kafka is tested against a real Apache Kafka
+  broker, SOAP, FTP and SFTP against servers started by the tests, and manual testing drives a real browser panel.
+- On the demo applications StepForge still catches **25 of 25 planted bugs** and explains **24 of 25** correctly,
+  with **0 false alarms** ([benchmarks](benchmarks.json)).
+- Exported projects run against the demo app: Playwright (TypeScript, Python), Cypress, Selenium Python, pytest, k6,
+  cURL and Postman, with and without page objects.
+
+## Upgrading
+
+Pull the latest version and start StepForge as usual: the database is backed up and upgraded automatically (your
+tests, runs and settings are kept; existing tests become *Automated*). Visual baselines are now kept per application,
+so a checkpoint saves a new baseline on its next run.
+
+## Coming next
+
+See [Coming next in the README](../README.md#coming-next) — native mobile and desktop apps lead the list
+([plan](NATIVE_APPS_PLAN.md)).

@@ -110,4 +110,7 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
 ## Coming next
 
+The latest additions are in [WHATS_NEW.md](WHATS_NEW.md); planned work is in the README's
+[Coming next](../README.md#coming-next).
+
 - Native mobile and desktop apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).

@@ -33,6 +33,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 ## Contents
 
 - [Why StepForge](#why-stepforge)
+- [What's new](#whats-new) · [Coming next](#coming-next)
 - [Features](#features)
 - [Quick start](#quick-start)
 - [Your first recorded test](#your-first-recorded-test)
@@ -63,7 +64,50 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | Export to Playwright, Cypress, Selenium, k6, Postman   |    Usually one      |       Sometimes        |      ✅       |
 | Free, no account or subscription                       |      Sometimes      |           —            |      ✅       |
 
+## What's new
+
+**October 2026 — 13 new features** ([full release notes](docs/WHATS_NEW.md)):
+
+| | Feature | In one line |
+| --- | --- | --- |
+| 🆕 | **Manual testing in the browser** | Tests are automated or manual; **Run manually** opens your app with the steps in a panel, records the session, and keeps screenshots and clips |
+| 🆕 | **Marked-up screenshots and bug reports** | Boxes, circles, arrows, pen and text; a failed step becomes a bug report with expected vs actual |
+| 🆕 | **Visual checkpoints** | Pixel comparison with an approved baseline, a red difference image and one-click accept |
+| 🆕 | **Any kind of web app** | Fake or wait for API responses, offline, downloads, storage, clock, mobile touch, per-environment browser settings |
+| 🆕 | **Campaigns** | One click runs a test set across environments × browsers × screen sizes, with a combined report |
+| 🆕 | **Reusable blocks with inputs** | Write "Sign in" once; fix it once and every test using it is repaired |
+| 🆕 | **Before / after each test** | Set-up and clean-up blocks per module or test, even after a failure |
+| 🆕 | **Element repository** | Shared named elements: fix a locator once and every step follows |
+| 🆕 | **Test data library** | Rows from tables, CSV files, read-only SQL queries or APIs |
+| 🆕 | **Conditions on the page** | "If the cookie banner is visible", "repeat while Load more is shown" |
+| 🆕 | **SOAP, Kafka and FTP** | SOAP with XPath checks, Kafka messages, FTP / FTPS / SFTP files |
+| 🆕 | **Slack, Microsoft Teams and more** | Summaries to Slack, Teams, Mattermost, Rocket.Chat, Telegram, email or any webhook |
+| 🆕 | **Network breakdown and run queue** | Traffic by type and host with page-weight budgets; queue priorities and "Run next" |
+
+Before release, a full review fixed **45 bugs** (each with a regression test); **450 unit and integration tests** and
+**33 end-to-end tests** pass, and the demo benchmark still catches **25/25** planted bugs.
+
+## Coming next
+
+Planned work, in order — all of it free, open source and local:
+
+| | Planned | What it brings |
+| --- | --- | --- |
+| 1 | **Electron desktop apps** | Test Electron apps (Windows, macOS, Linux) with the same steps, recorder and traces |
+| 2 | **Android apps** | Appium-based native Android testing from any computer: emulators or a USB phone |
+| 3 | **iOS apps** | Simulators and iPhones (from a Mac) |
+| 4 | **Mobile gestures and a native recorder** | Swipe, long press, back, rotate, deep links; record by clicking a mirrored screen |
+| 5 | **Windows and macOS desktop apps** | Native desktop testing through each system's accessibility layer |
+| 6 | **Linux desktop apps and image matching** | GTK/Qt apps, and image-based locators as a last resort |
+| 7 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
+| — | **More code export** | The newest steps (page conditions, network, SOAP / Kafka / FTP) exported instead of marked TODO |
+| — | **Desktop installer** | Start StepForge with a double-click instead of a terminal |
+
+The native-app work is planned in detail in [docs/NATIVE_APPS_PLAN.md](docs/NATIVE_APPS_PLAN.md).
+
 ## Features
+
+Every feature, grouped by what you want to do: **[docs/FEATURES.md](docs/FEATURES.md)**.
 
 | Layer | What you get |
 | --- | --- |
@@ -415,6 +459,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 
 | Guide | What it covers |
 | --- | --- |
+| [What's new](docs/WHATS_NEW.md) | The latest release: 13 new features |
 | [Features](docs/FEATURES.md) | Every feature in one page |
 | [Step reference](docs/STEP_REFERENCE.md) | Every step type, its parameters and checks |
 | [Testing every kind of web app](docs/WEB_APPS.md) | SPAs, PWAs, canvas, downloads, network mocking, visual checkpoints, browser settings |
@@ -442,8 +487,8 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
       notifications, network traffic breakdown, run queue priorities
 - [x] Every kind of web app: visual checkpoints, network waiting and mocking, downloads, mobile web with touch,
       clock control, storage, per-environment browser settings
-- [ ] Native mobile and desktop apps — [plan](docs/NATIVE_APPS_PLAN.md)
-- [ ] An optional desktop installer (Electron)
+- [x] Manual testing in the browser with recorded sessions, marked-up screenshots and bug reports
+- [ ] Next: see [Coming next](#coming-next)
 
 ## Contributing
 

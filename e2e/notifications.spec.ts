@@ -1,4 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+const shots = process.env.STEPFORGE_SHOTS;
+const shot = async (page: Page, name: string) => {
+  if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
+};
 
 test('notifications: add Microsoft Teams and Slack channels from Settings; the webhook URL is never shown again', async ({
   page,
@@ -27,6 +32,7 @@ test('notifications: add Microsoft Teams and Slack channels from Settings; the w
   await expect(list).toContainText('Microsoft Teams workflow');
   await expect(list).toContainText('Mattermost webhook');
   await expect(page.locator('body')).not.toContainText('SECRET-SIG');
+  await shot(page, 'notifications');
 
   // Editing keeps the stored URL when the field is left empty.
   await page.getByRole('button', { name: `Edit QA Mattermost ${unique}` }).click();

@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 /**
  * Renders the "what's new" post images (StepForge by Md Zarin Tasnim) from docs/case-study/whats-new.html into
- * docs/case-study/whats-new/01-….png … 11-….png, 1200×675 each (LinkedIn and X), and checks that no text leaves its
+ * docs/case-study/whats-new/01-….png … 15-….png, 1200×675 each (LinkedIn and X), and checks that no text leaves its
  * card or runs under the screenshot.
  *
  *   npx tsx scripts/export_whats_new.ts
@@ -16,16 +16,20 @@ const DIR = join(ROOT, 'docs/case-study');
 const OUT = join(DIR, 'whats-new');
 const NAMES = [
   '01-whats-new',
-  '02-reusable-blocks',
-  '03-hooks',
-  '04-element-repository',
-  '05-campaigns',
-  '06-test-data',
-  '07-page-conditions',
-  '08-visual-checkpoints',
-  '09-any-web-app',
-  '10-manual-runs',
-  '11-free-open-source',
+  '02-manual-testing',
+  '03-screenshots-bugs',
+  '04-visual-checkpoints',
+  '05-any-web-app',
+  '06-campaigns',
+  '07-reusable-blocks',
+  '08-before-after-hooks',
+  '09-element-repository',
+  '10-test-data-library',
+  '11-page-conditions',
+  '12-soap-kafka-ftp',
+  '13-slack-teams',
+  '14-network-queue',
+  '15-free-open-source',
 ];
 
 async function main() {

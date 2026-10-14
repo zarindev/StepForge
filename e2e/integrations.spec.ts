@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
+const shots = process.env.STEPFORGE_SHOTS;
+const shot = async (page: Page, name: string) => {
+  if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
+};
+
 const CLINIC = 'http://127.0.0.1:8191';
 
 async function sfApi<T>(page: Page, method: string, url: string, body?: unknown): Promise<T> {
@@ -60,6 +65,7 @@ test('SOAP, Kafka and FTP steps: plain English and their fields in the editor', 
   await expect(plain).toContainText('Call the SOAP service /ws/prices (GetPrice)');
   await expect(plain).toContainText('Wait for a Kafka message on invoices where $.status is "sent"');
   await expect(plain).toContainText('Download /outbox/invoice.pdf on SFTP files.test');
+  await shot(page, 'integrations');
 
   await page.getByRole('tab', { name: 'List' }).click();
   await page.getByRole('button', { name: /^ftp/ }).click();
