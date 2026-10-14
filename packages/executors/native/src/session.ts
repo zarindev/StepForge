@@ -1,6 +1,5 @@
 import {
   StepError,
-  type AndroidLaunch,
   type ArtifactRef,
   type ExecutorSession,
   type Locator,
@@ -10,9 +9,9 @@ import {
   type StepOutcome,
   type TestContext,
 } from '@stepforge/core';
-import { existsSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
-import { androidQueries } from './locators.ts';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { androidPlatform, iosPlatform, type NativePlatform } from './platforms.ts';
 import { WebDriverError, WebDriverSession, type ElementRef } from './webdriver.ts';
 
 const pad = (n: number) => String(n).padStart(3, '0');
@@ -21,100 +20,52 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Found = { el: ElementRef; used: Locator; index: number; matches: number };
 
-/** Android key codes for the key names steps use (as on the web). */
-const KEYCODES: Record<string, number> = {
-  Enter: 66,
-  Tab: 61,
-  Escape: 111,
-  Backspace: 67,
-  Delete: 112,
-  Space: 62,
-  ArrowUp: 19,
-  ArrowDown: 20,
-  ArrowLeft: 21,
-  ArrowRight: 22,
-  Home: 3,
-  Back: 4,
-  Menu: 82,
-  Search: 84,
-};
-
-/** The Appium capabilities for an environment's Android launch settings. */
-export function androidCapabilities(launch: AndroidLaunch): Record<string, unknown> {
-  const caps: Record<string, unknown> = {
-    platformName: 'Android',
-    'appium:automationName': 'UiAutomator2',
-    'appium:noReset': launch.resetApp === false,
-    'appium:fullReset': false,
-    'appium:autoGrantPermissions': true,
-    'appium:newCommandTimeout': 300,
-    'appium:disableWindowAnimation': true,
-    'appium:uiautomator2ServerInstallTimeout': 120_000,
-    'appium:uiautomator2ServerLaunchTimeout': 120_000,
-    'appium:adbExecTimeout': 60_000,
-    'appium:appWaitDuration': 60_000,
-  };
-  if (launch.app) {
-    const app = isAbsolute(launch.app) ? launch.app : resolve(launch.app);
-    if (!existsSync(app)) throw new StepError('invalid_params', `The app file was not found: ${app}`);
-    caps['appium:app'] = app;
-  }
-  if (launch.appPackage) caps['appium:appPackage'] = launch.appPackage;
-  if (launch.appActivity) caps['appium:appActivity'] = launch.appActivity;
-  if (!launch.app && !launch.appPackage)
-    throw new StepError(
-      'invalid_params',
-      'Set the app file (.apk) or the installed app’s package in the environment',
-    );
-  if (launch.udid) caps['appium:udid'] = launch.udid;
-  if (launch.avd) {
-    caps['appium:avd'] = launch.avd;
-    caps['appium:avdArgs'] = launch.showEmulator ? '-no-audio' : '-no-window -no-audio -no-boot-anim';
-    caps['appium:avdLaunchTimeout'] = 300_000;
-    caps['appium:avdReadyTimeout'] = 300_000;
-  }
-  return { ...caps, ...(launch.capabilities ?? {}) };
-}
-
-/** One test in an Android app, through a local Appium server (UiAutomator2). */
-export class AndroidSession implements ExecutorSession {
+/** One test in a native app (Android or iOS), through a local Appium server. */
+export class NativeSession implements ExecutorSession {
   private driver!: WebDriverSession;
-  private recording = false;
+  private readonly platform: NativePlatform;
+  private stopRecording: (() => Promise<Buffer | null>) | null = null;
   private failureArtifacts: ArtifactRef[] = [];
 
   constructor(
     private readonly ctx: TestContext,
     private readonly appiumUrl: () => Promise<string>,
-  ) {}
+    private readonly hasDriver: (driver: string) => boolean = () => true,
+  ) {
+    const o = ctx.options;
+    if (o.ios) this.platform = iosPlatform(o.ios);
+    else if (o.android) this.platform = androidPlatform(o.android);
+    else throw new StepError('invalid_params', 'No Android or iOS app is set for this test');
+  }
 
   async open(): Promise<void> {
-    const launch = this.ctx.options.android!;
-    const caps = androidCapabilities(launch);
+    const pf = this.platform;
+    const caps = pf.capabilities();
+    if (!this.hasDriver(pf.driver))
+      throw new StepError(
+        'navigation',
+        `Appium's ${pf.name} driver is not installed: run "npm run appium:install" (or Install Appium on the application's Environments tab)`,
+      );
     const url = await this.appiumUrl().catch((err: Error) => {
       throw new StepError('navigation', err.message);
     });
     try {
-      // The first test may boot the emulator and install Appium's helper app: allow minutes, not seconds.
-      this.driver = await WebDriverSession.create(url, caps, 420_000);
+      // The first test may boot the emulator or simulator and install (on iOS: build) Appium's helper app.
+      this.driver = await WebDriverSession.create(url, caps, pf.name === 'iOS' ? 900_000 : 420_000);
     } catch (err) {
       if (err instanceof StepError) throw err;
-      throw new StepError('navigation', `The Android app did not start: ${(err as Error).message}`);
+      throw new StepError('navigation', `The ${pf.name} app did not start: ${(err as Error).message}`);
     }
-    this.ctx.shared.set('android.driver', this.driver);
+    this.ctx.shared.set('native.driver', this.driver);
     // Older device log lines are not this test's.
-    await this.driver.logs('logcat').catch(() => []);
-    if (this.ctx.options.video !== 'off') {
-      this.recording = await this.driver
-        .startRecording({ timeLimit: '1800', bitRate: '2000000' })
-        .then(() => true)
-        .catch(() => false);
-    }
+    await this.driver.logs(pf.log.type).catch(() => []);
+    if (this.ctx.options.video !== 'off') this.stopRecording = await pf.record(this.driver);
   }
 
   /** Finds the element with the ranked locators, waiting up to the timeout. A lower-ranked match is "healed". */
   private async find(locators: Locator[], timeoutMs: number, signal?: AbortSignal): Promise<Found> {
     if (!locators.length) throw new StepError('invalid_params', 'This step needs at least one locator');
-    const queries = locators.map((l) => androidQueries(l));
+    const queries = locators.map((l) => this.platform.queries(l));
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       if (signal?.aborted) throw new StepError('aborted', 'Run was cancelled');
@@ -143,7 +94,7 @@ export class AndroidSession implements ExecutorSession {
 
   /** How many elements the first locator matches now (no waiting). */
   private async count(l: Locator): Promise<number> {
-    for (const q of androidQueries(l)) {
+    for (const q of this.platform.queries(l)) {
       const n = (await this.driver.findAll(q.using, q.value).catch(() => [])).length;
       if (n) return n;
     }
@@ -159,7 +110,7 @@ export class AndroidSession implements ExecutorSession {
         return this.driver.enabled(el);
       case 'checked':
       case 'unchecked':
-        return (await this.driver.attribute(el, 'checked')) === 'true';
+        return this.platform.isChecked(this.driver, el);
       case 'attribute':
         return this.driver.attribute(el, attribute ?? '');
       case 'value':
@@ -232,11 +183,9 @@ export class AndroidSession implements ExecutorSession {
           if (!/^[a-z][a-z0-9+.-]*:/i.test(url))
             throw new StepError(
               'unsupported',
-              'An Android app has no pages to open: the app starts on its first screen. Use a full deep link (myapp://…) to open a screen',
+              `An ${this.platform.name} app has no pages to open: the app starts on its first screen. Use a full deep link (myapp://…) to open a screen`,
             );
-          await this.driver.execute('mobile: deepLink', [
-            { url, package: (this.driver.capabilities['appium:appPackage'] as string) ?? undefined },
-          ]);
+          await this.platform.deepLink(this.driver, url);
           outcome = { message: `Opened ${url}` };
           break;
         }
@@ -247,7 +196,7 @@ export class AndroidSession implements ExecutorSession {
           break;
         case 'dblclick':
           await needs();
-          await this.driver.execute('mobile: doubleClickGesture', [{ elementId: found!.el }]);
+          await this.platform.doubleTap(this.driver, found!.el);
           break;
         case 'fill':
           await needs();
@@ -268,16 +217,7 @@ export class AndroidSession implements ExecutorSession {
             await needs();
             await this.driver.click(found!.el);
           }
-          if (key === 'Back') await this.driver.back();
-          else {
-            const keycode = KEYCODES[key];
-            if (keycode === undefined)
-              throw new StepError(
-                'invalid_params',
-                `The key "${key}" is not available on Android (keys: ${Object.keys(KEYCODES).join(', ')})`,
-              );
-            await this.driver.execute('mobile: pressKey', [{ keycode }]);
-          }
+          await this.platform.pressKey(this.driver, key, found?.el);
           outcome = { message: `Pressed ${key}` };
           break;
         }
@@ -285,7 +225,7 @@ export class AndroidSession implements ExecutorSession {
         case 'uncheck': {
           await needs();
           const want = name === 'check';
-          if (((await this.driver.attribute(found!.el, 'checked')) === 'true') !== want)
+          if ((await this.platform.isChecked(this.driver, found!.el)) !== want)
             await this.driver.click(found!.el);
           break;
         }
@@ -376,7 +316,7 @@ export class AndroidSession implements ExecutorSession {
         default:
           throw new StepError(
             'unsupported',
-            `"${step.type}" is not available in Android apps yet (it is a web-page step); see docs/ANDROID_APPS.md`,
+            `"${step.type}" is not available in ${this.platform.name} apps yet (it is a web-page step); see docs/${this.platform.name === 'iOS' ? 'IOS' : 'ANDROID'}_APPS.md`,
           );
       }
     } catch (err) {
@@ -404,22 +344,8 @@ export class AndroidSession implements ExecutorSession {
   }
 
   /** Swipes the screen; false when nothing moved any more. */
-  private async scroll(direction: 'up' | 'down'): Promise<boolean> {
-    const size = (await this.driver.execute('mobile: deviceScreenInfo').catch(() => null)) as {
-      realDisplaySize?: string;
-    } | null;
-    const [w, h] = (size?.realDisplaySize ?? '1080x2400').split('x').map(Number) as [number, number];
-    const more = await this.driver.execute('mobile: scrollGesture', [
-      {
-        left: Math.round(w * 0.1),
-        top: Math.round(h * 0.2),
-        width: Math.round(w * 0.8),
-        height: Math.round(h * 0.6),
-        direction,
-        percent: 0.75,
-      },
-    ]);
-    return more === true;
+  private scroll(direction: 'up' | 'down'): Promise<boolean> {
+    return this.platform.scroll(this.driver, direction);
   }
 
   private async assert(
@@ -515,8 +441,8 @@ export class AndroidSession implements ExecutorSession {
     const keep = (mode: string) => mode === 'always' || (mode === 'onFailure' && failed);
     const artifacts: ArtifactRef[] = [];
     if (!this.driver) return artifacts;
-    if (this.recording) {
-      const video = await this.driver.stopRecording().catch(() => null);
+    if (this.stopRecording) {
+      const video = await this.stopRecording();
       if (video?.length && keep(o.video)) {
         const path = join(this.ctx.artifactsDir, 'video.mp4');
         writeFileSync(path, video);
@@ -524,10 +450,11 @@ export class AndroidSession implements ExecutorSession {
       }
     }
     if (o.captureLogs) {
-      // The device log (logcat) is the app's console; a crash is reported as an error.
-      const lines = await this.driver.logs('logcat').catch(() => []);
+      // The device log (logcat, or the iOS system log) is the app's console; a crash is reported as an error.
+      const { type, crash } = this.platform.log;
+      const lines = await this.driver.logs(type).catch(() => []);
       const log = lines.slice(-2000).map((l) => ({
-        type: /FATAL EXCEPTION|ANR in /.test(l.message) ? 'error' : 'logcat',
+        type: crash.test(l.message) ? 'error' : type,
         text: l.message,
         at: l.timestamp,
       }));

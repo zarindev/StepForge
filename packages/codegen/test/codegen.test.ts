@@ -86,6 +86,8 @@ describe('plan', () => {
     expect(android.warnings.map((w) => w.message)).toContainEqual(
       expect.stringContaining('This is an Android app'),
     );
+    const ios = buildPlan({ ...KITCHEN_SINK, application: { ...KITCHEN_SINK.application, platform: 'ios' } });
+    expect(ios.warnings.map((w) => w.message)).toContainEqual(expect.stringContaining('This is an iOS app'));
   });
   it('inlines blocks and called scenarios, collects secrets and variables, and reports what cannot be exported', () => {
     const plan = buildPlan(KITCHEN_SINK, { pom: true });

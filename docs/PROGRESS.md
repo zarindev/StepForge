@@ -21,6 +21,27 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 15 | Reuse, scale and integrations; every kind of web app | ✅ Done (11 of 11 features + web-app coverage) |
 | N1 | Native apps, step 1: Electron desktop apps | ✅ Done |
 | N2 | Native apps, step 2: native foundation and Android apps | ✅ Done |
+| N3 | Native apps, step 3: iOS apps | ✅ Done |
+
+---
+
+## N3 — iOS apps (2026-10-14)
+
+**Delivered**
+- Platform `ios`; per-environment launch settings: .app / .ipa or bundle id, simulator (default: the first iPhone
+  simulator) or iPhone id, iOS version, reset app data, show the simulator, extra Appium capabilities.
+- The native session serves both platforms through an adapter (capabilities, locators, keys, deep links, double
+  tap, scrolling, device log, screen recording). iOS locators use accessibility ids and iOS predicates.
+- XCUITest 12.18.1 installed with Appium on macOS; simulator recordings with `simctl io recordVideo`.
+- `doctor native --platform android|ios`; status per platform in the API and the dashboard; iOS fields in the
+  environment form; the recorder and manual-test panel explain they are not available for iOS yet.
+- Demo app CareClinic mobile for iOS (`demo/ios-app`, Swift/UIKit, planted bug IOS-01), built by
+  `scripts/build-ios-demo.ts` with `swiftc` (arm64 + x86_64 simulator). CI job `ios` on macOS.
+
+**Tests**: iOS locator mapping and capabilities (always); on the iOS 27 simulator: sign in, add a patient with
+video, device log and screenshots, a wrong password, the planted bug with screenshot and element tree (executor); a
+full run with video, export/import, refusals (server); dashboard end-to-end test for the iOS forms. The Android tests
+were run again on the emulator after the shared-session refactor. [IOS_APPS.md](IOS_APPS.md)
 
 ---
 

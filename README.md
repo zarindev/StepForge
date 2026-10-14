@@ -66,8 +66,10 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 ## What's new
 
-**Just added — Android and desktop apps:**
+**Just added — iOS, Android and desktop apps:**
 
+- **iOS apps** (iPhone, iPad) on the iOS Simulator or a real iPhone, from a Mac with Xcode, through Appium. The same
+  steps and evidence as Android ([guide](docs/IOS_APPS.md)).
 - **Android apps** on an emulator or a USB phone, through Appium, which StepForge installs and runs itself. The same
   steps, screen recording, device log and element tree, plus `stepforge doctor native`
   ([guide](docs/ANDROID_APPS.md)).
@@ -102,12 +104,13 @@ Planned work, in order — all of it free, open source and local:
 | | Planned | What it brings |
 | --- | --- | --- |
 | ✅ | **Electron desktop apps** | Done — see [Desktop apps](docs/DESKTOP_APPS.md) |
-| ✅ | **Android apps** | Done — see [Android apps](docs/ANDROID_APPS.md) |
-| 1 | **iOS apps** | Simulators and iPhones (from a Mac) |
-| 2 | **Mobile gestures and a native recorder** | Swipe, long press, back, rotate, deep links; record by clicking a mirrored screen |
-| 3 | **Windows and macOS desktop apps** | Native desktop testing through each system's accessibility layer |
-| 4 | **Linux desktop apps and image matching** | GTK/Qt apps, and image-based locators as a last resort |
-| 5 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
+| ✅ | **iOS apps** | ✅ iPhone and iPad apps on the iOS Simulator or a real iPhone, from a Mac with Xcode · Appium + XCUITest installed and started by StepForge · a .app / .ipa or an installed bundle id per environment · accessibility ids, labels, placeholders, roles and XPath · screen recording, system log, element tree at failures — see [docs/IOS_APPS.md](docs/IOS_APPS.md) |
+| **Android apps** | Done — see [Android apps](docs/ANDROID_APPS.md) |
+| ✅ | **iOS apps** | Done — see [iOS apps](docs/IOS_APPS.md) |
+| 1 | **Mobile gestures and a native recorder** | Swipe, long press, back, rotate, deep links; record by clicking a mirrored screen |
+| 2 | **Windows and macOS desktop apps** | Native desktop testing through each system's accessibility layer |
+| 3 | **Linux desktop apps and image matching** | GTK/Qt apps, and image-based locators as a last resort |
+| 4 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
 | — | **More code export** | The newest steps (page conditions, network, SOAP / Kafka / FTP) exported instead of marked TODO |
 | — | **Desktop installer** | Start StepForge with a double-click instead of a terminal |
 
@@ -473,7 +476,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | [Features](docs/FEATURES.md) | Every feature in one page |
 | [Step reference](docs/STEP_REFERENCE.md) | Every step type, its parameters and checks |
 | [Testing every kind of web app](docs/WEB_APPS.md) | SPAs, PWAs, canvas, downloads, network mocking, visual checkpoints, browser settings |
-| [Android apps](docs/ANDROID_APPS.md) · [Desktop apps](docs/DESKTOP_APPS.md) | Native Android apps (emulators and phones) and Electron desktop apps |
+| [iOS apps](docs/IOS_APPS.md) · [Android apps](docs/ANDROID_APPS.md) · [Desktop apps](docs/DESKTOP_APPS.md) | iPhone and iPad apps (simulators and iPhones), Android apps (emulators and phones) and Electron desktop apps |
 | [Blocks and hooks](docs/BLOCKS.md) · [Elements](docs/ELEMENTS.md) · [Test data](docs/TEST_DATA.md) | Reuse: shared steps, before/after each test, shared elements, data sources |
 | [Campaigns](docs/CAMPAIGNS.md) · [Manual testing](docs/MANUAL_RUNS.md) · [Scheduling](docs/SCHEDULING.md) · [CLI](docs/CLI.md) | Running: test sets across browsers and sizes, tests done by hand, cron, notifications, CI |
 | [Databases](docs/DATABASES.md) · [Email](docs/EMAIL.md) · [Performance](docs/PERFORMANCE.md) · [SOAP, Kafka, FTP](docs/INTEGRATIONS.md) | Beyond the page |
@@ -481,7 +484,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | [Code export](docs/CODEGEN.md) | The 13 export targets |
 | [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) | How it is built |
 | [Known issues](docs/KNOWN_ISSUES.md) · [Changelog](CHANGELOG.md) | Limits and history |
-| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for native apps (Electron and Android: done; iOS and native desktop next) |
+| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for native apps (Electron, Android and iOS: done; gestures, recorder and native desktop next) |
 
 ## Roadmap
 
@@ -501,6 +504,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] Manual testing in the browser with recorded sessions, marked-up screenshots and bug reports
 - [x] Electron desktop apps (Windows, macOS, Linux)
 - [x] Android apps (emulators and phones, through Appium)
+- [x] iOS apps (simulators and iPhones, from a Mac)
 - [ ] Next: see [Coming next](#coming-next)
 
 ## Contributing

@@ -9,6 +9,7 @@ import {
   type BrowserSettings,
   type ElectronLaunch,
   type AndroidLaunch,
+  type IosLaunch,
   type RunOptions,
   type RunOptionsInput,
   type StepResult,
@@ -362,6 +363,10 @@ export class RunManager {
     // Placeholders (e.g. a basic-auth password from {{secret.x}}) are resolved here; the run never stores them.
     // A desktop (Electron) app: tests start the app from the environment's launch settings instead of a browser.
     const platform = repo.getApplication(this.db, run.applicationId).platform;
+    if (platform === 'ios') {
+      const launch = (env.browserDefaultsJson as { ios?: IosLaunch }).ios ?? {};
+      options.ios = new VariableResolver({ env: envScope, secret: secrets }).resolve(launch) as IosLaunch;
+    }
     if (platform === 'android') {
       const launch = (env.browserDefaultsJson as { android?: AndroidLaunch }).android ?? {};
       options.android = new VariableResolver({ env: envScope, secret: secrets }).resolve(
@@ -384,10 +389,11 @@ export class RunManager {
     const specs = this.specs;
     const appium = this.appium;
     const executors = [
-      options.android
+      options.android || options.ios
         ? createNativeExecutor({
             appiumUrl: () =>
-              appium ? appium.url() : Promise.reject(new Error('Android apps are not available here')),
+              appium ? appium.url() : Promise.reject(new Error('Phone apps are not available here')),
+            hasDriver: (d) => appium?.hasDriver(d) ?? false,
           })
         : createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines', run.applicationId) }),
       createApiExecutor({

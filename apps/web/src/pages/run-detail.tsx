@@ -350,7 +350,7 @@ export function RunDetailPage() {
               key={selectedId}
               runId={r.id}
               itemId={selectedId}
-              canOpenBrowser={r.application.platform !== 'android'}
+              canOpenBrowser={r.application.platform !== 'android' && r.application.platform !== 'ios'}
               onDone={() => {
                 const next = items.find(
                   (i) => i.id !== selectedId && (i.status === 'queued' || i.status === 'running'),

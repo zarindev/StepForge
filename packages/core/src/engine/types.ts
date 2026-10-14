@@ -96,6 +96,18 @@ export type AndroidLaunch = {
   capabilities?: Record<string, unknown>;
 };
 
+/** How to start an iOS app (see IosLaunchInput). */
+export type IosLaunch = {
+  app?: string;
+  bundleId?: string;
+  simulator?: string;
+  platformVersion?: string;
+  udid?: string;
+  resetApp?: boolean;
+  showSimulator?: boolean;
+  capabilities?: Record<string, unknown>;
+};
+
 /** What an executor reports back for one step. */
 export type StepOutcome = {
   message?: string;
@@ -239,6 +251,8 @@ export type RunOptions = {
   electron?: ElectronLaunch;
   /** Set for an Android app: the UI steps run in the app through Appium. */
   android?: AndroidLaunch;
+  /** Set for an iOS app: the UI steps run in the app through Appium (XCUITest). */
+  ios?: IosLaunch;
   baseUrl?: string;
 };
 

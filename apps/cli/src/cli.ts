@@ -35,7 +35,7 @@ Commands
   import    Create an application from an export
   secret    Store an environment secret (encrypted), e.g. in CI after "import"
   codegen   Export tests as a ready-to-run project (Playwright, Cypress, Selenium, API, docs)
-  doctor    doctor native — check this computer for Android testing (Java, SDK, emulators, Appium)
+  doctor    doctor native [--platform android|ios] — check this computer for testing phone apps
 
 run
   --app <slug>          Application (required)
@@ -157,6 +157,7 @@ const OPTIONS = {
   ci: { type: 'string' },
   list: { type: 'boolean' },
   'from-env': { type: 'string' },
+  platform: { type: 'string' },
   'data-dir': { type: 'string' },
   json: { type: 'boolean' },
 } as const;
@@ -612,19 +613,31 @@ const COMMANDS: Record<string, Handler> = {
   doctor: wrap(doctor),
 };
 
-/** `doctor native`: what Android testing needs on this computer, each with how to fix it. Exit 2 when not ready. */
+/**
+ * `doctor native [--platform android|ios]`: what Android and iOS testing need on this computer, each with how to fix
+ * it. Exit 0 when the platform asked for (or, without --platform, at least one) is ready, else 2.
+ */
 async function doctor(c: Ctx, v: Values, io: Io): Promise<number> {
+  const platform = typeof v.platform === 'string' ? v.platform : undefined;
+  if (platform && platform !== 'android' && platform !== 'ios')
+    throw new UsageError('--platform must be android or ios');
   const status = await nativeDoctor(c.ctx.config.toolsDir);
+  const shown = (['android', 'ios'] as const).filter((p) => !platform || p === platform);
+  const ready = shown.some((p) => status[p].ready);
   if (v.json) {
     io.out(JSON.stringify(status, null, 2));
-    return status.ready ? EXIT.passed : EXIT.error;
+    return ready ? EXIT.passed : EXIT.error;
   }
-  for (const check of status.checks) {
-    io.out(`${check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`);
-    if (!check.ok && check.fix) io.out(`    → ${check.fix}`);
+  for (const p of shown) {
+    io.out(`${p === 'android' ? 'Android' : 'iOS'}${status[p].ready ? ' — ready' : ' — not ready'}`);
+    for (const check of status[p].checks) {
+      io.out(`  ${check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`);
+      if (!check.ok && check.fix) io.out(`      → ${check.fix}`);
+    }
+    io.out('');
   }
-  io.out(status.ready ? '\nReady to test Android apps.' : '\nNot ready yet: fix the items marked ✗.');
-  return status.ready ? EXIT.passed : EXIT.error;
+  io.out(ready ? 'Ready.' : 'Not ready yet: fix the items marked ✗.');
+  return ready ? EXIT.passed : EXIT.error;
 }
 
 /** Usage errors print a hint; everything else is reported by main(). */

@@ -7,8 +7,8 @@ tests, runs, reports and diagnosis as web apps. The steps go to the app through 
 driver, both open source (Apache-2.0). StepForge installs them into its own `data/tools` folder and starts and stops
 them itself. Nothing is installed globally, and no device cloud or account is needed.
 
-This is step N2 of the [native apps plan](NATIVE_APPS_PLAN.md). iOS apps, swipe and long-press steps, and a recorder
-for native apps come next.
+This is step N2 of the [native apps plan](NATIVE_APPS_PLAN.md). [iOS apps](IOS_APPS.md) work the same way (N3); swipe
+and long-press steps and a recorder for native apps come next.
 
 ## What you need
 
@@ -22,18 +22,19 @@ for native apps come next.
 Check this computer at any time:
 
 ```bash
-./stepforge.sh doctor native      # stepforge.bat on Windows
+./stepforge.sh doctor native --platform android      # stepforge.bat on Windows
 ```
 
 ```text
-✓ Java 17 or newer: /Applications/Android Studio.app/Contents/jbr/Contents/Home
-✓ Android SDK: /Users/me/Library/Android/sdk
-✓ adb (platform-tools): …/platform-tools/adb
-✓ Android emulator: …/emulator/emulator
-✓ Emulators or phones: emulators: Pixel_8 · connected: emulator-5554 (device)
-✓ Appium and the Android driver: Appium 3.8.0, UiAutomator2 8.7.0 in data/tools/appium
+Android — ready
+  ✓ Java 17 or newer: /Applications/Android Studio.app/Contents/jbr/Contents/Home
+  ✓ Android SDK: /Users/me/Library/Android/sdk
+  ✓ adb (platform-tools): …/platform-tools/adb
+  ✓ Android emulator: …/emulator/emulator
+  ✓ Emulators or phones: emulators: Pixel_8 · connected: emulator-5554 (device)
+  ✓ Appium and the Android driver: Appium 3.8.0, UiAutomator2 8.7.0 in data/tools/appium
 
-Ready to test Android apps.
+Ready.
 ```
 
 Every line marked ✗ says how to fix it. The same checks appear on an Android app's **Environments** tab, with an

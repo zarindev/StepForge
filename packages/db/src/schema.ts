@@ -40,7 +40,7 @@ export const applications = sqliteTable('applications', {
   color: text('color').notNull().default('#F97316'),
   category: text('category').notNull().default('web'),
   /** What is tested: a web application in a browser, or an Electron desktop app. */
-  platform: text('platform', { enum: ['web', 'electron', 'android'] })
+  platform: text('platform', { enum: ['web', 'electron', 'android', 'ios'] })
     .notNull()
     .default('web'),
   tagsJson: json<string[]>('tags_json').notNull().default([]),

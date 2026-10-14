@@ -16,19 +16,41 @@ import {
   installedDrivers,
   nodeOkForAppium,
 } from './appium.ts';
+import { listSimulators, xcodeSelected, xcodeVersion, type Simulator } from './ios.ts';
 
 export type DoctorCheck = { name: string; ok: boolean; detail: string; fix?: string };
-export type NativeStatus = { ready: boolean; checks: DoctorCheck[]; avds: string[]; devices: Device[] };
+export type PlatformStatus = { ready: boolean; checks: DoctorCheck[] };
+export type NativeStatus = {
+  android: PlatformStatus;
+  /** `supported` is false away from macOS: Apple's tools only run there. */
+  ios: PlatformStatus & { supported: boolean };
+  avds: string[];
+  devices: Device[];
+  simulators: Simulator[];
+};
 
 const sdkCmd = (pkgs: string) => `sdkmanager ${pkgs} (in the Android SDK's cmdline-tools/latest/bin)`;
+const APPIUM_FIX = 'npm run appium:install, or Install Appium on the application’s Environments tab';
 
-/** What testing Android apps needs on this computer, each with how to fix it. */
+function appiumCheck(toolsDir: string, driver: 'uiautomator2' | 'xcuitest', label: string): DoctorCheck {
+  const ok = appiumInstalled(toolsDir, driver);
+  return {
+    name: `Appium and the ${label} driver`,
+    ok,
+    detail: ok
+      ? `Appium ${APPIUM_VERSION}, ${driver === 'xcuitest' ? 'XCUITest' : 'UiAutomator2'} ${installedDrivers(toolsDir)[driver]} in ${appiumPaths(toolsDir).root}` +
+        (nodeOkForAppium() ? '' : ` (runs on its own Node.js ${APPIUM_NODE_VERSION})`)
+      : 'not installed',
+    fix: APPIUM_FIX,
+  };
+}
+
+/** What testing Android and iOS apps needs on this computer, each with how to fix it. */
 export async function nativeDoctor(toolsDir: string): Promise<NativeStatus> {
   const sdk = androidSdk();
   const java = javaHome();
   const [avds, devices] = await Promise.all([listAvds(), listDevices()]);
-  const drivers = installedDrivers(toolsDir);
-  const checks: DoctorCheck[] = [
+  const android: DoctorCheck[] = [
     {
       name: 'Java 17 or newer',
       ok: !!java,
@@ -70,17 +92,52 @@ export async function nativeDoctor(toolsDir: string): Promise<NativeStatus> {
           .join(' · ') || 'none',
       fix: 'Create an emulator (Android Studio → Device Manager) or connect a phone with USB debugging on',
     },
-    {
-      name: 'Appium and the Android driver',
-      ok: appiumInstalled(toolsDir),
-      detail: appiumInstalled(toolsDir)
-        ? `Appium ${APPIUM_VERSION}, UiAutomator2 ${drivers.uiautomator2} in ${appiumPaths(toolsDir).root}` +
-          (nodeOkForAppium() ? '' : ` (runs on its own Node.js ${APPIUM_NODE_VERSION})`)
-        : 'not installed',
-      fix: 'npm run appium:install, or Install Appium on an Android app’s Environments tab',
-    },
+    appiumCheck(toolsDir, 'uiautomator2', 'Android'),
   ];
-  // The emulator check is optional when a phone is connected.
-  const required = checks.filter((c) => c.name !== 'Android emulator');
-  return { ready: required.every((c) => c.ok), checks, avds, devices };
+
+  const mac = process.platform === 'darwin';
+  const xcode = mac ? xcodeVersion() : undefined;
+  const selected = mac ? xcodeSelected() : undefined;
+  const simulators = mac ? listSimulators() : [];
+  const ios: DoctorCheck[] = mac
+    ? [
+        {
+          name: 'Xcode',
+          ok: !!xcode,
+          detail: xcode ?? 'not found',
+          fix: 'Install Xcode from the App Store (free), open it once and add the iOS platform',
+        },
+        {
+          name: 'Command-line tools use Xcode',
+          ok: !!selected?.includes('.app/Contents/Developer'),
+          detail: selected ?? 'not set',
+          fix: 'sudo xcode-select -s /Applications/Xcode.app/Contents/Developer && sudo xcodebuild -runFirstLaunch',
+        },
+        {
+          name: 'iOS simulators',
+          ok: simulators.length > 0,
+          detail: simulators.length
+            ? `${simulators.length}: ${[...new Set(simulators.map((s) => s.name))].slice(0, 4).join(', ')}${simulators.length > 4 ? '…' : ''}`
+            : 'none',
+          fix: 'Xcode → Settings → Components → iOS (the simulator runtime)',
+        },
+        appiumCheck(toolsDir, 'xcuitest', 'iOS'),
+      ]
+    : [
+        {
+          name: 'macOS',
+          ok: false,
+          detail: `this computer runs ${process.platform}`,
+          fix: 'iOS apps can only be tested from a Mac: Apple’s tools (Xcode, simulators) run only on macOS',
+        },
+      ];
+  // The emulator is optional when a phone is connected.
+  const androidReady = android.filter((c) => c.name !== 'Android emulator').every((c) => c.ok);
+  return {
+    android: { ready: androidReady, checks: android },
+    ios: { ready: ios.every((c) => c.ok), checks: ios, supported: mac },
+    avds,
+    devices,
+    simulators,
+  };
 }

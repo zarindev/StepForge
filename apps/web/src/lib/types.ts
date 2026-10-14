@@ -10,8 +10,8 @@ export type Application = {
   icon: string;
   color: string;
   category: string;
-  /** `electron` / `android`: a desktop or Android app started from the environment's launch settings. */
-  platform: 'web' | 'electron' | 'android';
+  /** `electron` / `android` / `ios`: a desktop or phone app started from the environment's launch settings. */
+  platform: 'web' | 'electron' | 'android' | 'ios';
   tagsJson: string[];
   archived: boolean;
   createdAt: string;

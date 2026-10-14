@@ -96,7 +96,9 @@ export function ApplicationDetailPage() {
             <h1 className="text-xl font-semibold tracking-tight">{a.name}</h1>
             <Badge>{a.category}</Badge>
             {a.platform !== 'web' && (
-              <Badge tone="indigo">{a.platform === 'android' ? 'Android app' : 'Desktop app'}</Badge>
+              <Badge tone="indigo">
+                {{ android: 'Android app', ios: 'iOS app', electron: 'Desktop app' }[a.platform]}
+              </Badge>
             )}
             {a.archived && <Badge tone="skip">Archived</Badge>}
           </div>

@@ -34,7 +34,11 @@ Tests against real PostgreSQL/MySQL/SQL Server/MongoDB run when `STEPFORGE_TEST_
 
 Android tests run on an emulator when `STEPFORGE_TEST_ANDROID` is set: an emulator's name, or `1` for the device that
 is already connected. They need `npm run appium:install`. Run their files one at a time, since they share the device:
-`STEPFORGE_TEST_ANDROID=Pixel npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts`.
+`STEPFORGE_TEST_ANDROID=Pixel npx vitest run --no-file-parallelism packages/executors/native/test/native.test.ts apps/server/test/android-apps.test.ts`.
+
+iOS tests (macOS with Xcode) run on a simulator when `STEPFORGE_TEST_IOS` is set: a simulator's name, or `1` for the
+first iPhone simulator:
+`STEPFORGE_TEST_IOS=1 npx vitest run --no-file-parallelism packages/executors/native/test/ios.test.ts apps/server/test/ios-apps.test.ts`.
 
 ## Layout
 

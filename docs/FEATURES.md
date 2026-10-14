@@ -47,6 +47,13 @@ touch, sites behind basic auth or client certificates, localised and time-zone-d
 features and visual regressions — with network waiting and mocking, offline mode, cookies and storage, a controllable
 clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
+## Test iOS apps
+
+iPhone and iPad apps on the iOS Simulator or a real iPhone, from a Mac with Xcode, through Appium (installed and
+started by StepForge). Each environment names the app (.app, .ipa or bundle id) and the simulator or iPhone. You get
+the same steps and checks as Android, plus a screen recording, the system log and the element tree at failures.
+[IOS_APPS.md](IOS_APPS.md)
+
 ## Test Android apps
 
 Native Android apps on an emulator or a USB phone, from any computer, through Appium (installed and started by
@@ -126,5 +133,5 @@ traces and diagnosis work as on the web. [DESKTOP_APPS.md](DESKTOP_APPS.md)
 The latest additions are in [WHATS_NEW.md](WHATS_NEW.md); planned work is in the README's
 [Coming next](../README.md#coming-next).
 
-- iOS apps, mobile gestures and a native recorder, and Windows / macOS / Linux desktop apps (Electron and Android are
+- Mobile gestures and a native recorder, and Windows / macOS / Linux desktop apps (Electron, Android and iOS are
   done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).

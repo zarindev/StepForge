@@ -85,6 +85,11 @@ export class WebDriverSession {
     const b64 = (await this.cmd('GET', el ? `/element/${el}/screenshot` : '/screenshot')) as string;
     return Buffer.from(b64, 'base64');
   }
+  /** The element that has the keyboard focus, if any. */
+  async activeElement(): Promise<ElementRef | undefined> {
+    const e = (await this.cmd('GET', '/element/active').catch(() => null)) as Record<string, string> | null;
+    return e ? (e[ELEMENT] ?? e.ELEMENT) : undefined;
+  }
   async source(): Promise<string> {
     return String(await this.cmd('GET', '/source'));
   }

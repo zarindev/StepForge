@@ -27,10 +27,10 @@ export const ApplicationInput = z.object({
   color: HexColor.default('#F97316'),
   category: z.string().max(60).default('web'),
   /**
-   * web: tested in a browser; electron: an Electron desktop app; android: an Android app (through Appium). Desktop
-   * and Android apps are started as configured in each environment.
+   * web: tested in a browser; electron: an Electron desktop app; android / ios: a phone app (through Appium). Desktop
+   * and phone apps are started as configured in each environment.
    */
-  platform: z.enum(['web', 'electron', 'android']).default('web'),
+  platform: z.enum(['web', 'electron', 'android', 'ios']).default('web'),
   tags: z.array(z.string().max(40)).default([]),
 });
 export type ApplicationInput = z.infer<typeof ApplicationInput>;
@@ -75,6 +75,24 @@ export const AndroidLaunchInput = z
     capabilities: z.record(z.string(), z.unknown()).default({}),
   })
   .refine((a) => a.app || a.appPackage, "Set the app file (.apk) or the installed app's package");
+
+/**
+ * How an environment starts an iOS app (macOS with Xcode only): the app (.app for simulators, .ipa for iPhones) or an
+ * installed app's bundle id, on a simulator (by name, e.g. "iPhone 17"; empty = the first iPhone simulator) or an
+ * iPhone (udid). By default the app's data is reset before each test. Text values may use {{env.x}} / {{secret.x}}.
+ */
+export const IosLaunchInput = z
+  .object({
+    app: z.string().max(1000).optional(),
+    bundleId: z.string().max(300).optional(),
+    simulator: z.string().max(200).optional(),
+    platformVersion: z.string().max(20).optional(),
+    udid: z.string().max(200).optional(),
+    resetApp: z.boolean().default(true),
+    showSimulator: z.boolean().default(false),
+    capabilities: z.record(z.string(), z.unknown()).default({}),
+  })
+  .refine((a) => a.app || a.bundleId, "Set the app (.app or .ipa) or the installed app's bundle id");
 
 /** An environment's browser settings (see BrowserSettings); text values may use {{secret.x}} / {{env.x}}. */
 export const BrowserSettingsInput = z.object({
@@ -131,6 +149,7 @@ export const EnvironmentInput = z.object({
       settings: BrowserSettingsInput.optional(),
       electron: ElectronLaunchInput.optional(),
       android: AndroidLaunchInput.optional(),
+      ios: IosLaunchInput.optional(),
     })
     .default({ browser: 'chromium', headless: true }),
 });

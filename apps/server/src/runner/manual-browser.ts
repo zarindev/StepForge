@@ -115,11 +115,11 @@ export class ManualBrowserService {
 
     // A desktop (Electron) app is opened itself, as its environment says; a web app in a browser.
     const platform = repo.getApplication(this.db, run.applicationId).platform;
-    if (platform === 'android')
+    if (platform === 'android' || platform === 'ios')
       throw new repo.RepoError(
         400,
         'invalid',
-        'Opening an Android app with the panel is planned; use the app on your phone or emulator and mark the steps here',
+        `Opening ${platform === 'ios' ? 'an iOS' : 'an Android'} app with the panel is planned; use the app on your phone, emulator or simulator and mark the steps here`,
       );
     const desktop = platform === 'electron';
     const launch = desktop

@@ -80,9 +80,9 @@ locators.
 
 For a web application, manual testing opens a web browser (Chromium) at the run's screen size. For an Electron desktop
 app it starts the app as the environment says, with the same panel in its window; closing the app finishes the
-session ([DESKTOP_APPS.md](DESKTOP_APPS.md)). For an Android app, the tester uses the
-app on the phone or emulator and marks the steps on the run page ([ANDROID_APPS.md](ANDROID_APPS.md)). The panel
-for native apps, iOS and other desktop apps come with the native-app work — see
+session ([DESKTOP_APPS.md](DESKTOP_APPS.md)). For an Android or iOS app, the tester uses
+the app on the phone, emulator or simulator and marks the steps on the run page ([ANDROID_APPS.md](ANDROID_APPS.md),
+[IOS_APPS.md](IOS_APPS.md)). The panel for phone apps and other desktop apps come with the native-app work — see
 [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
 
 ## API

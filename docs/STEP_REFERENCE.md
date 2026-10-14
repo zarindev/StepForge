@@ -2,8 +2,9 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
-In Android apps the `ui.*` steps work as described in [ANDROID_APPS.md](ANDROID_APPS.md#writing-tests); web-page
-steps (hover, tabs, network faking…) are reported as not available there.
+In Android and iOS apps the `ui.*` steps work as described in [ANDROID_APPS.md](ANDROID_APPS.md#writing-tests) and
+[IOS_APPS.md](IOS_APPS.md#writing-tests); web-page steps (hover, tabs, network faking…) are reported as not
+available there.
 
 Every step shares the same shape (see [ARCHITECTURE.md](ARCHITECTURE.md#step-model)):
 `type`, `label`, `params`, `locators`, `assertions`, `enabled`, `continueOnFail`, `timeoutMs`, `retries`, `captureAs`.

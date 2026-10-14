@@ -67,7 +67,7 @@ export function AppFormDialog({
       open={open}
       onClose={onClose}
       title={initial ? 'Edit application' : 'New application'}
-      description="An application under test: a web app, a desktop or Android app, an API or all of them."
+      description="An application under test: a web app, a desktop or phone app, an API or all of them."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -113,7 +113,9 @@ export function AppFormDialog({
               ? 'Each environment says which app to start (its executable or project folder).'
               : v.platform === 'android'
                 ? 'Each environment says which app (.apk) and which emulator or phone; tests run through Appium.'
-                : 'Tests open the app in a browser at the environment’s address.'
+                : v.platform === 'ios'
+                  ? 'Each environment says which app and which simulator or iPhone; needs a Mac with Xcode.'
+                  : 'Tests open the app in a browser at the environment’s address.'
           }
         >
           <Select
@@ -124,6 +126,7 @@ export function AppFormDialog({
             <option value="web">Web app (in a browser)</option>
             <option value="electron">Desktop app (Electron)</option>
             <option value="android">Android app</option>
+            <option value="ios">iOS app (iPhone, iPad)</option>
           </Select>
         </Field>
         <Field label="Description">

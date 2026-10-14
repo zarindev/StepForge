@@ -2,6 +2,16 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — iOS apps
+
+StepForge now tests **iPhone and iPad apps** on the iOS Simulator or a real iPhone, from a Mac with Xcode. Set an
+application's platform to _iOS app_. Each environment then names the app (.app, .ipa or an installed bundle id) and
+the simulator or iPhone. Appium's iOS driver is installed and run by StepForge, as for Android. The steps, locators
+(accessibility ids, labels, placeholders, roles) and evidence (screen recording, system log, element tree) are the
+same. On simulators the recording uses Xcode's own tool, so nothing else is needed. A demo app, CareClinic mobile for
+iOS, is built with Xcode's compiler and has the same planted bug as the Android one.
+→ [iOS apps](IOS_APPS.md)
+
 ## Update — Android apps
 
 StepForge now tests **native Android apps** on an emulator or a USB phone, from Windows, macOS or Linux. Set an

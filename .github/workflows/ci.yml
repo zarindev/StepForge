@@ -199,3 +199,23 @@ jobs:
           disable-animations: true
           # One emulator: the test files take turns.
           script: STEPFORGE_TEST_ANDROID=1 npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts
+
+  ios:
+    # iOS apps: the demo app (demo/ios-app, built with Xcode's compiler) on a simulator, through Appium (XCUITest).
+    # macOS runners come with Xcode and simulators; the first test builds Appium's helper app.
+    name: iOS app on a simulator
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run appium:install
+      - run: npx tsx scripts/build-ios-demo.ts
+      - run: ./stepforge.sh doctor native --platform ios
+      # One simulator: the test files take turns.
+      - run: npx vitest run --no-file-parallelism packages/executors/native/test/ios.test.ts apps/server/test/ios-apps.test.ts
+        env:
+          STEPFORGE_TEST_IOS: '1'

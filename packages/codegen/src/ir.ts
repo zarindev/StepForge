@@ -947,11 +947,12 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean } = {}): Pl
         'This is a desktop (Electron) app: the exported UI tests open a browser at the base URL. Start the app ' +
         "with Playwright's _electron.launch() instead (see docs/DESKTOP_APPS.md).",
     });
-  if (input.application.platform === 'android' && tests.some((t) => t.usesUi))
+  const phone = { android: 'an Android', ios: 'an iOS' }[input.application.platform as 'android' | 'ios'];
+  if (phone && tests.some((t) => t.usesUi))
     warnings.push({
       message:
-        'This is an Android app: the exported UI tests open a browser at the base URL. Exports to Appium are ' +
-        'planned (see docs/ANDROID_APPS.md); API, database and email steps export as usual.',
+        `This is ${phone} app: the exported UI tests open a browser at the base URL. Exports to Appium are ` +
+        'planned (see docs/NATIVE_APPS_PLAN.md); API, database and email steps export as usual.',
     });
   const all = tests.flatMap((t) => t.refs);
   const secrets = [...new Set([...all.filter((r) => r.scope === 'secret').map((r) => r.name)])].sort();

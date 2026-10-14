@@ -102,14 +102,17 @@ describe('Android apps', () => {
   });
 
   it('reports what this computer has for Android testing', async () => {
-    const status = await ok<{ ready: boolean; checks: { name: string; ok: boolean; fix?: string }[] }>(
+    type Checks = { ready: boolean; checks: { name: string; ok: boolean; fix?: string }[] };
+    const status = await ok<{ android: Checks; ios: Checks & { supported: boolean } }>(
       'GET',
       '/api/native/status',
     );
-    expect(status.checks.map((c) => c.name)).toEqual(
+    expect(status.android.checks.map((c) => c.name)).toEqual(
       expect.arrayContaining(['Java 17 or newer', 'Android SDK', 'Appium and the Android driver']),
     );
-    expect(status.checks.every((c) => c.ok || c.fix)).toBe(true);
+    expect(status.android.checks.every((c) => c.ok || c.fix)).toBe(true);
+    expect(status.ios.supported).toBe(process.platform === 'darwin');
+    expect(status.ios.checks.every((c) => c.ok || c.fix)).toBe(true);
   });
 
   it.skipIf(!AVD)(

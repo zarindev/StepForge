@@ -5,12 +5,17 @@ import { Field, Input, Select, Switch, Textarea } from '@/components/ui/input';
 import { toast, toastError } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 
-export type NativeStatus = {
+type PlatformStatus = {
   ready: boolean;
-  installing: boolean;
   checks: { name: string; ok: boolean; detail: string; fix?: string }[];
+};
+export type NativeStatus = {
+  android: PlatformStatus;
+  ios: PlatformStatus & { supported: boolean };
+  installing: boolean;
   avds: string[];
   devices: { serial: string; state: string; model?: string; emulator: boolean }[];
+  simulators: { udid: string; name: string; runtime: string; state: string }[];
 };
 const STATUS_KEY = ['native-status'];
 export const useNativeStatus = (enabled = true) =>
@@ -54,16 +59,7 @@ export function androidToForm(v: unknown): AndroidForm {
 
 /** The launch settings to save; throws a readable message when the extra capabilities are not a JSON object. */
 export function formToAndroid(f: AndroidForm): AndroidLaunch {
-  let capabilities: Record<string, unknown> = {};
-  if (f.capabilities.trim()) {
-    try {
-      capabilities = JSON.parse(f.capabilities) as Record<string, unknown>;
-    } catch {
-      throw new Error('Extra Appium capabilities must be a JSON object');
-    }
-    if (!capabilities || typeof capabilities !== 'object' || Array.isArray(capabilities))
-      throw new Error('Extra Appium capabilities must be a JSON object');
-  }
+  const capabilities = parseCapabilities(f.capabilities);
   const t = (s: string) => s.trim() || undefined;
   return {
     app: t(f.app),
@@ -186,8 +182,172 @@ export function AndroidLaunchFields({
   );
 }
 
-/** What this computer has for Android testing, with how to fix what is missing, and installing Appium. */
-export function AndroidStatusCard() {
+type IosLaunch = {
+  app?: string;
+  bundleId?: string;
+  simulator?: string;
+  platformVersion?: string;
+  udid?: string;
+  resetApp?: boolean;
+  showSimulator?: boolean;
+  capabilities?: Record<string, unknown>;
+};
+export type IosForm = {
+  app: string;
+  bundleId: string;
+  simulator: string;
+  platformVersion: string;
+  udid: string;
+  resetApp: boolean;
+  showSimulator: boolean;
+  capabilities: string;
+};
+
+export function iosToForm(v: unknown): IosForm {
+  const a = (v ?? {}) as IosLaunch;
+  return {
+    app: a.app ?? '',
+    bundleId: a.bundleId ?? '',
+    simulator: a.simulator ?? '',
+    platformVersion: a.platformVersion ?? '',
+    udid: a.udid ?? '',
+    resetApp: a.resetApp ?? true,
+    showSimulator: a.showSimulator ?? false,
+    capabilities:
+      a.capabilities && Object.keys(a.capabilities).length ? JSON.stringify(a.capabilities, null, 2) : '',
+  };
+}
+
+const parseCapabilities = (text: string): Record<string, unknown> => {
+  if (!text.trim()) return {};
+  let caps: unknown;
+  try {
+    caps = JSON.parse(text);
+  } catch {
+    throw new Error('Extra Appium capabilities must be a JSON object');
+  }
+  if (!caps || typeof caps !== 'object' || Array.isArray(caps))
+    throw new Error('Extra Appium capabilities must be a JSON object');
+  return caps as Record<string, unknown>;
+};
+
+export function formToIos(f: IosForm): IosLaunch {
+  const t = (s: string) => s.trim() || undefined;
+  return {
+    app: t(f.app),
+    bundleId: t(f.bundleId),
+    simulator: t(f.simulator),
+    platformVersion: t(f.platformVersion),
+    udid: t(f.udid),
+    resetApp: f.resetApp,
+    showSimulator: f.showSimulator,
+    capabilities: parseCapabilities(f.capabilities),
+  };
+}
+export const iosLaunchSet = (f: IosForm) => !!(f.app.trim() || f.bundleId.trim());
+
+/** How an environment starts an iOS app: the app, the simulator or iPhone, and per-test options. */
+export function IosLaunchFields({ value: f, onChange }: { value: IosForm; onChange: (f: IosForm) => void }) {
+  const status = useNativeStatus();
+  const set = (p: Partial<IosForm>) => onChange({ ...f, ...p });
+  const names = [
+    ...new Set([
+      ...(status.data?.simulators.map((x) => x.name) ?? []),
+      ...(f.simulator ? [f.simulator] : []),
+    ]),
+  ];
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      <p className="text-sm font-medium">Start the iOS app</p>
+      <p className="text-xs text-muted">
+        A simulator build (.app folder, or a .zip of it) or an iPhone build (.ipa) is installed for each test,
+        or name an app already installed. Variables work here: {'{{env.appPath}}'}.
+      </p>
+      <Field label="App (.app or .ipa)">
+        <Input
+          aria-label="App file"
+          value={f.app}
+          className="font-mono text-xs"
+          placeholder="/Users/me/builds/MyApp.app"
+          onChange={(e) => set({ app: e.target.value })}
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="or installed app’s bundle id">
+          <Input
+            aria-label="Bundle id"
+            value={f.bundleId}
+            className="font-mono text-xs"
+            placeholder="com.example.app"
+            onChange={(e) => set({ bundleId: e.target.value })}
+          />
+        </Field>
+        <Field label="iOS version" hint="Optional, e.g. 27.0.">
+          <Input
+            aria-label="iOS version"
+            value={f.platformVersion}
+            className="font-mono text-xs"
+            onChange={(e) => set({ platformVersion: e.target.value })}
+          />
+        </Field>
+        <Field label="Simulator" hint="Empty: the first iPhone simulator.">
+          <Select
+            aria-label="Simulator"
+            value={f.simulator}
+            onChange={(e) => set({ simulator: e.target.value })}
+          >
+            <option value="">— first iPhone simulator —</option>
+            {names.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="or iPhone (device id)" hint="A real iPhone needs the app signed for it.">
+          <Input
+            aria-label="Device id"
+            value={f.udid}
+            className="font-mono text-xs"
+            placeholder="00008110-001A…"
+            onChange={(e) => set({ udid: e.target.value })}
+          />
+        </Field>
+      </div>
+      <div className="flex flex-wrap gap-6 text-sm">
+        <label className="flex items-center gap-2">
+          <Switch
+            checked={f.resetApp}
+            onChange={(resetApp) => set({ resetApp })}
+            label="Reset the app before each test"
+          />
+          Reset the app’s data before each test
+        </label>
+        <label className="flex items-center gap-2">
+          <Switch
+            checked={f.showSimulator}
+            onChange={(showSimulator) => set({ showSimulator })}
+            label="Show the simulator window"
+          />
+          Show the simulator window
+        </label>
+      </div>
+      <Field label="Extra Appium capabilities" hint='Optional JSON, e.g. { "appium:language": "fr" }.'>
+        <Textarea
+          aria-label="Extra Appium capabilities"
+          value={f.capabilities}
+          rows={2}
+          className="font-mono text-xs"
+          onChange={(e) => set({ capabilities: e.target.value })}
+        />
+      </Field>
+      {!iosLaunchSet(f) && <p className="text-xs text-fail">Set the app or the installed app’s bundle id.</p>}
+    </div>
+  );
+}
+
+/** What this computer has for testing Android or iOS apps, with how to fix what is missing, and installing Appium. */
+export function NativeStatusCard({ platform }: { platform: 'android' | 'ios' }) {
   const status = useNativeStatus();
   const qc = useQueryClient();
   const install = useMutation({
@@ -199,14 +359,16 @@ export function AndroidStatusCard() {
     onError: toastError,
   });
   if (!status.data) return null;
-  const appiumMissing = status.data.checks.some((c) => c.name.startsWith('Appium') && !c.ok);
+  const p = status.data[platform];
+  const name = platform === 'ios' ? 'iOS' : 'Android';
+  const appiumMissing = p.checks.some((c) => c.name.startsWith('Appium') && !c.ok);
   return (
-    <section aria-label="Android on this computer" className="rounded-lg border border-border p-4">
+    <section aria-label={`${name} on this computer`} className="rounded-lg border border-border p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          Android on this computer{' '}
-          <span className={status.data.ready ? 'text-pass' : 'text-warn'}>
-            {status.data.ready ? '— ready' : '— needs setting up'}
+          {name} on this computer{' '}
+          <span className={p.ready ? 'text-pass' : 'text-warn'}>
+            {p.ready ? '— ready' : '— needs setting up'}
           </span>
         </p>
         {appiumMissing && (
@@ -216,7 +378,7 @@ export function AndroidStatusCard() {
         )}
       </div>
       <ul className="space-y-1 text-xs">
-        {status.data.checks.map((c) => (
+        {p.checks.map((c) => (
           <li key={c.name} className="flex items-start gap-2">
             {c.ok ? (
               <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pass" />

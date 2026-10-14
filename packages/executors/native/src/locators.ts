@@ -90,3 +90,71 @@ export function androidQueries(l: Locator): Query[] {
       throw new StepError('invalid_params', `The locator "${l.strategy}" is not available for Android apps`);
   }
 }
+
+/** A string literal for an iOS predicate (NSPredicate): double quotes, with \ and " escaped. */
+export function predicateLiteral(s: string): string {
+  return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+const pred = (value: string): Query => ({ using: '-ios predicate string', value });
+
+/** XCUITest element types for the web's ARIA roles, so `role=button "Sign in"` works on an iPhone too. */
+const IOS_ROLE_TYPES: Record<string, string[]> = {
+  button: ['XCUIElementTypeButton'],
+  textbox: ['XCUIElementTypeTextField', 'XCUIElementTypeSecureTextField', 'XCUIElementTypeTextView'],
+  searchbox: ['XCUIElementTypeSearchField'],
+  checkbox: ['XCUIElementTypeSwitch', 'XCUIElementTypeToggle'],
+  switch: ['XCUIElementTypeSwitch', 'XCUIElementTypeToggle'],
+  radio: ['XCUIElementTypeButton'],
+  combobox: ['XCUIElementTypePickerWheel', 'XCUIElementTypePopUpButton'],
+  img: ['XCUIElementTypeImage'],
+  image: ['XCUIElementTypeImage'],
+  link: ['XCUIElementTypeLink'],
+  text: ['XCUIElementTypeStaticText'],
+  heading: ['XCUIElementTypeStaticText', 'XCUIElementTypeNavigationBar'],
+  list: ['XCUIElementTypeTable', 'XCUIElementTypeCollectionView'],
+  progressbar: ['XCUIElementTypeProgressIndicator', 'XCUIElementTypeActivityIndicator'],
+  slider: ['XCUIElementTypeSlider'],
+  tab: ['XCUIElementTypeTab', 'XCUIElementTypeTabBar'],
+};
+
+/**
+ * The Appium queries for one StepForge locator on iOS, best first:
+ * test id → accessibility identifier; label → accessibility identifier, then label; placeholder → placeholder
+ * value; text → label or value, exact then contained; role → element type (+ label, name or placeholder);
+ * XPath as is. CSS is for web pages only.
+ */
+export function iosQueries(l: Locator): Query[] {
+  const v = predicateLiteral(l.value);
+  switch (l.strategy) {
+    case 'testId':
+      return [{ using: 'accessibility id', value: l.value }];
+    case 'label':
+      return [{ using: 'accessibility id', value: l.value }, pred(`label == ${v}`)];
+    case 'placeholder':
+      return [pred(`placeholderValue == ${v}`)];
+    case 'text':
+      return [pred(`label == ${v} OR value == ${v}`), pred(`label CONTAINS ${v} OR value CONTAINS ${v}`)];
+    case 'role': {
+      const types = IOS_ROLE_TYPES[l.value.toLowerCase()];
+      if (!types)
+        throw new StepError(
+          'invalid_params',
+          `The role "${l.value}" has no iOS equivalent; use a test id, text or XPath (roles: ${Object.keys(IOS_ROLE_TYPES).join(', ')})`,
+        );
+      const typeIn = `type IN {${types.map(predicateLiteral).join(', ')}}`;
+      if (!l.name) return [pred(typeIn)];
+      const n = predicateLiteral(l.name);
+      return [pred(`${typeIn} AND (label == ${n} OR name == ${n} OR placeholderValue == ${n})`)];
+    }
+    case 'xpath':
+      return [{ using: 'xpath', value: l.value }];
+    case 'css':
+      throw new StepError(
+        'invalid_params',
+        'CSS locators work on web pages; in an iOS app use a test id (accessibility identifier), text, a role or XPath',
+      );
+    default:
+      throw new StepError('invalid_params', `The locator "${l.strategy}" is not available for iOS apps`);
+  }
+}

@@ -64,8 +64,9 @@ export function RunDialogHost() {
 
 function RunDialog({ req }: { req: Request }) {
   const envs = useEnvironments(req.applicationId);
-  // Android apps are not opened with the panel yet: the tester uses the phone or emulator and marks steps here.
-  const android = useApplications().data?.find((a) => a.id === req.applicationId)?.platform === 'android';
+  // Phone apps are not opened with the panel yet: the tester uses the phone, emulator or simulator and marks steps here.
+  const platform = useApplications().data?.find((a) => a.id === req.applicationId)?.platform;
+  const phone = platform === 'android' || platform === 'ios';
   const tree = useTree(req.scope ? null : req.applicationId);
   const tags = useTags(req.scope ? null : req.applicationId);
   const [envId, setEnvId] = useState('');
@@ -115,7 +116,7 @@ function RunDialog({ req }: { req: Request }) {
       close();
       navigate({ to: '/runs/$runId', params: { runId: run.id } });
       // A manual run opens the tester's browser on the first test right away.
-      if (mode === 'manual' && openBrowser && !android) {
+      if (mode === 'manual' && openBrowser && !phone) {
         try {
           const detail = await api<{ items: { id: string }[] }>(`/api/runs/${run.id}`);
           const first = detail.items[0];
@@ -162,12 +163,12 @@ function RunDialog({ req }: { req: Request }) {
             <option value="manual">Manual — a person follows the steps and records results</option>
           </Select>
         </Field>
-        {mode === 'manual' && android && (
+        {mode === 'manual' && phone && (
           <p className="text-xs text-muted">
-            Use the app on your phone or emulator and mark each step on the run page.
+            Use the app on your phone, emulator or simulator and mark each step on the run page.
           </p>
         )}
-        {mode === 'manual' && !android && (
+        {mode === 'manual' && !phone && (
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={openBrowser} onChange={setOpenBrowser} label="Open the browser now" /> Open the
             browser now, with the steps beside the app

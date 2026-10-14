@@ -120,11 +120,11 @@ export class RecorderManager {
       env.baseUrl.endsWith('/') ? env.baseUrl : `${env.baseUrl}/`,
     ).toString();
     const platform = repo.getApplication(this.db, d.applicationId).platform;
-    if (platform === 'android')
+    if (platform === 'android' || platform === 'ios')
       throw new repo.RepoError(
         400,
         'invalid',
-        'Recording Android apps comes with the native recorder (planned); add the steps in the editor for now',
+        `Recording ${platform === 'ios' ? 'iOS' : 'Android'} apps comes with the native recorder (planned); add the steps in the editor for now`,
       );
     // A desktop (Electron) app is recorded in its own windows, started as its environment says.
     const desktop = platform === 'electron';

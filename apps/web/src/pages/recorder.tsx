@@ -170,10 +170,10 @@ function StartPanel() {
                 ))}
               </Select>
             </Field>
-            {app?.platform === 'android' ? (
+            {app?.platform === 'android' || app?.platform === 'ios' ? (
               <p className="self-end pb-2 text-sm text-muted">
-                Recording Android apps comes with the native recorder (planned). Add the steps in the editor
-                for now.
+                Recording {app.platform === 'ios' ? 'iOS' : 'Android'} apps comes with the native recorder
+                (planned). Add the steps in the editor for now.
               </p>
             ) : app?.platform === 'electron' ? (
               <p className="self-end pb-2 text-sm text-muted">
@@ -202,7 +202,7 @@ function StartPanel() {
           )}
           <Button
             data-tour="recorder-button"
-            disabled={!envId || start.isPending || app?.platform === 'android'}
+            disabled={!envId || start.isPending || app?.platform === 'android' || app?.platform === 'ios'}
             onClick={() => start.mutate()}
           >
             <Circle className="h-3.5 w-3.5 fill-current text-fail" />{' '}

@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- **iOS apps**: a new platform, _iOS app_ (macOS with Xcode). An iOS app's environment names the app (.app or .zip
+  for simulators, .ipa for iPhones, or an installed bundle id), the simulator (by name; empty = the first iPhone
+  simulator) or iPhone, the iOS version, resetting the app, showing the simulator, and extra Appium capabilities.
+  The native executor now serves Android and iOS through one session with a per-platform adapter (locators: accessibility
+  identifier, label, placeholder value, label/value text, XCUIElementType roles via iOS predicates, XPath). On a Mac,
+  `appium:install` also installs the XCUITest driver 12.18.1. Simulator screens are recorded with
+  `xcrun simctl io recordVideo`; the system log is the console. `stepforge doctor native [--platform android|ios]`
+  and `/api/native/status` report Android and iOS separately (Xcode, command-line tools, simulators). Demo app
+  CareClinic mobile for iOS in `demo/ios-app` (Swift/UIKit, built by `scripts/build-ios-demo.ts` without an Xcode
+  project). New CI job on a macOS runner. See [docs/IOS_APPS.md](docs/IOS_APPS.md).
 - **Android apps**: a new platform, _Android app_ (no migration needed). An Android app's environment names the app
   (an .apk, or an installed package and activity), the emulator (started when needed) or phone, whether to reset
   the app's data before each test (on by default), whether to show the emulator window, and extra Appium

@@ -8,6 +8,18 @@ import { androidEnv } from './android.ts';
 /** Pinned versions, installed into StepForge's data folder (never globally). Both Apache-2.0. */
 export const APPIUM_VERSION = '3.8.0';
 export const UIAUTOMATOR2_VERSION = '8.7.0';
+/** The iOS driver (Apache-2.0); installed on macOS only, since iOS testing needs Xcode. */
+export const XCUITEST_VERSION = '12.18.1';
+
+/** The drivers this computer can use: Android everywhere, iOS on a Mac. */
+export function wantedDrivers(): { name: 'uiautomator2' | 'xcuitest'; version: string; label: string }[] {
+  return [
+    { name: 'uiautomator2', version: UIAUTOMATOR2_VERSION, label: 'the Android driver (UiAutomator2)' },
+    ...(process.platform === 'darwin'
+      ? [{ name: 'xcuitest' as const, version: XCUITEST_VERSION, label: 'the iOS driver (XCUITest)' }]
+      : []),
+  ];
+}
 
 /** A Node.js for Appium when StepForge's own is outside Appium's range (an LTS, MIT licence, from nodejs.org). */
 export const APPIUM_NODE_VERSION = '22.23.3';
@@ -107,12 +119,11 @@ export function installedDrivers(toolsDir: string): Record<string, string> {
   return out;
 }
 
-export function appiumInstalled(toolsDir: string): boolean {
-  return (
-    existsSync(appiumPaths(toolsDir).main) &&
-    !!installedDrivers(toolsDir).uiautomator2 &&
-    !!appiumNode(toolsDir)
-  );
+/** Appium, a Node.js to run it, and the driver (default: every driver this computer can use). */
+export function appiumInstalled(toolsDir: string, driver?: string): boolean {
+  if (!existsSync(appiumPaths(toolsDir).main) || !appiumNode(toolsDir)) return false;
+  const drivers = installedDrivers(toolsDir);
+  return driver ? !!drivers[driver] : wantedDrivers().every((d) => !!drivers[d.name]);
 }
 
 function exec(
@@ -163,11 +174,12 @@ export async function installAppium(toolsDir: string, log: (m: string) => void =
       log,
     );
   }
-  if (!installedDrivers(toolsDir).uiautomator2) {
-    log(`Installing the Android driver (UiAutomator2 ${UIAUTOMATOR2_VERSION})…`);
+  for (const d of wantedDrivers()) {
+    if (installedDrivers(toolsDir)[d.name]) continue;
+    log(`Installing ${d.label} ${d.version}…`);
     await exec(
       node,
-      [main, 'driver', 'install', `uiautomator2@${UIAUTOMATOR2_VERSION}`],
+      [main, 'driver', 'install', `${d.name}@${d.version}`],
       { cwd: root, env: { ...process.env, APPIUM_HOME: home } },
       log,
     );
@@ -194,8 +206,13 @@ export class AppiumServer {
 
   constructor(private readonly toolsDir: string) {}
 
+  /** Appium itself (and a Node.js for it); each test checks its platform's driver. */
   get installed(): boolean {
-    return appiumInstalled(this.toolsDir);
+    return existsSync(appiumPaths(this.toolsDir).main) && !!appiumNode(this.toolsDir);
+  }
+
+  hasDriver(name: string): boolean {
+    return appiumInstalled(this.toolsDir, name);
   }
 
   /** The server's URL, starting it if needed. */
