@@ -91,7 +91,8 @@ describe.skipIf(!SIM)('iOS app on a simulator (CareClinic mobile)', () => {
       executors: [createNativeExecutor({ appiumUrl: () => appium.url() }), utilExecutor],
       options: {
         ...DEFAULT_RUN_OPTIONS,
-        defaultTimeoutMs: 10_000,
+        // As in real runs of phone apps (see the runner).
+        defaultTimeoutMs: 30_000,
         video: 'off',
         trace: 'off',
         screenshots: 'off',

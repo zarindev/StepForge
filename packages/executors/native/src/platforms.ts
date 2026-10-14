@@ -330,6 +330,11 @@ export function iosCapabilities(launch: IosLaunch): Record<string, unknown> {
     'appium:wdaConnectionTimeout': 600_000,
     'appium:simulatorStartupTimeout': 300_000,
     'appium:shouldTerminateApp': true,
+    // XCUITest waits for the app to be idle before every action, by default up to 10 s: on a slow machine with
+    // animations that made every step take seconds. A short wait still lets a scroll settle before the next tap.
+    'appium:waitForIdleTimeout': 1,
+    'appium:animationCoolOffTimeout': 0,
+    'appium:reduceMotion': true,
   };
   if (launch.app) {
     caps['appium:app'] = appFile(launch.app);
