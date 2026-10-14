@@ -22,6 +22,26 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | N1 | Native apps, step 1: Electron desktop apps | ✅ Done |
 | N2 | Native apps, step 2: native foundation and Android apps | ✅ Done |
 | N3 | Native apps, step 3: iOS apps | ✅ Done |
+| N4 | Native apps, step 4: gestures, phone recorder, phone diagnosis, device campaigns | ✅ Done |
+
+---
+
+## N4 — Gestures, recorder, diagnosis and device campaigns for phone apps (2026-10-14)
+
+**Delivered**
+- Steps `ui.swipe`, `ui.longPress`, `ui.scrollTo`, `ui.back`, `ui.hideKeyboard`, `ui.rotate`, `ui.appState`,
+  `ui.deepLink`, `ui.setLocation`, `ui.permission`, `ui.pushNotification` on Android and iOS (per-platform adapter),
+  `ui.handleDialog` for phone dialogs, `ui.back` in browsers; editor fields, plain-English text, export TODOs.
+- Phone recorder: the screen in the dashboard, taps / long presses / typing / swipes / back / hide keyboard /
+  checks, ranked locators from the element tree checked against the app, passwords as secrets; review and save as
+  for the browser recorder.
+- Diagnosis facts from the device (crash, app state, dialog, keyboard, off-screen) and six rules in `native.yaml`.
+- Campaigns run desktop and phone apps once per environment.
+- The given app file is installed for every resetting test (a same-version rebuild was silently not installed).
+
+**Tests**: gesture and device steps on the Android emulator and the iOS simulator (the same scenario on both),
+recording through the API on both platforms (and replaying the saved scenario), recording through the dashboard on
+iOS (E2E), element-tree parsing and locator ranking, the diagnosis rules, device campaigns.
 
 ---
 

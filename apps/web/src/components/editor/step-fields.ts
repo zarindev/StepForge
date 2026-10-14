@@ -237,6 +237,58 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
       showWhen: { key: 'action', equals: ['fastForward'] },
     },
   ],
+  'ui.swipe': [
+    {
+      key: 'direction',
+      label: 'Direction',
+      kind: 'select',
+      options: ['up', 'down', 'left', 'right'],
+      hint: 'With an element: swipe on it. Without: on the screen',
+    },
+    { key: 'percent', label: 'Distance (0–1)', kind: 'number', hint: 'Default 0.75 of the area' },
+  ],
+  'ui.longPress': [{ key: 'durationMs', label: 'Hold (ms)', kind: 'number', hint: 'Default 1000' }],
+  'ui.scrollTo': [
+    { key: 'direction', label: 'Direction', kind: 'select', options: ['down', 'up'] },
+    { key: 'maxSwipes', label: 'At most (swipes)', kind: 'number', hint: 'Default 10' },
+  ],
+  'ui.rotate': [
+    { key: 'orientation', label: 'Orientation', kind: 'select', options: ['landscape', 'portrait'] },
+  ],
+  'ui.appState': [
+    {
+      key: 'action',
+      label: 'App',
+      kind: 'select',
+      options: ['launch', 'close', 'background', 'reset'],
+      hint: 'background: the app comes back after the seconds below',
+    },
+    {
+      key: 'seconds',
+      label: 'Seconds in the background',
+      kind: 'number',
+      showWhen: { key: 'action', equals: ['background'] },
+    },
+  ],
+  'ui.deepLink': [{ key: 'url', label: 'Link', kind: 'text', placeholder: 'myapp://orders/42', wide: true }],
+  'ui.setLocation': [
+    { key: 'latitude', label: 'Latitude', kind: 'number' },
+    { key: 'longitude', label: 'Longitude', kind: 'number' },
+  ],
+  'ui.permission': [
+    {
+      key: 'permission',
+      label: 'Permission',
+      kind: 'text',
+      placeholder: 'camera',
+      hint: 'camera, location, microphone, contacts, photos, notifications, calendar — or a platform name',
+    },
+    { key: 'action', label: 'Action', kind: 'select', options: ['grant', 'revoke'] },
+  ],
+  'ui.pushNotification': [
+    { key: 'title', label: 'Title', kind: 'text' },
+    { key: 'body', label: 'Text', kind: 'text', wide: true },
+  ],
   'ui.networkSummary': [
     {
       key: 'since',
@@ -272,6 +324,13 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
   'ui.handleDialog': [
     { key: 'action', label: 'Action', kind: 'select', options: ['accept', 'dismiss'] },
     { key: 'promptText', label: 'Prompt text', kind: 'text' },
+    {
+      key: 'buttonLabel',
+      label: 'Button (phone apps)',
+      kind: 'text',
+      placeholder: 'Allow',
+      hint: 'Phone apps: answers the dialog on screen; name a button when there are more than two',
+    },
   ],
   'ui.switchFrame': [
     { key: 'selector', label: 'Frame selector', kind: 'text', placeholder: '#payment-iframe' },

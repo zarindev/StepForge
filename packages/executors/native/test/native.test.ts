@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gestureSteps } from './gestures.ts';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   androidCapabilities,
@@ -51,6 +52,7 @@ describe('Android locators and launch settings', () => {
       'appium:avd': 'Pixel',
       'appium:avdArgs': '-no-window -no-audio -no-boot-anim',
       'appium:noReset': false,
+      'appium:enforceAppInstall': true,
       'appium:language': 'fr',
     });
     expect(androidCapabilities({ appPackage: 'com.x', udid: 'R58N', resetApp: false })).toMatchObject({
@@ -224,4 +226,10 @@ describe.skipIf(!AVD)('Android app on an emulator (CareClinic mobile)', () => {
     expect(r.errorKind).toBe('element_not_found');
     expect(r.error).toContain('testId=nope');
   }, 300_000);
+
+  it('gestures and device steps: scroll to, swipe, long press, rotate, location, permission, background, back, deep link, close and launch', async () => {
+    const r = await run(steps(...gestureSteps('android')), { screenshots: 'onFailure' });
+    expect(r.error ?? null).toBeNull();
+    expect(r.status).toBe('passed');
+  }, 600_000);
 });

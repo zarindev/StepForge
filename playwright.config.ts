@@ -49,6 +49,8 @@ export default defineConfig({
         STEPFORGE_RECORDER_CDP_PORT: '9333',
         // Mailpit installed by `npm run mailpit:install`, on ports that do not clash with a dev instance.
         STEPFORGE_BIN_DIR: 'data/bin',
+        // Appium installed by `npm run appium:install` (phone-app specs run on a device only when asked).
+        STEPFORGE_TOOLS_DIR: 'data/tools',
         STEPFORGE_MAILPIT_PORT: '8196',
         STEPFORGE_MAILPIT_SMTP_PORT: '1196',
       },

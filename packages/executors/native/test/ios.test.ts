@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gestureSteps } from './gestures.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildIosDemo, IOS_DEMO_APP } from '../../../../scripts/build-ios-demo.ts';
 import {
@@ -209,4 +210,19 @@ describe.skipIf(!SIM)('iOS app on a simulator (CareClinic mobile)', () => {
     const tree = r.artifacts.find((a) => a.kind === 'dom');
     expect(readFileSync(tree!.path, 'utf8')).toContain('patient_count');
   }, 600_000);
+
+  it('gestures and device steps: scroll to, swipe, long press, rotate, location, permission, background, back, deep link, close and launch', async () => {
+    const r = await run(steps(...gestureSteps('ios')), { screenshots: 'onFailure' });
+    if (r.status !== 'passed')
+      console.log(
+        JSON.stringify(
+          r.steps
+            .filter((x) => x.status !== 'passed')
+            .map((x) => [x.type, x.label, x.message])
+            .slice(0, 2),
+        ),
+      );
+    expect(r.error ?? null).toBeNull();
+    expect(r.status).toBe('passed');
+  }, 900_000);
 });

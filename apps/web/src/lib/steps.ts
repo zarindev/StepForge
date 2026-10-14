@@ -41,6 +41,16 @@ export function defaultParams(type: string): Record<string, unknown> {
       return { value: '' };
     case 'ui.press':
       return { key: 'Enter' };
+    case 'ui.swipe':
+      return { direction: 'up' };
+    case 'ui.appState':
+      return { action: 'launch' };
+    case 'ui.rotate':
+      return { orientation: 'landscape' };
+    case 'ui.permission':
+      return { permission: 'camera', action: 'grant' };
+    case 'ui.deepLink':
+      return { url: '' };
     case 'api.request':
       return { method: 'GET', url: '{{env.baseUrl}}/api/', headers: {} };
     case 'db.query':

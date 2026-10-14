@@ -11,7 +11,7 @@ import {
 } from '@stepforge/core';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { androidPlatform, iosPlatform, type NativePlatform } from './platforms.ts';
+import { androidPlatform, iosPlatform, type Direction, type NativePlatform } from './platforms.ts';
 import { WebDriverError, WebDriverSession, type ElementRef } from './webdriver.ts';
 
 const pad = (n: number) => String(n).padStart(3, '0');
@@ -26,6 +26,8 @@ export class NativeSession implements ExecutorSession {
   private readonly platform: NativePlatform;
   private stopRecording: (() => Promise<Buffer | null>) | null = null;
   private failureArtifacts: ArtifactRef[] = [];
+  /** Device log lines read so far (reading drains Appium's buffer). */
+  private deviceLog: { timestamp: number; level: string; message: string }[] = [];
 
   constructor(
     private readonly ctx: TestContext,
@@ -313,6 +315,137 @@ export class NativeSession implements ExecutorSession {
         case 'assert':
           outcome = await this.assert(step, ctx, p, (f) => (found = f));
           break;
+        case 'swipe': {
+          const target = Array.isArray(p.target) ? (p.target as Locator[]) : [];
+          if (target.length) {
+            // From the step's element onto the target element.
+            await needs();
+            const to = await this.find(target, timeout, ctx.signal);
+            await this.platform.drag(this.driver, found!.el, to.el);
+            break;
+          }
+          const direction = String(p.direction ?? 'up') as Direction;
+          if (!['up', 'down', 'left', 'right'].includes(direction))
+            throw new StepError('invalid_params', `Swipe up, down, left or right (not "${direction}")`);
+          if (step.locators.length) await needs();
+          await this.platform.swipe(this.driver, direction, Number(p.percent ?? 0.75), found?.el);
+          outcome = { message: `Swiped ${direction}` };
+          break;
+        }
+        case 'longPress':
+          await needs();
+          await this.platform.longPress(this.driver, found!.el, Number(p.durationMs ?? 1000));
+          break;
+        case 'scrollTo': {
+          const direction = p.direction === 'up' ? 'up' : 'down';
+          const max = Number(p.maxSwipes ?? 10);
+          // Look, swipe, look again, until the element shows or the screen stops moving.
+          let ended = false;
+          for (let i = 0; ; i++) {
+            try {
+              found = await this.find(step.locators, 500, ctx.signal);
+              if (await this.driver.displayed(found.el)) break;
+            } catch (err) {
+              if ((err as StepError).kind !== 'element_not_found') throw err;
+            }
+            if (i >= max || ended)
+              throw new StepError(
+                'element_not_found',
+                `Scrolled ${direction} ${i} time(s) and the element did not show. Tried: ${step.locators.map(describe).join(' | ')}`,
+                { tried: step.locators },
+              );
+            // The end is reached when a swipe no longer changes the screen.
+            const before = await this.driver.source().catch(() => '');
+            await this.scroll(direction);
+            ended = before !== '' && (await this.driver.source().catch(() => '')) === before;
+          }
+          outcome = { message: 'Scrolled to the element' };
+          break;
+        }
+        case 'back':
+          await this.driver.back();
+          break;
+        case 'hideKeyboard':
+          await this.platform.hideKeyboard(this.driver);
+          break;
+        case 'rotate': {
+          const orientation = p.orientation === 'portrait' ? 'PORTRAIT' : 'LANDSCAPE';
+          await this.driver.setOrientation(orientation);
+          outcome = { message: `Turned to ${orientation.toLowerCase()}` };
+          break;
+        }
+        case 'appState': {
+          const action = String(p.action ?? 'launch');
+          if (!['launch', 'close', 'background', 'reset'].includes(action))
+            throw new StepError(
+              'invalid_params',
+              `The app action is launch, close, background or reset (not "${action}")`,
+            );
+          await this.platform.appState(
+            this.driver,
+            action as 'launch',
+            p.seconds === undefined || p.seconds === '' ? undefined : Number(p.seconds),
+          );
+          outcome = { message: `App: ${action}` };
+          break;
+        }
+        case 'deepLink': {
+          const url = String(p.url ?? '');
+          if (!/^[a-z][a-z0-9+.-]*:/i.test(url))
+            throw new StepError(
+              'invalid_params',
+              `A deep link needs a scheme, e.g. myapp://orders/42 (got "${url}")`,
+            );
+          await this.platform.deepLink(this.driver, url);
+          outcome = { message: `Opened ${url}` };
+          break;
+        }
+        case 'setLocation': {
+          const lat = Number(p.latitude);
+          const lon = Number(p.longitude);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180)
+            throw new StepError('invalid_params', 'Set a latitude (−90…90) and a longitude (−180…180)');
+          await this.platform.setLocation(this.driver, lat, lon);
+          outcome = { message: `Location set to ${lat}, ${lon}` };
+          break;
+        }
+        case 'permission': {
+          const permission = String(p.permission ?? '').trim();
+          if (!permission)
+            throw new StepError('invalid_params', 'Name the permission, e.g. camera or location');
+          await this.platform.permission(this.driver, permission, p.action !== 'revoke');
+          outcome = { message: `${p.action === 'revoke' ? 'Revoked' : 'Granted'} ${permission}` };
+          break;
+        }
+        case 'handleDialog': {
+          // The dialog on screen now (an app alert or a system permission dialog), waiting for it to appear.
+          const accept = p.action !== 'dismiss';
+          const label = p.buttonLabel ? String(p.buttonLabel) : undefined;
+          const deadline = Date.now() + timeout;
+          for (;;) {
+            try {
+              await this.platform.dialog(this.driver, accept, label);
+              break;
+            } catch (err) {
+              const e = err as Error;
+              const none =
+                (err as WebDriverError).error === 'no such alert' ||
+                /no such alert|no alert|not.*(present|open|shown)|cannot be found/i.test(e.message);
+              if (!none) throw err;
+              if (Date.now() >= deadline)
+                throw new StepError('timeout', `No dialog appeared within ${timeout} ms`);
+              await sleep(250);
+            }
+          }
+          outcome = {
+            message: `${accept ? 'Accepted' : 'Dismissed'} the dialog${label ? ` (${label})` : ''}`,
+          };
+          break;
+        }
+        case 'pushNotification':
+          await this.platform.pushNotification(this.driver, String(p.title ?? ''), String(p.body ?? ''));
+          outcome = { message: 'Notification sent' };
+          break;
         default:
           throw new StepError(
             'unsupported',
@@ -428,12 +561,46 @@ export class NativeSession implements ExecutorSession {
     } catch {
       // the app may have gone
     }
+    // What a phone app's failure is often about: a crash, the app gone, a dialog or the keyboard in the way, or the
+    // element below the visible screen.
+    const native: Record<string, unknown> = { platform: this.platform.name };
+    await this.readDeviceLog();
+    const crash = this.deviceLog.find((l) => this.platform.log.crash.test(l.message));
+    if (crash) native.crash = crash.message.slice(0, 300);
+    const state = await this.platform.queryAppState(this.driver).catch(() => undefined);
+    if (state !== undefined) native.appState = state;
+    const alert = await this.driver.alertText();
+    if (alert) native.alert = alert.replace(/\s+/g, ' ').slice(0, 200);
+    native.keyboard = (await this.driver.execute('mobile: isKeyboardShown').catch(() => false)) === true;
+    let matchCount: number | undefined;
+    let visible: boolean | undefined;
     if (step.locators.length) {
-      let matchCount = 0;
+      matchCount = 0;
       for (const l of step.locators) matchCount += await this.count(l).catch(() => 0);
-      out.diagnostics = { matchCount, candidates: [] } as StepOutcome['diagnostics'];
+      if (matchCount > 0) {
+        try {
+          const f = await this.find(step.locators, 0);
+          visible = await this.driver.displayed(f.el);
+          const [r, screen] = await Promise.all([this.driver.rect(f.el), this.driver.windowSize()]);
+          if (r.y >= screen.height || r.y + r.height <= 0) native.offScreen = true;
+        } catch {
+          // gone again
+        }
+      }
     }
+    out.diagnostics = {
+      ...(matchCount !== undefined && { matchCount }),
+      ...(visible !== undefined && { visible }),
+      candidates: [],
+      native,
+    } as StepOutcome['diagnostics'];
     return out;
+  }
+
+  private async readDeviceLog(): Promise<void> {
+    const lines = await this.driver.logs(this.platform.log.type).catch(() => []);
+    this.deviceLog.push(...lines);
+    if (this.deviceLog.length > 5000) this.deviceLog.splice(0, this.deviceLog.length - 5000);
   }
 
   async close({ failed }: { failed: boolean }): Promise<ArtifactRef[]> {
@@ -452,8 +619,8 @@ export class NativeSession implements ExecutorSession {
     if (o.captureLogs) {
       // The device log (logcat, or the iOS system log) is the app's console; a crash is reported as an error.
       const { type, crash } = this.platform.log;
-      const lines = await this.driver.logs(type).catch(() => []);
-      const log = lines.slice(-2000).map((l) => ({
+      await this.readDeviceLog();
+      const log = this.deviceLog.slice(-2000).map((l) => ({
         type: crash.test(l.message) ? 'error' : type,
         text: l.message,
         at: l.timestamp,

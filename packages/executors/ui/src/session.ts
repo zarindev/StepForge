@@ -72,6 +72,20 @@ function mapError(err: unknown): never {
   throw new StepError('unknown', msg);
 }
 
+/** Steps for phone apps only (the native executor runs them). */
+const PHONE_ONLY = new Set([
+  'swipe',
+  'longPress',
+  'scrollTo',
+  'hideKeyboard',
+  'rotate',
+  'appState',
+  'deepLink',
+  'setLocation',
+  'permission',
+  'pushNotification',
+]);
+
 export class UiSession implements ExecutorSession {
   private pages: Page[] = [];
   private page!: Page;
@@ -481,6 +495,10 @@ export class UiSession implements ExecutorSession {
             await this.page.waitForLoadState((p.loadState as 'load') ?? 'load', { timeout });
           }
           break;
+        case 'back':
+          // The browser's Back button.
+          await this.page.goBack({ timeout });
+          break;
         case 'screenshot': {
           const path = join(this.ctx.artifactsDir, `shot-${pad(step.position)}.png`);
           if (step.locators.length) {
@@ -647,6 +665,11 @@ export class UiSession implements ExecutorSession {
           break;
         }
         default:
+          if (PHONE_ONLY.has(name))
+            throw new StepError(
+              'unsupported',
+              `"${step.type}" is for Android and iOS apps; in a browser use clicks, scrolling and navigation`,
+            );
           throw new StepError('unsupported', `Unknown UI step "${step.type}"`);
       }
     } catch (err) {

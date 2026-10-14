@@ -1,4 +1,18 @@
-import { newId, VariableResolver, type ElectronLaunch, type StepInput } from '@stepforge/core';
+import {
+  newId,
+  StepError,
+  VariableResolver,
+  type AndroidLaunch,
+  type ElectronLaunch,
+  type IosLaunch,
+  type StepInput,
+} from '@stepforge/core';
+import {
+  androidPlatform,
+  iosPlatform,
+  NativeRecordingSession,
+  type AppiumServer,
+} from '@stepforge/executor-native';
 import type { StepForgeDb } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
 import { networkToApiSteps, RecordingSession, type RecorderSnapshot } from '@stepforge/recorder';
@@ -42,7 +56,8 @@ type Active = {
   environmentId: string;
   baseUrl: string;
   target: RecordingTarget | null;
-  session: RecordingSession;
+  /** A browser or desktop app (Playwright), or a phone app (Appium). */
+  session: RecordingSession | NativeRecordingSession;
 };
 
 /** One recording at a time; the dashboard follows it live over the WebSocket. */
@@ -58,6 +73,9 @@ export class RecorderManager {
         secrets: Record<string, string>;
       })
     | null = null;
+
+  /** The local Appium server, for recording phone apps (set by the server). */
+  appium?: AppiumServer;
 
   constructor(
     private readonly db: StepForgeDb,
@@ -120,12 +138,54 @@ export class RecorderManager {
       env.baseUrl.endsWith('/') ? env.baseUrl : `${env.baseUrl}/`,
     ).toString();
     const platform = repo.getApplication(this.db, d.applicationId).platform;
-    if (platform === 'android' || platform === 'ios')
-      throw new repo.RepoError(
-        400,
-        'invalid',
-        `Recording ${platform === 'ios' ? 'iOS' : 'Android'} apps comes with the native recorder (planned); add the steps in the editor for now`,
-      );
+    const resolver = () =>
+      new VariableResolver({
+        env: { ...env.variablesJson, baseUrl: env.baseUrl, name: env.name },
+        secret: repo.resolveSecrets(this.db, this.masterKey, env.id),
+      });
+    if (platform === 'android' || platform === 'ios') {
+      // A phone app: started through Appium; the dashboard shows its screen and sends the taps.
+      if (!this.appium) throw new repo.RepoError(400, 'invalid', 'Phone apps are not available here');
+      const defaults = env.browserDefaultsJson as { android?: AndroidLaunch; ios?: IosLaunch };
+      const native =
+        platform === 'ios'
+          ? iosPlatform(resolver().resolve(defaults.ios ?? {}) as IosLaunch)
+          : androidPlatform(resolver().resolve(defaults.android ?? {}) as AndroidLaunch);
+      if (!this.appium.hasDriver(native.driver))
+        throw new repo.RepoError(
+          400,
+          'invalid',
+          `Appium's ${native.name} driver is not installed: run "npm run appium:install" (or Install Appium on the Environments tab)`,
+        );
+      const id = newId();
+      let session: NativeRecordingSession;
+      try {
+        session = await NativeRecordingSession.start({
+          appiumUrl: await this.appium.url(),
+          platform: native,
+          startUrl: env.baseUrl,
+          onChange: () => this.publish(),
+          onStop: (snap) => this.stopped(id, snap, d, env.baseUrl, target, session.secrets),
+        });
+      } catch (err) {
+        throw new repo.RepoError(
+          400,
+          'invalid',
+          err instanceof StepError ? err.message : (err as Error).message,
+        );
+      }
+      this.active = {
+        id,
+        applicationId: d.applicationId,
+        environmentId: d.environmentId,
+        baseUrl: env.baseUrl,
+        target,
+        session,
+      };
+      this.last = null;
+      this.publish();
+      return this.status();
+    }
     // A desktop (Electron) app is recorded in its own windows, started as its environment says.
     const desktop = platform === 'electron';
     const electron = desktop
@@ -176,9 +236,41 @@ export class RecorderManager {
     return this.status();
   }
 
-  /** The live session (tests drive its page). */
+  /** The live browser session (tests drive its page). */
   session(): RecordingSession | null {
-    return this.active?.session ?? null;
+    const s = this.active?.session;
+    return s instanceof RecordingSession ? s : null;
+  }
+
+  /** The live phone-app session: the dashboard's screen mirror sends its taps here. */
+  native(): NativeRecordingSession {
+    const s = this.active?.session;
+    if (!(s instanceof NativeRecordingSession))
+      throw new repo.RepoError(409, 'conflict', 'No phone app is being recorded');
+    return s;
+  }
+
+  private stopped(
+    id: string,
+    snap: RecorderSnapshot,
+    d: { applicationId: string; environmentId: string },
+    baseUrl: string,
+    target: RecordingTarget | null,
+    secrets: Record<string, string>,
+  ): void {
+    if (this.active?.id === id) {
+      this.last = {
+        ...snap,
+        id,
+        applicationId: d.applicationId,
+        environmentId: d.environmentId,
+        baseUrl,
+        target,
+        secrets: { ...secrets },
+      };
+      this.active = null;
+    }
+    this.publish();
   }
 
   async stop() {

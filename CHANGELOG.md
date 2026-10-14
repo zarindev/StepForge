@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- **Phone gestures, recording and diagnosis** (Android and iOS): new steps `ui.swipe` (direction, or drag onto a
+  `target`), `ui.longPress`, `ui.scrollTo`, `ui.back` (also the browser's Back button), `ui.hideKeyboard`,
+  `ui.rotate`, `ui.appState` (launch, close, background, reset), `ui.deepLink`, `ui.setLocation`, `ui.permission`
+  and `ui.pushNotification` (iOS simulators); `ui.handleDialog` answers the dialog on a phone's screen (also system
+  permission dialogs, optionally by `buttonLabel`). The recorder records phone apps: the dashboard shows the screen
+  (`GET /api/recorder/screen`), and taps, long presses, typing (passwords become secrets), swipes, back, hide
+  keyboard and checks (`POST /api/recorder/act`) become steps with ranked locators from the element tree, each
+  checked against the app. Diagnosis rules for phone apps (`rules/native.yaml`): the app crashed, the app was no
+  longer on screen, a dialog covered the app, the element is below the screen, the keyboard covers it, the app did
+  not start. Campaigns run desktop and phone apps once per environment (one per device). An environment that resets
+  the app now installs the given app file every time (`enforceAppInstall`). The demo apps have a long-press to
+  remove a patient, a `careclinic://patients` link, a scrolling footer and a Remind me dialog.
 - **iOS apps**: a new platform, _iOS app_ (macOS with Xcode). An iOS app's environment names the app (.app or .zip
   for simulators, .ipa for iPhones, or an installed bundle id), the simulator (by name; empty = the first iPhone
   simulator) or iPhone, the iOS version, resetting the app, showing the simulator, and extra Appium capabilities.

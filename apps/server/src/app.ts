@@ -154,6 +154,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     startedAt: new Date(),
   };
   ctx.runs.appium = appium;
+  ctx.recorder.appium = appium;
   ctx.manual = new ManualRunService(db, bus, ctx.runs, config.artifactsDir);
   ctx.manualBrowser = new ManualBrowserService(db, bus, ctx.runs, ctx.manual, config.artifactsDir);
   ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);

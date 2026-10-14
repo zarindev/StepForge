@@ -74,10 +74,7 @@ describe('Android apps', () => {
     ).toBe('android');
   });
 
-  it('the recorder and the manual-test panel explain they are not available for Android apps yet', async () => {
-    const rec = await call('POST', '/api/recorder/start', { applicationId: appId, environmentId: envId });
-    expect(rec.statusCode).toBe(400);
-    expect(rec.json().message).toContain('native recorder');
+  it('the manual-test panel explains it is not available for Android apps yet', async () => {
     const s = await ok('POST', `/api/modules/${moduleId}/scenarios`, {
       name: 'Check the list by hand',
       execution: 'manual',
@@ -99,6 +96,22 @@ describe('Android apps', () => {
       done: true,
     });
     expect((await ok<{ status: string }>('GET', `/api/runs/${run.id}`)).status).toBe('passed');
+  });
+
+  it('a campaign runs a phone app once per environment (one per device), not per browser and screen size', async () => {
+    const phone = await ok('POST', `/api/applications/${appId}/environments`, {
+      name: 'Second phone',
+      baseUrl: 'app://careclinic',
+      browserDefaults: { android: { app: APK, udid: 'R58N12ABCDE' } },
+    });
+    const c = await ok<{ id: string }>('POST', `/api/applications/${appId}/campaigns`, {
+      name: 'Devices',
+      environmentIds: [envId, phone.id],
+      browsers: ['chromium', 'firefox'],
+      viewports: ['desktop', 'mobile'],
+    });
+    const got = await ok<{ matrix: { environmentId: string }[] }>('GET', `/api/campaigns/${c.id}`);
+    expect(got.matrix.map((m) => m.environmentId)).toEqual([envId, phone.id]);
   });
 
   it('reports what this computer has for Android testing', async () => {
@@ -177,5 +190,79 @@ describe('Android apps', () => {
       expect(JSON.stringify(item)).toContain('video.mp4');
     },
     600_000,
+  );
+
+  it.skipIf(!AVD)(
+    'records the app from its screen: taps, typing (a password becomes a secret), a check; then saves the scenario',
+    async () => {
+      // The previous test's recorder refusal does not apply any more: phone apps can be recorded.
+      const started = await call('POST', '/api/recorder/start', {
+        applicationId: appId,
+        environmentId: envId,
+        moduleId,
+      });
+      expect(started.statusCode, started.body).toBe(201);
+      expect(started.json().native).toEqual({ platform: 'Android' });
+      const screen = await call('GET', '/api/recorder/screen');
+      expect(screen.headers['content-type']).toBe('image/png');
+      expect(String(screen.headers['x-screen-size'])).toMatch(/^\d+x\d+$/);
+      const s = ctx.recorder.native();
+      const at = async (locator: { strategy: 'testId' | 'placeholder' | 'text'; value: string }) => {
+        // As a person would, wait for the screen to show it (a new screen takes a moment).
+        for (let i = 0; i < 40; i++) {
+          const p = await s.pointOf([locator]);
+          if (p) return p;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        throw new Error(`Not on screen: ${locator.strategy}=${locator.value}`);
+      };
+      const act = (body: Record<string, unknown>) => ok('POST', '/api/recorder/act', body);
+      await act({ action: 'tap', ...(await at({ strategy: 'testId', value: 'email' })) });
+      await act({ action: 'type', text: 'nurse@careclinic.test' });
+      await act({ action: 'tap', ...(await at({ strategy: 'testId', value: 'password' })) });
+      await act({ action: 'type', text: 'CareClinic1' });
+      await act({ action: 'tap', ...(await at({ strategy: 'testId', value: 'sign_in' })) });
+      await act({
+        action: 'check',
+        check: 'text',
+        ...(await at({ strategy: 'testId', value: 'patient_count' })),
+      });
+      const nothing = await call('POST', '/api/recorder/act', { action: 'type', text: 'x' });
+      expect(nothing.statusCode).toBe(422);
+      const stopped = await ok<{
+        state: string;
+        steps: {
+          type: string;
+          params: Record<string, unknown>;
+          locators: { strategy: string; value: string }[];
+        }[];
+        secretKeys: string[];
+      }>('POST', '/api/recorder/stop');
+      expect(stopped.state).toBe('stopped');
+      expect(stopped.steps.map((x) => x.type)).toEqual(['ui.fill', 'ui.fill', 'ui.click', 'ui.assert']);
+      expect(stopped.steps[0]!.locators[0]).toMatchObject({ strategy: 'testId', value: 'email' });
+      expect(stopped.steps[1]!.params.value).toBe('{{secret.password}}');
+      expect(stopped.secretKeys).toEqual(['password']);
+      expect(stopped.steps[3]!.params).toEqual({ check: 'text', expected: 'No patients yet' });
+      const saved = await ok<{ scenario: { id: string } }>('POST', '/api/recorder/save', {
+        moduleId,
+        name: 'Recorded sign-in',
+      });
+      // The recorded scenario replays.
+      const r = await ok<{ id: string }>('POST', '/api/runs', {
+        applicationId: appId,
+        environmentId: envId,
+        scope: { type: 'scenarios', ids: [saved.scenario.id] },
+        options: { video: 'off' },
+      });
+      await ctx.runs.idle();
+      const run = await ok<{ status: string; items: { errorMessage: string | null }[] }>(
+        'GET',
+        `/api/runs/${r.id}`,
+      );
+      expect(run.items[0]!.errorMessage ?? null).toBeNull();
+      expect(run.status).toBe('passed');
+    },
+    1_200_000,
   );
 });

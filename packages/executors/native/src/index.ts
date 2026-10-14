@@ -24,3 +24,13 @@ export function createNativeExecutor(opts: {
     },
   };
 }
+export { androidPlatform, iosPlatform, type Direction, type NativePlatform } from './platforms.ts';
+export {
+  elementAt,
+  locatorsFor,
+  NativeRecordingSession,
+  parseElements,
+  type NativeRecordedStep,
+  type NativeRecorderSnapshot,
+  type ScreenElement,
+} from './recorder.ts';

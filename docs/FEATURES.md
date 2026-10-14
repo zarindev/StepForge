@@ -47,6 +47,13 @@ touch, sites behind basic auth or client certificates, localised and time-zone-d
 features and visual regressions — with network waiting and mocking, offline mode, cookies and storage, a controllable
 clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
+## Phone gestures, recording and diagnosis
+
+Swipe, long press, scroll to, back, rotate, app state, deep links, location, permissions, dialogs and push
+notifications in Android and iOS apps. Record a phone app by clicking its screen in the dashboard. Failures explain
+crashes, dialogs, the keyboard and off-screen elements. Campaigns run on several devices.
+[ANDROID_APPS.md](ANDROID_APPS.md#gestures-and-device-steps)
+
 ## Test iOS apps
 
 iPhone and iPad apps on the iOS Simulator or a real iPhone, from a Mac with Xcode, through Appium (installed and
@@ -133,5 +140,5 @@ traces and diagnosis work as on the web. [DESKTOP_APPS.md](DESKTOP_APPS.md)
 The latest additions are in [WHATS_NEW.md](WHATS_NEW.md); planned work is in the README's
 [Coming next](../README.md#coming-next).
 
-- Mobile gestures and a native recorder, and Windows / macOS / Linux desktop apps (Electron, Android and iOS are
-  done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
+- Windows / macOS / Linux desktop apps (Electron, Android, iOS, gestures and the phone recorder are done):
+  [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).

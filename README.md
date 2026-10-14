@@ -68,6 +68,10 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 **Just added — iOS, Android and desktop apps:**
 
+- **Phone gestures, recording and diagnosis**: swipe, long press, scroll to, back, rotate, app state, deep links,
+  location, permissions and dialogs. Record a phone app by clicking its screen in the dashboard. A failure says when
+  the app crashed or a dialog covered it, and campaigns run on several devices
+  ([recording](docs/ANDROID_APPS.md#recording)).
 - **iOS apps** (iPhone, iPad) on the iOS Simulator or a real iPhone, from a Mac with Xcode, through Appium. The same
   steps and evidence as Android ([guide](docs/IOS_APPS.md)).
 - **Android apps** on an emulator or a USB phone, through Appium, which StepForge installs and runs itself. The same
@@ -104,13 +108,14 @@ Planned work, in order — all of it free, open source and local:
 | | Planned | What it brings |
 | --- | --- | --- |
 | ✅ | **Electron desktop apps** | Done — see [Desktop apps](docs/DESKTOP_APPS.md) |
-| ✅ | **iOS apps** | ✅ iPhone and iPad apps on the iOS Simulator or a real iPhone, from a Mac with Xcode · Appium + XCUITest installed and started by StepForge · a .app / .ipa or an installed bundle id per environment · accessibility ids, labels, placeholders, roles and XPath · screen recording, system log, element tree at failures — see [docs/IOS_APPS.md](docs/IOS_APPS.md) |
+| ✅ | **Phone apps: gestures and recording** | ✅ Swipe, long press, scroll to, back, rotate, open / close / background / reset the app, deep links, location, permissions, dialogs, push notifications (iOS simulators) · record by clicking the phone's screen in the dashboard · diagnosis of crashes, dialogs, keyboard and off-screen elements · campaigns across devices — see [docs/ANDROID_APPS.md](docs/ANDROID_APPS.md#gestures-and-device-steps) |
+| **iOS apps** | ✅ iPhone and iPad apps on the iOS Simulator or a real iPhone, from a Mac with Xcode · Appium + XCUITest installed and started by StepForge · a .app / .ipa or an installed bundle id per environment · accessibility ids, labels, placeholders, roles and XPath · screen recording, system log, element tree at failures — see [docs/IOS_APPS.md](docs/IOS_APPS.md) |
 | **Android apps** | Done — see [Android apps](docs/ANDROID_APPS.md) |
 | ✅ | **iOS apps** | Done — see [iOS apps](docs/IOS_APPS.md) |
-| 1 | **Mobile gestures and a native recorder** | Swipe, long press, back, rotate, deep links; record by clicking a mirrored screen |
-| 2 | **Windows and macOS desktop apps** | Native desktop testing through each system's accessibility layer |
-| 3 | **Linux desktop apps and image matching** | GTK/Qt apps, and image-based locators as a last resort |
-| 4 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
+| ✅ | **Mobile gestures and a native recorder** | Done — see [recording phone apps](docs/ANDROID_APPS.md#recording) |
+| 1 | **Windows and macOS desktop apps** | Native desktop testing through each system's accessibility layer |
+| 2 | **Linux desktop apps and image matching** | GTK/Qt apps, and image-based locators as a last resort |
+| 3 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
 | — | **More code export** | The newest steps (page conditions, network, SOAP / Kafka / FTP) exported instead of marked TODO |
 | — | **Desktop installer** | Start StepForge with a double-click instead of a terminal |
 
@@ -484,7 +489,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | [Code export](docs/CODEGEN.md) | The 13 export targets |
 | [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) | How it is built |
 | [Known issues](docs/KNOWN_ISSUES.md) · [Changelog](CHANGELOG.md) | Limits and history |
-| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for native apps (Electron, Android and iOS: done; gestures, recorder and native desktop next) |
+| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for native apps (Electron, Android, iOS, gestures and the phone recorder: done; native desktop next) |
 
 ## Roadmap
 
@@ -505,6 +510,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] Electron desktop apps (Windows, macOS, Linux)
 - [x] Android apps (emulators and phones, through Appium)
 - [x] iOS apps (simulators and iPhones, from a Mac)
+- [x] Phone gestures and device steps, recording phone apps from their screen, phone-app diagnosis, device campaigns
 - [ ] Next: see [Coming next](#coming-next)
 
 ## Contributing

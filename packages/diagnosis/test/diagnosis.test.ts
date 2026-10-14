@@ -608,3 +608,64 @@ describe('diagnoses (fixtures)', () => {
     );
   });
 });
+
+describe('phone apps (Android, iOS)', () => {
+  const tap = (
+    native: NonNullable<StepSnapshot['diagnostics']>['native'],
+    extra: Partial<StepSnapshot> = {},
+  ) =>
+    step({
+      type: 'ui.click',
+      errorKind: 'element_not_found',
+      message: 'No element found within 10000 ms. Tried: testId=save',
+      locators: [{ strategy: 'testId', value: 'save' }],
+      diagnostics: {
+        matchCount: 0,
+        candidates: [],
+        native: { platform: 'Android', appState: 4, keyboard: false, ...native },
+      },
+      ...extra,
+    });
+
+  it('a crash in the device log: the app crashed', () => {
+    const d = diagnose(
+      input(tap({ crash: 'FATAL EXCEPTION: main java.lang.NullPointerException', appState: 1 })),
+    );
+    expect(d.title).toBe('The app crashed');
+    expect(d.owner).toBe('app');
+    expect(d.explanation).toContain('NullPointerException');
+  });
+
+  it('a dialog on screen, a keyboard, an element below the screen, the app gone', () => {
+    const dialog = diagnose(input(tap({ alert: 'Allow CareClinic to use your location?' })));
+    expect(dialog.title).toBe('A dialog covered the app: "Allow CareClinic to use your location?"');
+    expect(dialog.fix).toContain('Handle dialog');
+    const below = diagnose(
+      input(
+        tap(
+          { offScreen: true },
+          { diagnostics: { matchCount: 1, visible: false, candidates: [], native: { offScreen: true } } },
+        ),
+      ),
+    );
+    expect(below.title).toBe('testId=save is below the visible screen');
+    expect(below.fix).toContain('Scroll to');
+    expect(diagnose(input(tap({ keyboard: true }))).title).toBe('The keyboard may cover testId=save');
+    expect(diagnose(input(tap({ appState: 3 }))).title).toBe('The app was no longer on screen');
+  });
+
+  it('the app did not start: the environment', () => {
+    const d = diagnose(
+      input(
+        step({
+          type: 'ui.click',
+          errorKind: 'navigation',
+          message:
+            'The iOS app did not start: An unknown server-side error occurred: xcodebuild failed with code 65',
+        }),
+      ),
+    );
+    expect(d.title).toBe('The app did not start on the device');
+    expect(d.owner).toBe('environment');
+  });
+});

@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Space;
 import android.widget.TextView;
 
 /** CareClinic mobile — sign in. Demo account: nurse@careclinic.test / CareClinic1 */
@@ -28,6 +30,11 @@ public class SignInActivity extends Activity {
         root.addView(password);
         root.addView(signIn);
         root.addView(error);
+        // Far below the form: tests scroll to it (ui.scrollTo, ui.swipe).
+        Space gap = new Space(this);
+        gap.setMinimumHeight(Ui.dp(this, 1500));
+        root.addView(gap);
+        root.addView(Ui.text(this, R.id.app_version, "Version 1.0 · support@careclinic.test"));
         signIn.setOnClickListener(v -> {
             if (EMAIL.equals(email.getText().toString().trim())
                     && PASSWORD.equals(password.getText().toString())) {
@@ -37,6 +44,8 @@ public class SignInActivity extends Activity {
                 error.setText("Wrong email or password");
             }
         });
-        setContentView(root);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
     }
 }

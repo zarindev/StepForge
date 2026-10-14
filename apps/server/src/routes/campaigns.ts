@@ -13,7 +13,9 @@ export function registerCampaignRoutes(app: FastifyInstance, ctx: AppContext): v
   );
   app.get<P<'id'>>('/api/campaigns/:id', async (req) => ({
     ...repo.getCampaign(db, req.params.id),
-    matrix: repo.campaignMatrix(repo.getCampaign(db, req.params.id)),
+    matrix: ((c) => repo.campaignMatrix(c, repo.getApplication(db, c.applicationId).platform))(
+      repo.getCampaign(db, req.params.id),
+    ),
     runs: repo.listCampaignRuns(db, req.params.id),
   }));
   app.put<P<'id'>>('/api/campaigns/:id', async (req) => {

@@ -38,7 +38,9 @@ JSON-schema and contract mismatch (field by field), assertion mismatch (with the
 unreachable, constraint violation, empty result, data-integrity mismatch, data-quality audit failures, email not
 received, inbox unreachable, OTP not found, missing email link, JavaScript exception (with source location), visual change (a checkpoint differs from its approved screenshot), flaky
 timing, performance threshold exceeded (and regression against the last passing run), missing index (full table
-scan), test-data collision, test configuration errors, and a catch-all.
+scan), test-data collision, test configuration errors, phone apps (the app crashed, the app was no longer on screen,
+a dialog covered the app, the element is below the visible screen, the keyboard covers it, the app did not start;
+[ANDROID_APPS.md](ANDROID_APPS.md#diagnosis)), and a catch-all.
 
 ## Locator changed: one-click fix
 

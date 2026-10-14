@@ -68,3 +68,41 @@ test('iOS apps: the platform, what this computer has, and the app and simulator 
   );
   expect(env!.browserDefaultsJson.ios).toMatchObject({ app: APP, platformVersion: '27.0', resetApp: true });
 });
+
+test('recording an iOS app from its screen in the dashboard', async ({ page }) => {
+  test.skip(!process.env.STEPFORGE_TEST_IOS, 'needs an iOS simulator (STEPFORGE_TEST_IOS)');
+  test.setTimeout(600_000);
+  await page.goto('/applications');
+  const name = `CareClinic iOS rec ${Date.now().toString(36)}`;
+  const app = await sfApi<{ id: string }>(page, 'POST', '/api/applications', {
+    name,
+    slug: `cc-ios-rec-${Date.now().toString(36)}`,
+    platform: 'ios',
+  });
+  await sfApi(page, 'POST', `/api/applications/${app.id}/environments`, {
+    name: 'Simulator',
+    baseUrl: 'app://careclinic',
+    browserDefaults: { ios: { app: APP } },
+  });
+  const mod = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/modules`, {
+    name: 'Sign in',
+  });
+  const scenario = await sfApi<{ id: string }>(page, 'POST', `/api/modules/${mod.id}/scenarios`, {
+    name: 'Recorded',
+  });
+  await page.goto(`/recorder?scenario=${scenario.id}`);
+  await page.getByRole('button', { name: 'Start recording' }).click();
+  const screen = page.getByRole('img', { name: "The iOS app's screen" });
+  await expect(screen).toBeVisible({ timeout: 300_000 });
+  // The email field is near the top of the screen: about 18 % down, in the middle.
+  const box = (await screen.boundingBox())!;
+  await screen.click({ position: { x: box.width / 2, y: box.height * 0.18 } });
+  await expect(page.getByText(/Type into TextField "Email"/)).toBeVisible({ timeout: 30_000 });
+  await page.getByLabel('Text to type').fill('nurse@careclinic.test');
+  await page.getByRole('button', { name: 'Type' }).click();
+  const steps = page.getByRole('list', { name: 'Recorded steps' });
+  await expect(steps).toContainText('nurse@careclinic.test');
+  await shot(page, 'ios-recorder');
+  await page.getByRole('button', { name: /Stop/ }).click();
+  await expect(page.getByText(/Review/).first()).toBeVisible({ timeout: 30_000 });
+});

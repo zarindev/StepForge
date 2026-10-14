@@ -1,0 +1,69 @@
+# Phone apps (Android, iOS). Facts: native.platform, native.crash, native.appState (1 not running, 2–3 background,
+# 4 on screen), native.alert, native.keyboard, native.offScreen, plus the UI facts (locator, matchCount, visible…).
+
+- id: native-app-did-not-start
+  category: app_not_started
+  priority: 97
+  confidence: 0.9
+  owner: environment
+  when:
+    {
+      layer: ui,
+      message:
+        {
+          matches: '(Android|iOS) app did not start|driver is not installed|Appium is not (installed|reachable)',
+        },
+    }
+  title: 'The app did not start on the device'
+  explanation: 'StepForge could not open the app: {{message}}'
+  fix: 'Run "stepforge doctor native", then check the environment: the app file or bundle id / package, the emulator or simulator name, and that the phone is connected and unlocked.'
+
+- id: native-app-crashed
+  category: app_crashed
+  priority: 96
+  confidence: 0.9
+  owner: app
+  when: { layer: ui, native: { exists: true }, native.crash: { exists: true } }
+  title: 'The app crashed'
+  explanation: 'The device log shows a crash while this test ran: {{native.crash}}'
+  fix: 'Open the Console evidence (the device log) for the full crash and stack trace, and fix the crash in the app.'
+
+- id: native-app-gone
+  category: app_closed
+  priority: 90
+  confidence: 0.8
+  owner: app
+  when: { layer: ui, native.appState: { in: [1, 2, 3] }, native.crash: { exists: false } }
+  title: 'The app was no longer on screen'
+  explanation: 'When {{locator}} was needed, the app was closed or in the background (state {{native.appState}}), so its screen could not be used.'
+  fix: 'Check whether a step closed the app or opened another one (a link, the camera, a share sheet); bring it back with an App step (launch).'
+
+- id: native-dialog-in-the-way
+  category: dialog_in_the_way
+  priority: 88
+  confidence: 0.85
+  owner: test
+  when: { layer: ui, native.alert: { exists: true } }
+  title: 'A dialog covered the app: "{{native.alert}}"'
+  explanation: 'A dialog was on screen when the step ran (often a permission request or an error message), so the app behind it could not be used.'
+  fix: 'Add a "Handle dialog" step (accept or dismiss) before this step, or grant the permission up front with a Permission step. If the dialog reports an error, it is the app''s.'
+
+- id: native-element-off-screen
+  category: element_off_screen
+  priority: 86
+  confidence: 0.8
+  owner: test
+  when: { layer: ui, native.offScreen: true }
+  title: '{{locator}} is below the visible screen'
+  explanation: 'The element exists but is outside the screen, so it cannot be tapped or read.'
+  fix: 'Add a "Scroll to" step for {{locator}} before this step.'
+
+- id: native-keyboard-covers
+  category: keyboard_covers
+  priority: 84
+  confidence: 0.6
+  owner: test
+  when: { layer: ui, native.keyboard: true, errorKind: [element_not_found, timeout] }
+  title: 'The keyboard may cover {{locator}}'
+  explanation: 'The on-screen keyboard was open when {{locator}} could not be found; elements under it are not visible.'
+  fix: 'Add a "Hide keyboard" step after typing, or scroll to the element first.'

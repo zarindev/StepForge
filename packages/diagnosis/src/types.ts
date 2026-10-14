@@ -38,6 +38,16 @@ export type StepSnapshot = {
     candidates?: { locator: LocatorLike; text?: string; score: number; count: number }[];
     /** The page the step failed on. */
     pageUrl?: string;
+    /** Phone apps: a crash in the device log, the app's state, a dialog or keyboard on screen, an off-screen element. */
+    native?: {
+      platform?: string;
+      crash?: string;
+      /** 1 not running, 2–3 in the background, 4 on screen. */
+      appState?: number;
+      alert?: string;
+      keyboard?: boolean;
+      offScreen?: boolean;
+    };
   };
   /** From the scenario definition. */
   locators?: LocatorLike[];

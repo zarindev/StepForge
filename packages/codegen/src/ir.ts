@@ -681,6 +681,19 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
         todo(ctx, step, 'this browser step is not exported yet; write it with the framework’s own API'),
       );
       break;
+    case 'ui.swipe':
+    case 'ui.longPress':
+    case 'ui.scrollTo':
+    case 'ui.back':
+    case 'ui.hideKeyboard':
+    case 'ui.rotate':
+    case 'ui.appState':
+    case 'ui.deepLink':
+    case 'ui.setLocation':
+    case 'ui.permission':
+    case 'ui.pushNotification':
+      out.push(todo(ctx, step, 'phone-app steps are not exported yet (Appium export is planned)'));
+      break;
     default:
       out.push(todo(ctx, step, 'this step type has no exporter'));
   }

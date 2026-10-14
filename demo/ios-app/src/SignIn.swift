@@ -12,7 +12,11 @@ final class SignInViewController: UIViewController {
         error.textColor = .systemRed
         let signIn = Ui.button("sign_in", "Sign in")
         signIn.addTarget(self, action: #selector(submit), for: .touchUpInside)
-        _ = Ui.column(in: view, [email, password, signIn, error])
+        // Far below the form: tests scroll to it (ui.scrollTo, ui.swipe).
+        let gap = UIView()
+        gap.heightAnchor.constraint(equalToConstant: 1500).isActive = true
+        let version = Ui.label("app_version", "Version 1.0 · support@careclinic.test")
+        _ = Ui.scrollingColumn(in: view, [email, password, signIn, error, gap, version])
     }
 
     @objc private func submit() {

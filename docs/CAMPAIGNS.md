@@ -14,12 +14,13 @@ results come back as one **campaign run** with a combined report. Everything run
 | --- | --- |
 | Tests | **All tests**, or any mix of modules (with their sub-modules), tags and single scenarios |
 | Environments | One or more environments of the application |
-| Browsers | Chromium, Firefox and/or WebKit |
-| Screen sizes | Desktop, tablet and/or mobile |
+| Browsers | Chromium, Firefox and/or WebKit (web apps) |
+| Screen sizes | Desktop, tablet and/or mobile (web apps) |
 | Parallel tests, retries | Used by every run of the campaign |
 | Send one summary to | Notification channels that get **one** summary when the whole campaign has finished |
 
-The dialog shows how many runs one campaign run makes.
+The dialog shows how many runs one campaign run makes. Desktop and phone apps run once per environment: give each
+device (emulator, phone, simulator) its own environment ([ANDROID_APPS.md](ANDROID_APPS.md#campaigns-on-several-devices)).
 
 ## Running it
 

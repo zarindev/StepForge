@@ -9,4 +9,7 @@
     <item type="id" name="patient_count" />
     <item type="id" name="patient_list" />
     <item type="id" name="sign_out" />
+    <item type="id" name="app_version" />
+    <item type="id" name="remind" />
+    <item type="id" name="reminders" />
 </resources>

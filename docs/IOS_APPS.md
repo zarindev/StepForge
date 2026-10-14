@@ -11,7 +11,8 @@ and stops them itself. No device cloud or paid account is needed.
 Linux, StepForge's iOS checks say so.
 
 This is step N3 of the [native apps plan](NATIVE_APPS_PLAN.md). It works like [Android apps](ANDROID_APPS.md): the same
-steps, locators and evidence.
+steps, locators, evidence, gestures, [recording](ANDROID_APPS.md#recording),
+[diagnosis](ANDROID_APPS.md#diagnosis) and [campaigns on several devices](ANDROID_APPS.md#campaigns-on-several-devices).
 
 ## What you need
 
@@ -84,6 +85,11 @@ The steps work as on Android ([table](ANDROID_APPS.md#writing-tests)), with thes
 - **Check / Uncheck** reads a switch's value (`1` / `0`).
 - **Scroll** swipes the screen.
 - **Open (navigate)** opens a deep link such as `careclinic://patients/42`.
+- **Gestures and device steps** work as on [Android](ANDROID_APPS.md#gestures-and-device-steps), with two
+  differences. **Go back** taps the navigation bar's back button. **Permission** cannot grant `notifications` from
+  outside the app: the app asks, and a **Handle dialog** step answers iOS's dialog (Allow). **Notification** sends a
+  push notification on simulators once the app is allowed to show them.
+- **Hide keyboard** uses the keyboard's Done or Return key; a keyboard without either says so.
 
 ## Evidence
 
@@ -109,9 +115,9 @@ Simulators need nothing more than Xcode. A real iPhone also needs:
 
 ## Manual tests and recording
 
-As for Android: manual tests of an iOS app are marked on the run page while the tester uses the simulator or iPhone,
-and recording iOS apps comes with the native recorder (planned). Add steps in the editor for now. The element tree from
-a failed run shows the identifiers and labels to use.
+As for Android: manual tests of an iOS app are marked on the run page while the tester uses the simulator or iPhone.
+**Record** shows the app's screen in the dashboard, and taps, typing, swipes and checks there become steps
+([how](ANDROID_APPS.md#recording)).
 
 ## Running in CI
 

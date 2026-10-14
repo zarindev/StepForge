@@ -80,6 +80,6 @@ test('Android apps: the platform, what this computer has, and the app and device
     name: 'Sign in',
   });
   await page.goto(`/recorder?scenario=${scenario.id}`);
-  await expect(page.getByText('Recording Android apps comes with the native recorder')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Start recording' })).toBeDisabled();
+  await expect(page.getByText('Starts the app on the emulator or phone')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start recording' })).toBeEnabled();
 });

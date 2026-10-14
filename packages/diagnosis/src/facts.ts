@@ -181,6 +181,9 @@ export function buildFacts(input: DiagnosisInput): Record<string, unknown> {
       slowest?.durationMs && timeoutMs ? Math.round((slowest.durationMs / timeoutMs) * 100) / 100 : undefined,
     timeoutMs,
 
+    // Phone apps (Android, iOS)
+    native: f.diagnostics?.native,
+
     // Database
     rowCount: query?.rowCount,
     connection: query?.connection ?? (f.params?.connection as string | undefined),

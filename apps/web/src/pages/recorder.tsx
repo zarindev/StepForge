@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { EditorProvider } from '@/components/editor/context';
+import { NativeScreen } from '@/components/recorder/native-screen';
 import { fromDrafts, toDrafts, type DraftStep } from '@/components/editor/drafts';
 import { StepList } from '@/components/editor/step-list';
 import { PageHeader } from '@/components/shell/layout';
@@ -53,6 +54,8 @@ type Recording = {
   network: Captured[];
   secretKeys: string[];
   target?: Target;
+  /** Set when a phone app is recorded: the dashboard shows its screen. */
+  native?: { platform: string };
 } | null;
 
 const RECORDER_KEY = ['recorder'] as const;
@@ -81,7 +84,7 @@ export function RecorderPage() {
     <>
       <PageHeader
         title="Recorder"
-        description="Click through your app in a real browser. Steps, checks, secrets and network calls are captured as you go."
+        description="Click through your app in a real browser, a desktop app or a phone app. Steps, checks, secrets and network calls are captured as you go."
       />
       {recording.isPending ? (
         <Skeleton className="h-64" />
@@ -172,8 +175,8 @@ function StartPanel() {
             </Field>
             {app?.platform === 'android' || app?.platform === 'ios' ? (
               <p className="self-end pb-2 text-sm text-muted">
-                Recording {app.platform === 'ios' ? 'iOS' : 'Android'} apps comes with the native recorder
-                (planned). Add the steps in the editor for now.
+                Starts the app on the {app.platform === 'ios' ? 'simulator or iPhone' : 'emulator or phone'};
+                you use it from its screen here.
               </p>
             ) : app?.platform === 'electron' ? (
               <p className="self-end pb-2 text-sm text-muted">
@@ -202,12 +205,12 @@ function StartPanel() {
           )}
           <Button
             data-tour="recorder-button"
-            disabled={!envId || start.isPending || app?.platform === 'android' || app?.platform === 'ios'}
+            disabled={!envId || start.isPending}
             onClick={() => start.mutate()}
           >
             <Circle className="h-3.5 w-3.5 fill-current text-fail" />{' '}
             {start.isPending
-              ? app?.platform === 'electron'
+              ? app?.platform === 'electron' || app?.platform === 'android' || app?.platform === 'ios'
                 ? 'Starting the app…'
                 : 'Opening browser…'
               : 'Start recording'}
@@ -310,7 +313,7 @@ function LivePanel({ rec }: { rec: NonNullable<Recording> }) {
               variant="ghost"
               size="sm"
               onClick={() => call.mutate('undo')}
-              disabled={rec.steps.length <= 1}
+              disabled={rec.steps.length <= (rec.native ? 0 : 1)}
             >
               <Undo2 className="h-3.5 w-3.5" /> Undo
             </Button>
@@ -322,34 +325,55 @@ function LivePanel({ rec }: { rec: NonNullable<Recording> }) {
             </Button>
           </div>
         </div>
-        <ol className="max-h-[60vh] overflow-y-auto p-3" aria-label="Recorded steps" aria-live="polite">
-          {rec.steps.map((s, i) => (
-            <StepLine key={String(s.id ?? i)} step={s} index={i} />
-          ))}
-        </ol>
+        {rec.native ? (
+          <NativeScreen platform={rec.native.platform} recordKey={RECORDER_KEY} />
+        ) : (
+          <ol className="max-h-[60vh] overflow-y-auto p-3" aria-label="Recorded steps" aria-live="polite">
+            {rec.steps.map((s, i) => (
+              <StepLine key={String(s.id ?? i)} step={s} index={i} />
+            ))}
+          </ol>
+        )}
       </Card>
       <div className="space-y-4">
         <Card className="p-4 text-sm">
           <div className="flex items-center gap-2 font-medium">
-            <MonitorSmartphone className="h-4 w-4 text-brand" /> The browser window is recording
+            <MonitorSmartphone className="h-4 w-4 text-brand" />{' '}
+            {rec.native ? `The ${rec.native.platform} app is recording` : 'The browser window is recording'}
           </div>
           <p className="mt-1 text-muted">
-            Use the toolbar inside it to pause, add checks, save values, mask fields or stop.
+            {rec.native
+              ? 'Use the app from its screen here: taps, typing, swipes and checks become steps.'
+              : 'Use the toolbar inside it to pause, add checks, save values, mask fields or stop.'}
           </p>
         </Card>
-        <Card className="p-4 text-sm">
-          <div className="flex items-center gap-2 font-medium">
-            <Webhook className="h-4 w-4 text-indigo" /> {rec.network.length} API call(s) captured
-          </div>
-          <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto font-mono text-xs text-muted">
-            {rec.network.slice(-12).map((n) => (
-              <li key={n.id} className="truncate">
-                {n.method} {pathOf(n.url)}{' '}
-                <span className={n.status >= 400 ? 'text-fail' : 'text-pass'}>{n.status}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        {!rec.native && (
+          <Card className="p-4 text-sm">
+            <div className="flex items-center gap-2 font-medium">
+              <Webhook className="h-4 w-4 text-indigo" /> {rec.network.length} API call(s) captured
+            </div>
+            <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto font-mono text-xs text-muted">
+              {rec.network.slice(-12).map((n) => (
+                <li key={n.id} className="truncate">
+                  {n.method} {pathOf(n.url)}{' '}
+                  <span className={n.status >= 400 ? 'text-fail' : 'text-pass'}>{n.status}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        {rec.native && (
+          <Card className="text-sm">
+            <div className="border-b border-border px-4 py-2.5 font-medium">
+              {rec.steps.length} step(s) recorded
+            </div>
+            <ol className="max-h-[50vh] overflow-y-auto p-2" aria-label="Recorded steps" aria-live="polite">
+              {rec.steps.map((s, i) => (
+                <StepLine key={String(s.id ?? i)} step={s} index={i} />
+              ))}
+            </ol>
+          </Card>
+        )}
         {rec.secretKeys.length > 0 && (
           <Card className="p-4 text-sm">
             <div className="flex items-center gap-2 font-medium">

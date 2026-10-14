@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.stepforge.careclinic"
-    android:versionCode="1"
-    android:versionName="1.0">
+    android:versionCode="2"
+    android:versionName="1.1">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
+    <!-- Declared so tests can grant and revoke it (ui.permission). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application android:label="CareClinic" android:allowBackup="false">
         <activity android:name=".SignInActivity" android:exported="true"
             android:theme="@android:style/Theme.Material.Light.NoActionBar">
@@ -12,7 +15,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".PatientsActivity" android:exported="false"
-            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+        <!-- careclinic://patients opens the patients screen (ui.deepLink). -->
+        <activity android:name=".PatientsActivity" android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="careclinic" android:host="patients" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

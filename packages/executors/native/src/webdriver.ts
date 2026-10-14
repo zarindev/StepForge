@@ -85,6 +85,14 @@ export class WebDriverSession {
     const b64 = (await this.cmd('GET', el ? `/element/${el}/screenshot` : '/screenshot')) as string;
     return Buffer.from(b64, 'base64');
   }
+  /** The text of the dialog on screen, or undefined when there is none. */
+  async alertText(): Promise<string | undefined> {
+    const t = await this.cmd('GET', '/alert/text').catch(() => undefined);
+    return typeof t === 'string' ? t : undefined;
+  }
+  async windowSize(): Promise<{ width: number; height: number }> {
+    return (await this.cmd('GET', '/window/rect')) as { width: number; height: number };
+  }
   /** The element that has the keyboard focus, if any. */
   async activeElement(): Promise<ElementRef | undefined> {
     const e = (await this.cmd('GET', '/element/active').catch(() => null)) as Record<string, string> | null;
@@ -95,6 +103,10 @@ export class WebDriverSession {
   }
   back() {
     return this.cmd('POST', '/back', {});
+  }
+  /** PORTRAIT or LANDSCAPE. */
+  setOrientation(orientation: 'PORTRAIT' | 'LANDSCAPE') {
+    return this.cmd('POST', '/orientation', { orientation });
   }
   /** Appium `mobile:` commands and scripts. */
   execute(script: string, args: unknown[] = [], timeoutMs?: number) {

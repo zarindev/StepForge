@@ -27,6 +27,19 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = UINavigationController(rootViewController: SignInViewController())
         window.makeKeyAndVisible()
         self.window = window
+        if let url = options.urlContexts.first?.url { open(url) }
+    }
+
+    func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
+        if let url = contexts.first?.url { open(url) }
+    }
+
+    /// careclinic://patients opens the patients screen.
+    private func open(_ url: URL) {
+        guard url.host == "patients", let nav = window?.rootViewController as? UINavigationController else { return }
+        if !(nav.topViewController is PatientsViewController) {
+            nav.pushViewController(PatientsViewController(), animated: false)
+        }
     }
 }
 
@@ -40,6 +53,8 @@ enum Ui {
         f.autocapitalizationType = .none
         f.autocorrectionType = .no
         f.isSecureTextEntry = secure
+        // Return closes the keyboard, as in most apps.
+        f.addAction(UIAction { _ in }, for: .editingDidEndOnExit)
         return f
     }
 
@@ -57,6 +72,29 @@ enum Ui {
         l.text = text
         l.numberOfLines = 0
         return l
+    }
+
+    /// A column inside a scroll view, for screens taller than the display.
+    static func scrollingColumn(in view: UIView, _ views: [UIView]) -> UIStackView {
+        let scroll = UIScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scroll)
+        let stack = UIStackView(arrangedSubviews: views)
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(stack)
+        NSLayoutConstraint.activate([
+            scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -24),
+            stack.leadingAnchor.constraint(equalTo: scroll.frameLayoutGuide.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: scroll.frameLayoutGuide.trailingAnchor, constant: -24),
+        ])
+        return stack
     }
 
     static func column(in view: UIView, _ views: [UIView]) -> UIStackView {

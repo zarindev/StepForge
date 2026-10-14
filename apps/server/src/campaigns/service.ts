@@ -48,7 +48,7 @@ export class CampaignService {
   ): repo.CampaignRunSummary {
     const c = repo.getCampaign(this.db, campaignId);
     const scope = repo.campaignScope(this.db, c);
-    const matrix = repo.campaignMatrix(c);
+    const matrix = repo.campaignMatrix(c, repo.getApplication(this.db, c.applicationId).platform);
     if (!matrix.length)
       throw new repo.RepoError(400, 'invalid', 'This campaign has no environments; edit it and choose one');
     return this.start(

@@ -7,8 +7,8 @@ tests, runs, reports and diagnosis as web apps. The steps go to the app through 
 driver, both open source (Apache-2.0). StepForge installs them into its own `data/tools` folder and starts and stops
 them itself. Nothing is installed globally, and no device cloud or account is needed.
 
-This is step N2 of the [native apps plan](NATIVE_APPS_PLAN.md). [iOS apps](IOS_APPS.md) work the same way (N3); swipe
-and long-press steps and a recorder for native apps come next.
+This is step N2 of the [native apps plan](NATIVE_APPS_PLAN.md). [iOS apps](IOS_APPS.md) work the same way (N3), and
+both have gestures, device steps, a recorder and phone-app diagnosis (N4).
 
 ## What you need
 
@@ -64,7 +64,7 @@ Use `x86_64` instead of `arm64-v8a` on Intel and AMD computers.
 | **or installed app's package** | An app already on the device: `com.example.app`, and optionally its **start screen** (activity, for example `.MainActivity`) |
 | **Emulator** | An emulator on this computer. It starts when a test needs it and keeps running for the next tests |
 | **Phone or device serial** | A phone's serial from `adb devices`. Leave both empty to use the only device connected |
-| **Reset the app's data before each test** | On by default: every test starts signed out, with empty storage |
+| **Reset the app's data before each test** | On by default: every test starts signed out, with empty storage, and the app file is installed again (so a new build with the same version number is really tested) |
 | **Show the emulator window** | Off by default: the emulator runs without a window |
 | **Extra Appium capabilities** | Optional JSON for anything else Appium supports, for example `{ "appium:language": "fr", "appium:locale": "FR" }` |
 
@@ -106,11 +106,31 @@ one still does, the step passes and the run reports the healed locator.
 | Extract | An element's text, an attribute (for example `resource-id`, `content-desc`, `checked`) or the number of matches |
 | Screenshot | The screen, or one element |
 | Open (navigate) | A deep link such as `careclinic://patients/42`. An app has no pages to open by path |
+| Handle dialog | Answers the dialog on screen (an app alert or a system permission request): accept or dismiss, or a named button, waiting for it to appear |
 | Conditions | `util.if` / `util.loop` page conditions ("if the rating dialog is visible → close it") |
 
+### Gestures and device steps
+
+These steps are for phone apps (Android and iOS). **Go back** also works in a browser: it presses the browser's Back
+button.
+
+| Step | What it does |
+| --- | --- |
+| Swipe | `up`, `down`, `left` or `right`, on an element or on the screen; with a **target** element, drags the element onto it |
+| Long press | Holds the element (default 1 s) |
+| Scroll to | Swipes until the element shows (default: down, at most 10 swipes); fails when the screen stops moving |
+| Go back | Android's Back key; on iOS the navigation bar's back button |
+| Hide keyboard | Closes the on-screen keyboard (nothing happens when it is already closed) |
+| Rotate | `landscape` or `portrait` |
+| App | `launch`, `close`, `background` (for some seconds, then back) or `reset` (clear the app's data) |
+| Open link | A deep link (`careclinic://patients`) |
+| Set location | A latitude and longitude for the device's GPS (emulators and simulators) |
+| Permission | Grants or revokes `camera`, `location`, `microphone`, `contacts`, `photos`, `notifications`, `calendar`, or a platform permission name (`android.permission.…`) |
+| Notification | Sends a push notification to the app (iOS simulators; on Android it needs the app's own push service) |
+
 Steps that only make sense in a browser are reported as not available, and the test stops with a clear message.
-These are hover, right-click, uploads, drag and drop, tabs, frames, browser dialogs, network faking, storage, clock
-control, downloads, visual checkpoints and page performance. API, database, email and utility steps work in the same
+These are hover, right-click, uploads, drag and drop (use **Swipe** with a target), tabs, frames, network faking,
+storage, clock control, downloads, visual checkpoints and page performance. API, database, email and utility steps work in the same
 test as usual. For example, one test can create a patient through the API, then check that it appears in the app.
 
 ## Evidence
@@ -131,9 +151,39 @@ apps get, which opens the app beside the steps, is planned for native apps.
 
 ## Recording
 
-Recording Android apps comes with the native recorder (planned): a mirror of the device screen in the dashboard where
-clicks become steps. For now, add steps in the editor. The element tree from a failed run, or from
-`adb shell uiautomator dump`, shows the ids and texts to use.
+**Record** on an Android or iOS app starts the app on the device and shows its screen in the dashboard, refreshed
+about once a second. Use the app from there:
+
+- **Click the screen** to tap. A text field gets the focus; type in **Text to type** and press **Type**, which records
+  a **Fill** step. Typing again into the same field updates that step. Password fields become secrets
+  (`{{secret.password}}`), as in the browser recorder.
+- Choose what a click does: **Tap**, **Long press**, **Check text** (records a check of the text the element shows
+  now) or **Check visible**.
+- **Swipe** buttons, **Back** and **Hide keyboard**.
+
+Each action is done in the app and recorded with ranked locators from the element tree: the resource id or
+accessibility identifier first, then the label, hint or placeholder, the role with its text, the text, and XPath
+last. Every locator is checked against the app before it is kept. An element without any id, text or label is not
+recorded: the recorder explains why instead. Give the element an accessibility id in the app. **Stop & review** then
+works as for the browser: edit, reorder, save as a new scenario or add to one.
+
+## Diagnosis
+
+A failed step in a phone app also looks at the device. The explanation then says:
+
+- **the app crashed**: a crash in the device log, quoted;
+- **the app was no longer on screen**: closed or in the background;
+- **a dialog covered the app**: the dialog's text, for example a permission request. The fix suggests a **Handle
+  dialog** or **Permission** step;
+- **the element is below the visible screen**: add a **Scroll to** step;
+- **the keyboard may cover the element**: add **Hide keyboard**;
+- **the app did not start**: run `stepforge doctor native` and check the environment.
+
+## Campaigns on several devices
+
+Give each device its own environment (one emulator, one phone, one iPhone simulator…) and choose them in a campaign.
+A campaign runs a phone app once per environment, with one combined report. The browsers and screen sizes of the
+campaign only apply to web apps.
 
 ## Running in CI
 

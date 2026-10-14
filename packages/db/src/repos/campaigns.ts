@@ -129,8 +129,20 @@ export function deleteCampaign(db: StepForgeDb, id: string): void {
   });
 }
 
-/** The campaign's matrix: every environment × browser × screen size. */
-export function campaignMatrix(c: Campaign): { environmentId: string; browser: string; viewport: string }[] {
+/**
+ * The campaign's matrix: every environment × browser × screen size. Desktop and phone apps bring their own window
+ * or device (one environment per emulator, simulator or phone), so they run once per environment.
+ */
+export function campaignMatrix(
+  c: Campaign,
+  platform = 'web',
+): { environmentId: string; browser: string; viewport: string }[] {
+  if (platform !== 'web')
+    return c.environmentIdsJson.map((environmentId) => ({
+      environmentId,
+      browser: c.browsersJson[0] ?? 'chromium',
+      viewport: c.viewportsJson[0] ?? 'desktop',
+    }));
   return c.environmentIdsJson.flatMap((environmentId) =>
     c.browsersJson.flatMap((browser) =>
       c.viewportsJson.map((viewport) => ({ environmentId, browser, viewport })),

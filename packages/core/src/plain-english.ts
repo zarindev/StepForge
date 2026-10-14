@@ -184,6 +184,50 @@ export function describeStep(step: AnyStep): string {
     case 'ui.tap':
       s = `Tap ${t}`;
       break;
+    case 'ui.swipe':
+      s = Array.isArray(p.target)
+        ? `Drag ${t} onto another element`
+        : `Swipe ${String(p.direction ?? 'up')}${step.locators.length ? ` on ${t}` : ''}`;
+      break;
+    case 'ui.longPress':
+      s = `Long-press ${t}`;
+      break;
+    case 'ui.scrollTo':
+      s = `Scroll ${String(p.direction ?? 'down')} until ${t} shows`;
+      break;
+    case 'ui.back':
+      s = 'Go back';
+      break;
+    case 'ui.hideKeyboard':
+      s = 'Hide the keyboard';
+      break;
+    case 'ui.rotate':
+      s = `Turn the device to ${String(p.orientation ?? 'landscape')}`;
+      break;
+    case 'ui.appState': {
+      const a = String(p.action ?? 'launch');
+      s =
+        a === 'close'
+          ? 'Close the app'
+          : a === 'background'
+            ? `Put the app in the background${p.seconds ? ` for ${String(p.seconds)} s` : ''}`
+            : a === 'reset'
+              ? 'Reset the app’s data'
+              : 'Open the app';
+      break;
+    }
+    case 'ui.deepLink':
+      s = `Open the link ${String(p.url ?? '')}`;
+      break;
+    case 'ui.setLocation':
+      s = `Set the device location to ${String(p.latitude ?? '')}, ${String(p.longitude ?? '')}`;
+      break;
+    case 'ui.permission':
+      s = `${p.action === 'revoke' ? 'Revoke' : 'Grant'} the ${String(p.permission ?? '')} permission`;
+      break;
+    case 'ui.pushNotification':
+      s = `Send a notification "${String(p.title ?? '')}"`;
+      break;
     case 'ui.download':
       s = `Download the file from ${t}`;
       break;

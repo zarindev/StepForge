@@ -2,6 +2,19 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — phone gestures, recording and diagnosis
+
+Phone apps (Android and iOS) get their own steps: **swipe** (or drag one element onto another), **long press**,
+**scroll to**, **go back**, **hide keyboard**, **rotate**, **open / close / background / reset the app**, **deep
+links**, **location**, **permissions** and **push notifications** (iOS simulators). **Handle dialog** now answers a
+dialog on a phone's screen, such as a permission request. The **recorder** shows the phone's screen in the dashboard:
+click it to tap, type into fields, swipe, or add checks. Each action becomes a step with locators checked against
+the app. When a step fails, the **diagnosis** now looks at the device too: the app crashed, it was no longer on
+screen, a dialog covered it, the element was below the screen, or the keyboard covered it. **Campaigns** run a phone
+app once per environment, so one campaign can cover several devices.
+→ [Gestures](ANDROID_APPS.md#gestures-and-device-steps) · [Recording](ANDROID_APPS.md#recording) ·
+[Diagnosis](ANDROID_APPS.md#diagnosis)
+
 ## Update — iOS apps
 
 StepForge now tests **iPhone and iPad apps** on the iOS Simulator or a real iPhone, from a Mac with Xcode. Set an

@@ -55,7 +55,7 @@ How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth stagi
 | `scroll` | `x`, `y` (page wheel) | with a locator: scrolls it into view |
 | `switchTab` | `index` or `urlContains` | without params: newest tab. In a desktop (Electron) app, each window is a tab ([DESKTOP_APPS.md](DESKTOP_APPS.md)) |
 | `closeTab` | — | switches to the remaining newest tab |
-| `handleDialog` | `action` (`accept`/`dismiss`), `promptText` | put it **before** the step that opens the dialog; other dialogs are dismissed |
+| `handleDialog` | `action` (`accept`/`dismiss`), `promptText`, `buttonLabel` | browser: put it **before** the step that opens the dialog; other dialogs are dismissed. Phone apps: answers the dialog on screen (or the next one to appear), optionally by its button |
 | `switchFrame` | `selector` (iframe CSS) or `main: true` | |
 | `waitFor` | with locator: `state` (`visible`/`hidden`/`attached`/`detached`); else `url` (glob) or `loadState` | prefer this over `util.wait` |
 | `screenshot` | `fullPage` | with a locator: element screenshot; kept as evidence |
@@ -69,6 +69,17 @@ How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth stagi
 | `storage` | `kind` (`cookie`/`local`/`session`), `action` (`get`/`set`/`remove`/`clear`), `name`, `value` | `get`: targets `value`, `exists`; output: the value |
 | `networkSummary` | `since` (`test` default, or `lastNavigation`: since the last `navigate`) | the page traffic as checks: targets `requests`, `bytes`, `kb`, `failed`, `thirdPartyRequests`, `thirdPartyHosts`, `hosts`, `thirdPartyHostNames`, `requests:<type>`, `bytes:<type>` (type = `script`, `image`, `fetch`, `document`, …) |
 | `setClock` | `action` (`set` = fixed time, `install` = runs from `time`, `fastForward` + `ms`), `time` (ISO date or epoch ms) | put `install` before `ui.navigate` so the page's timers use it |
+| `back` | — | browser: the Back button; Android: the Back key; iOS: the navigation bar's back button |
+| `swipe` | `direction` (`up`/`down`/`left`/`right`), `percent` (0–1); or `target` (locators) to drag onto | phone apps; with an element, swipes on it |
+| `longPress` | `durationMs` (default 1000) | phone apps |
+| `scrollTo` | `direction` (`down`/`up`), `maxSwipes` (default 10) | phone apps; fails when the screen stops moving |
+| `hideKeyboard` | — | phone apps |
+| `rotate` | `orientation` (`landscape`/`portrait`) | phone apps |
+| `appState` | `action` (`launch`/`close`/`background`/`reset`), `seconds` (background) | phone apps |
+| `deepLink` | `url` (`myapp://…`) | phone apps |
+| `setLocation` | `latitude`, `longitude` | phone apps (emulators, simulators) |
+| `permission` | `permission` (`camera`, `location`, `microphone`, `contacts`, `photos`, `notifications`, `calendar` or a platform name), `action` (`grant`/`revoke`) | phone apps; iOS notifications: answer the app's dialog with `handleDialog` |
+| `pushNotification` | `title`, `body` | iOS simulators |
 
 `ui.assert` checks: `visible`, `hidden`, `text`, `textContains`, `textMatches` (regex), `value`, `count`,
 `attribute` (+ `attribute` name), `enabled`, `disabled`, `checked`, `unchecked`, `url`, `urlContains`,
