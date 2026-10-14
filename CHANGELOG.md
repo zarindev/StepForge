@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- **Run queue priorities** (like Cerberus Testing's queue priorities): runs have a priority (high, normal, low) set in
+  the Run dialog, schedules, campaigns or with `stepforge run --priority`; waiting runs start by priority, then oldest
+  first. The Runs page shows the queue — the run in progress and the waiting ones in start order — with **Run next**,
+  a priority picker and Cancel. `GET /api/runs/queue`, `POST /api/runs/:id/priority`. Migration 0012.
 - **Network traffic breakdown** (like Cerberus Testing's network traffic statistics): each request now records its
   size and the step that made it; the run page's Network evidence has a **Breakdown** (requests, bytes, failures,
   third-party hosts; by type; by host with third parties marked; slowest; largest; failed) and a filterable request
@@ -19,10 +23,6 @@
   `api.kafkaProduce` / `api.kafkaConsume` (wait for the first matching message since the test started; key, text or
   JSONPath match; TLS and SASL), and `api.ftp` (upload, download, list, delete, exists over FTP, FTPS or SFTP). CI
   runs the Kafka tests against Apache Kafka.
-
-### Fixed
-- A step's screenshot is tried once more when the first try times out on a busy machine (a CI run had a step without
-  its screenshot).
 - **Manual test runs** (like Cerberus Testing's manual executions): Run → *How: Manual*. Nothing is executed; a
   tester follows each test's steps in plain English — blocks, hooks and called scenarios expanded, test data and
   environment variables filled in, secrets kept hidden — and records passed / failed / blocked / skipped per step with
@@ -52,7 +52,6 @@
   or a page check, re-checked before every pass; the count is a safety limit, default 100). The step form shows the
   condition's fields and the element picker; the plain-English view reads “Repeat while the "Load more" button is
   visible”. Code export marks these steps TODO for now.
-
 - **Setup/teardown hooks** (like Cerberus Testing's pre/post testing): a module's menu sets a block to run before
   and one after every test of the module and its sub-modules; a scenario's Details tab adds its own and lists the
   inherited ones. Before-hooks run outermost first and a failure skips the test; after-hooks run innermost first and
@@ -93,6 +92,9 @@
   works as before.
 
 ### Fixed
+- The recorder recorded a slow first page load twice (seen on Windows CI).
+- A step's screenshot is tried once more when the first try times out on a busy machine (a CI run had a step without
+  its screenshot).
 - Opening an `if`/`loop` step whose nested steps were created through the API (without `locators`) crashed the
   step editor; missing fields now get their defaults.
 - Diagnosis: a failed response-time check on an API step is now diagnosed as a slow API (rule `api-slow-response`)

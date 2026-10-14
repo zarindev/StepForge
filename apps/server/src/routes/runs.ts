@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
+import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 
 type P<T extends string> = { Params: Record<T, string> };
@@ -163,6 +164,12 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
     return { ok: true, baseline: visual.baseline };
   });
 
+  // The run queue: what runs now and what waits, in order; a waiting run's priority can change.
+  app.get('/api/runs/queue', async () => runs.queueState());
+  app.post<P<'id'>>('/api/runs/:id/priority', async (req) => {
+    const { priority } = z.object({ priority: z.enum(['high', 'normal', 'low', 'next']) }).parse(req.body);
+    return runs.setPriority(req.params.id, priority);
+  });
   app.post<P<'id'>>('/api/runs/:id/cancel', async (req) => runs.cancel(req.params.id));
   app.post<P<'id'>>('/api/runs/:id/resume', async (req) => runs.resume(req.params.id));
   app.delete<P<'id'>>('/api/runs/:id', async (req, reply) => {

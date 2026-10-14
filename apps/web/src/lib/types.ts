@@ -153,6 +153,8 @@ export type RunOptionsForm = {
   screenshots: 'off' | 'onFailure' | 'everyStep';
   /** Record Web Vitals after every navigation. */
   pageMetrics?: boolean;
+  /** Place in the run queue. */
+  priority?: 'high' | 'normal' | 'low';
 };
 export type RunScope =
   | { type: 'application' }
@@ -168,6 +170,8 @@ export type Run = {
   trigger: string;
   /** Set when the run is one combination of a campaign run. */
   campaignRunId?: string | null;
+  /** Queue order: higher first (high 1, normal 0, low -1, "next" above all). */
+  priority?: number;
   /** manual: a person follows the steps and records the results. */
   mode?: 'auto' | 'manual';
   scopeJson: RunScope;

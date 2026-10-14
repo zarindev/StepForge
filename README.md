@@ -77,6 +77,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | **Reusable blocks** | ✅ Before/after-each-test hooks per module or scenario (after-hooks run even after a failure) · shared step groups ("Sign in") with inputs · make a block from selected steps · "used by" list · a fix inside a block repairs every test using it (one-click locator fix lands in the block) · failures grouped by block — see [docs/BLOCKS.md](docs/BLOCKS.md) |
 | **Element repository** | ✅ Named, shared UI elements ("Save patient button") · steps point at them · fix a locator once and every step follows (the one-click diagnosis fix updates the element) · recordings reuse matching elements — see [docs/ELEMENTS.md](docs/ELEMENTS.md) |
 | **Manual runs** | ✅ A tester follows each test's steps in plain English and records passed / failed / blocked with notes and screenshots · manual checks inside automated tests · results in the same history and reports — see [docs/MANUAL_RUNS.md](docs/MANUAL_RUNS.md) |
+| **Run queue** | ✅ Priorities (high, normal, low) from the Run dialog, schedules, campaigns or `--priority` · queue on the Runs page with **Run next** and Cancel |
 | **Campaigns** | ✅ Saved test sets (all, or modules / tags / scenarios) run across environments × browsers × screen sizes in one click · combined report with each test's result per combination · rerun only what failed, only where it failed · from the dashboard, a schedule or `stepforge campaign` in CI · one summary notification — see [docs/CAMPAIGNS.md](docs/CAMPAIGNS.md) |
 | **Test data library** | ✅ Named data sources: tables kept in StepForge, CSV files, read-only SQL queries, API calls · a `util.useData` step picks the first, a random, a given or a matching row, or one not used yet in the run · preview in any environment — see [docs/TEST_DATA.md](docs/TEST_DATA.md) |
 | **Diagnosis** | ✅ Rule-based "where / why / whose issue / how to fix" · last-green diff · locator suggestions · automatic bug reports (PDF, Jira/Trello CSV, Markdown) |
@@ -438,10 +439,9 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] Showcase material: case study, samples, screenshots and clips
 - [x] Cerberus-inspired features: reusable blocks with inputs, element repository, campaigns, test data library,
       before/after hooks, page conditions, manual test runs, SOAP / Kafka / FTP steps, Slack / Teams / webhook
-      notifications, network traffic breakdown
+      notifications, network traffic breakdown, run queue priorities
 - [x] Every kind of web app: visual checkpoints, network waiting and mocking, downloads, mobile web with touch,
       clock control, storage, per-environment browser settings
-- [ ] Run queue priorities
 - [ ] Native mobile and desktop apps — [plan](docs/NATIVE_APPS_PLAN.md)
 - [ ] An optional desktop installer (Electron)
 

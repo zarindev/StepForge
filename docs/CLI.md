@@ -40,7 +40,7 @@ Every command accepts `--data-dir <dir>` (default: `./data`, or `STEPFORGE_DATA_
 | `--app <slug>` | Application (the slug shown by `list`) |
 | `--env <name>` | Environment name (case-insensitive) |
 | `--tag <name>` / `--module <name>` / `--scenario <name>` | Run only a tag, a module (with sub-modules) or named scenarios (`--scenario` can repeat). Pick one. |
-| `--browser chromium\|firefox\|webkit`, `--workers <n>`, `--retries <n>`, `--headed` | Run options, as in the dashboard's Run dialog |
+| `--browser chromium\|firefox\|webkit`, `--workers <n>`, `--retries <n>`, `--headed`, `--priority high\|normal\|low` | Run options, as in the dashboard's Run dialog (`--priority` sets the place in the run queue) |
 | `--junit <file>` | JUnit XML for CI test viewers (one suite per module; failures carry the diagnosis) |
 | `--html <file>` / `--pdf <file>` | The run report ("Prepared by …" from Settings → Reports) |
 | `--notify <channel>` | Send the summary to a notification channel from Settings → Notifications (can repeat) |

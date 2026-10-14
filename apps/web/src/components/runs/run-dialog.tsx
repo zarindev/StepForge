@@ -219,6 +219,17 @@ function RunDialog({ req }: { req: Request }) {
                   <option value="mobile">Mobile 390</option>
                 </Select>
               </Field>
+              <Field label="Priority">
+                <Select
+                  aria-label="Priority"
+                  value={opts.priority ?? 'normal'}
+                  onChange={(e) => set({ priority: e.target.value as RunOptionsForm['priority'] })}
+                >
+                  <option value="high">High — before other waiting runs</option>
+                  <option value="normal">Normal</option>
+                  <option value="low">Low — after other waiting runs</option>
+                </Select>
+              </Field>
               <Field label="Workers">
                 <Select
                   aria-label="Workers"

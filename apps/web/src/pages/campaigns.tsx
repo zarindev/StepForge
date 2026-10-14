@@ -62,7 +62,7 @@ type Campaign = {
   environmentIdsJson: string[];
   browsersJson: string[];
   viewportsJson: string[];
-  optionsJson: { workers?: number; retries?: number };
+  optionsJson: { workers?: number; retries?: number; priority?: 'high' | 'normal' | 'low' };
   notifyChannelIdsJson: string[];
   lastRun: CampaignRunSummary | null;
 };
@@ -364,6 +364,7 @@ function CampaignEditor({
   const [viewports, setViewports] = useState<string[]>(initial?.viewportsJson ?? ['desktop']);
   const [workers, setWorkers] = useState(initial?.optionsJson.workers ?? 2);
   const [retries, setRetries] = useState(initial?.optionsJson.retries ?? 0);
+  const [priority, setPriority] = useState(initial?.optionsJson.priority ?? 'normal');
   const [channelIds, setChannelIds] = useState<string[]>(initial?.notifyChannelIdsJson ?? []);
   const combos = environmentIds.length * browsers.length * viewports.length;
   const nothing = !all && modules.length + tagIds.length + scenarios.length === 0;
@@ -376,7 +377,7 @@ function CampaignEditor({
         environmentIds,
         browsers,
         viewports,
-        options: { workers, retries },
+        options: { workers, retries, priority },
         channelIds,
       };
       return initial
@@ -540,6 +541,17 @@ function CampaignEditor({
                   {n}
                 </option>
               ))}
+            </Select>
+          </Field>
+          <Field label="Queue priority">
+            <Select
+              aria-label="Queue priority"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as 'high' | 'normal' | 'low')}
+            >
+              <option value="high">High</option>
+              <option value="normal">Normal</option>
+              <option value="low">Low</option>
             </Select>
           </Field>
         </div>

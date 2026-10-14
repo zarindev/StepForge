@@ -333,6 +333,8 @@ export const runs = sqliteTable(
     mode: text('mode', { enum: ['auto', 'manual'] })
       .notNull()
       .default('auto'),
+    /** Queue order: higher runs first (high 1, normal 0, low -1; "Run next" goes above all), then oldest first. */
+    priority: integer('priority').notNull().default(0),
     ...timestamps,
   },
   (t) => [

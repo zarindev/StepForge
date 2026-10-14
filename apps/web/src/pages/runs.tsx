@@ -4,6 +4,7 @@ import { GitCompare, Play, PlayCircle, RotateCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { formatDuration, StatusPill, timeAgo, TotalsBar } from '@/components/runs/status';
 import { openRunDialog } from '@/components/runs/run-dialog';
+import { RunQueue } from '@/components/runs/run-queue';
 import { PageHeader } from '@/components/shell/layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -58,6 +59,7 @@ export function RunsPage() {
           </>
         }
       />
+      <RunQueue />
       {runs.isError && <ErrorState error={runs.error} onRetry={() => runs.refetch()} />}
       {runs.isPending && <Skeleton className="h-64" />}
       {runs.data?.length === 0 && (

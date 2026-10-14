@@ -259,6 +259,8 @@ export const RunOptionsInput = z.object({
   timeoutMs: z.number().int().min(1000).max(600_000).optional(),
   /** Record Web Vitals (LCP, CLS, TTFB, load time…) after every ui.navigate. */
   pageMetrics: z.boolean().default(false),
+  /** Place in the run queue: high runs before normal, normal before low. */
+  priority: z.enum(['high', 'normal', 'low']).default('normal'),
 });
 export type RunOptionsInput = z.infer<typeof RunOptionsInput>;
 

@@ -57,6 +57,9 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
   `util.manual` steps describe checks only a person can do. [MANUAL_RUNS.md](MANUAL_RUNS.md)
 - **Evidence** — screenshots, video, Playwright traces (opened in the local Trace Viewer), console and network logs,
   downloads, API requests and responses, database results, received emails.
+- **Run queue** — one run at a time; waiting runs start by priority (high, normal, low — in the Run dialog, schedules,
+  campaigns and `--priority` in the CLI), then oldest first. The Runs page shows the queue with **Run next**, a
+  priority picker and Cancel.
 - **Campaigns** — a saved test set across environments × browsers × sizes in one click, a combined report, and
   *Rerun failed* only where it failed. [CAMPAIGNS.md](CAMPAIGNS.md)
 - **Schedules and notifications** — cron schedules for tests or campaigns; summaries to Slack, Microsoft Teams,
@@ -107,5 +110,3 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 ## Coming next
 
 - Native mobile and desktop apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
-- More features inspired by Cerberus Testing (run queue priorities): see the
-  [CHANGELOG](../CHANGELOG.md) as they land.

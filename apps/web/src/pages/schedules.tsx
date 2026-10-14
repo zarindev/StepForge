@@ -49,6 +49,7 @@ type Draft = {
   scope: RunScope;
   browser: 'chromium' | 'firefox' | 'webkit';
   retries: number;
+  priority: 'high' | 'normal' | 'low';
   enabled: boolean;
   channelIds: string[];
   /** Set when the schedule runs a campaign (its environments, browsers and sizes) instead of one run. */
@@ -109,7 +110,7 @@ function ScheduleEditor({
         ...(d!.campaignId ? { campaignId: d!.campaignId } : { environmentId: d!.environmentId }),
         cron: d!.cron.trim(),
         scope: d!.scope,
-        options: { browser: d!.browser, retries: d!.retries },
+        options: { browser: d!.browser, retries: d!.retries, priority: d!.priority },
         enabled: d!.enabled,
         channelIds: d!.channelIds,
       };
@@ -309,6 +310,17 @@ function ScheduleEditor({
             </Select>
           </Field>
         )}
+        <Field label="Queue priority" hint="When another run is going, which waiting run starts first">
+          <Select
+            aria-label="Queue priority"
+            value={d.priority}
+            onChange={(e) => setD({ ...d, priority: e.target.value as Draft['priority'] })}
+          >
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+          </Select>
+        </Field>
         <Field label="Retries for failed tests">
           <Select
             aria-label="Retries"
@@ -462,6 +474,7 @@ export function SchedulesPage() {
     scope: { type: 'application' },
     browser: 'chromium',
     retries: 0,
+    priority: 'normal',
     enabled: true,
     channelIds: [],
     campaignId: '',
@@ -475,6 +488,7 @@ export function SchedulesPage() {
     scope: s.scopeJson,
     browser: s.optionsJson.browser ?? 'chromium',
     retries: s.optionsJson.retries ?? 0,
+    priority: s.optionsJson.priority ?? 'normal',
     enabled: s.enabled,
     channelIds: s.notifyChannelIdsJson,
     campaignId: s.campaignId ?? '',

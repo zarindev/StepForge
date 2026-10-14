@@ -47,6 +47,7 @@ type Totals = {
 };
 
 const now = () => new Date().toISOString();
+const PRIORITY = { high: 1, normal: 0, low: -1 } as const;
 const FINAL_ITEM = ['passed', 'failed', 'broken', 'skipped', 'flaky'];
 
 /**
@@ -116,6 +117,7 @@ export class RunManager {
           workers: d.options.workers,
           optionsJson: d.options,
           mode: d.mode,
+          priority: PRIORITY[d.options.priority],
           // A manual run starts at once: nothing is queued, people record the results.
           status: d.mode === 'manual' ? 'running' : 'queued',
           startedAt: d.mode === 'manual' ? now() : null,
@@ -223,8 +225,74 @@ export class RunManager {
     }
   }
 
+  /** The waiting run to start next: highest priority, then the oldest. */
+  private takeNext(): string | undefined {
+    if (!this.queue.length) return undefined;
+    const waiting = this.db
+      .select({ id: schema.runs.id, priority: schema.runs.priority, createdAt: schema.runs.createdAt })
+      .from(schema.runs)
+      .where(inArray(schema.runs.id, this.queue))
+      .all();
+    const order = new Map(this.queue.map((id, i) => [id, i]));
+    waiting.sort(
+      (a, b) =>
+        b.priority - a.priority ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        order.get(a.id)! - order.get(b.id)!,
+    );
+    const next = waiting[0]?.id ?? this.queue[0];
+    this.queue = this.queue.filter((q) => q !== next);
+    return next;
+  }
+
+  /** Changes a waiting run's place: high / normal / low, or "next" (before everything waiting). */
+  setPriority(runId: string, priority: 'high' | 'normal' | 'low' | 'next'): Run {
+    const run = this.getRun(runId);
+    if (run.status !== 'queued')
+      throw new repo.RepoError(
+        409,
+        'conflict',
+        `Only waiting runs can be reordered (this one is ${run.status})`,
+      );
+    let value: number = priority === 'next' ? 0 : PRIORITY[priority];
+    if (priority === 'next') {
+      const top = this.db
+        .select({ priority: schema.runs.priority })
+        .from(schema.runs)
+        .where(eq(schema.runs.status, 'queued'))
+        .all()
+        .reduce<number>((m, r) => Math.max(m, r.priority), PRIORITY.high);
+      value = top + 1;
+    }
+    this.db
+      .update(schema.runs)
+      .set({ priority: value, updatedAt: now() })
+      .where(eq(schema.runs.id, runId))
+      .run();
+    this.publishRun(runId);
+    return this.getRun(runId);
+  }
+
+  /** The run in progress and the waiting ones, in the order they will start. */
+  queueState() {
+    const active = this.active ? this.getRun(this.active.runId) : null;
+    const waiting = this.db
+      .select()
+      .from(schema.runs)
+      .where(and(eq(schema.runs.status, 'queued'), eq(schema.runs.mode, 'auto')))
+      .all()
+      .sort((a, b) => b.priority - a.priority || a.createdAt.localeCompare(b.createdAt));
+    const name = new Map<string, string>();
+    const label = (r: Run) => {
+      if (!name.has(r.applicationId))
+        name.set(r.applicationId, repo.getApplication(this.db, r.applicationId).name);
+      return { ...r, applicationName: name.get(r.applicationId)! };
+    };
+    return { active: active && label(active), waiting: waiting.map(label) };
+  }
+
   private async drain(): Promise<void> {
-    for (let next = this.queue.shift(); next; next = this.queue.shift()) {
+    for (let next = this.takeNext(); next; next = this.takeNext()) {
       try {
         await this.execute(next);
       } catch (err) {

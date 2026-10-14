@@ -44,6 +44,7 @@ run
   --browser <name>      chromium | firefox | webkit
   --workers <n>         Parallel tests (1–8)
   --retries <n>         Retries for failed tests (0–3)
+  --priority <level>    high | normal | low (place in the run queue)
   --headed              Show the browser
   --junit <file>        Write JUnit XML (for CI)
   --html <file>         Write the HTML report
@@ -134,6 +135,7 @@ const OPTIONS = {
   browser: { type: 'string' },
   workers: { type: 'string' },
   retries: { type: 'string' },
+  priority: { type: 'string' },
   headed: { type: 'boolean' },
   junit: { type: 'string' },
   html: { type: 'string' },
@@ -252,6 +254,7 @@ const run: Handler = async (c, v, io) => {
     ...(typeof v.browser === 'string' && { browser: v.browser }),
     ...(num('workers') !== undefined && { workers: num('workers') }),
     ...(num('retries') !== undefined && { retries: num('retries') }),
+    ...(typeof v.priority === 'string' && { priority: v.priority }),
     ...(v.headed && { headed: true }),
   };
 
