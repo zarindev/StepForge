@@ -432,6 +432,7 @@ export function getTree(db: StepForgeDb, applicationId: string) {
           status: scenarios.status,
           owner: scenarios.owner,
           version: scenarios.version,
+          execution: scenarios.execution,
         })
         .from(scenarios)
         .where(inArray(scenarios.moduleId, modIds))

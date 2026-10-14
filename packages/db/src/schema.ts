@@ -202,6 +202,10 @@ export const scenarios = sqliteTable(
     version: integer('version').notNull().default(1),
     setupBlockId: fk('setup_block_id', () => blocks.id, 'set null'),
     teardownBlockId: fk('teardown_block_id', () => blocks.id, 'set null'),
+    /** automated: StepForge runs it (and schedules do); manual: a person runs it, pending until they do. */
+    execution: text('execution', { enum: ['automated', 'manual'] })
+      .notNull()
+      .default('automated'),
     ...timestamps,
   },
   (t) => [index('scenarios_module_idx').on(t.moduleId)],

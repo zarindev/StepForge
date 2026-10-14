@@ -38,7 +38,7 @@ type Line = { number: string; text: string; depth: number; group: boolean };
 type Checklist = {
   item: { status: string; errorMessage: string | null };
   lines: Line[];
-  results: { number: string; status: string; note: string; screenshot?: string }[];
+  results: { number: string; status: string; note: string; screenshots: string[] }[];
 };
 type RunDetail = {
   status: string;
@@ -165,7 +165,7 @@ describe('manual runs', () => {
     });
     expect(done.results.find((r) => r.number === '3')).toMatchObject({
       status: 'failed',
-      screenshot: shot.path,
+      screenshots: [shot.path],
     });
 
     const detail = await ok<RunDetail>('GET', `/api/runs/${run.id}`);

@@ -96,9 +96,15 @@ export class RunManager {
     const env = repo.getEnvironment(this.db, d.environmentId);
     if (env.applicationId !== d.applicationId)
       throw new repo.RepoError(400, 'invalid', 'Environment belongs to another application');
-    const planned = expandScope(this.db, d.applicationId, d.scope);
+    const planned = expandScope(this.db, d.applicationId, d.scope, { includeManual: d.mode === 'manual' });
     if (planned.length === 0)
-      throw new repo.RepoError(400, 'empty_scope', 'Nothing to run: the selection has no runnable scenarios');
+      throw new repo.RepoError(
+        400,
+        'empty_scope',
+        d.mode === 'manual'
+          ? 'Nothing to run: the selection has no scenarios'
+          : 'Nothing to run: the selection has no automated scenarios (manual ones run in a manual run)',
+      );
 
     const runId = newId();
     this.db.transaction(() => {

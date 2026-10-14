@@ -1,0 +1,1 @@
+ALTER TABLE `scenarios` ADD `execution` text DEFAULT 'automated' NOT NULL;

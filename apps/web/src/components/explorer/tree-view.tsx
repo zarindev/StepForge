@@ -328,6 +328,15 @@ function ScenarioRow({
         <KindIcon kind={s.kind} />
         <span className={cn('truncate', selected && 'font-medium')}>{s.name}</span>
         {ctx.lastResults[s.id] && <StatusIcon status={ctx.lastResults[s.id]!} className="h-3.5 w-3.5" />}
+        {s.execution === 'manual' && (
+          <Badge
+            tone="indigo"
+            className="shrink-0"
+            title={ctx.lastResults[s.id] ? 'Manual test' : 'Manual test, not run yet'}
+          >
+            {ctx.lastResults[s.id] ? 'manual' : 'manual · pending'}
+          </Badge>
+        )}
         <Badge tone={PRIORITY_TONE[s.priority]} className="ml-auto shrink-0">
           {s.priority}
         </Badge>

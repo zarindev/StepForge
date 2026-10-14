@@ -160,6 +160,8 @@ export const ScenarioInput = z.object({
   /** Hooks: a block run before / after this test (inside the module's hooks). */
   setupBlockId: z.string().nullable().default(null),
   teardownBlockId: z.string().nullable().default(null),
+  /** automated: run by StepForge (and schedules); manual: run by a person, pending until then. */
+  execution: z.enum(['automated', 'manual']).default('automated'),
 });
 
 export const TestTechnique = z.enum([

@@ -27,8 +27,8 @@ export default tseslint.config(
     },
   },
   {
-    // Runs inside the recorded browser page, not in Node.
-    files: ['packages/recorder/src/injected.js'],
+    // Run inside the browser page (recorder toolbar, manual testing panel), not in Node.
+    files: ['packages/recorder/src/injected.js', 'apps/server/src/runner/manual-toolbar.js'],
     languageOptions: {
       globals: {
         window: 'readonly',

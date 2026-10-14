@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Download, FileCode2, FileText, Sheet } from 'lucide-react';
 import { Menu } from '@/components/ui/menu';
 import { ResultsGrid } from '@/components/database/results-grid';
@@ -32,7 +32,7 @@ import { toastError } from '@/components/ui/toast';
 import { api, download, artifactUrl } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
 import { useLiveEvent, type LiveEvent } from '@/lib/live';
-import { useRun, useRunItem } from '@/lib/queries';
+import { qk, useRun, useRunItem } from '@/lib/queries';
 import { groupOf, LAYER } from '@/lib/steps';
 import type { RunItem, StepResultRow } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -64,11 +64,17 @@ export function RunDetailPage() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
   const [live, setLive] = useState<Record<string, { steps: LiveStep[]; current?: LiveStep }>>({});
   const [logs, setLogs] = useState<LogLine[]>([]);
+  const qc = useQueryClient();
 
   const onEvent = useCallback(
     (e: LiveEvent) => {
       if (e.runId !== runId) return;
       const itemId = e.itemId as string | undefined;
+      // Manual tests: results, screenshots and the session video arrive from the tester's browser.
+      if ((e.type === 'manual.updated' || e.type === 'manual.browser') && itemId) {
+        void qc.invalidateQueries({ queryKey: qk.runItem(itemId) });
+        return;
+      }
       if (e.type === 'step.started' && itemId) {
         setLive((l) => ({
           ...l,
@@ -98,7 +104,7 @@ export function RunDetailPage() {
         ]);
       }
     },
-    [runId],
+    [runId, qc],
   );
   useLiveEvent(onEvent);
 

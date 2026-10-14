@@ -10,6 +10,13 @@ import type { EventBus } from '../context.ts';
 import type { RunManager } from './manager.ts';
 import { testCaseData } from './scope.ts';
 
+type StoredExtra = {
+  blocked?: boolean;
+  screenshots?: string[];
+  clips?: { startMs: number; endMs: number; video?: string }[];
+  bug?: { id: string; code: string };
+};
+
 /** One line of a manual checklist: a step to do and check, or a heading (a block, a branch) over nested lines. */
 export type ManualLine = PlainLine & { group: boolean };
 export type ManualStatus = 'passed' | 'failed' | 'blocked' | 'skipped';
@@ -32,7 +39,20 @@ export const ManualSave = z.object({
         number: z.string().min(1).max(100),
         status: z.enum(['passed', 'failed', 'blocked', 'skipped', 'pending']),
         note: z.string().max(5000).optional(),
+        /** One screenshot (older clients), or several (each may be an annotated copy). */
         screenshot: z.string().max(500).optional(),
+        screenshots: z.array(z.string().max(500)).max(20).optional(),
+        /** Parts of the session's screen recording, in ms from its start. */
+        clips: z
+          .array(
+            z.object({
+              startMs: z.number().min(0),
+              endMs: z.number().min(0),
+              video: z.string().max(500).optional(),
+            }),
+          )
+          .max(20)
+          .optional(),
       }),
     )
     .max(2000),
@@ -147,19 +167,28 @@ export class ManualRunService {
       .where(eq(schema.stepResults.runItemId, itemId))
       .orderBy(schema.stepResults.position)
       .all()
-      .map((r) => ({
-        number: r.stepId ?? '',
-        status: ((r.responseJson as { blocked?: boolean } | null)?.blocked
-          ? 'blocked'
-          : r.status) as ManualStatus,
-        note: r.message ?? '',
-        screenshot: r.screenshotPath ?? undefined,
-      }));
+      .map((r) => {
+        const extra = (r.responseJson ?? {}) as StoredExtra;
+        return {
+          number: r.stepId ?? '',
+          status: (extra.blocked ? 'blocked' : r.status) as ManualStatus | 'pending',
+          note: r.message ?? '',
+          screenshots: extra.screenshots ?? (r.screenshotPath ? [r.screenshotPath] : []),
+          clips: extra.clips ?? [],
+          ...(extra.bug && { bug: extra.bug }),
+        };
+      });
+    const video = this.db
+      .select()
+      .from(schema.artifacts)
+      .where(and(eq(schema.artifacts.runItemId, itemId), eq(schema.artifacts.kind, 'video')))
+      .get();
     return {
       item,
       run: { id: run.id, status: run.status, mode: run.mode },
       lines: this.lines(itemId),
       results,
+      video: video?.path ?? null,
     };
   }
 
@@ -171,14 +200,35 @@ export class ManualRunService {
     const lines = this.lines(itemId);
     const given = new Map(body.results.map((r) => [r.number, r]));
     const folder = `runs/${run.id}/${item.id}/`;
+    const shotsOf = (r: z.infer<typeof ManualSave>['results'][number]) =>
+      r.screenshots ?? (r.screenshot ? [r.screenshot] : []);
+    // A step without a result is kept when it has a note, screenshots or clips (it stays pending).
     const rows = lines
       .map((line, position) => ({ line, position, r: given.get(line.number) }))
-      .filter((x) => !x.line.group && x.r && x.r.status !== 'pending');
+      .filter(
+        (x) =>
+          !x.line.group &&
+          x.r &&
+          (x.r.status !== 'pending' || x.r.note?.trim() || shotsOf(x.r).length || x.r.clips?.length),
+      );
     for (const { r } of rows)
-      if (r!.screenshot && (!r!.screenshot.startsWith(folder) || r!.screenshot.includes('..')))
-        throw new repo.RepoError(400, 'invalid', 'A screenshot must be one uploaded for this test');
+      for (const shot of shotsOf(r!))
+        if (!shot.startsWith(folder) || shot.includes('..'))
+          throw new repo.RepoError(
+            400,
+            'invalid',
+            'A screenshot must be one taken or uploaded for this test',
+          );
+    const previous = new Map(
+      this.db
+        .select()
+        .from(schema.stepResults)
+        .where(eq(schema.stepResults.runItemId, itemId))
+        .all()
+        .map((r) => [r.stepId, (r.responseJson ?? {}) as StoredExtra]),
+    );
 
-    const statuses = rows.map((x) => x.r!.status);
+    const statuses = rows.map((x) => x.r!.status).filter((st) => st !== 'pending');
     const firstFailed =
       rows.find((x) => x.r!.status === 'failed') ?? rows.find((x) => x.r!.status === 'blocked');
     const status = !body.done
@@ -202,16 +252,28 @@ export class ManualRunService {
             position,
             type: 'manual',
             label: line.text,
-            // Blocked is stored as broken (the test could not be done), and remembered as blocked.
-            status: r!.status === 'blocked' ? 'broken' : r!.status,
+            // Blocked is stored as broken (the test could not be done), and remembered as blocked. A finished test's
+            // open steps count as skipped.
+            status:
+              r!.status === 'blocked'
+                ? 'broken'
+                : r!.status === 'pending'
+                  ? body.done
+                    ? 'skipped'
+                    : 'pending'
+                  : r!.status,
             message: r!.note?.trim() || null,
-            screenshotPath: r!.screenshot ?? null,
+            screenshotPath: shotsOf(r!)[0] ?? null,
             responseJson: {
               path: line.number,
               depth: line.depth,
               manual: true,
               blocked: r!.status === 'blocked',
-            },
+              screenshots: shotsOf(r!),
+              clips: r!.clips ?? [],
+              // A bug filed from this step stays linked.
+              ...(previous.get(line.number)?.bug && { bug: previous.get(line.number)!.bug }),
+            } satisfies StoredExtra & Record<string, unknown>,
           })
           .run();
       this.db
@@ -233,9 +295,65 @@ export class ManualRunService {
       runId: run.id,
       item: this.db.select().from(schema.runItems).where(eq(schema.runItems.id, itemId)).get(),
     });
+    this.bus.publish({ type: 'manual.updated', runId: run.id, itemId });
     if (body.done && !this.open(run.id).length) this.complete(run.id);
     else this.runs.publishRun(run.id);
     return this.checklist(itemId);
+  }
+
+  /** Files a bug from a failed (or blocked) step: expected vs actual, with that step's screenshots as evidence. */
+  reportBug(itemId: string, input: unknown) {
+    const { item, run } = this.item(itemId);
+    const d = z
+      .object({
+        number: z.string().min(1).max(100),
+        title: z.string().trim().min(3).max(200),
+        expected: z.string().max(5000).default(''),
+        actual: z.string().max(5000).default(''),
+        severity: z.enum(['critical', 'major', 'minor', 'trivial']).default('major'),
+        priority: z.enum(['P1', 'P2', 'P3', 'P4']).default('P2'),
+      })
+      .parse(input);
+    if (!item.scenarioId) throw new repo.RepoError(400, 'invalid', 'This test has no scenario any more');
+    const lines = this.lines(itemId);
+    const at = lines.findIndex((l) => l.number === d.number);
+    if (at < 0) throw new repo.RepoError(400, 'invalid', `There is no step ${d.number}`);
+    const env = run.environmentId ? repo.getEnvironment(this.db, run.environmentId) : undefined;
+    const { bug } = repo.recordFailure(this.db, {
+      applicationId: run.applicationId,
+      runItemId: item.id,
+      scenarioId: item.scenarioId,
+      testCaseId: item.testCaseId,
+      failedStepId: d.number,
+      category: 'manual',
+      title: d.title,
+      summary: `Found in a manual test: ${item.labelJson?.scenario ?? ''}, step ${d.number}`,
+      severity: d.severity,
+      priority: d.priority,
+      environment: env ? { environment: env.name, baseUrl: env.baseUrl, run: run.id } : { run: run.id },
+      preconditions: repo.getScenario(this.db, item.scenarioId).preconditions,
+      stepsToReproduce: lines
+        .slice(0, at + 1)
+        .filter((l) => !l.group)
+        .map((l) => `${l.number}. ${l.text}`),
+      expected: d.expected,
+      actual: d.actual,
+      diagnosis: null,
+      owner: 'app',
+    });
+    const row = this.db
+      .select()
+      .from(schema.stepResults)
+      .where(and(eq(schema.stepResults.runItemId, itemId), eq(schema.stepResults.stepId, d.number)))
+      .get();
+    if (row)
+      this.db
+        .update(schema.stepResults)
+        .set({ responseJson: { ...(row.responseJson as object), bug: { id: bug.id, code: bug.code } } })
+        .where(eq(schema.stepResults.id, row.id))
+        .run();
+    this.bus.publish({ type: 'manual.updated', runId: run.id, itemId });
+    return bug;
   }
 
   /** Keeps a screenshot (a PNG or JPEG data URL) for one line; the path goes into that line's result. */

@@ -132,7 +132,21 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
   });
 
   // Manual runs: the checklist of one test, its results, screenshots, and finishing the run.
-  app.get<P<'id'>>('/api/run-items/:id/manual', async (req) => ctx.manual.checklist(req.params.id));
+  app.get<P<'id'>>('/api/run-items/:id/manual', async (req) => ({
+    ...ctx.manual.checklist(req.params.id),
+    browserOpen: ctx.manualBrowser.isOpen(req.params.id),
+  }));
+  // The tester's browser for a manual test (StepForge panel on top, session recorded), and bug reports from a step.
+  app.post<P<'id'>>('/api/run-items/:id/manual/browser', async (req) =>
+    ctx.manualBrowser.open(req.params.id),
+  );
+  app.delete<P<'id'>>('/api/run-items/:id/manual/browser', async (req, reply) => {
+    await ctx.manualBrowser.close(req.params.id);
+    return reply.code(204).send();
+  });
+  app.post<P<'id'>>('/api/run-items/:id/manual/bug', async (req, reply) =>
+    reply.code(201).send(ctx.manual.reportBug(req.params.id, req.body)),
+  );
   app.put<P<'id'>>('/api/run-items/:id/manual', async (req) => ctx.manual.save(req.params.id, req.body));
   app.post<P<'id'>>(
     '/api/run-items/:id/manual/attachments',

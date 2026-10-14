@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Code2, Copy, Play, Trash2 } from 'lucide-react';
+import { Code2, Copy, Hand, Play, Trash2 } from 'lucide-react';
 import { openRunDialog } from '@/components/runs/run-dialog';
 import { Badge, PRIORITY_TONE, STATUS_TONE } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,7 @@ export function ScenarioPanel({
             <Badge tone={PRIORITY_TONE[s.priority]}>{s.priority}</Badge>
             <Badge tone={STATUS_TONE[s.status]}>{s.status}</Badge>
             <Badge>{s.kind}</Badge>
+            {s.execution === 'manual' && <Badge tone="indigo">manual test</Badge>}
             <Badge className="font-mono">v{s.version}</Badge>
             {s.owner && <span className="text-xs text-muted">· owner {s.owner}</span>}
           </div>
@@ -87,18 +88,40 @@ export function ScenarioPanel({
           </Link>
           <Button
             size="sm"
+            variant={s.execution === 'manual' ? 'primary' : 'outline'}
             disabled={s.steps.length === 0}
-            title={s.steps.length ? 'Run this scenario' : 'Add steps first'}
+            title={
+              s.steps.length
+                ? 'Open a browser with the steps beside it and record each result yourself'
+                : 'Add steps first'
+            }
             onClick={() =>
               openRunDialog({
                 applicationId: s.applicationId,
                 scope: { type: 'scenarios', ids: [s.id] },
-                label: `Run "${s.name}" (${Math.max(1, s.testCases.filter((t) => t.status === 'active').length)} test case(s))`,
+                mode: 'manual',
+                label: `Run "${s.name}" by hand`,
               })
             }
           >
-            <Play className="h-3.5 w-3.5 fill-current" /> Run
+            <Hand className="h-3.5 w-3.5" /> Run manually
           </Button>
+          {s.execution !== 'manual' && (
+            <Button
+              size="sm"
+              disabled={s.steps.length === 0}
+              title={s.steps.length ? 'Run this scenario' : 'Add steps first'}
+              onClick={() =>
+                openRunDialog({
+                  applicationId: s.applicationId,
+                  scope: { type: 'scenarios', ids: [s.id] },
+                  label: `Run "${s.name}" (${Math.max(1, s.testCases.filter((t) => t.status === 'active').length)} test case(s))`,
+                })
+              }
+            >
+              <Play className="h-3.5 w-3.5 fill-current" /> Run
+            </Button>
+          )}
         </div>
       </div>
       <Tabs

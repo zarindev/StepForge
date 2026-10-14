@@ -137,6 +137,7 @@ export const ApplicationExport = z.object({
         status: z.enum(['draft', 'ready', 'deprecated']).default('draft'),
         owner: z.string().default(''),
         preconditions: z.string().default(''),
+        execution: z.enum(['automated', 'manual']).default('automated'),
         setupBlockRef: z.string().nullable().default(null),
         teardownBlockRef: z.string().nullable().default(null),
         tags: z.array(z.string()).default([]),
@@ -317,6 +318,7 @@ export function exportApplication(
         status: s.status,
         owner: s.owner,
         preconditions: s.preconditions,
+        execution: s.execution,
         setupBlockRef: s.setupBlockId,
         teardownBlockRef: s.teardownBlockId,
         tags: s.tagIds.map((t) => tagName.get(t)!).filter(Boolean),
@@ -457,6 +459,7 @@ export function importApplication(
         status: s.status,
         owner: s.owner,
         preconditions: s.preconditions,
+        execution: s.execution,
         steps: portableSteps(s.steps as AnyStep[], map),
       });
       map.scenarios.set(s.ref, id);

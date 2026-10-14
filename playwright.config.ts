@@ -45,6 +45,7 @@ export default defineConfig({
         STEPFORGE_OPEN_BROWSER: '0',
         STEPFORGE_LOG_LEVEL: 'warn',
         STEPFORGE_RECORDER_HEADLESS: '1',
+        STEPFORGE_MANUAL_HEADLESS: '1',
         STEPFORGE_RECORDER_CDP_PORT: '9333',
         // Mailpit installed by `npm run mailpit:install`, on ports that do not clash with a dev instance.
         STEPFORGE_BIN_DIR: 'data/bin',

@@ -18,7 +18,16 @@ export type PlannedItem = {
  * Expands a run scope into the list of (scenario, test case) pairs to execute, in tree order.
  * Deprecated scenarios and skipped test cases are left out; a scenario without test cases runs once with no data.
  */
-export function expandScope(db: StepForgeDb, applicationId: string, scope: RunScope): PlannedItem[] {
+/**
+ * The tests a run covers. Automated runs (and schedules, campaigns, the CLI) leave out manual tests, which stay
+ * pending until a person runs them in a manual run; a manual run can take any test.
+ */
+export function expandScope(
+  db: StepForgeDb,
+  applicationId: string,
+  scope: RunScope,
+  opts: { includeManual?: boolean } = {},
+): PlannedItem[] {
   const tree = repo.getTree(db, applicationId);
   const byModule = new Map<string | null, typeof tree.modules>();
   for (const m of tree.modules) byModule.set(m.parentId, [...(byModule.get(m.parentId) ?? []), m]);
@@ -68,7 +77,12 @@ export function expandScope(db: StepForgeDb, applicationId: string, scope: RunSc
 
   const explicit = scope.type === 'scenarios' || scope.type === 'testCases';
   const scenarios = tree.scenarios
-    .filter((s) => scenarioIds.has(s.id) && (explicit || s.status !== 'deprecated'))
+    .filter(
+      (s) =>
+        scenarioIds.has(s.id) &&
+        (explicit || s.status !== 'deprecated') &&
+        (opts.includeManual || s.execution !== 'manual'),
+    )
     .sort((a, b) => order.indexOf(a.moduleId) - order.indexOf(b.moduleId) || a.name.localeCompare(b.name));
 
   const items: PlannedItem[] = [];

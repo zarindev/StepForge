@@ -5,12 +5,13 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field, Select, Switch } from '@/components/ui/input';
+import { toastError } from '@/components/ui/toast';
 import { api, type Settings } from '@/lib/api';
 import { useEnvironments, useTags, useTree } from '@/lib/queries';
 import type { Run, RunOptionsForm, RunScope } from '@/lib/types';
 import { flattenModules } from '@/lib/tree';
 
-type Request = { applicationId: string; scope?: RunScope; label?: string };
+type Request = { applicationId: string; scope?: RunScope; label?: string; mode?: 'auto' | 'manual' };
 let current: Request | null = null;
 const listeners = new Set<() => void>();
 /** Opens the run dialog from anywhere (Explorer, bulk bar, top bar, command palette). */
@@ -76,7 +77,8 @@ function RunDialog({ req }: { req: Request }) {
     }
   }, [settings.data, settled]);
   const [scopeChoice, setScopeChoice] = useState('application');
-  const [mode, setMode] = useState<'auto' | 'manual'>('auto');
+  const [mode, setMode] = useState<'auto' | 'manual'>(req.mode ?? 'auto');
+  const [openBrowser, setOpenBrowser] = useState(true);
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -106,10 +108,20 @@ function RunDialog({ req }: { req: Request }) {
         json: { applicationId: req.applicationId, environmentId: envId, scope, options: opts, mode },
       });
     },
-    onSuccess: (run) => {
+    onSuccess: async (run) => {
       qc.invalidateQueries({ queryKey: ['runs'] });
       close();
       navigate({ to: '/runs/$runId', params: { runId: run.id } });
+      // A manual run opens the tester's browser on the first test right away.
+      if (mode === 'manual' && openBrowser) {
+        try {
+          const detail = await api<{ items: { id: string }[] }>(`/api/runs/${run.id}`);
+          const first = detail.items[0];
+          if (first) await api(`/api/run-items/${first.id}/manual/browser`, { method: 'POST' });
+        } catch (err) {
+          toastError(err);
+        }
+      }
     },
   });
 
@@ -148,6 +160,12 @@ function RunDialog({ req }: { req: Request }) {
             <option value="manual">Manual — a person follows the steps and records results</option>
           </Select>
         </Field>
+        {mode === 'manual' && (
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={openBrowser} onChange={setOpenBrowser} label="Open the browser now" /> Open the
+            browser now, with the steps beside the app
+          </label>
+        )}
         {!req.scope && (
           <Field label="Scope">
             <Select aria-label="Scope" value={scopeChoice} onChange={(e) => setScopeChoice(e.target.value)}>

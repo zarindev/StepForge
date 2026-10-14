@@ -39,7 +39,9 @@ free, open source and local.
 - **Hooks** — before/after-each-test blocks per module and scenario (migration 0010). [BLOCKS.md](BLOCKS.md#hooks)
 - **Page conditions** — `util.if` checks on the page, `util.loop` "repeat while". [STEP_REFERENCE.md](STEP_REFERENCE.md)
 - **Manual test runs** — a person follows the steps and records results per step; `util.manual` checks (migration
-  0011). [MANUAL_RUNS.md](MANUAL_RUNS.md)
+  0011). Then **manual testing in the browser**: automated or manual tests (migration 0013), Run manually opens the
+  app with a StepForge panel, the session is recorded, screenshots are marked up, bugs are filed from steps.
+  [MANUAL_RUNS.md](MANUAL_RUNS.md)
 - **SOAP, Kafka and FTP** — `api.soap`, XPath checks for XML, `api.kafkaProduce` / `kafkaConsume`, `api.ftp`
   (FTP, FTPS, SFTP); CI runs Apache Kafka as a service container. [INTEGRATIONS.md](INTEGRATIONS.md)
 - **Slack, Teams and webhook notifications** — Slack / Mattermost / Rocket.Chat incoming webhooks, Teams Workflows

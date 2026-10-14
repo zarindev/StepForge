@@ -1,15 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
+import { PNG } from 'pngjs';
 
 const CLINIC = 'http://127.0.0.1:8191';
 const shots = process.env.STEPFORGE_SHOTS;
 const shot = async (page: Page, name: string) => {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
 };
-// A 1×1 PNG as a file to attach.
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-  'base64',
-);
+// A 320×200 light-grey image as a screenshot to attach and mark up.
+const IMAGE = (() => {
+  const png = new PNG({ width: 320, height: 200 });
+  png.data.fill(230);
+  return PNG.sync.write(png);
+})();
 
 async function sfApi<T>(page: Page, method: string, url: string, body?: unknown): Promise<T> {
   return page.evaluate(
@@ -30,7 +32,7 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-test('manual run: a tester follows the steps, records passed / failed with a note and a screenshot', async ({
+test('manual testing: a manual test is pending until run; Run manually opens the browser; results, marked-up screenshots and a bug report', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -43,7 +45,7 @@ test('manual run: a tester follows the steps, records passed / failed with a not
   const mod = await sfApi<{ id: string }>(page, 'POST', `/api/applications/${app.id}/modules`, {
     name: 'Front desk',
   });
-  await sfApi(page, 'POST', `/api/modules/${mod.id}/scenarios`, {
+  const s = await sfApi<{ id: string }>(page, 'POST', `/api/modules/${mod.id}/scenarios`, {
     name: 'Print a visit summary',
     steps: [
       { type: 'ui.navigate', params: { url: '/login' } },
@@ -54,11 +56,17 @@ test('manual run: a tester follows the steps, records passed / failed with a not
     ],
   });
   await page.evaluate((id) => localStorage.setItem('stepforge.currentApp', id), app.id);
-  await page.reload();
 
-  await page.getByRole('button', { name: 'Run', exact: true }).first().click();
+  // Make it a manual test: it is pending, and only "Run manually" is offered.
+  await page.goto(`/explorer?scenario=${s.id}&tab=overview`);
+  await page.getByLabel('How it is tested').selectOption('manual');
+  await page.getByRole('button', { name: 'Save details' }).click();
+  await expect(page.getByText('manual · pending')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Run', exact: true }).nth(1)).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Run manually' }).click();
   const dialog = page.getByRole('dialog', { name: 'Run tests' });
-  await dialog.getByLabel('How', { exact: true }).selectOption('manual');
+  await expect(dialog.getByLabel('How', { exact: true })).toHaveValue('manual');
   await expect(dialog.getByLabel('Browser', { exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Start manual run' }).click();
 
@@ -67,22 +75,50 @@ test('manual run: a tester follows the steps, records passed / failed with a not
     .or(page.getByLabel('Manual checklist'));
   await expect(checklist).toContainText('Open /login');
   await expect(checklist).toContainText('Print the visit summary — expect: The clinic logo is on the page');
+  await expect(checklist).toContainText('Browser open · recording', { timeout: 30_000 });
   await expect(page.getByText('Manual run', { exact: true })).toBeVisible();
 
   await checklist.getByRole('button', { name: 'Step 1: Passed' }).click();
   await checklist.getByRole('button', { name: 'Step 2: Failed' }).click();
   await checklist.getByLabel('Step 2: note').fill('The logo is missing on the printout');
+  await checklist.getByText('Do each step and record what happened').click(); // leaving the note saves it
   const chooser = page.waitForEvent('filechooser');
   await checklist.getByRole('button', { name: 'Step 2: attach a screenshot' }).click();
-  await (await chooser).setFiles({ name: 'printout.png', mimeType: 'image/png', buffer: PNG });
-  await expect(checklist.getByRole('img', { name: 'Screenshot for step 2' })).toBeVisible();
+  await (await chooser).setFiles({ name: 'printout.png', mimeType: 'image/png', buffer: IMAGE });
+  await expect(checklist.getByRole('img', { name: 'Screenshot 1 for step 2' })).toBeVisible();
   await expect(checklist).toContainText('2 of 2 steps recorded');
-  await shot(page, 'manual-checklist');
-  await checklist.getByRole('button', { name: 'Finish test' }).click();
 
+  // Mark up the screenshot with a red box.
+  await checklist.getByRole('button', { name: 'Mark up screenshot 1 of step 2' }).click();
+  const annotator = page.getByTestId('annotator');
+  await annotator.getByRole('button', { name: 'Box' }).click();
+  const canvas = annotator.getByLabel('Screenshot to mark up');
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.6, { steps: 5 });
+  await page.mouse.up();
+  await shot(page, 'manual-annotate');
+  await page.getByRole('button', { name: 'Save marked-up copy' }).click();
+  await expect(page.getByText('Marked-up screenshot saved')).toBeVisible();
+
+  // Report the bug: how it should behave, how it behaves.
+  await checklist.getByRole('button', { name: 'Report a bug' }).click();
+  const bug = page.getByRole('dialog', { name: 'Report a bug — step 2' });
+  await expect(bug.getByLabel('Expected behaviour')).toHaveValue('The clinic logo is on the page');
+  await expect(bug.getByLabel('Actual behaviour')).toHaveValue('The logo is missing on the printout');
+  await bug.getByLabel('Severity').selectOption('critical');
+  await bug.getByRole('button', { name: 'File the bug' }).click();
+  await expect(page.getByText('BUG-001 filed')).toBeVisible();
+  await expect(checklist.getByRole('link', { name: 'BUG-001' })).toBeVisible();
+  await shot(page, 'manual-checklist');
+
+  await checklist.getByRole('button', { name: 'Finish test' }).click();
   // The only test is done, so the run is finished: failed, with the tester's note in the report.
   await expect(page.getByText('1 failed')).toBeVisible();
   const timeline = page.getByRole('list', { name: 'Step timeline' });
   await expect(timeline).toContainText('The logo is missing on the printout');
+  // The browser session's recording is the test's video.
+  await expect(page.getByRole('tab', { name: 'Video' })).toBeVisible({ timeout: 30_000 });
   await shot(page, 'manual-result');
 });

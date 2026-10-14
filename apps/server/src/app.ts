@@ -1,4 +1,5 @@
 import { ManualRunService } from './runner/manual.ts';
+import { ManualBrowserService } from './runner/manual-browser.ts';
 import fastifyWebsocket from '@fastify/websocket';
 import { loadOrCreateKey } from '@stepforge/crypto';
 import { getSetting, openDatabase, schema } from '@stepforge/db';
@@ -132,6 +133,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
       data,
     ),
     manual: undefined as unknown as ManualRunService,
+    manualBrowser: undefined as unknown as ManualBrowserService,
     recorder: new RecorderManager(db, masterKey, bus),
     specs,
     database,
@@ -147,6 +149,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     startedAt: new Date(),
   };
   ctx.manual = new ManualRunService(db, bus, ctx.runs, config.artifactsDir);
+  ctx.manualBrowser = new ManualBrowserService(db, bus, ctx.runs, ctx.manual, config.artifactsDir);
   ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);
   ctx.campaigns = new CampaignService(
     db,
@@ -212,6 +215,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     ctx.scheduler.stop();
     ctx.maintenance.stop();
     ctx.demo.stop();
+    await ctx.manualBrowser.closeAll();
     await ctx.runs.shutdown();
     await email.mailpit.stop();
     await closePdfBrowser();

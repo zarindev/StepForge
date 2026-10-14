@@ -20,6 +20,7 @@ type Form = Pick<
   | 'preconditions'
   | 'setupBlockId'
   | 'teardownBlockId'
+  | 'execution'
 >;
 
 export function OverviewTab({ scenario }: { scenario: ScenarioDetail }) {
@@ -32,6 +33,7 @@ export function OverviewTab({ scenario }: { scenario: ScenarioDetail }) {
     preconditions: scenario.preconditions,
     setupBlockId: scenario.setupBlockId ?? null,
     teardownBlockId: scenario.teardownBlockId ?? null,
+    execution: scenario.execution ?? 'automated',
   };
   const [f, setF] = useState<Form>(initial);
   const tags = useTags(scenario.applicationId);
@@ -85,6 +87,23 @@ export function OverviewTab({ scenario }: { scenario: ScenarioDetail }) {
       </Field>
       <Field label="Description">
         <Textarea rows={3} value={f.description} onChange={(e) => set({ description: e.target.value })} />
+      </Field>
+      <Field
+        label="How it is tested"
+        hint={
+          f.execution === 'manual'
+            ? 'A person runs it ("Run manually"); automated runs and schedules leave it out, and it stays pending until someone runs it'
+            : 'StepForge runs the steps — on demand, on a schedule, in campaigns and in CI'
+        }
+      >
+        <Select
+          aria-label="How it is tested"
+          value={f.execution}
+          onChange={(e) => set({ execution: e.target.value as Form['execution'] })}
+        >
+          <option value="automated">Automated</option>
+          <option value="manual">Manual</option>
+        </Select>
       </Field>
       <div className="grid grid-cols-3 gap-3">
         <Field label="Priority">

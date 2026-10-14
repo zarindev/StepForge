@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- **Manual testing in the browser**: tests are **Automated** or **Manual** (Details → *How it is tested*; migration
+  0013). Automated runs, schedules, campaigns and the CLI leave manual tests out; the Test Explorer shows them as
+  *manual · pending* until they are run. **Run manually** (any test) opens the application in a browser with a
+  StepForge panel — current step, expected result, next step, pass / fail / blocked / skip, notes, screenshots
+  without the panel, screen-recording clips, jump to a step, finish — and records the whole session as the test's
+  video. The run page follows live; screenshots can be marked up (boxes, circles, arrows, pen, text, eight colours)
+  and failed steps turned into bug reports (expected vs actual, severity, steps to reproduce, screenshots). See
+  [docs/MANUAL_RUNS.md](docs/MANUAL_RUNS.md).
 - **Run queue priorities**: runs have a priority (high, normal, low) set in
   the Run dialog, schedules, campaigns or with `stepforge run --priority`; waiting runs start by priority, then oldest
   first. The Runs page shows the queue — the run in progress and the waiting ones in start order — with **Run next**,

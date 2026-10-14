@@ -59,6 +59,8 @@ export type ScenarioSummary = {
   status: ScenarioStatus;
   owner: string;
   version: number;
+  /** automated: run by StepForge and schedules; manual: run by a person (pending until then). */
+  execution?: 'automated' | 'manual';
   tagIds: string[];
   stepCount: number;
 };
