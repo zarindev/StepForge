@@ -190,7 +190,20 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
+      # The emulator download or boot sometimes fails on the runner: one more attempt before failing the job.
+      - id: android-1
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # One emulator: the test files take turns.
+          script: STEPFORGE_TEST_ANDROID=1 npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts
+      - if: steps.android-1.outcome == 'failure'
+        uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
