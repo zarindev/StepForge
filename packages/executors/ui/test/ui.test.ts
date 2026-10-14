@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BrowserPool, createUiExecutor } from '../src/index.ts';
+import { baselineKey, urlMatcher } from '../src/visual.ts';
 
 const html = readFileSync(new URL('./fixture.html', import.meta.url), 'utf8');
 let server: Server;
@@ -78,6 +79,15 @@ navigator.geolocation.getCurrentPosition(p => document.getElementById('geo').tex
         .end(
           `<ul id="list"></ul><button id="more" onclick="const l = document.getElementById('list'); l.insertAdjacentHTML('beforeend', '<li>Item ' + (l.children.length + 1) + '</li>'); if (l.children.length === 3) this.remove();">Load more</button>`,
         );
+    if (req.url?.startsWith('/api/orders'))
+      return res.writeHead(200, { 'content-type': 'application/json' }).end('{"from":"server"}');
+    if (req.url === '/mock.html') {
+      const send = (id: string, init: string) =>
+        `<button id="${id}" onclick="fetch('/api/orders?page=1'${init}).then(r => r.text()).then(t => out.textContent = '${id} ' + t).catch(() => out.textContent = 'offline')">${id}</button>`;
+      return res
+        .writeHead(200, { 'content-type': 'text/html' })
+        .end(`${send('get', '')}${send('post', ", { method: 'POST' }")}<p id="out"></p>`);
+    }
     if (req.url === '/other.html')
       return res.writeHead(200, { 'content-type': 'text/html' }).end('<title>Help</title><h1>Help page</h1>');
     res.writeHead(200, { 'content-type': 'text/html' }).end(html);
@@ -122,6 +132,30 @@ const run = (s: ReturnType<typeof steps>, opts: Partial<typeof DEFAULT_RUN_OPTIO
     artifactsDir,
   }).then((r) => ({ ...r, artifactsDir }));
 };
+
+describe('URL patterns and baseline keys', () => {
+  it('a glob starting with / is a path on any host; **/ also matches no segment; a query string is fine', () => {
+    const m = (pattern: string, url: string) => urlMatcher(pattern)(url);
+    expect(m('/api/orders*', 'http://h:3000/api/orders?page=1')).toBe(true);
+    expect(m('/api/*', 'https://shop.test/api/cart')).toBe(true);
+    expect(m('/api/*', 'https://shop.test/web/cart')).toBe(false);
+    expect(m('**/a/**/b', 'http://h/a/b')).toBe(true);
+    expect(m('**/a/**/b', 'http://h/a/x/y/b')).toBe(true);
+    expect(m('**/api/items', 'http://h/api/items?page=2')).toBe(true);
+    expect(m('**/api/items', 'http://h/api/items/7')).toBe(false);
+    expect(m('**/api/items?page=*', 'http://h/api/items?page=2')).toBe(true);
+    expect(m('/api/items', 'http://h/v1/api/items?x')).toBe(true);
+  });
+
+  it('long step ids keep a readable start and a hash of the whole id, so similar ids never share a baseline', () => {
+    const key = (id: string) => baselineKey({ stepId: id, browser: 'chromium', width: 1280, height: 720 });
+    const long = 'step-'.repeat(40);
+    expect(key(`${long}a`)).not.toBe(key(`${long}b`));
+    expect(key(`${long}a`).length).toBeLessThan(120);
+    expect(key(`${long}a`)).toMatch(/^step-step-/);
+    expect(key('home')).toBe('home-chromium-1280x720.png');
+  });
+});
 
 describe('UI executor', () => {
   it('logs in with label/testId/role locators, select, check and waits for async text', async () => {
@@ -523,5 +557,97 @@ describe('UI executor', () => {
     );
     expect(r.status, r.steps.map((s) => `${s.type} ${s.message}`).join('\n')).toBe('passed');
     expect(r.steps[1]!.message).toMatch(/^4 requests, [\d.]+ (B|kB), 1 failed, 1 third-party host\(s\)/);
+  });
+
+  it('mocks per method on one URL; "times" counts only requests the mock answers; offline and back online', async () => {
+    const css = (value: string) => [{ strategy: 'css' as const, value }];
+    const out = (expected: string) => ({
+      type: 'ui.assert',
+      params: { check: 'text', expected },
+      locators: css('#out'),
+    });
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/mock.html' } },
+        { type: 'ui.mockRoute', params: { url: '/api/orders*', method: 'GET', body: '{"m":"get"}' } },
+        {
+          type: 'ui.mockRoute',
+          params: { url: '/api/orders*', method: 'POST', body: '{"m":"post"}', times: 1 },
+        },
+        // The GET passes through the POST mock first (it falls back): that must not use up its one time.
+        { type: 'ui.click', locators: css('#get') },
+        out('get {"m":"get"}'),
+        { type: 'ui.click', locators: css('#post') },
+        out('post {"m":"post"}'),
+        { type: 'ui.click', locators: css('#post') },
+        out('post {"from":"server"}'),
+        { type: 'ui.click', locators: css('#get') },
+        out('get {"m":"get"}'),
+        { type: 'ui.mockRoute', params: { url: '/api/orders*', action: 'remove' } },
+        { type: 'ui.click', locators: css('#get') },
+        out('get {"from":"server"}'),
+        { type: 'ui.setOffline', params: { state: 'offline' } },
+        { type: 'ui.click', locators: css('#get') },
+        out('offline'),
+        // An unticked "offline" used to vanish and mean offline again; "state" wins.
+        { type: 'ui.setOffline', params: { state: 'online', offline: true } },
+        { type: 'ui.click', locators: css('#post') },
+        out('post {"from":"server"}'),
+      ),
+    );
+    expect(r.status, r.steps.map((s) => `${s.type} ${s.status} ${s.message}`).join('\n')).toBe('passed');
+    expect(r.steps.at(-3)!.message).toBe('The browser is back online');
+  });
+
+  it('clear messages: storage before a page is open, and a visual threshold that is not a number', async () => {
+    const r = await run(
+      steps(
+        { type: 'ui.storage', params: { kind: 'local', action: 'get', name: 'theme' }, continueOnFail: true },
+        { type: 'ui.navigate', params: { url: '/web.html' } },
+        {
+          type: 'ui.visualCheckpoint',
+          locators: [{ strategy: 'css', value: '#box' }],
+          params: { maxDiffPercent: '5%' },
+          continueOnFail: true,
+        },
+        {
+          type: 'ui.visualCheckpoint',
+          locators: [{ strategy: 'css', value: '#box' }],
+          params: { threshold: 2 },
+        },
+      ),
+    );
+    expect(r.steps.map((s) => s.status)).toEqual(['broken', 'passed', 'broken', 'broken']);
+    expect(r.steps[0]!.message).toBe('Open a page before using localStorage');
+    expect(r.steps[2]!.message).toMatch(/"maxDiffPercent" must be a number/);
+    expect(r.steps[3]!.message).toMatch(/"threshold" must be a number from 0 to 1/);
+  });
+
+  it('network summary: when requests went unrecorded it says so and fails, since budgets cannot be trusted', async () => {
+    const r = await runTestCase({
+      runId: 'R',
+      steps: steps(
+        { type: 'ui.navigate', params: { url: '/net.html' } },
+        {
+          type: 'ui.networkSummary',
+          assertions: [{ target: 'bytes', operator: 'lt', expected: 1_000_000 }],
+        },
+      ),
+      env: { baseUrl },
+      executors: [createUiExecutor(pool, { maxNetworkEntries: 2 }), utilExecutor],
+      options: {
+        ...DEFAULT_RUN_OPTIONS,
+        defaultTimeoutMs: 8000,
+        video: 'off',
+        trace: 'off',
+        screenshots: 'off',
+        baseUrl,
+      },
+      artifactsDir: mkdtempSync(join(tmpdir(), 'sf-ui-')),
+    });
+    const summary = r.steps[1]!;
+    expect(summary.status).toBe('failed');
+    expect(summary.message).toMatch(/^Incomplete: 2 more requests were not recorded \(over 2 in this test\)/);
+    expect(summary.assertions.find((a) => a.target === 'truncated')).toMatchObject({ passed: false });
   });
 });

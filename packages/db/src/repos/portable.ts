@@ -8,7 +8,7 @@ import { createBlock, getBlock, listBlocks, saveBlockSteps } from './blocks.ts';
 import { listCampaigns, saveCampaign } from './campaigns.ts';
 import { createElement, listElements } from './elements.ts';
 import { createEnvironment, listEnvironments } from './environments.ts';
-import { invalid } from './errors.ts';
+import { invalid, RepoError } from './errors.ts';
 import { createModule, updateModule } from './modules.ts';
 import { createScenario, createTestCase, getScenario, saveSteps } from './scenarios.ts';
 import { createTag, setScenarioTags } from './tags.ts';
@@ -106,7 +106,8 @@ export const ApplicationExport = z.object({
         moduleRefs: z.array(z.string()).default([]),
         tags: z.array(z.string()).default([]),
         scenarioRefs: z.array(z.string()).default([]),
-        environments: z.array(z.string()).min(1),
+        /** May be empty (every environment was deleted); such a campaign is skipped on import. */
+        environments: z.array(z.string()).default([]),
         browsers: z.array(z.string()).default(['chromium']),
         viewports: z.array(z.string()).default(['desktop']),
         options: z.record(z.string(), z.unknown()).default({}),
@@ -351,6 +352,8 @@ export type ImportResult = {
   };
   /** Secrets to enter again, per environment. */
   missingSecrets: { environment: string; keys: string[] }[];
+  /** What was left out, in plain words (e.g. a campaign whose environments no longer exist). */
+  warnings: string[];
 };
 
 /** Creates a new application from an export, in one transaction. `slug` overrides the exported one. */
@@ -427,13 +430,23 @@ export function importApplication(
     for (const b of d.blocks)
       if (b.steps.length)
         saveBlockSteps(db, map.blocks.get(b.ref)!, portableSteps(b.steps as AnyStep[], map));
-    // Module hooks point at the new blocks.
+    // Module hooks point at the new blocks. A hook StepForge no longer accepts (e.g. a block with an input
+    // that has no default) is left out with a warning; the check runs before anything is written.
+    const warnings: string[] = [];
     for (const m of d.modules)
-      if (m.setupBlockRef || m.teardownBlockRef)
-        updateModule(db, moduleIds.get(m.ref)!, {
-          setupBlockId: m.setupBlockRef ? (map.blocks.get(m.setupBlockRef) ?? null) : null,
-          teardownBlockId: m.teardownBlockRef ? (map.blocks.get(m.teardownBlockRef) ?? null) : null,
-        });
+      for (const [key, ref] of [
+        ['setupBlockId', m.setupBlockRef],
+        ['teardownBlockId', m.teardownBlockRef],
+      ] as const) {
+        const blockId = ref ? map.blocks.get(ref) : undefined;
+        if (!blockId) continue;
+        try {
+          updateModule(db, moduleIds.get(m.ref)!, { [key]: blockId });
+        } catch (err) {
+          if (!(err instanceof RepoError)) throw err;
+          warnings.push(`The hook of module "${m.name}" was not imported: ${err.message}`);
+        }
+      }
     for (const ds of d.datasets)
       db.insert(datasets)
         .values({
@@ -482,27 +495,44 @@ export function importApplication(
       }
     }
     // Campaigns last: they point at environments, tags, modules and scenarios that now exist.
+    // A campaign left with no environment or nothing selected (its environments, modules or scenarios were
+    // deleted before the export) is skipped with a warning instead of failing the whole import.
     const envIds = new Map(listEnvironments(db, app.id).map((e) => [e.name, e.id]));
-    for (const c of d.campaigns)
+    let campaignCount = 0;
+    for (const c of d.campaigns) {
+      const environmentIds = c.environments.map((n) => envIds.get(n)).filter((x): x is string => !!x);
+      const selection = {
+        modules: c.moduleRefs.map((r) => moduleIds.get(r)).filter(Boolean),
+        tags: c.tags.map((t) => tagIds.get(t)).filter(Boolean),
+        scenarios: c.scenarioRefs.map((r) => map.scenarios.get(r)).filter(Boolean),
+      };
+      if (!environmentIds.length) {
+        warnings.push(`Campaign "${c.name}" was not imported: it has no environment`);
+        continue;
+      }
+      if (!c.all && !selection.modules.length && !selection.tags.length && !selection.scenarios.length) {
+        warnings.push(`Campaign "${c.name}" was not imported: the tests it selected are not in the export`);
+        continue;
+      }
       saveCampaign(db, app.id, {
         name: c.name,
         description: c.description,
-        selection: c.all
-          ? { all: true }
-          : {
-              modules: c.moduleRefs.map((r) => moduleIds.get(r)).filter(Boolean),
-              tags: c.tags.map((t) => tagIds.get(t)).filter(Boolean),
-              scenarios: c.scenarioRefs.map((r) => map.scenarios.get(r)).filter(Boolean),
-            },
-        environmentIds: c.environments.map((n) => envIds.get(n)).filter(Boolean),
+        selection: c.all ? { all: true } : selection,
+        environmentIds,
         browsers: c.browsers,
         viewports: c.viewports,
         options: c.options,
       });
-    // A scenario may call one that was created after it: rewrite those references now that all ids exist.
+      campaignCount++;
+    }
+    // Steps may call a scenario created after them (blocks are saved before any scenario exists): rewrite
+    // those references now that all ids exist.
     for (const s of d.scenarios)
       if (callsScenario(s.steps as AnyStep[]))
         saveSteps(db, map.scenarios.get(s.ref)!, portableSteps(s.steps as AnyStep[], map));
+    for (const b of d.blocks)
+      if (callsScenario(b.steps as AnyStep[]))
+        saveBlockSteps(db, map.blocks.get(b.ref)!, portableSteps(b.steps as AnyStep[], map));
 
     return {
       applicationId: app.id,
@@ -514,11 +544,12 @@ export function importApplication(
         testCases,
         blocks: d.blocks.length,
         elements: d.elements.length,
-        campaigns: d.campaigns.length,
+        campaigns: campaignCount,
       },
       missingSecrets: d.environments
         .filter((e) => e.secretKeys.length)
         .map((e) => ({ environment: e.name, keys: e.secretKeys })),
+      warnings,
     };
   });
 }

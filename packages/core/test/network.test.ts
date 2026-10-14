@@ -50,6 +50,22 @@ describe('network breakdown', () => {
     expect(s.largest[0]!.url).toBe('https://static.example.co.uk/app.js');
   });
 
+  it('a short domain under a country code is a site of its own; only known second levels are like co.uk', () => {
+    const third = (base: string, ...urls: string[]) =>
+      summarizeNetwork(
+        urls.map((u) => e(u, 'script')),
+        base,
+      )
+        .byHost.filter((h) => h.thirdParty)
+        .map((h) => h.key);
+    expect(third('https://www.bmw.de', 'https://cdn.bmw.de/a.js', 'https://sap.de/b.js')).toEqual(['sap.de']);
+    expect(third('https://abc.io', 'https://static.abc.io/a.js')).toEqual([]);
+    expect(
+      third('https://shop.example.com.au', 'https://img.example.com.au/a.js', 'https://other.com.au/b.js'),
+    ).toEqual(['other.com.au']);
+    expect(third('http://localhost:3000', 'http://api.localhost:3001/a.js')).toEqual([]);
+  });
+
   it('formats byte counts', () => {
     expect([950, 12_400, 3_100_000].map(formatBytes)).toEqual(['950 B', '12.4 kB', '3.1 MB']);
   });

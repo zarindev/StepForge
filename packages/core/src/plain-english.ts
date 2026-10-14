@@ -207,7 +207,9 @@ export function describeStep(step: AnyStep): string {
       break;
     }
     case 'ui.setOffline':
-      s = p.offline === false || p.offline === 'false' ? 'Go back online' : 'Go offline';
+      s = (p.state ? p.state === 'online' : p.offline === false || p.offline === 'false')
+        ? 'Go back online'
+        : 'Go offline';
       break;
     case 'ui.storage': {
       const where =

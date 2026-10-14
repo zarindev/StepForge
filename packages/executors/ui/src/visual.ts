@@ -1,4 +1,5 @@
 import type { VisualResult } from '@stepforge/core';
+import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import pixelmatch from 'pixelmatch';
@@ -12,7 +13,13 @@ export function baselineKey(parts: {
   width: number;
   height: number;
 }) {
-  const base = (parts.name?.trim() || parts.stepId).replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 120);
+  const id = parts.name?.trim() || parts.stepId;
+  const safe = id.replace(/[^A-Za-z0-9._-]+/g, '_');
+  // Long keys keep a readable start plus a hash of the whole id, so ids sharing a long prefix never collide.
+  const base =
+    safe.length > 80
+      ? `${safe.slice(0, 60)}_${createHash('sha256').update(id).digest('hex').slice(0, 12)}`
+      : safe;
   return `${base}-${parts.browser}-${parts.width}x${parts.height}.png`;
 }
 
@@ -58,18 +65,25 @@ export function compareWithBaseline(input: {
   };
 }
 
-/** Turns a URL pattern into a test: a glob with `*` (within a path segment) / `**` (anything), else a substring. */
+/**
+ * Turns a URL pattern into a test: a glob with `*` (within a path segment) / `**` (anything; `**` then a slash also
+ * matches no segment at all), else a substring. A glob starting with `/` is a path (any host), and a query string after the
+ * matched part is fine unless the glob itself has a `?`.
+ */
 export function urlMatcher(pattern: string): (url: string) => boolean {
   const p = pattern.trim();
   if (p.includes('*')) {
-    const esc = (x: string) => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(
-      `^${p
-        .split('**')
-        .map((part) => part.split('*').map(esc).join('[^/]*'))
-        .join('.*')}$`,
-    );
-    return (u) => re.test(u);
+    const glob = p.startsWith('/') ? `**${p}` : p;
+    let re = '';
+    for (let i = 0; i < glob.length;) {
+      if (glob.startsWith('**/', i)) [re, i] = [re + '(?:.*/)?', i + 3];
+      else if (glob.startsWith('**', i)) [re, i] = [re + '.*', i + 2];
+      else if (glob[i] === '*') [re, i] = [re + '[^/]*', i + 1];
+      else [re, i] = [re + glob[i]!.replace(/[.+?^${}()|[\]\\]/g, '\\$&'), i + 1];
+    }
+    const query = glob.includes('?') ? '' : '(?:[?#].*)?';
+    const rx = new RegExp(`^${re}${query}$`);
+    return (u) => rx.test(u);
   }
   return (u) => u.includes(p);
 }

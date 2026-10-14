@@ -226,6 +226,7 @@ export function DataCard() {
         slug: string;
         counts: { scenarios: number };
         missingSecrets: { environment: string; keys: string[] }[];
+        warnings?: string[];
       }>('/api/applications/import', { method: 'POST', json: data });
     },
     onSuccess: (r) => {
@@ -235,6 +236,8 @@ export function DataCard() {
       toast(
         `Imported ${r.slug} (${r.counts.scenarios} scenarios)${missing.length ? `. Enter these secrets again: ${missing.join(', ')}` : ''}`,
       );
+      // Parts that could not be imported as they were (e.g. a campaign without environments) are named.
+      for (const w of r.warnings ?? []) toast(w, 'error');
     },
     onError: toastError,
   });

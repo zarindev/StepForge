@@ -83,32 +83,43 @@ function withTimeout<T>(p: Promise<T>, ms: number, signal: AbortSignal): Promise
   });
 }
 
-/** Resolves placeholders in everything an executor reads (nested step lists are resolved when they run). */
-/** Replaces `element` locators with the saved element's current locators (best first). */
+/**
+ * Replaces `element` locators with the saved element's current locators (best first). A deleted element is
+ * dropped while the step still has other locators to try; only a step left with none fails.
+ */
 function expandElements(locators: RunnableStep['locators'], elements?: Record<string, Locator[]>) {
   if (!locators.some((l) => l.strategy === 'element')) return locators;
-  return locators.flatMap((l) => {
-    if (l.strategy !== 'element') return [l];
-    const found = elements?.[l.value];
-    if (!found?.length)
-      throw new StepError(
-        'invalid_params',
-        'The saved element this step uses was deleted; choose another element',
-      );
-    return found;
-  });
+  const expanded = locators.flatMap((l) => (l.strategy === 'element' ? (elements?.[l.value] ?? []) : [l]));
+  if (!expanded.length)
+    throw new StepError(
+      'invalid_params',
+      'The saved element this step uses was deleted; choose another element',
+    );
+  return expanded;
 }
 
+/**
+ * Resolves placeholders in everything an executor reads. Nested step lists are resolved when they run, and
+ * the conditions of `util.if` / `util.loop` each time they are evaluated (so they can use variables set later).
+ */
 function resolveStep(
   step: RunnableStep,
   r: VariableResolver,
   elements?: Record<string, Locator[]>,
 ): RunnableStep {
   const { steps: nested, else: elseSteps, ...rest } = step.params as Record<string, unknown>;
+  const deferred: Record<string, unknown> = {};
+  if (step.type === 'util.if' || step.type === 'util.loop')
+    for (const key of ['condition', 'while'])
+      if (rest[key] !== undefined) {
+        deferred[key] = rest[key];
+        delete rest[key];
+      }
   return {
     ...step,
     params: {
       ...r.resolve(rest),
+      ...deferred,
       ...(nested !== undefined && { steps: nested }),
       ...(elseSteps !== undefined && { else: elseSteps }),
     },
@@ -121,9 +132,14 @@ function resolveStep(
   };
 }
 
-/** Parses nested step lists from control-step params, giving each child a stable runtime id. */
+/**
+ * Parses nested step lists from control-step params, giving each child a stable runtime id: its own id, or
+ * `<parentId>:<key><n>`. Inside a block or called scenario the own id keeps the call chain (`useStep>`), like
+ * the block's top-level steps, so the run step can be traced back to its owner.
+ */
 function childSteps(raw: unknown, parentId: string, key: string): InputStep[] {
   if (!Array.isArray(raw)) return [];
+  const chain = parentId.slice(0, parentId.lastIndexOf('>') + 1);
   return raw.map((s, i) => {
     const parsed = Step.safeParse(s);
     if (!parsed.success) {
@@ -132,7 +148,8 @@ function childSteps(raw: unknown, parentId: string, key: string): InputStep[] {
         `Nested step ${i + 1}: ${parsed.error.issues.map((x) => x.message).join('; ')}`,
       );
     }
-    return { ...parsed.data, id: (s as { id?: string }).id ?? `${parentId}:${key}${i}` };
+    const own = (s as { id?: string }).id;
+    return { ...parsed.data, id: own ? `${chain}${own}` : `${parentId}:${key}${i}` };
   });
 }
 
@@ -144,12 +161,14 @@ function childSteps(raw: unknown, parentId: string, key: string): InputStep[] {
 export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResult> {
   const started = Date.now();
   const signal = input.signal ?? new AbortController().signal;
+  // Kept by reference so block inputs can be restored afterwards (the resolver only offers setVar).
+  const vars: Record<string, unknown> = {};
   const resolver = new VariableResolver({
     env: input.env ?? {},
     secret: input.secrets ?? {},
     data: input.data ?? {},
     run: { id: input.runId },
-    vars: {},
+    vars,
   });
   const emit = (e: EngineEvent) => input.onEvent?.(e);
   const ctx: TestContext = {
@@ -428,9 +447,10 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         let ran = 0;
         let last = { passed: true, detail: '' };
         while (ran < max && !stopped && !signal.aborted) {
+          // Set before the check, so the condition can use {{vars.index}} on the first pass too.
+          resolver.setVar('index', ran);
           last = await evaluate((step.params as Record<string, unknown>).while);
           if (!last.passed) break;
-          resolver.setVar('index', ran);
           await runList(children, `${base.path}[${ran + 1}]`, base.depth + 1, callDepth);
           ran++;
         }
@@ -508,19 +528,35 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         unknown
       >;
       const inputNames: string[] = [];
-      for (const def of declared ?? []) {
-        const value = given[def.name] !== undefined && given[def.name] !== '' ? given[def.name] : def.default;
-        if (value === undefined)
-          throw new StepError('invalid_params', `The block needs a value for its input "${def.name}"`);
-        resolver.setVar(def.name, value);
-        inputNames.push(def.name);
-      }
-      for (const [name, value] of Object.entries(given))
-        if (!inputNames.includes(name) && value !== undefined) {
-          resolver.setVar(name, value);
-          inputNames.push(name);
+      // Inputs are scoped to the block: the caller's variables of the same name come back afterwards.
+      const saved = new Map<string, { existed: boolean; value: unknown }>();
+      const setInput = (name: string, value: unknown) => {
+        if (!saved.has(name)) saved.set(name, { existed: Object.hasOwn(vars, name), value: vars[name] });
+        resolver.setVar(name, value);
+        inputNames.push(name);
+      };
+      try {
+        for (const def of declared ?? []) {
+          const passed = given[def.name] !== undefined && given[def.name] !== '';
+          // A default may itself use placeholders, e.g. {{env.admin}}.
+          const value = passed
+            ? given[def.name]
+            : def.default === undefined
+              ? undefined
+              : resolver.resolve(def.default);
+          if (value === undefined)
+            throw new StepError('invalid_params', `The block needs a value for its input "${def.name}"`);
+          setInput(def.name, value);
         }
-      await runList(target, base.path, base.depth + 1, callDepth + 1);
+        for (const [name, value] of Object.entries(given))
+          if (!inputNames.includes(name) && value !== undefined) setInput(name, value);
+        await runList(target, base.path, base.depth + 1, callDepth + 1);
+      } finally {
+        for (const [name, prev] of saved) {
+          if (prev.existed) vars[name] = prev.value;
+          else delete vars[name];
+        }
+      }
       const msg = `Ran ${isBlock ? 'block' : 'scenario'} (${target.length} steps)${inputNames.length ? ` with ${inputNames.join(', ')}` : ''}`;
       return childFailed()
         ? done('failed', `${msg}; a nested step failed`, 'assertion')

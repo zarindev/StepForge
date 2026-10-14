@@ -248,6 +248,69 @@ describe('test data library', () => {
     expect(sqlPreview.total).toBeGreaterThan(0);
   }, 60_000);
 
+  it('a SQL source refuses writes and extra statements before reaching the driver; preview too', async () => {
+    const make = (name: string, query: string) =>
+      ok('POST', `/api/applications/${appId}/data-sources`, {
+        name,
+        kind: 'sql',
+        config: { connection: 'clinic', query },
+      });
+    const multi = await make('multi', "SELECT 1; DELETE FROM patients WHERE full_name = 'nobody'");
+    const res = await call('POST', `/api/data-sources/${multi.id}/preview`, { environmentId: envId });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toMatch(/runs one query/);
+    const write = await make('writer', "UPDATE patients SET full_name = 'X'");
+    const w = await call('POST', `/api/data-sources/${write.id}/preview`, { environmentId: envId });
+    expect(w.statusCode).toBe(400);
+    expect(w.json().message).toMatch(/only reads data/);
+  });
+
+  it('a CSV source only reads .csv/.tsv/.txt files, never StepForge’s own key or database', async () => {
+    writeFileSync(join(dir, '.key'), 'secret');
+    for (const [i, path] of ['.key', join(dir, 'stepforge.db'), '../../etc/passwd'].entries()) {
+      const src = await ok('POST', `/api/applications/${appId}/data-sources`, {
+        name: `bad${i}`,
+        kind: 'csv',
+        config: { path },
+      });
+      const res = await call('POST', `/api/data-sources/${src.id}/preview`, { environmentId: envId });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().message).toMatch(/must point to a \.csv, \.tsv or \.txt file/);
+    }
+  });
+
+  it('renaming a source rewrites the steps that read it, nested ones too', async () => {
+    const src = await ok('POST', `/api/applications/${appId}/data-sources`, {
+      name: 'old name',
+      kind: 'table',
+      columns: ['a'],
+      rows: [{ a: '1' }],
+    });
+    const s = await scenario('Reads old name', [
+      use('old name'),
+      {
+        type: 'util.if',
+        params: { condition: { value: 1, operator: 'equals', expected: 1 }, steps: [use('old name')] },
+      },
+    ]);
+    await ok('PUT', `/api/data-sources/${src.id}`, {
+      name: 'new name',
+      kind: 'table',
+      columns: ['a'],
+      rows: [{ a: '1' }],
+    });
+    const got = await ok<{ steps: { type: string; params: Record<string, unknown> }[] }>(
+      'GET',
+      `/api/scenarios/${s.id}`,
+    );
+    expect(got.steps[0]!.params.source).toBe('new name');
+    expect((got.steps[1]!.params.steps as { params: { source: string } }[])[0]!.params.source).toBe(
+      'new name',
+    );
+    const r = await run([s.id]);
+    expect(r.items[0]!.errorMessage).toBeNull();
+  });
+
   it('travels with application export/import; exported code marks the step', async () => {
     const exported = await ok<{ datasets: { name: string; kind: string }[] }>(
       'GET',

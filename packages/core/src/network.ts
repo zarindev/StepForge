@@ -35,12 +35,43 @@ const hostOf = (url: string) => {
     return '';
   }
 };
-/** example.co.uk and www.example.co.uk are the same site; cdn.example.com belongs to example.com. */
+/** Second-level labels that are public suffixes under a country code (example.co.uk, example.com.au …). */
+const SECOND_LEVEL = new Set([
+  'co',
+  'com',
+  'org',
+  'net',
+  'ac',
+  'gov',
+  'edu',
+  'ne',
+  'or',
+  'ltd',
+  'plc',
+  'sch',
+  'nhs',
+  'go',
+  'gob',
+  'mil',
+  'nic',
+  'gv',
+  'gen',
+  'biz',
+  'info',
+  'nom',
+  'ind',
+  'res',
+]);
+/**
+ * example.co.uk and www.example.co.uk are the same site; cdn.example.com belongs to example.com, cdn.bmw.de to
+ * bmw.de, and app.localhost to localhost.
+ */
 const site = (host: string) => {
-  const h = host.replace(/:\d+$/, '');
-  if (/^[\d.]+$/.test(h) || h === 'localhost' || !h.includes('.')) return h;
+  const h = host.replace(/:\d+$/, '').toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost')) return 'localhost';
+  if (/^[\d.]+$/.test(h) || h.startsWith('[') || !h.includes('.')) return h;
   const parts = h.split('.');
-  const twoLevel = parts.length > 2 && parts.at(-2)!.length <= 3 && parts.at(-1)!.length === 2;
+  const twoLevel = parts.length > 2 && parts.at(-1)!.length === 2 && SECOND_LEVEL.has(parts.at(-2)!);
   return parts.slice(twoLevel ? -3 : -2).join('.');
 };
 

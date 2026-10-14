@@ -156,7 +156,7 @@ jobs:
           sleep 15
       - name: Wait for Kafka
         run: for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/9092) 2>/dev/null && break; sleep 2; done
-      - run: npx vitest run packages/executors/database packages/perf packages/executors/api/test/kafka.test.ts
+      - run: npx vitest run packages/executors/database packages/perf packages/executors/api/test/kafka.test.ts packages/executors/api/test/kafka-newtopic.test.ts
         env:
           STEPFORGE_TEST_PG_URL: postgres://postgres:stepforge@127.0.0.1:5432/stepforge_test
           STEPFORGE_TEST_MYSQL_URL: mysql://root:stepforge@127.0.0.1:3306/stepforge_test

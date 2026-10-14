@@ -39,7 +39,12 @@ function findStep(steps: AnyStep[], id: string | null): AnyStep | undefined {
       }
     }
   }
-  return undefined;
+  // Nested steps saved without an id are named by the run after their parent: `<parentId>:t<n>` / `l<n>` / `e<n>`.
+  const synthetic = /^(.+):([tel])(\d+)$/.exec(id);
+  if (!synthetic) return undefined;
+  const nested = findStep(steps, synthetic[1]!)?.params?.[synthetic[2] === 'e' ? 'else' : 'steps'];
+  const hit = Array.isArray(nested) ? (nested[Number(synthetic[3])] as AnyStep | undefined) : undefined;
+  return hit && typeof hit === 'object' ? hit : undefined;
 }
 
 function snapshot(row: StepRow): StepSnapshot {

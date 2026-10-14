@@ -72,7 +72,11 @@ export function xpathValue(
 export function soapFault(text: string, owner?: object): { code: string; message: string } | null {
   const doc = parseXml(text, owner);
   if (!doc) return null;
-  const fault = xpath.select("//*[local-name()='Fault']", doc as unknown as Node) as Node[];
+  // Only a Fault directly in the envelope body: a business element that happens to be named Fault is not one.
+  const fault = xpath.select(
+    "/*[local-name()='Envelope']/*[local-name()='Body']/*[local-name()='Fault']",
+    doc as unknown as Node,
+  ) as Node[];
   if (!fault.length) return null;
   const pick = (expr: string) => {
     const n = xpath.select(expr, fault[0]!) as Node[];

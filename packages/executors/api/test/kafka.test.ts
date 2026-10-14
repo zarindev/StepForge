@@ -2,7 +2,7 @@ import { DEFAULT_RUN_OPTIONS, newId, runTestCase, type StepInput } from '@stepfo
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApiExecutor } from '../src/index.ts';
 
 /**
@@ -90,4 +90,83 @@ describe.skipIf(!BROKERS)('Kafka', () => {
     expect(r.steps[0]).toMatchObject({ status: 'failed', errorKind: 'network' });
     expect(r.steps[0]!.message).toContain('Kafka at 127.0.0.1:1');
   }, 30_000);
+});
+
+/** A stand-in for kafkajs: the admin client does not know the topic yet; the consumer then sees one message. */
+describe('kafkaConsume on a topic that does not exist yet', () => {
+  afterEach(() => {
+    vi.doUnmock('kafkajs');
+    vi.resetModules();
+  });
+
+  it('subscribes from the beginning instead of failing, and still only counts messages since the test started', async () => {
+    const subscribed: unknown[] = [];
+    const seeks: unknown[] = [];
+    const created: unknown[] = [];
+    const startedAt = Date.now();
+    const unknownTopic = Object.assign(new Error('This server does not host this topic-partition'), {
+      name: 'KafkaJSProtocolError',
+      type: 'UNKNOWN_TOPIC_OR_PARTITION',
+    });
+    vi.doMock('kafkajs', () => ({
+      logLevel: { NOTHING: 0 },
+      Kafka: class {
+        consumer() {
+          return {
+            connect: async () => {},
+            disconnect: async () => {},
+            subscribe: async (o: unknown) => void subscribed.push(o),
+            seek: (o: unknown) => void seeks.push(o),
+            run: async ({ eachMessage }: { eachMessage: (m: unknown) => Promise<void> }) => {
+              const msg = (key: string, timestamp: number) => ({
+                partition: 0,
+                message: {
+                  key: Buffer.from(key),
+                  value: Buffer.from('{"ok":true}'),
+                  headers: {},
+                  offset: '0',
+                  timestamp: String(timestamp),
+                },
+              });
+              setTimeout(() => {
+                void eachMessage(msg('old', startedAt - 60_000)).then(() =>
+                  eachMessage(msg('new', startedAt + 10)),
+                );
+              }, 10);
+            },
+          };
+        }
+        admin() {
+          return {
+            connect: async () => {},
+            disconnect: async () => {},
+            deleteGroups: async () => {},
+            createTopics: async (o: unknown) => void created.push(o),
+            fetchTopicOffsetsByTimestamp: async () => {
+              throw unknownTopic;
+            },
+            fetchTopicOffsets: async () => {
+              throw unknownTopic;
+            },
+          };
+        }
+      },
+    }));
+    vi.resetModules();
+    const { kafkaConsume } = await import('../src/kafka.ts');
+    const signal = new AbortController().signal;
+    const out = await kafkaConsume({ brokers: 'localhost:9092', topic: 'brand-new' }, {
+      runId: 'R',
+      startedAt,
+      timeoutMs: 2000,
+      signal,
+      stepIndex: 0,
+    } as never);
+    expect(subscribed).toEqual([{ topic: 'brand-new', fromBeginning: true }]);
+    expect(seeks).toEqual([]);
+    // It creates the topic and waits for it to be ready, so the app's first message lands on a ready topic.
+    expect(created).toEqual([{ topics: [{ topic: 'brand-new' }], waitForLeaders: true }]);
+    // The message from before the test started is skipped by the timestamp filter.
+    expect((out.output as { key: string }).key).toBe('new');
+  });
 });

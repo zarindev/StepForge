@@ -177,6 +177,12 @@ export function createCampaignRun(
   return getCampaignRunRow(db, id);
 }
 
+/** Removes a campaign run that never got any runs (a launch that failed half way). */
+export function deleteCampaignRun(db: StepForgeDb, id: string): void {
+  db.update(runs).set({ campaignRunId: null }).where(eq(runs.campaignRunId, id)).run();
+  db.delete(campaignRuns).where(eq(campaignRuns.id, id)).run();
+}
+
 export function getCampaignRunRow(db: StepForgeDb, id: string): CampaignRun {
   const r = db.select().from(campaignRuns).where(eq(campaignRuns.id, id)).get();
   if (!r) throw notFound('Campaign run', id);
@@ -217,7 +223,8 @@ export function summarizeCampaignRun(db: StepForgeDb, r: CampaignRun): CampaignR
       ? st.every((s) => s === 'queued')
         ? 'queued'
         : 'running'
-      : st.length && st.every((s) => s === 'cancelled')
+      : // A campaign run without runs ran nothing: never report that as passed.
+        !st.length || st.every((s) => s === 'cancelled')
         ? 'cancelled'
         : st.some((s) => s === 'failed' || s === 'interrupted' || s === 'cancelled')
           ? 'failed'

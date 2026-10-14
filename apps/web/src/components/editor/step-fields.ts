@@ -21,6 +21,8 @@ export type FieldSpec = {
   wide?: boolean;
   /** Only shown when another field has one of these values (e.g. the row number for pick = row). */
   showWhen?: { key: string; equals: string[] };
+  /** Emptying this field removes the whole object it is in (e.g. clearing "Repeat while — compare" drops `while`). */
+  clearsParent?: boolean;
 };
 
 const ASSERT_CHECKS = [
@@ -92,6 +94,8 @@ function conditionFields(at: string, label: string): FieldSpec[] {
       kind: 'select',
       options: ['value', 'element'],
       hint: at === 'while' ? 'Empty: no “while” (count / for each)' : 'element: check something on the page',
+      // Otherwise the other while keys stay behind and the loop is still, invisibly, a while loop.
+      ...(at === 'while' && { clearsParent: true }),
     },
     { key: `${at}.value`, label: 'Value', kind: 'text', placeholder: '{{vars.count}}', showWhen: value },
     { key: `${at}.operator`, label: 'Operator', kind: 'select', options: OPERATORS, showWhen: value },
@@ -195,7 +199,16 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
     { key: 'delayMs', label: 'Delay (ms)', kind: 'number' },
     { key: 'times', label: 'Only the next N requests', kind: 'number' },
   ],
-  'ui.setOffline': [{ key: 'offline', label: 'Offline', kind: 'checkbox', hint: 'Off: back online' }],
+  // A select, not a checkbox: an unticked box removes the key, which the step reads as "offline".
+  'ui.setOffline': [
+    {
+      key: 'state',
+      label: 'Network',
+      kind: 'select',
+      options: ['offline', 'online'],
+      hint: 'Empty: offline',
+    },
+  ],
   'ui.storage': [
     { key: 'kind', label: 'Where', kind: 'select', options: ['cookie', 'local', 'session'] },
     { key: 'action', label: 'Do', kind: 'select', options: ['get', 'set', 'remove', 'clear'] },
@@ -710,4 +723,16 @@ export function setPath(obj: Record<string, unknown>, path: string, value: unkno
   if (Object.keys(nested).length) copy[head] = nested;
   else delete copy[head];
   return copy;
+}
+
+/** Sets one form field's value; an emptied `clearsParent` field removes the object around it. */
+export function setField(
+  obj: Record<string, unknown>,
+  spec: FieldSpec,
+  value: unknown,
+): Record<string, unknown> {
+  const parent = spec.key.split('.').slice(0, -1).join('.');
+  if (spec.clearsParent && parent && (value === undefined || value === ''))
+    return setPath(obj, parent, undefined);
+  return setPath(obj, spec.key, value);
 }

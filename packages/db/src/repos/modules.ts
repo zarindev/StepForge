@@ -106,12 +106,26 @@ export function assertHookBlock(
 ): void {
   if (!blockId) return;
   const b = db
-    .select({ applicationId: blocks.applicationId })
+    .select({ applicationId: blocks.applicationId, name: blocks.name, inputs: blocks.inputsJson })
     .from(blocks)
     .where(eq(blocks.id, blockId))
     .get();
   if (!b) throw notFound('Block', blockId);
   if (b.applicationId !== applicationId) throw invalid('Hooks must use a block of the same application');
+  // A hook passes no values, so an input without a default would fail every test it runs for.
+  const needed = requiredBlockInputs(b.inputs);
+  if (needed.length)
+    throw invalid(
+      `The block "${b.name}" cannot be a hook: its input ${needed.map((n) => `"${n}"`).join(', ')} has no ` +
+        'default, and a hook passes no values. Give the input a default first.',
+    );
+}
+
+/** Names of a block's inputs that have no default (a use must pass them). */
+export function requiredBlockInputs(
+  inputs: { name: string; default?: string }[] | null | undefined,
+): string[] {
+  return (inputs ?? []).filter((i) => i.default === undefined).map((i) => i.name);
 }
 
 export function updateModule(db: StepForgeDb, id: string, input: z.input<typeof ModuleUpdate>): Module {

@@ -3,7 +3,7 @@ import { EnvironmentInput, EnvironmentUpdate, newId, SecretInput } from '@stepfo
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { StepForgeDb } from '../index.ts';
-import { applications, dbConnections, environments, secrets } from '../schema.ts';
+import { applications, campaigns, dbConnections, environments, secrets } from '../schema.ts';
 import { notFound, now } from './errors.ts';
 
 export type Environment = typeof environments.$inferSelect;
@@ -73,9 +73,16 @@ export function updateEnvironment(
 }
 
 export function deleteEnvironment(db: StepForgeDb, id: string): void {
-  getEnvironment(db, id);
+  const env = getEnvironment(db, id);
   db.transaction(() => {
     purgeConnectionSecrets(db, [id]);
+    // Campaigns keep environment ids in JSON (no foreign key): drop this one, so they still launch, edit and export.
+    for (const c of db.select().from(campaigns).where(eq(campaigns.applicationId, env.applicationId)).all())
+      if (c.environmentIdsJson.includes(id))
+        db.update(campaigns)
+          .set({ environmentIdsJson: c.environmentIdsJson.filter((e) => e !== id), updatedAt: now() })
+          .where(eq(campaigns.id, c.id))
+          .run();
     db.delete(environments).where(eq(environments.id, id)).run();
   });
 }

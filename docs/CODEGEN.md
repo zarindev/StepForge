@@ -36,6 +36,9 @@ database step under `sql/`, and optionally **GitHub Actions** and **GitLab CI** 
   Cypress uses Testing Library's `findBy*` queries (same meaning); Selenium uses a small finder
   (`find.js`) that matches test ids, ARIA roles with accessible names, labels, placeholders and text the way StepForge
   does, and waits like Playwright. StepForge's self-healing (falling back to other locators) is not exported.
+- **Page errors:** a JavaScript error on the page is logged, not a failure — in StepForge, in Playwright, and in the
+  exported Cypress projects (`cypress/support/e2e.js` turns Cypress's default "fail on any uncaught exception" off).
+  Tests fail on their own checks.
 - **Values:** `{{env.baseUrl}}` and `{{env.x}}` become configuration with the exported environment's values as
   defaults (`BASE_URL`, `X`); `{{secret.x}}` becomes the environment variable `X` with **no value** — StepForge never
   puts secret values in exports (the generator never even receives them); `{{data.x}}` reads the test case;

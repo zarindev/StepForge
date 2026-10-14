@@ -42,6 +42,8 @@ const DEVICE_PROFILE = {
 const MAX_RESPONSES = 300;
 
 const MAX_LOG_ENTRIES = 1000;
+/** Requests kept per test; past this they are only counted (per step), so a network summary can say it is incomplete. */
+const MAX_NETWORK_ENTRIES = 5000;
 const pad = (n: number) => String(n + 1).padStart(2, '0');
 /** Playwright errors are multi-line; the first line is the useful part. */
 const firstLine = (e: unknown) =>
@@ -74,14 +76,21 @@ export class UiSession implements ExecutorSession {
   private scope!: Scope;
   private context!: BrowserContext;
   private network: NetworkEntry[] = [];
+  /** Requests kept (counted when they finish, before their sizes are read, so the cap holds). */
+  private keptRequests = 0;
+  /** Requests not kept (past MAX_NETWORK_ENTRIES), by step (-1: before the first step). */
+  private droppedRequests = new Map<number, number>();
   private consoleLog: ConsoleEntry[] = [];
   private pendingDialog: { action: 'accept' | 'dismiss'; promptText?: string } | null = null;
   private failureArtifacts: ArtifactRef[] = [];
   private videoDir: string;
   /** Responses seen so far; `ui.waitForResponse` takes the first one not taken yet. */
   private responses: SeenResponse[] = [];
-  /** Active `ui.mockRoute` mocks by URL pattern (a new mock for the same pattern replaces the old one). */
-  private mocks = new Map<string, { matcher: (u: URL) => boolean; handler: (r: Route) => Promise<void> }>();
+  /** Active `ui.mockRoute` mocks by method and URL pattern (a new mock for both replaces the old one). */
+  private mocks = new Map<
+    string,
+    { pattern: string; matcher: (u: URL) => boolean; handler: (r: Route) => Promise<void> }
+  >();
   private touch = false;
   /** The step running now, so each request records which step made it. */
   private currentStep = -1;
@@ -151,8 +160,9 @@ export class UiSession implements ExecutorSession {
       }),
     );
     p.on('requestfinished', async (r) => {
-      if (this.network.length >= MAX_LOG_ENTRIES) return;
       const step = this.currentStep;
+      if (this.keptRequests >= this.maxNetworkEntries) return this.dropRequest(step);
+      this.keptRequests++;
       const res = await r.response().catch(() => null);
       const sizes = await r.sizes().catch(() => null);
       const t = r.timing();
@@ -173,7 +183,9 @@ export class UiSession implements ExecutorSession {
         this.responses.splice(0, this.responses.length - MAX_RESPONSES);
     });
     p.on('requestfailed', (r) => {
-      if (this.network.length < MAX_LOG_ENTRIES) {
+      if (this.keptRequests >= this.maxNetworkEntries) this.dropRequest(this.currentStep);
+      else {
+        this.keptRequests++;
         this.network.push({
           method: r.method(),
           url: r.url(),
@@ -191,6 +203,14 @@ export class UiSession implements ExecutorSession {
       if (pending?.action === 'accept') void d.accept(pending.promptText).catch(() => {});
       else void d.dismiss().catch(() => {});
     });
+  }
+
+  private get maxNetworkEntries(): number {
+    return this.options.maxNetworkEntries ?? MAX_NETWORK_ENTRIES;
+  }
+
+  private dropRequest(step: number): void {
+    this.droppedRequests.set(step, (this.droppedRequests.get(step) ?? 0) + 1);
   }
 
   private resolve(step: RunnableStep, ctx: StepContext, locators = step.locators): Promise<Resolved> {
@@ -504,7 +524,13 @@ export class UiSession implements ExecutorSession {
           outcome = await this.mockRoute(p);
           break;
         case 'setOffline': {
-          const offline = p.offline === undefined ? true : !!p.offline && p.offline !== 'false';
+          // `state` (offline/online) wins; older steps have only `offline`, where missing means offline.
+          const offline =
+            p.state !== undefined && p.state !== ''
+              ? String(p.state) !== 'online'
+              : p.offline === undefined
+                ? true
+                : !!p.offline && p.offline !== 'false';
           await this.context.setOffline(offline);
           outcome = { message: offline ? 'The browser is offline' : 'The browser is back online' };
           break;
@@ -521,18 +547,39 @@ export class UiSession implements ExecutorSession {
           const since = p.since === 'lastNavigation' ? this.lastNavigation : -1;
           const entries = this.network.filter((e) => since < 0 || (e.step ?? -1) >= since);
           const s = summarizeNetwork(entries, this.ctx.options.baseUrl);
+          let dropped = 0;
+          for (const [at, n] of this.droppedRequests) if (since < 0 || at >= since) dropped += n;
+          const truncated = dropped > 0;
           const kinds = s.byType.map((g) => `${g.requests} ${g.key}`).join(', ');
+          const summary = `${s.requests} request${s.requests === 1 ? '' : 's'}, ${formatBytes(s.bytes)}${s.failed ? `, ${s.failed} failed` : ''}${s.thirdPartyHosts ? `, ${s.thirdPartyHosts} third-party host(s)` : ''}${kinds ? ` — ${kinds}` : ''}`;
+          const incomplete = `Incomplete: ${dropped} more request${dropped === 1 ? ' was' : 's were'} not recorded (over ${this.maxNetworkEntries} in this test), so totals and budgets cannot be trusted`;
           outcome = {
             output: {
               requests: s.requests,
               bytes: s.bytes,
               failed: s.failed,
               thirdPartyHosts: s.thirdPartyHosts,
+              ...(truncated && { truncated, droppedRequests: dropped }),
             },
-            message: `${s.requests} request${s.requests === 1 ? '' : 's'}, ${formatBytes(s.bytes)}${s.failed ? `, ${s.failed} failed` : ''}${s.thirdPartyHosts ? `, ${s.thirdPartyHosts} third-party host(s)` : ''}${kinds ? ` — ${kinds}` : ''}`,
-            response: { body: s },
+            message: truncated ? `${incomplete}. ${summary}` : summary,
+            response: { body: truncated ? { ...s, truncated, droppedRequests: dropped } : s },
+            // A budget checked against part of the traffic would pass falsely.
+            ...(truncated && {
+              assertions: [
+                {
+                  target: 'truncated',
+                  operator: 'equals',
+                  expected: false,
+                  actual: true,
+                  passed: false,
+                  message: incomplete,
+                },
+              ],
+            }),
             getTarget: (t) => {
               const flat: Record<string, unknown> = {
+                truncated,
+                droppedRequests: dropped,
                 requests: s.requests,
                 bytes: s.bytes,
                 kb: Math.round(s.bytes / 100) / 10,
@@ -611,6 +658,20 @@ export class UiSession implements ExecutorSession {
     resolved: () => Resolved | undefined,
   ): Promise<StepOutcome> {
     const o = this.ctx.options;
+    const maxDiffPercent =
+      p.maxDiffPercent !== undefined && p.maxDiffPercent !== '' ? Number(p.maxDiffPercent) : 0.1;
+    const threshold = p.threshold !== undefined && p.threshold !== '' ? Number(p.threshold) : 0.1;
+    // NaN would make every comparison pass.
+    if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1)
+      throw new StepError(
+        'invalid_params',
+        `"threshold" must be a number from 0 to 1 (the colour tolerance per pixel), not "${String(p.threshold)}"`,
+      );
+    if (!Number.isFinite(maxDiffPercent) || maxDiffPercent < 0)
+      throw new StepError(
+        'invalid_params',
+        `"maxDiffPercent" must be a number of 0 or more (percent of pixels allowed to differ), not "${String(p.maxDiffPercent)}"`,
+      );
     const actual = join(this.ctx.artifactsDir, `visual-${pad(step.position)}.png`);
     const masks = (Array.isArray(p.mask) ? p.mask : String(p.mask ?? '').split(','))
       .map((m) => String(m).trim())
@@ -635,14 +696,12 @@ export class UiSession implements ExecutorSession {
       width: o.viewport.width,
       height: o.viewport.height,
     });
-    const maxDiffPercent =
-      p.maxDiffPercent !== undefined && p.maxDiffPercent !== '' ? Number(p.maxDiffPercent) : 0.1;
     const v = compareWithBaseline({
       actual,
       baseline: join(this.options.baselineDir ?? join(this.ctx.artifactsDir, 'baselines'), key),
       diff: join(this.ctx.artifactsDir, `visual-${pad(step.position)}-diff.png`),
       key,
-      threshold: p.threshold !== undefined && p.threshold !== '' ? Number(p.threshold) : 0.1,
+      threshold,
       maxDiffPercent,
     });
     const message = {
@@ -733,15 +792,23 @@ export class UiSession implements ExecutorSession {
     const pattern = String(p.url ?? '');
     if (!pattern) throw new StepError('invalid_params', 'mockRoute needs a "url" (part of it, or a glob)');
     const action = String(p.action ?? 'fulfill');
-    const old = this.mocks.get(pattern);
-    if (old) {
-      await this.context.unroute(old.matcher, old.handler);
-      this.mocks.delete(pattern);
+    const method = p.method ? String(p.method).toUpperCase() : undefined;
+    // GET and POST mocks for the same URL live side by side; "remove" without a method removes them all.
+    const key = `${method ?? '*'} ${pattern}`;
+    const drop = async (k: string) => {
+      const old = this.mocks.get(k);
+      if (!old) return;
+      this.mocks.delete(k);
+      await this.context.unroute(old.matcher, old.handler).catch(() => {});
+    };
+    if (action === 'remove') {
+      const keys = method ? [key] : [...this.mocks].filter(([, m]) => m.pattern === pattern).map(([k]) => k);
+      for (const k of keys) await drop(k);
+      return { message: `Requests to ${pattern}${method ? ` (${method})` : ''} reach the server again` };
     }
-    if (action === 'remove') return { message: `Requests to ${pattern} reach the server again` };
+    await drop(key);
     const match = urlMatcher(pattern);
     const matcher = (u: URL) => match(u.toString());
-    const method = p.method ? String(p.method).toUpperCase() : undefined;
     const status = Number(p.status ?? 200);
     const body =
       p.body === undefined || p.body === null
@@ -755,16 +822,26 @@ export class UiSession implements ExecutorSession {
         ? 'application/json'
         : 'text/plain';
     const delayMs = Number(p.delayMs ?? 0);
+    // Empty or 0: every matching request, as before.
+    const times =
+      p.times !== undefined && p.times !== '' && Number(p.times) !== 0 ? Number(p.times) : undefined;
+    if (times !== undefined && !(Number.isInteger(times) && times > 0))
+      throw new StepError('invalid_params', `"times" must be a whole number, not "${String(p.times)}"`);
+    // Counted here, not by Playwright: requests of another method fall back and must not use up the count.
+    let used = 0;
     const handler = async (route: Route) => {
       if (method && route.request().method() !== method) return route.fallback();
+      if (times !== undefined) {
+        if (used >= times) return route.fallback();
+        if (++used >= times && this.mocks.get(key)?.handler === handler) void drop(key);
+      }
       if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
       if (action === 'abort') return route.abort('failed');
       if (action === 'delay') return route.fallback();
       return route.fulfill({ status, body, contentType });
     };
-    const times = p.times !== undefined && p.times !== '' ? Number(p.times) : undefined;
-    await this.context.route(matcher, handler, times ? { times } : undefined);
-    this.mocks.set(pattern, { matcher, handler });
+    await this.context.route(matcher, handler);
+    this.mocks.set(key, { pattern, matcher, handler });
     const what =
       action === 'abort'
         ? 'fail (network error)'
@@ -818,6 +895,9 @@ export class UiSession implements ExecutorSession {
       clear(): void;
     };
     const area = kind === 'session' || kind === 'sessionStorage' ? 'sessionStorage' : 'localStorage';
+    // about:blank has no origin: the browser would throw a SecurityError nobody understands.
+    if (!/^https?:/.test(this.page.url()))
+      throw new StepError('invalid_params', `Open a page before using ${area}`);
     const got = await this.page.evaluate(
       ([a, act, k, v]) => {
         const store = (globalThis as unknown as Record<string, Store>)[a]!;

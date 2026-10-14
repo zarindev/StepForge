@@ -26,13 +26,21 @@ export type ChannelData = {
   secret?: string | null;
 };
 
+/** Older webhook channels kept header values in the config: only their names are ever shown. */
+function publicConfig(kind: ChannelRow['kind'], config: Record<string, unknown>): Record<string, unknown> {
+  if (kind !== 'webhook' || !config.headers) return config;
+  const { headers, ...rest } = config;
+  const names = Object.keys((headers as Record<string, string>) ?? {});
+  return { ...rest, headerNames: [...new Set([...((rest.headerNames as string[]) ?? []), ...names])] };
+}
+
 const channelView = (r: ChannelRow): ChannelView => {
   const c = r.configJson as { config?: Record<string, unknown>; on?: 'always' | 'failures' };
   return {
     id: r.id,
     name: r.name,
     kind: r.kind,
-    config: c.config ?? {},
+    config: publicConfig(r.kind, c.config ?? {}),
     on: c.on ?? 'always',
     hasSecret: !!r.secretId,
     createdAt: r.createdAt,
@@ -98,7 +106,8 @@ export function deleteChannel(db: StepForgeDb, id: string): void {
 export function resolveChannel(db: StepForgeDb, masterKey: Buffer, id: string) {
   const r = channelRow(db, id);
   const s = r.secretId ? db.select().from(secrets).where(eq(secrets.id, r.secretId)).get() : undefined;
-  return { ...channelView(r), secret: s ? decrypt(s, masterKey) : undefined };
+  const config = (r.configJson as { config?: Record<string, unknown> }).config ?? {};
+  return { ...channelView(r), config, secret: s ? decrypt(s, masterKey) : undefined };
 }
 
 // ─── Schedules ────────────────────────────────────────────────────────────

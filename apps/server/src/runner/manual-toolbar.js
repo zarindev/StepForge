@@ -42,14 +42,18 @@
   let note = '';
   let message = '';
 
+  // Resolves to true when StepForge took the action.
   const send = async (action) => {
+    let ok = false;
     try {
       const next = await window.__sfManual(action);
       if (next) state = next;
+      ok = true;
     } catch (e) {
-      message = String((e && e.message) || e);
+      message = String((e && e.message) || e).replace(/^.*Error: /, '');
     }
     render();
+    return ok;
   };
   const esc = (s) =>
     String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -110,7 +114,14 @@
       }),
     );
     const on = (sel, fn) => panel.querySelector(sel)?.addEventListener('click', fn);
-    on('[data-shot]', () => send({ type: 'screenshot', number: cur.number, note }));
+    // The note goes with the screenshot; once saved, it is not sent again with the result.
+    on('[data-shot]', async () => {
+      const n = note;
+      if ((await send({ type: 'screenshot', number: cur.number, note: n })) && note === n) {
+        note = '';
+        render();
+      }
+    });
     on('[data-clip]', () => send({ type: state.recording ? 'clipStop' : 'clipStart', number: cur.number }));
     on('[data-finish]', () => send({ type: 'finish' }));
     on('[data-min]', () => panel.classList.toggle('min'));

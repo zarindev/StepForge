@@ -12,8 +12,8 @@ Application → **Test data** → **New data source**:
 | Kind | Rows come from |
 | --- | --- |
 | **Table** | Rows kept in StepForge: type them, or **Paste CSV** (the first line names the columns) |
-| **CSV file** | A file on this computer: an absolute path, or one relative to StepForge's data folder |
-| **SQL query** | A query on one of the application's database connections, chosen by name, so each environment uses its own database. The query **always runs read-only**, even on a connection that allows writes |
+| **CSV file** | A file on this computer: an absolute path, or one relative to StepForge's data folder. Only `.csv`, `.tsv` and `.txt` files are read (so StepForge's own key and database files are never reachable) |
+| **SQL query** | A query on one of the application's database connections, chosen by name, so each environment uses its own database. The query **always runs read-only**, even on a connection that allows writes: one statement only, and anything that would change data is refused before it reaches the database |
 | **API call** | A GET or POST to the application (absolute, or relative to the environment's base URL), with optional headers. **Rows at** is a JSONPath to the list, e.g. `$.items` |
 
 The settings of CSV, SQL and API sources can use `{{env.…}}` and `{{secret.…}}`; they are filled in from the run's
@@ -42,3 +42,6 @@ equals `Ana Lopez`). Rows are read **once per run** per source, so many tests re
 - Application export/import carries data sources: table rows, the CSV path, the SQL query and the API settings.
   Secrets stay as `{{secret.…}}` placeholders.
 - Code export cannot read StepForge's data library: `util.useData` steps are marked `TODO(StepForge)` with a warning.
+
+Steps refer to a source by name. **Renaming a source updates every step that reads it** (in scenarios and blocks, nested
+steps included).

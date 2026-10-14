@@ -120,6 +120,8 @@ describe('web apps', () => {
     expect(first.item.status).toBe('passed');
     const visual = first.steps.at(-1)!.responseJson.visual!;
     expect(visual.status).toBe('new');
+    // Baselines are kept per application, so a checkpoint in another application never shares one.
+    expect(visual.baseline.split(/[\\/]/).slice(0, 2)).toEqual(['baselines', appId]);
 
     // Someone's change turned the box another colour: here, the baseline is altered instead.
     const file = join(ctx.config.artifactsDir, visual.baseline);

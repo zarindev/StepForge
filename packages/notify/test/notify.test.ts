@@ -6,11 +6,14 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  ChannelInput,
   formatSlack,
   formatSummary,
   formatTeams,
   notify,
+  readWebhookSecret,
   sendTelegram,
+  writeWebhookSecret,
   type RunSummary,
 } from '../src/index.ts';
 
@@ -205,8 +208,23 @@ describe('Slack, Mattermost, Teams and webhooks', () => {
       },
       summary,
     );
-    expect(got.map((g) => g.path)).toEqual(['/slack/T000/B000/XXX', '/teams/workflow?sig=SECRET', '/hook']);
+    await notify(
+      {
+        kind: 'webhook',
+        config: { headerNames: ['x-api-key'] },
+        on: 'always',
+        secret: writeWebhookSecret({ url: `${base}/hook2`, headers: { 'x-api-key': 'KEY1' } }),
+      },
+      summary,
+    );
+    expect(got.map((g) => g.path)).toEqual([
+      '/slack/T000/B000/XXX',
+      '/teams/workflow?sig=SECRET',
+      '/hook',
+      '/hook2',
+    ]);
     expect(got[2]!.headers.authorization).toBe('Bearer abc');
+    expect(got[3]!.headers['x-api-key']).toBe('KEY1');
     expect(got[2]!.body).toMatchObject({
       event: 'run.finished',
       summary: { application: 'CareClinic', status: 'failed' },
@@ -224,6 +242,56 @@ describe('Slack, Mattermost, Teams and webhooks', () => {
         { ...summary, status: 'passed' },
       ),
     ).toBe(false);
+  });
+});
+
+describe('webhook secrets', () => {
+  it('reads the URL and header values from the secret, and a plain-URL secret from older channels', () => {
+    const s = writeWebhookSecret({ url: 'https://h.test/x', headers: { Authorization: 'Bearer T' } });
+    expect(readWebhookSecret(s)).toEqual({ url: 'https://h.test/x', headers: { Authorization: 'Bearer T' } });
+    expect(readWebhookSecret('https://h.test/old')).toEqual({ url: 'https://h.test/old', headers: {} });
+    expect(readWebhookSecret(undefined)).toEqual({ url: '', headers: {} });
+  });
+
+  it('refuses webhook URLs with a username or password', () => {
+    for (const kind of ['slack', 'teams', 'webhook'] as const)
+      expect(
+        ChannelInput.safeParse({ kind, name: 'x', config: {}, secret: 'https://user:pass@h.test/x' }).success,
+      ).toBe(false);
+    expect(
+      ChannelInput.safeParse({ kind: 'webhook', name: 'x', config: {}, secret: 'https://h.test/x' }).success,
+    ).toBe(true);
+  });
+
+  it('errors never quote the URL or token, even when fetch does', async () => {
+    const errs = await Promise.all([
+      // "Failed to parse URL from …"
+      notify({ kind: 'slack', config: {}, on: 'always', secret: 'TOKEN-abc not a url' }, summary).catch(
+        (e: Error) => e,
+      ),
+      // "Request cannot be constructed from a URL that includes credentials: …"
+      notify(
+        { kind: 'teams', config: {}, on: 'always', secret: 'http://user:PASSWORD@127.0.0.1:1/x' },
+        summary,
+      ).catch((e: Error) => e),
+      notify(
+        {
+          kind: 'webhook',
+          config: {},
+          on: 'always',
+          secret: writeWebhookSecret({ url: 'http://u:PASSWORD@127.0.0.1:1/x', headers: {} }),
+        },
+        summary,
+      ).catch((e: Error) => e),
+      sendTelegram('123:BOT-TOKEN', { chatId: '1', apiBase: 'http://u:PASSWORD@127.0.0.1:1' }, 'hi').catch(
+        (e: Error) => e,
+      ),
+    ]);
+    for (const e of errs) {
+      expect(e).toBeInstanceOf(Error);
+      expect(String(e)).toContain('could not be reached');
+      expect(String(e)).not.toMatch(/TOKEN|PASSWORD|127\.0\.0\.1|https?:/);
+    }
   });
 });
 

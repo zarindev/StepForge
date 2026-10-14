@@ -363,7 +363,7 @@ export class RunManager {
     const pool = new BrowserPool();
     const specs = this.specs;
     const executors = [
-      createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines') }),
+      createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines', run.applicationId) }),
       createApiExecutor({
         contracts: specs
           ? async (ref, req, res) => {

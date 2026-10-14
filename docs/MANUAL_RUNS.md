@@ -64,7 +64,7 @@ steps to reproduce (the test's steps up to that one), the environment and the st
 | Skipped          | no step was recorded as passed, failed or blocked        |
 
 Steps left open when you finish a test count as skipped. The first failed (or blocked) step and its note become the
-test's error message, shown on the run page and in the reports. **Finish run** ends the run at any time; tests nobody
+test's error message, shown on the run page and in the reports. The checklist is fixed when the test is first opened, so editing or deleting the scenario during the run does not move or lose recorded results. **Finish run** ends the run at any time; tests nobody
 finished are marked _skipped — not tested_. A manual run stays open while StepForge restarts; **Cancel** discards the
 rest.
 
@@ -87,7 +87,7 @@ with the native-app work — see [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /api/runs` with `"mode": "manual"`               | Starts a manual run (status `running`, tests `queued`); manual tests are only included in manual runs                            |
 | `GET /api/run-items/:id/manual`                        | The test's checklist, results (notes, screenshots, clips, linked bug), session video, and whether its browser is open            |
-| `PUT /api/run-items/:id/manual`                        | `{ results: [{ number, status, note?, screenshots?, clips? }], done }` — `status` is `passed`, `failed`, `blocked`, `skipped` or `pending` |
+| `PUT /api/run-items/:id/manual`                        | `{ result: {…} }` (one step) or `{ results: [{ number, status, note?, screenshots?, clips? }] }`, plus `done` / `reopen` — merged per step, so steps not sent keep what is stored; `status` is `passed`, `failed`, `blocked`, `skipped` or `pending`. A finished test stays finished unless `reopen` is sent |
 | `POST /api/run-items/:id/manual/browser` · `DELETE …`  | Opens (or brings forward) / closes the tester's browser                                                                          |
 | `POST /api/run-items/:id/manual/attachments`           | `{ number, dataUrl }` (PNG/JPEG) → `{ path }` to add to a step's `screenshots`                                                   |
 | `POST /api/run-items/:id/manual/bug`                   | `{ number, title, expected, actual, severity }` → the bug                                                                        |

@@ -266,7 +266,7 @@ function SourceEditor({
         </div>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
-        <Field label="Name" hint="Steps refer to it by name">
+        <Field label="Name" hint="Steps refer to it by name; renaming updates them">
           <Input
             aria-label="Data source name"
             value={name}
@@ -414,7 +414,7 @@ function SourceEditor({
       {kind === 'csv' && (
         <Field
           label="CSV file"
-          hint="An absolute path, or relative to StepForge's data folder. The first line holds the column names."
+          hint="A .csv, .tsv or .txt file: an absolute path, or relative to StepForge's data folder. The first line holds the column names."
         >
           <Input
             aria-label="CSV path"

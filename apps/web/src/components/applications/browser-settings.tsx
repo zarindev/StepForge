@@ -21,14 +21,16 @@ export type BrowserSettingsForm = {
   pfxPath: string;
   passphrase: string;
   serviceWorkers: string;
+  /** The settings as loaded: what the form has no field for (reduced motion, proxy bypass …) is kept on save. */
+  original?: Record<string, unknown>;
 };
 
 type Settings = Record<string, unknown> & {
-  geolocation?: { latitude: number; longitude: number };
+  geolocation?: { latitude: number; longitude: number; accuracy?: number };
   permissions?: string[];
   extraHTTPHeaders?: Record<string, string>;
   httpCredentials?: { username: string; password: string };
-  proxy?: { server: string };
+  proxy?: { server: string; bypass?: string; username?: string; password?: string };
   clientCertificates?: {
     origin: string;
     certPath?: string;
@@ -63,14 +65,20 @@ export function settingsToForm(raw: unknown): BrowserSettingsForm {
     pfxPath: str(cert?.pfxPath),
     passphrase: str(cert?.passphrase),
     serviceWorkers: str(s.serviceWorkers),
+    ...(raw && typeof raw === 'object' ? { original: raw as Record<string, unknown> } : {}),
   };
 }
 
-/** Only what is filled in is sent; the server checks the values. */
+/**
+ * Only what is filled in is sent; the server checks the values. Settings the form has no field for (reduced motion,
+ * JavaScript off, location accuracy, proxy bypass and login, more client certificates) are kept as loaded.
+ */
 export function formToSettings(f: BrowserSettingsForm): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+  const orig = (f.original ?? {}) as Settings;
+  const out: Record<string, unknown> = { ...orig };
   const put = (key: string, v: string) => {
     if (v.trim()) out[key] = v.trim();
+    else delete out[key];
   };
   put('channel', f.channel);
   put('locale', f.locale);
@@ -78,34 +86,59 @@ export function formToSettings(f: BrowserSettingsForm): Record<string, unknown> 
   put('colorScheme', f.colorScheme);
   put('userAgent', f.userAgent);
   put('serviceWorkers', f.serviceWorkers);
-  if (f.latitude.trim() && f.longitude.trim())
-    out.geolocation = { latitude: Number(f.latitude), longitude: Number(f.longitude) };
+  // Each managed key is set from the form or removed; the extra fields inside it are kept.
+  const keep = (key: string, value: unknown) => {
+    if (value === undefined) delete out[key];
+    else out[key] = value;
+  };
+  keep(
+    'geolocation',
+    f.latitude.trim() && f.longitude.trim()
+      ? { ...orig.geolocation, latitude: Number(f.latitude), longitude: Number(f.longitude) }
+      : undefined,
+  );
   const permissions = f.permissions
     .split(',')
     .map((p) => p.trim())
     .filter(Boolean);
-  if (permissions.length) out.permissions = permissions;
+  keep('permissions', permissions.length ? permissions : undefined);
   const headers = Object.fromEntries(
     f.headers
       .split('\n')
       .map((l) => l.split(/:(.*)/s).map((x) => x.trim()))
       .filter(([k, v]) => k && v !== undefined),
   );
-  if (Object.keys(headers).length) out.extraHTTPHeaders = headers;
-  if (f.basicUser.trim()) out.httpCredentials = { username: f.basicUser.trim(), password: f.basicPassword };
-  if (f.proxy.trim()) out.proxy = { server: f.proxy.trim() };
-  if (f.certOrigin.trim())
-    out.clientCertificates = [
-      Object.fromEntries(
-        Object.entries({
-          origin: f.certOrigin.trim(),
-          certPath: f.certPath.trim(),
-          keyPath: f.keyPath.trim(),
-          pfxPath: f.pfxPath.trim(),
-          passphrase: f.passphrase,
-        }).filter(([, v]) => v),
-      ),
-    ];
+  keep('extraHTTPHeaders', Object.keys(headers).length ? headers : undefined);
+  keep(
+    'httpCredentials',
+    f.basicUser.trim()
+      ? { ...orig.httpCredentials, username: f.basicUser.trim(), password: f.basicPassword }
+      : undefined,
+  );
+  keep('proxy', f.proxy.trim() ? { ...orig.proxy, server: f.proxy.trim() } : undefined);
+  // The form edits the first client certificate; any others stay.
+  const [first, ...others] = orig.clientCertificates ?? [];
+  const { origin: _o, certPath: _c, keyPath: _k, pfxPath: _p, passphrase: _pp, ...firstExtra } = first ?? {};
+  const certs = [
+    ...(f.certOrigin.trim()
+      ? [
+          {
+            ...firstExtra,
+            ...Object.fromEntries(
+              Object.entries({
+                origin: f.certOrigin.trim(),
+                certPath: f.certPath.trim(),
+                keyPath: f.keyPath.trim(),
+                pfxPath: f.pfxPath.trim(),
+                passphrase: f.passphrase,
+              }).filter(([, v]) => v),
+            ),
+          },
+        ]
+      : []),
+    ...others,
+  ];
+  keep('clientCertificates', certs.length ? certs : undefined);
   return out;
 }
 
@@ -120,10 +153,15 @@ export function BrowserSettingsFields({
   value: BrowserSettingsForm;
   onChange: (v: BrowserSettingsForm) => void;
 }) {
-  const filled = Object.values(value).filter((v) => v.trim()).length;
+  const filled = Object.values(value).filter((v) => typeof v === 'string' && v.trim()).length;
   const [open, setOpen] = useState(filled > 0);
   const set = (p: Partial<BrowserSettingsForm>) => onChange({ ...value, ...p });
-  const text = (key: keyof BrowserSettingsForm, label: string, placeholder?: string, hint?: string) => (
+  const text = (
+    key: Exclude<keyof BrowserSettingsForm, 'original'>,
+    label: string,
+    placeholder?: string,
+    hint?: string,
+  ) => (
     <Field label={label} hint={hint}>
       <Input
         aria-label={label}

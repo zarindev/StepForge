@@ -7,7 +7,7 @@ import { H, testServer } from './helpers.ts';
 let app: FastifyInstance;
 let hook: Server;
 let base = '';
-const got: { path: string; body: Record<string, unknown> }[] = [];
+const got: { path: string; body: Record<string, unknown>; headers: Record<string, unknown> }[] = [];
 
 async function ok<T = Record<string, unknown> & { id: string }>(
   method: string,
@@ -30,7 +30,7 @@ beforeAll(async () => {
     let b = '';
     req.on('data', (c) => (b += c));
     req.on('end', () => {
-      got.push({ path: req.url ?? '', body: JSON.parse(b) as Record<string, unknown> });
+      got.push({ path: req.url ?? '', body: JSON.parse(b) as Record<string, unknown>, headers: req.headers });
       res.writeHead(200).end('ok');
     });
   });
@@ -80,5 +80,66 @@ describe('webhook notification channels', () => {
       payload: { kind: 'teams', name: 'x', config: {}, secret: 'not a url' },
     });
     expect(bad.statusCode).toBe(400);
+  });
+
+  it('stores webhook header values encrypted with the URL and keeps them when editing', async () => {
+    const hookCh = await ok('POST', '/api/notify-channels', {
+      kind: 'webhook',
+      name: 'Hook',
+      config: { headers: { Authorization: 'Bearer HEADER-SECRET' } },
+      secret: `${base}/hook/URLTOKEN`,
+    });
+    expect(hookCh.config).toEqual({ headerNames: ['Authorization'] });
+    const shown = JSON.stringify(await ok<unknown[]>('GET', '/api/notify-channels'));
+    expect(shown).not.toContain('HEADER-SECRET');
+    expect(shown).not.toContain('URLTOKEN');
+
+    // Empty URL and empty headers keep the stored ones.
+    await ok('PUT', `/api/notify-channels/${hookCh.id}`, {
+      kind: 'webhook',
+      name: 'Hook renamed',
+      config: {},
+    });
+    got.length = 0;
+    expect(await ok('POST', `/api/notify-channels/${hookCh.id}/test`)).toMatchObject({ ok: true });
+    expect(got[0]!.path).toBe('/hook/URLTOKEN');
+    expect(got[0]!.headers.authorization).toBe('Bearer HEADER-SECRET');
+
+    // New headers replace the stored ones; the URL is still kept.
+    await ok('PUT', `/api/notify-channels/${hookCh.id}`, {
+      kind: 'webhook',
+      name: 'Hook renamed',
+      config: { headers: { 'X-Key': 'K2' } },
+    });
+    got.length = 0;
+    await ok('POST', `/api/notify-channels/${hookCh.id}/test`);
+    expect(got[0]!.path).toBe('/hook/URLTOKEN');
+    expect(got[0]!.headers['x-key']).toBe('K2');
+    expect(got[0]!.headers.authorization).toBeUndefined();
+  });
+
+  it('refuses to reuse a stored secret when the channel type changes', async () => {
+    const slack = await ok('POST', '/api/notify-channels', {
+      kind: 'slack',
+      name: 'Slack',
+      config: {},
+      secret: `${base}/services/X`,
+    });
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/notify-channels/${slack.id}`,
+      headers: H,
+      payload: { kind: 'telegram', name: 'Slack', config: { chatId: '1' } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain('Enter the URL/token again for the new channel type');
+    // A URL with credentials is refused outright.
+    const creds = await app.inject({
+      method: 'POST',
+      url: '/api/notify-channels',
+      headers: H,
+      payload: { kind: 'webhook', name: 'x', config: {}, secret: 'https://user:pass@example.test/x' },
+    });
+    expect(creds.statusCode).toBe(400);
   });
 });

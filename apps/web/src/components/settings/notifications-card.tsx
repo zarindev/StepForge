@@ -51,8 +51,10 @@ type Draft = {
   to: string;
   flavor: 'slack' | 'mattermost';
   mention: string;
-  /** Webhook headers, one "Name: value" per line. */
+  /** Webhook headers, one "Name: value" per line. Empty keeps the stored ones when editing. */
   headers: string;
+  /** Names of the stored webhook headers (their values are stored encrypted and never sent back). */
+  headerNames: string[];
   /** Empty keeps the stored token/password when editing. */
   secret: string;
   hasSecret: boolean;
@@ -66,6 +68,7 @@ const blank = (kind: Draft['kind']): Draft => ({
   flavor: 'slack',
   mention: '',
   headers: '',
+  headerNames: [],
   on: 'always',
   chatId: '',
   host: '',
@@ -95,9 +98,7 @@ function toDraft(c: NotifyChannel): Draft {
     to: Array.isArray(cfg.to) ? (cfg.to as string[]).join(', ') : '',
     flavor: cfg.flavor === 'mattermost' ? 'mattermost' : 'slack',
     mention: String(cfg.mention ?? ''),
-    headers: Object.entries((cfg.headers as Record<string, string>) ?? {})
-      .map(([k, v]) => `${k}: ${v}`)
-      .join('\n'),
+    headerNames: Array.isArray(cfg.headerNames) ? (cfg.headerNames as string[]) : [],
   };
 }
 
@@ -243,7 +244,15 @@ function ChannelEditor({ draft, onClose }: { draft: Draft | null; onClose: () =>
               </>
             )}
             {d.kind === 'webhook' && (
-              <Field label="Headers (optional)" className="sm:col-span-2" hint="One per line: Name: value">
+              <Field
+                label="Headers (optional)"
+                className="sm:col-span-2"
+                hint={
+                  d.headerNames.length
+                    ? `One per line: Name: value. Stored encrypted; leave empty to keep: ${d.headerNames.join(', ')}`
+                    : 'One per line: Name: value. Stored encrypted.'
+                }
+              >
                 <Textarea
                   aria-label="Webhook headers"
                   rows={2}

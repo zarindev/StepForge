@@ -208,6 +208,10 @@ const ICON: Record<string, string> = { passed: '✓', failed: '✗', broken: '!'
 
 const run: Handler = async (c, v, io) => {
   const { db } = c.ctx;
+  // Checked here so a typo gets a plain message instead of a validation dump from the run options.
+  const priority = typeof v.priority === 'string' ? lc(v.priority) : undefined;
+  if (priority !== undefined && !['high', 'normal', 'low'].includes(priority))
+    throw new UsageError('--priority must be high, normal or low');
   const application = findApp(c, need(v, 'app'));
   const envName = need(v, 'env');
   const envs = repo.listEnvironments(db, application.id);
@@ -254,7 +258,7 @@ const run: Handler = async (c, v, io) => {
     ...(typeof v.browser === 'string' && { browser: v.browser }),
     ...(num('workers') !== undefined && { workers: num('workers') }),
     ...(num('retries') !== undefined && { retries: num('retries') }),
-    ...(typeof v.priority === 'string' && { priority: v.priority }),
+    ...(priority && { priority }),
     ...(v.headed && { headed: true }),
   };
 
@@ -503,6 +507,7 @@ const importCmd: Handler = async (c, v, io) => {
   );
   for (const m of r.missingSecrets)
     io.out(`  Enter these secrets again in ${m.environment}: ${m.keys.join(', ')}`);
+  for (const w of r.warnings ?? []) io.out(`  Not imported: ${w}`);
   return EXIT.passed;
 };
 

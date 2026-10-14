@@ -4,6 +4,7 @@ import {
   closeSync,
   existsSync,
   fstatSync,
+  mkdirSync,
   mkdtempSync,
   openSync,
   readdirSync,
@@ -19,7 +20,7 @@ import { basename, join } from 'node:path';
 import { FtpSrv } from 'ftp-srv';
 import ssh2 from 'ssh2';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApiExecutor } from '../src/index.ts';
+import { checkAssertions, createApiExecutor, soapFault, soapRequest } from '../src/index.ts';
 
 /** SOAP, XML responses, FTP and SFTP against servers started in this test. */
 let http: Server;
@@ -151,6 +152,10 @@ beforeAll(async () => {
           return res.writeHead(500, { 'content-type': 'text/xml' }).end(FAULT);
         return res.writeHead(200, { 'content-type': 'text/xml' }).end(PRICE('1.90'));
       }
+      if (req.url === '/ns.xml')
+        return res
+          .writeHead(200, { 'content-type': 'application/xml' })
+          .end('<orders xmlns="urn:orders"><order id="7"><total>42.50</total></order></orders>');
       if (req.url === '/orders.xml')
         return res
           .writeHead(200, { 'content-type': 'application/xml' })
@@ -277,6 +282,70 @@ describe('SOAP and XML', () => {
   });
 });
 
+describe('XPath namespaces and SOAP envelopes', () => {
+  const ns = { o: 'urn:orders' };
+  it("a request step's namespaces apply to its checks, schema checks and a later extract", async () => {
+    const r = await run(
+      steps(
+        {
+          type: 'api.request',
+          params: { url: '/ns.xml', namespaces: ns },
+          assertions: [
+            { target: '//o:total', operator: 'equals', expected: '42.50' },
+            { target: '//o:total', operator: 'matchesSchema', expected: { type: 'string', pattern: '^42' } },
+          ],
+        },
+        { type: 'api.extract', params: { path: '//o:order/@id' }, captureAs: 'id' },
+      ),
+    );
+    expect(r.status, report(r)).toBe('passed');
+    expect(r.vars.id).toBe('7');
+  });
+
+  it('checkAssertions (the API Client) takes namespaces', () => {
+    const res = { status: 200, headers: {}, text: '<a xmlns="urn:x"><b>1</b></a>', body: null } as never;
+    const [eq, schema] = checkAssertions(
+      res,
+      [
+        { target: '//x:b', operator: 'equals', expected: '1' },
+        { target: '//x:b', operator: 'matchesSchema', expected: { type: 'string' } },
+      ],
+      { x: 'urn:x' },
+    );
+    expect(eq!.passed).toBe(true);
+    expect(schema!.passed).toBe(true);
+  });
+
+  it('only a Fault directly in the envelope body is a SOAP fault', () => {
+    const env = (inner: string) =>
+      `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body>${inner}</soap:Body></soap:Envelope>`;
+    expect(
+      soapFault(env('<m:Claim xmlns:m="x"><m:Fault>Scratch on the door</m:Fault></m:Claim>')),
+    ).toBeNull();
+    expect(
+      soapFault(
+        env('<soap:Fault><faultcode>soap:Server</faultcode><faultstring>Down</faultstring></soap:Fault>'),
+      ),
+    ).toEqual({ code: 'soap:Server', message: 'Down' });
+  });
+
+  it('recognises a whole envelope after a comment or DOCTYPE, and reads its SOAP version', () => {
+    const v12 =
+      '<!-- order lookup -->\n<env:Envelope xmlns:env="http://www.w3.org/2003/05/soap-envelope"><env:Body><m:Get xmlns:m="x"/></env:Body></env:Envelope>';
+    const r12 = soapRequest({ body: v12, action: 'urn:Get' });
+    expect(r12.xml).toBe(v12);
+    expect(r12.headers['content-type']).toBe('application/soap+xml; charset=utf-8; action="urn:Get"');
+
+    const v11 =
+      '<?xml version="1.0"?>\n<!DOCTYPE note>\n<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body/></soap:Envelope>';
+    const r11 = soapRequest({ body: v11, action: 'urn:Get' });
+    expect(r11.xml).toBe(v11);
+    expect(r11.headers).toEqual({ 'content-type': 'text/xml; charset=utf-8', soapaction: '"urn:Get"' });
+    // A body fragment is still wrapped.
+    expect(soapRequest({ body: '<m:Get xmlns:m="x"/>' }).xml).toContain('<soap:Body><m:Get');
+  });
+});
+
 describe('FTP and SFTP', () => {
   for (const protocol of ['ftp', 'sftp'] as const) {
     it(`${protocol}: upload, list, exists, download, delete`, async () => {
@@ -322,6 +391,53 @@ describe('FTP and SFTP', () => {
       expect(r.status, report(r)).toBe('passed');
     }, 30_000);
   }
+
+  for (const protocol of ['ftp', 'sftp'] as const) {
+    it(`${protocol}: exists for the root, folders (with or without a trailing slash) and missing parents`, async () => {
+      mkdirSync(join(protocol === 'ftp' ? ftpRoot : sftpRoot, 'inbox'), { recursive: true });
+      const conn = {
+        protocol,
+        host: '127.0.0.1',
+        port: protocol === 'ftp' ? ftpPort : sftpPort,
+        username: 'qa',
+        password: 'secret',
+        action: 'exists',
+      };
+      const check = (remotePath: string, expected: boolean) => ({
+        type: 'api.ftp',
+        params: { ...conn, remotePath },
+        assertions: [{ target: 'exists', operator: 'equals' as const, expected }],
+      });
+      const r = await run(
+        steps(
+          check('/', true),
+          check('/inbox', true),
+          check('/inbox/', true),
+          check('/no-such-folder/file.txt', false),
+        ),
+      );
+      expect(r.status, report(r)).toBe('passed');
+    }, 30_000);
+  }
+
+  it('a missing private key file is reported as such, not as a missing remote file', async () => {
+    const r = await run(
+      steps({
+        type: 'api.ftp',
+        params: {
+          protocol: 'sftp',
+          host: '127.0.0.1',
+          port: sftpPort,
+          username: 'qa',
+          privateKey: join(tmpdir(), 'sf-no-such-key'),
+          action: 'list',
+        },
+      }),
+    );
+    expect(r.status).not.toBe('passed');
+    expect(r.steps[0]!.message).toContain('Cannot read the private key');
+    expect(r.steps[0]!.errorKind).toBe('invalid_params');
+  });
 
   it('a wrong password fails with a clear message', async () => {
     const r = await run(

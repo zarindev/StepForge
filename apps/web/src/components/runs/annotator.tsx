@@ -95,6 +95,9 @@ export function Annotator({
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [draft, setDraft] = useState<Shape | null>(null);
+  // The shape being drawn, kept outside render: several pointer events can arrive before React renders (fast pen
+  // strokes), and each must build on the previous one, not on the last rendered draft.
+  const drawing = useRef<Shape | null>(null);
   const [tool, setTool] = useState<Tool>('box');
   const [color, setColor] = useState(COLORS[0]!);
   const [width, setWidth] = useState(WIDTHS[1]!);
@@ -133,25 +136,33 @@ export function Annotator({
       return;
     }
     (e.target as Element).setPointerCapture(e.pointerId);
-    setDraft(
+    drawing.current =
       tool === 'pen'
         ? { tool, color, width, points: [[x, y]] }
-        : { tool, color, width, x1: x, y1: y, x2: x, y2: y },
-    );
+        : { tool, color, width, x1: x, y1: y, x2: x, y2: y };
+    setDraft(drawing.current);
   };
   const move = (e: React.PointerEvent) => {
-    if (!draft) return;
+    const d = drawing.current;
+    if (!d) return;
     const [x, y] = point(e);
-    setDraft(
-      draft.tool === 'pen'
-        ? { ...draft, points: [...draft.points, [x, y]] }
-        : draft.tool === 'text'
-          ? draft
-          : { ...draft, x2: x, y2: y },
-    );
+    drawing.current =
+      d.tool === 'pen'
+        ? { ...d, points: [...d.points, [x, y]] }
+        : d.tool === 'text'
+          ? d
+          : { ...d, x2: x, y2: y };
+    setDraft(drawing.current);
   };
   const up = () => {
-    if (draft) setShapes((all) => [...all, draft]);
+    const d = drawing.current;
+    drawing.current = null;
+    if (d) setShapes((all) => [...all, d]);
+    setDraft(null);
+  };
+  // The system took the pointer (a palm, a scroll gesture): the unfinished shape is dropped.
+  const cancel = () => {
+    drawing.current = null;
     setDraft(null);
   };
 
@@ -258,6 +269,7 @@ export function Annotator({
             onPointerDown={down}
             onPointerMove={move}
             onPointerUp={up}
+            onPointerCancel={cancel}
           />
         </div>
       </div>

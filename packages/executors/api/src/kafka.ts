@@ -49,6 +49,15 @@ function kafkaError(err: unknown, brokers: unknown): never {
   throw new StepError('unknown', `Kafka: ${msg}`);
 }
 
+/** Kafka's "unknown topic" answer (kafkajs reports it as a protocol error of that type). */
+const unknownTopic = (err: unknown) => {
+  const e = err as { type?: string; message?: string };
+  return (
+    e.type === 'UNKNOWN_TOPIC_OR_PARTITION' ||
+    /UNKNOWN_TOPIC_OR_PARTITION|does not host this topic-partition/i.test(e.message ?? '')
+  );
+};
+
 /** Sends one message to a topic. */
 export async function kafkaProduce(p: Record<string, unknown>, ctx: StepContext): Promise<StepOutcome> {
   const topic = String(p.topic ?? '');
@@ -128,16 +137,30 @@ export async function kafkaConsume(p: Record<string, unknown>, ctx: StepContext)
     return true;
   };
   let seen = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
   try {
     await Promise.all([consumer.connect(), admin.connect()]);
     // Start each partition at the first message since the test began (or the beginning).
-    const offsets =
-      since > 0
-        ? await admin.fetchTopicOffsetsByTimestamp(topic, since)
-        : (await admin.fetchTopicOffsets(topic)).map((o) => ({ partition: o.partition, offset: o.low }));
-    await consumer.subscribe({ topic, fromBeginning: since === 0 });
+    let offsets: { partition: number; offset: string }[] = [];
+    let missing = false;
+    try {
+      offsets =
+        since > 0
+          ? await admin.fetchTopicOffsetsByTimestamp(topic, since)
+          : (await admin.fetchTopicOffsets(topic)).map((o) => ({ partition: o.partition, offset: o.low }));
+    } catch (err) {
+      // The admin client never creates topics: one that does not exist yet has no offsets to seek to.
+      // The consumer creates it; reading from the beginning is safe since the timestamp filter still applies.
+      if (!unknownTopic(err)) throw err;
+      missing = true;
+    }
+    // Create it now (and wait for its partition leaders), so the app's first message lands on a ready topic instead
+    // of racing the broker's own creation. A topic created meanwhile by someone else is fine.
+    if (missing) await admin.createTopics({ topics: [{ topic }], waitForLeaders: true }).catch(() => false);
+    await consumer.subscribe({ topic, fromBeginning: since === 0 || missing });
     const found = await new Promise<Found>((resolve, reject) => {
-      const timer = setTimeout(
+      timer = setTimeout(
         () =>
           reject(
             new StepError(
@@ -147,9 +170,9 @@ export async function kafkaConsume(p: Record<string, unknown>, ctx: StepContext)
           ),
         ctx.timeoutMs,
       );
-      ctx.signal.addEventListener('abort', () => reject(new StepError('aborted', 'Run was cancelled')), {
-        once: true,
-      });
+      onAbort = () => reject(new StepError('aborted', 'Run was cancelled'));
+      if (ctx.signal.aborted) onAbort();
+      else ctx.signal.addEventListener('abort', onAbort, { once: true });
       consumer
         .run({
           eachMessage: async ({ partition, message }) => {
@@ -165,10 +188,7 @@ export async function kafkaConsume(p: Record<string, unknown>, ctx: StepContext)
             };
             if (m.timestamp < since) return;
             seen++;
-            if (matches(m)) {
-              clearTimeout(timer);
-              resolve(m);
-            }
+            if (matches(m)) resolve(m);
           },
         })
         .then(() => {
@@ -188,8 +208,10 @@ export async function kafkaConsume(p: Record<string, unknown>, ctx: StepContext)
       },
     };
   } catch (err) {
-    kafkaError(err, p.brokers);
+    return kafkaError(err, p.brokers);
   } finally {
+    clearTimeout(timer);
+    if (onAbort) ctx.signal.removeEventListener('abort', onAbort);
     await consumer.disconnect().catch(() => {});
     await admin.deleteGroups([groupId]).catch(() => {});
     await admin.disconnect().catch(() => {});

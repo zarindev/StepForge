@@ -479,4 +479,109 @@ describe('control flow', () => {
       'unsupported',
     );
   });
+
+  it('block inputs are scoped to the block: the caller’s variables come back afterwards', async () => {
+    const log: string[] = [];
+    const r = await go(
+      steps(
+        { type: 'util.setVariable', params: { name: 'user', value: 'caller' } },
+        { type: 'util.useBlock', params: { blockId: 'B', inputs: { user: 'block-user', extra: 'x' } } },
+        logStep('after {{vars.user}}'),
+      ),
+      {
+        loadBlockSteps: () => ({
+          steps: steps(logStep('inside {{vars.user}} {{vars.extra}}')),
+          inputs: [{ name: 'user' }],
+        }),
+      },
+      log,
+    );
+    expect(r.status).toBe('passed');
+    expect(log).toEqual(['inside block-user x', 'after caller']);
+    expect(r.vars).toEqual({ user: 'caller' });
+  });
+
+  it('block input defaults are resolved like any other value', async () => {
+    const log: string[] = [];
+    const r = await go(
+      steps({ type: 'util.useBlock', params: { blockId: 'B' } }),
+      {
+        env: { admin: 'root@x.test' },
+        loadBlockSteps: () => ({
+          steps: steps(logStep('as {{vars.email}}')),
+          inputs: [{ name: 'email', default: '{{env.admin}}' }],
+        }),
+      },
+      log,
+    );
+    expect(r.status).toBe('passed');
+    expect(log).toEqual(['as root@x.test']);
+  });
+
+  it('a while condition and an if condition may use variables set later (resolved when evaluated)', async () => {
+    const log: string[] = [];
+    const r = await go(
+      steps(
+        {
+          type: 'util.loop',
+          params: {
+            while: { value: '{{vars.index}}', operator: 'lt', expected: 2 },
+            steps: [{ type: 'util.setVariable', params: { name: 'later', value: 'set' } }, logStep('pass')],
+          },
+        },
+        {
+          type: 'util.if',
+          params: {
+            condition: { value: '{{vars.later}}', operator: 'equals', expected: 'set' },
+            steps: [logStep('yes')],
+          },
+        },
+      ),
+      {},
+      log,
+    );
+    expect(r.status).toBe('passed');
+    expect(log).toEqual(['pass', 'pass', 'yes']);
+  });
+});
+
+describe('saved elements', () => {
+  const seen: unknown[] = [];
+  const ui: Executor = {
+    group: 'ui',
+    async createSession() {
+      return {
+        async execute(step) {
+          seen.push(step.locators.map((l) => `${l.strategy}=${l.value}`));
+          return {};
+        },
+        async close() {
+          return [];
+        },
+      };
+    },
+  };
+  const click = (locators: { strategy: string; value: string }[]) =>
+    steps({ type: 'ui.click', locators: locators as never });
+
+  it('drops a deleted element while other locators remain; fails only when none are left', async () => {
+    seen.length = 0;
+    const ok = await run(
+      click([
+        { strategy: 'element', value: 'GONE' },
+        { strategy: 'element', value: 'E1' },
+        { strategy: 'css', value: '#b' },
+      ]),
+      { executors: [ui], elements: { E1: [{ strategy: 'css', value: '#a' }] as never } },
+    );
+    expect(ok.status).toBe('passed');
+    expect(seen).toEqual([['css=#a', 'css=#b']]);
+
+    const none = await run(click([{ strategy: 'element', value: 'GONE' }]), {
+      executors: [ui],
+      elements: {},
+    });
+    expect(none).toMatchObject({ status: 'broken', errorKind: 'invalid_params' });
+    expect(none.error).toMatch(/was deleted/);
+  });
 });

@@ -1,3 +1,5 @@
+import { parseXml } from './xml.ts';
+
 const ENVELOPE_NS = {
   '1.1': 'http://schemas.xmlsoap.org/soap/envelope/',
   '1.2': 'http://www.w3.org/2003/05/soap-envelope',
@@ -14,9 +16,18 @@ export function soapRequest(input: { body: string; header?: string; action?: str
   xml: string;
   headers: Record<string, string>;
 } {
-  const version: SoapVersion = input.version === '1.2' ? '1.2' : '1.1';
   const body = input.body.trim();
-  const whole = /^(<\?xml[^>]*>\s*)?<([\w-]+:)?Envelope[\s>]/.test(body);
+  // A whole envelope may start with an XML declaration, comments, processing instructions or a DOCTYPE.
+  const whole =
+    /^(?:\s*(?:<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>[]*(?:\[[\s\S]*?\])?\s*>))*\s*<([\w.-]+:)?Envelope[\s>/]/.test(
+      body,
+    );
+  // Without a version, a whole envelope says which one it is through its namespace.
+  const version: SoapVersion =
+    input.version === '1.2' ||
+    (!input.version && whole && parseXml(body)?.documentElement?.namespaceURI === ENVELOPE_NS['1.2'])
+      ? '1.2'
+      : '1.1';
   const xml = whole
     ? body
     : `<?xml version="1.0" encoding="utf-8"?>\n<soap:Envelope xmlns:soap="${ENVELOPE_NS[version]}">${

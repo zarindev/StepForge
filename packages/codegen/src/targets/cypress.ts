@@ -563,6 +563,12 @@ export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject
     "  if (String(value ?? '') !== '') cy.wrap(subject).type(String(value), { parseSpecialCharSequences: false, delay: 0 });",
     '});',
     '',
+    '/** A JavaScript error on the page is logged, not fatal: like StepForge and Playwright, a test fails on its own checks. */',
+    "Cypress.on('uncaught:exception', (err) => {",
+    "  Cypress.log({ name: 'page error', message: err.message });",
+    '  return false;',
+    '});',
+    '',
   ].join('\n');
   files['cypress/support/config.js'] = [
     `// ${CREDIT}`,

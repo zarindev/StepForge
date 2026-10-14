@@ -12,7 +12,7 @@ import {
   PenLine,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -87,7 +87,10 @@ function BugDialog({
   const qc = useQueryClient();
   const [what, expect] = line ? split(line.text) : ['', ''];
   const [f, setF] = useState({ title: '', expected: '', actual: '', severity: 'major' });
-  useEffect(() => {
+  // Filled in once per step: updates from the server (a new `result` object each time) must not reset the form.
+  const [filledFor, setFilledFor] = useState<string | null>(null);
+  if ((line?.number ?? null) !== filledFor) {
+    setFilledFor(line?.number ?? null);
     if (line)
       setF({
         title: `${what}: ${result?.note?.split('\n')[0] || 'does not work as expected'}`.slice(0, 160),
@@ -95,7 +98,7 @@ function BugDialog({
         actual: result?.note ?? '',
         severity: 'major',
       });
-  }, [line, what, expect, result]);
+  }
   const file = useMutation({
     mutationFn: () =>
       api<{ code: string }>(`/api/run-items/${itemId}/manual/bug`, {
@@ -194,6 +197,8 @@ export function ManualChecklist({
   const fileInput = useRef<HTMLInputElement>(null);
   // The note being typed (not saved yet) survives updates from the server.
   const [editing, setEditing] = useState<string | null>(null);
+  // Lines changed here and not saved yet ("Save progress" / "Finish test" send them).
+  const dirty = useRef(new Set<string>());
   // The server's results win whenever they change (the browser panel saves there).
   if (q.data && q.data !== synced) {
     setSynced(q.data);
@@ -218,34 +223,49 @@ export function ManualChecklist({
     screenshots: [],
     clips: [],
   });
-  const set = (number: string, patch: Partial<Result>) =>
+  const set = (number: string, patch: Partial<Result>) => {
+    dirty.current.add(number);
     setResults((all) => ({ ...all, [number]: { ...blank(number), ...all[number], ...patch } }));
+  };
 
+  // Saves are per line: the server keeps every other line as stored, so what the browser panel saved is never
+  // overwritten. Without `line`, the lines changed here and not saved yet are sent.
   const save = useMutation({
-    mutationFn: ({ done, list }: { done: boolean; list?: Result[] }) =>
+    mutationFn: ({ done, line }: { done: boolean; line?: Result }) =>
       api<Checklist>(`/api/run-items/${itemId}/manual`, {
         method: 'PUT',
-        json: { results: list ?? Object.values(results), done },
+        json: line
+          ? { result: line, done }
+          : {
+              results: [...dirty.current].flatMap((n) => (results[n] ? [results[n]] : [])),
+              done,
+            },
       }),
-    onSuccess: (_d, { done, list }) => {
+    onSuccess: (_d, { done, line }) => {
+      if (line) dirty.current.delete(line.number);
+      else dirty.current.clear();
       qc.invalidateQueries({ queryKey: qk.run(runId) });
       qc.invalidateQueries({ queryKey: qk.runItem(itemId) });
       qc.invalidateQueries({ queryKey: ['runs'] });
       qc.invalidateQueries({ queryKey: ['manual', itemId] });
-      if (!list) toast(done ? 'Test finished' : 'Progress saved');
+      if (!line) toast(done ? 'Test finished' : 'Progress saved');
       if (done) onDone();
     },
     onError: toastError,
   });
+  /** Changes one line and saves only that line at once. */
+  const saveLine = (number: string, patch: Partial<Result>) => {
+    const line = { ...blank(number), ...results[number], ...patch };
+    dirty.current.add(number);
+    setResults((all) => ({ ...all, [number]: line }));
+    save.mutate({ done: false, line });
+  };
   /** Adds (or replaces) a screenshot of a step and saves at once. */
   const keepShot = (number: string, path: string, replace?: string) => {
     const r = { ...blank(number), ...results[number] };
-    const screenshots = replace
-      ? r.screenshots.map((p) => (p === replace ? path : p))
-      : [...r.screenshots, path];
-    const next = { ...results, [number]: { ...r, screenshots } };
-    setResults(next);
-    save.mutate({ done: false, list: Object.values(next) });
+    saveLine(number, {
+      screenshots: replace ? r.screenshots.map((p) => (p === replace ? path : p)) : [...r.screenshots, path],
+    });
   };
   const upload = useMutation({
     mutationFn: async ({ number, dataUrl }: { number: string; dataUrl: string; replace?: string }) =>
@@ -371,12 +391,7 @@ export function ManualChecklist({
                         title={c.label}
                         onClick={() => {
                           // Saved at once, so the browser panel and the dashboard stay the same.
-                          const next = {
-                            ...results,
-                            [l.number]: { ...blank(l.number), ...results[l.number], status: c.status },
-                          };
-                          setResults(next);
-                          save.mutate({ done: false, list: Object.values(next) });
+                          saveLine(l.number, { status: c.status });
                         }}
                         className={cn(
                           'inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs',
@@ -414,7 +429,7 @@ export function ManualChecklist({
                     onFocus={() => setEditing(l.number)}
                     onBlur={() => {
                       setEditing(null);
-                      save.mutate({ done: false, list: Object.values(results) });
+                      if (dirty.current.has(l.number)) saveLine(l.number, {});
                     }}
                   />
                   {shots.length > 0 && (

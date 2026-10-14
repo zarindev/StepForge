@@ -2,7 +2,7 @@ import { describeSteps, newId, type Locator, type PlainLine } from '@stepforge/c
 import type { StepForgeDb } from '@stepforge/db';
 import { schema } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -20,6 +20,8 @@ type StoredExtra = {
 /** One line of a manual checklist: a step to do and check, or a heading (a block, a branch) over nested lines. */
 export type ManualLine = PlainLine & { group: boolean };
 export type ManualStatus = 'passed' | 'failed' | 'blocked' | 'skipped';
+/** A run item's label, plus the checklist as it was when the test was first opened (results are tied to it). */
+type ItemLabel = NonNullable<typeof schema.runItems.$inferSelect.labelJson> & { manualLines?: ManualLine[] };
 type AnyStep = {
   type: string;
   label?: string;
@@ -32,32 +34,39 @@ const MAX_DEPTH = 5;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const now = () => new Date().toISOString();
 
-export const ManualSave = z.object({
-  results: z
+const ManualLineResult = z.object({
+  number: z.string().min(1).max(100),
+  status: z.enum(['passed', 'failed', 'blocked', 'skipped', 'pending']),
+  note: z.string().max(5000).optional(),
+  /** One screenshot (older clients), or several (each may be an annotated copy). */
+  screenshot: z.string().max(500).optional(),
+  screenshots: z.array(z.string().max(500)).max(20).optional(),
+  /** Parts of the session's screen recording, in ms from its start. */
+  clips: z
     .array(
       z.object({
-        number: z.string().min(1).max(100),
-        status: z.enum(['passed', 'failed', 'blocked', 'skipped', 'pending']),
-        note: z.string().max(5000).optional(),
-        /** One screenshot (older clients), or several (each may be an annotated copy). */
-        screenshot: z.string().max(500).optional(),
-        screenshots: z.array(z.string().max(500)).max(20).optional(),
-        /** Parts of the session's screen recording, in ms from its start. */
-        clips: z
-          .array(
-            z.object({
-              startMs: z.number().min(0),
-              endMs: z.number().min(0),
-              video: z.string().max(500).optional(),
-            }),
-          )
-          .max(20)
-          .optional(),
+        startMs: z.number().min(0),
+        endMs: z.number().min(0),
+        video: z.string().max(500).optional(),
       }),
     )
-    .max(2000),
+    .max(20)
+    .optional(),
+});
+type LineResult = z.infer<typeof ManualLineResult>;
+
+/**
+ * Results are merged per line: the lines given replace what is stored for them, every other line keeps its stored
+ * result (so the dashboard and the browser panel never overwrite each other's work on other lines).
+ */
+export const ManualSave = z.object({
+  results: z.array(ManualLineResult).max(2000).default([]),
+  /** One line's result (the usual save: a status click, a note, a screenshot). */
+  result: ManualLineResult.optional(),
   /** true: the test is finished; lines without a result count as skipped. */
   done: z.boolean().default(false),
+  /** true: a finished test is opened again. Otherwise a finished test stays finished (its status is recomputed). */
+  reopen: z.boolean().default(false),
 });
 
 /**
@@ -82,21 +91,49 @@ export class ManualRunService {
     return { item, run };
   }
 
-  /** The steps of one test as checklist lines (numbered like an automated run: before.1, 1, 2.1, after.1). */
+  /**
+   * The steps of one test as checklist lines (numbered like an automated run: before.1, 1, 2.1, after.1). They are
+   * kept with the run item the first time they are needed, so editing (or deleting) the scenario during the run does
+   * not move recorded results onto other steps.
+   */
   lines(itemId: string): ManualLine[] {
     const { item, run } = this.item(itemId);
+    const label = item.labelJson as ItemLabel | null;
+    if (label?.manualLines) return label.manualLines;
     if (!item.scenarioId) return [];
-    const scenario = repo.getScenario(this.db, item.scenarioId);
+    const lines = this.describe(item, run);
+    this.db
+      .update(schema.runItems)
+      .set({ labelJson: { ...(label ?? emptyLabel), manualLines: lines } as ItemLabel })
+      .where(eq(schema.runItems.id, itemId))
+      .run();
+    return lines;
+  }
+
+  /** Whether the item's checklist is kept (or can still be made from its scenario). */
+  private hasLines(item: typeof schema.runItems.$inferSelect) {
+    return !!(item.labelJson as ItemLabel | null)?.manualLines || !!item.scenarioId;
+  }
+
+  /** The checklist lines from the scenario as it is now. */
+  private describe(
+    item: typeof schema.runItems.$inferSelect,
+    run: ReturnType<RunManager['getRun']>,
+  ): ManualLine[] {
+    const scenario = repo.getScenario(this.db, item.scenarioId!);
     const env = run.environmentId ? repo.getEnvironment(this.db, run.environmentId) : undefined;
     const values: Record<string, Record<string, unknown>> = {
       data: testCaseData(this.db, item.testCaseId),
       env: env ? { ...env.variablesJson, baseUrl: env.baseUrl, name: env.name } : {},
     };
     const elements = repo.elementLocatorMap(this.db, run.applicationId);
+    // A block or called scenario deleted since is shown as such (not expanded) instead of failing the checklist.
     const blockSteps = (blockId: string) => {
-      const b = repo.getBlock(this.db, blockId);
-      return b.applicationId === run.applicationId ? b : undefined;
+      const b = orMissing(() => repo.getBlock(this.db, blockId));
+      return b === MISSING ? b : b.applicationId === run.applicationId ? b : undefined;
     };
+    const deleted = (label: string | undefined, what: string) =>
+      label ? `${label} (deleted ${what})` : `(deleted ${what})`;
 
     // Blocks and called scenarios are expanded under their step, saved elements become their locators, and
     // {{data.x}} / {{env.x}} / block inputs are filled in (secrets stay as placeholders).
@@ -109,7 +146,8 @@ export class ManualRunService {
         let label = s.label;
         if (depth < MAX_DEPTH && s.type === 'util.useBlock' && typeof params.blockId === 'string') {
           const b = blockSteps(params.blockId);
-          if (b) {
+          if (b === MISSING) label = deleted(label, 'block');
+          else if (b) {
             const inputs = (params.inputs ?? {}) as Record<string, unknown>;
             const own = { ...vars };
             for (const i of b.inputsJson) own[i.name] = inputs[i.name] ?? i.default ?? '';
@@ -121,8 +159,11 @@ export class ManualRunService {
           s.type === 'util.callScenario' &&
           typeof params.scenarioId === 'string'
         ) {
-          if (repo.applicationIdForScenario(this.db, params.scenarioId) === run.applicationId) {
-            const called = repo.getScenario(this.db, params.scenarioId);
+          const scenarioId = params.scenarioId;
+          const appId = orMissing(() => repo.applicationIdForScenario(this.db, scenarioId));
+          if (appId === MISSING) label = deleted(label, 'scenario');
+          else if (appId === run.applicationId) {
+            const called = repo.getScenario(this.db, scenarioId);
             label ||= called.name;
             params.steps = expand(called.steps as AnyStep[], vars, depth + 1);
           }
@@ -178,30 +219,78 @@ export class ManualRunService {
           ...(extra.bug && { bug: extra.bug }),
         };
       });
-    const video = this.db
+    // Each browser session leaves a video; the latest is the one shown, all are listed.
+    const videos = this.db
       .select()
       .from(schema.artifacts)
       .where(and(eq(schema.artifacts.runItemId, itemId), eq(schema.artifacts.kind, 'video')))
-      .get();
+      .orderBy(desc(schema.artifacts.createdAt))
+      .all()
+      .map((a) => a.path);
+    const lines = this.lines(itemId);
+    const { manualLines: _kept, ...label } = (item.labelJson ?? {}) as ItemLabel;
     return {
-      item,
+      item: { ...item, labelJson: item.labelJson ? label : null },
       run: { id: run.id, status: run.status, mode: run.mode },
-      lines: this.lines(itemId),
+      lines,
       results,
-      video: video?.path ?? null,
+      video: videos[0] ?? null,
+      videos,
     };
   }
 
-  /** Records results; `done` finishes the test (and the run when it was the last open test). */
+  /**
+   * Records results, merged per line (lines not given keep what is stored); `done` finishes the test (and the run
+   * when it was the last open test). A finished test stays finished unless `reopen` is given.
+   */
   save(itemId: string, input: unknown) {
     const { item, run } = this.item(itemId);
     if (run.status !== 'running') throw new repo.RepoError(409, 'conflict', `This run is ${run.status}`);
     const body = ManualSave.parse(input);
+    // Without its checklist (the scenario was deleted before the test was opened) nothing can be matched to a step:
+    // refuse rather than drop what is stored.
+    if (!this.hasLines(item)) throw new repo.RepoError(409, 'conflict', 'This test has no scenario any more');
     const lines = this.lines(itemId);
-    const given = new Map(body.results.map((r) => [r.number, r]));
+    const finished = !['queued', 'running'].includes(item.status);
+    const done = body.done || (finished && !body.reopen);
+    const shotsOf = (r: LineResult) => r.screenshots ?? (r.screenshot ? [r.screenshot] : []);
     const folder = `runs/${run.id}/${item.id}/`;
-    const shotsOf = (r: z.infer<typeof ManualSave>['results'][number]) =>
-      r.screenshots ?? (r.screenshot ? [r.screenshot] : []);
+    const inFolder = (p: string) => p.startsWith(folder) && !p.includes('..');
+    for (const r of [...body.results, ...(body.result ? [body.result] : [])]) {
+      if (!shotsOf(r).every(inFolder))
+        throw new repo.RepoError(400, 'invalid', 'A screenshot must be one taken or uploaded for this test');
+      if (!(r.clips ?? []).every((c) => !c.video || inFolder(c.video)))
+        throw new repo.RepoError(400, 'invalid', 'A clip must be part of this test’s recording');
+    }
+    const stored = this.db
+      .select()
+      .from(schema.stepResults)
+      .where(eq(schema.stepResults.runItemId, itemId))
+      .all();
+    const previous = new Map(stored.map((r) => [r.stepId, (r.responseJson ?? {}) as StoredExtra]));
+    const given = new Map<string, LineResult>(
+      stored.map((r) => {
+        const extra = (r.responseJson ?? {}) as StoredExtra;
+        const status: LineResult['status'] =
+          extra.blocked || r.status === 'broken'
+            ? 'blocked'
+            : r.status === 'passed' || r.status === 'failed' || r.status === 'skipped'
+              ? r.status
+              : 'pending';
+        return [
+          r.stepId ?? '',
+          {
+            number: r.stepId ?? '',
+            status,
+            note: r.message ?? '',
+            screenshots: extra.screenshots ?? (r.screenshotPath ? [r.screenshotPath] : []),
+            clips: extra.clips ?? [],
+          },
+        ];
+      }),
+    );
+    for (const r of body.results) given.set(r.number, r);
+    if (body.result) given.set(body.result.number, body.result);
     // A step without a result is kept when it has a note, screenshots or clips (it stays pending).
     const rows = lines
       .map((line, position) => ({ line, position, r: given.get(line.number) }))
@@ -211,27 +300,11 @@ export class ManualRunService {
           x.r &&
           (x.r.status !== 'pending' || x.r.note?.trim() || shotsOf(x.r).length || x.r.clips?.length),
       );
-    for (const { r } of rows)
-      for (const shot of shotsOf(r!))
-        if (!shot.startsWith(folder) || shot.includes('..'))
-          throw new repo.RepoError(
-            400,
-            'invalid',
-            'A screenshot must be one taken or uploaded for this test',
-          );
-    const previous = new Map(
-      this.db
-        .select()
-        .from(schema.stepResults)
-        .where(eq(schema.stepResults.runItemId, itemId))
-        .all()
-        .map((r) => [r.stepId, (r.responseJson ?? {}) as StoredExtra]),
-    );
 
     const statuses = rows.map((x) => x.r!.status).filter((st) => st !== 'pending');
     const firstFailed =
       rows.find((x) => x.r!.status === 'failed') ?? rows.find((x) => x.r!.status === 'blocked');
-    const status = !body.done
+    const status = !done
       ? 'running'
       : statuses.includes('failed')
         ? 'failed'
@@ -258,7 +331,7 @@ export class ManualRunService {
               r!.status === 'blocked'
                 ? 'broken'
                 : r!.status === 'pending'
-                  ? body.done
+                  ? done
                     ? 'skipped'
                     : 'pending'
                   : r!.status,
@@ -296,7 +369,9 @@ export class ManualRunService {
       item: this.db.select().from(schema.runItems).where(eq(schema.runItems.id, itemId)).get(),
     });
     this.bus.publish({ type: 'manual.updated', runId: run.id, itemId });
-    if (body.done && !this.open(run.id).length) this.complete(run.id);
+    // A finished test closes its browser (wherever it was finished).
+    if (done) this.bus.publish({ type: 'manual.finished', runId: run.id, itemId });
+    if (done && !this.open(run.id).length) this.complete(run.id);
     else this.runs.publishRun(run.id);
     return this.checklist(itemId);
   }
@@ -319,13 +394,15 @@ export class ManualRunService {
     const at = lines.findIndex((l) => l.number === d.number);
     if (at < 0) throw new repo.RepoError(400, 'invalid', `There is no step ${d.number}`);
     const env = run.environmentId ? repo.getEnvironment(this.db, run.environmentId) : undefined;
-    const { bug } = repo.recordFailure(this.db, {
+    // The reporter decided this is a bug: every report is a new bug (a unique category keeps it from being counted as
+    // another occurrence of an earlier report from the same step); the category is set back to "manual" after.
+    const { bug: filed } = repo.recordFailure(this.db, {
       applicationId: run.applicationId,
       runItemId: item.id,
       scenarioId: item.scenarioId,
       testCaseId: item.testCaseId,
       failedStepId: d.number,
-      category: 'manual',
+      category: `manual:${newId()}`,
       title: d.title,
       summary: `Found in a manual test: ${item.labelJson?.scenario ?? ''}, step ${d.number}`,
       severity: d.severity,
@@ -341,6 +418,8 @@ export class ManualRunService {
       diagnosis: null,
       owner: 'app',
     });
+    this.db.update(schema.bugs).set({ category: 'manual' }).where(eq(schema.bugs.id, filed.id)).run();
+    const bug = repo.getBug(this.db, filed.id);
     const row = this.db
       .select()
       .from(schema.stepResults)
@@ -396,8 +475,34 @@ export class ManualRunService {
       .set({ status: 'skipped', errorMessage: 'Not tested', updatedAt: now() })
       .where(and(eq(schema.runItems.runId, runId), inArray(schema.runItems.status, ['queued', 'running'])))
       .run();
+    // Steps left open in a finished run count as skipped, as when a test is finished.
+    const items = this.db
+      .select({ id: schema.runItems.id })
+      .from(schema.runItems)
+      .where(eq(schema.runItems.runId, runId))
+      .all()
+      .map((i) => i.id);
+    if (items.length)
+      this.db
+        .update(schema.stepResults)
+        .set({ status: 'skipped' })
+        .where(and(inArray(schema.stepResults.runItemId, items), eq(schema.stepResults.status, 'pending')))
+        .run();
     this.complete(runId);
     return this.runs.getRun(runId);
+  }
+}
+
+const emptyLabel = { scenario: '', modulePath: [], testCaseCode: null, testCaseTitle: null };
+const MISSING = Symbol('missing');
+
+/** The value, or MISSING when it was deleted (a 404 from the repository). */
+function orMissing<T>(get: () => T): T | typeof MISSING {
+  try {
+    return get();
+  } catch (e) {
+    if (e instanceof repo.RepoError && e.statusCode === 404) return MISSING;
+    throw e;
   }
 }
 

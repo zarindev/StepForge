@@ -41,6 +41,8 @@ export class BrowserPool {
 export type UiExecutorOptions = {
   /** Where visual checkpoints keep their approved baselines (default: `baselines` in the test's artifacts folder). */
   baselineDir?: string;
+  /** Requests kept per test for the network log and summaries (default 5000); more are only counted. */
+  maxNetworkEntries?: number;
 };
 
 export function createUiExecutor(pool: BrowserPool, options: UiExecutorOptions = {}): Executor {

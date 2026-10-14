@@ -86,9 +86,15 @@ export function RunQueue() {
               <Select
                 aria-label={`Priority of run ${r.id.slice(-8)}`}
                 className="h-8 w-28 text-xs"
-                value={p === 'next' ? 'high' : p}
+                value={p}
                 onChange={(e) => act.mutate({ id: r.id, priority: e.target.value })}
               >
+                {/* Shown only while the run is "next", so choosing High from it is a real change. */}
+                {p === 'next' && (
+                  <option value="next" disabled>
+                    Next
+                  </option>
+                )}
                 <option value="high">High</option>
                 <option value="normal">Normal</option>
                 <option value="low">Low</option>

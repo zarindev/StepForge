@@ -26,14 +26,33 @@ async function connect(p: Record<string, unknown>, timeoutMs: number): Promise<R
   const user = String(p.username ?? 'anonymous');
   const password = String(p.password ?? '');
   if (protocol === 'sftp') {
+    // Read the key first: a missing local key file must not look like a missing remote file.
+    let privateKey: Buffer | undefined;
+    if (p.privateKey) {
+      try {
+        privateKey = readFileSync(String(p.privateKey));
+      } catch (err) {
+        const e = err as NodeJS.ErrnoException;
+        throw new StepError(
+          'invalid_params',
+          `Cannot read the private key ${String(p.privateKey)}: ${e.code ?? e.message}`,
+        );
+      }
+    }
     const sftp = new SftpClient();
-    await sftp.connect({
-      host,
-      port: Number(p.port || 22),
-      username: user,
-      ...(p.privateKey ? { privateKey: readFileSync(String(p.privateKey)) } : { password }),
-      readyTimeout: timeoutMs,
-    });
+    try {
+      await sftp.connect({
+        host,
+        port: Number(p.port || 22),
+        username: user,
+        ...(privateKey ? { privateKey } : { password }),
+        readyTimeout: timeoutMs,
+      });
+    } catch (err) {
+      // A failed login would otherwise leave the socket open.
+      await sftp.end().catch(() => {});
+      throw err;
+    }
     return {
       upload: async (from, to) => void (await sftp.put(typeof from === 'string' ? from : from, to)),
       download: async (from, to) => void (await sftp.get(from, to)),
@@ -50,15 +69,21 @@ async function connect(p: Record<string, unknown>, timeoutMs: number): Promise<R
     };
   }
   const ftp = new FtpClient(timeoutMs);
-  await ftp.access({
-    host,
-    port: Number(p.port || 21),
-    user,
-    password,
-    secure: protocol === 'ftps',
-    // Test servers often use self-signed certificates.
-    secureOptions: { rejectUnauthorized: p.rejectUnauthorized === true },
-  });
+  try {
+    await ftp.access({
+      host,
+      port: Number(p.port || 21),
+      user,
+      password,
+      secure: protocol === 'ftps',
+      // Test servers often use self-signed certificates.
+      secureOptions: { rejectUnauthorized: p.rejectUnauthorized === true },
+    });
+  } catch (err) {
+    // A failed login would otherwise leave the socket open.
+    ftp.close();
+    throw err;
+  }
   const entry = (f: FileInfo): Entry => ({
     name: f.name,
     size: f.size,
@@ -72,8 +97,16 @@ async function connect(p: Record<string, unknown>, timeoutMs: number): Promise<R
     list: async (dir) => (await ftp.list(dir)).map(entry),
     remove: async (path) => void (await ftp.remove(path)),
     exists: async (path) => {
+      // Listed in its parent folder (files and folders alike); a missing parent means it does not exist.
       const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) || '/' : '.';
-      return (await ftp.list(dir)).some((f) => f.name === basename(path));
+      let entries: FileInfo[];
+      try {
+        entries = await ftp.list(dir);
+      } catch (err) {
+        if (/550|No such file|not found|cannot find/i.test((err as Error).message ?? '')) return false;
+        throw err;
+      }
+      return entries.some((f) => f.name === basename(path));
     },
     close: async () => ftp.close(),
   };
@@ -136,7 +169,9 @@ export async function ftpStep(
         await remote.remove(remotePath);
         return { message: `Deleted ${where}` };
       case 'exists': {
-        const exists = await remote.exists(remotePath);
+        // "dir/" is "dir"; the root (and the login folder) always exist.
+        const path = remotePath.replace(/\/+$/, '');
+        const exists = path === '' || path === '.' ? true : await remote.exists(path);
         return {
           output: exists,
           message: `${where} ${exists ? 'exists' : 'does not exist'}`,

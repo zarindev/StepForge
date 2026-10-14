@@ -2,7 +2,14 @@ import { passRate } from '@stepforge/analytics';
 import { RunOptionsInput, RunScope } from '@stepforge/core';
 import { schema, type StepForgeDb } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
-import { ChannelInput, notify, TEST_SUMMARY, type RunSummary } from '@stepforge/notify';
+import {
+  ChannelInput,
+  notify,
+  readWebhookSecret,
+  TEST_SUMMARY,
+  writeWebhookSecret,
+  type RunSummary,
+} from '@stepforge/notify';
 import { Cron } from 'croner';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -298,16 +305,28 @@ export class SchedulerService {
 
   saveChannel(input: unknown, id?: string) {
     const d = ChannelInput.parse(input);
+    const existing = id ? repo.resolveChannel(this.db, this.masterKey, id) : undefined;
+    // A Slack URL is not a Telegram token: never carry a secret over to another channel type.
+    if (existing && existing.kind !== d.kind && d.secret === undefined && existing.secret)
+      throw new repo.RepoError(400, 'invalid', 'Enter the URL/token again for the new channel type');
+    let config: Record<string, unknown> = d.config;
+    let secret = d.secret !== undefined ? d.secret || null : undefined;
+    if (d.kind === 'webhook') {
+      // Header values are encrypted with the URL; the config keeps only their names. Empty keeps the stored ones.
+      const stored = existing?.kind === 'webhook' ? readWebhookSecret(existing.secret) : undefined;
+      const storedHeaders = {
+        ...((existing?.kind === 'webhook' && (existing.config.headers as Record<string, string>)) || {}),
+        ...stored?.headers,
+      };
+      const headers = Object.keys(d.config.headers).length ? d.config.headers : storedHeaders;
+      const url = d.secret || stored?.url || '';
+      secret = url ? writeWebhookSecret({ url, headers }) : null;
+      config = { headerNames: url ? Object.keys(headers) : [] };
+    }
     return repo.saveChannel(
       this.db,
       this.masterKey,
-      {
-        name: d.name,
-        kind: d.kind,
-        config: d.config,
-        on: d.on,
-        ...(d.secret !== undefined && { secret: d.secret || null }),
-      },
+      { name: d.name, kind: d.kind, config, on: d.on, ...(secret !== undefined && { secret }) },
       id,
     );
   }

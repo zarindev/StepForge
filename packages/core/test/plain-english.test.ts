@@ -71,6 +71,9 @@ describe('plain English', () => {
     ],
     [s('ui.setClock', { action: 'set', time: '2030-01-15' }), 'Set the page clock to 2030-01-15'],
     [s('ui.setOffline', {}), 'Go offline'],
+    [s('ui.setOffline', { state: 'online' }), 'Go back online'],
+    [s('ui.setOffline', { state: 'offline', offline: false }), 'Go offline'],
+    [s('ui.setOffline', { offline: false }), 'Go back online'],
     [
       s('ui.visualCheckpoint', {}, [{ strategy: 'testId' as never, value: 'chart' }]),
       'Check that the element "chart" looks like the approved screenshot',

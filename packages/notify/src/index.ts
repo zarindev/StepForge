@@ -26,9 +26,45 @@ export const SlackConfig = z.object({
 });
 export const TeamsConfig = z.object({});
 export const WebhookConfig = z.object({
-  /** Extra request headers, e.g. an authorization header your service expects. */
+  /**
+   * Extra request headers as entered, e.g. an authorization header your service expects. The server moves
+   * their values into the encrypted secret; empty keeps the stored ones when editing.
+   */
   headers: z.record(z.string(), z.string()).default({}),
+  /** Names of the stored headers, for display (their values are encrypted with the URL). */
+  headerNames: z.array(z.string()).default([]),
 });
+
+/** Credentials belong in a header: a URL with user:pass@ would be echoed by fetch errors. */
+const WebhookUrl = z
+  .url()
+  .max(2000)
+  .refine((u) => {
+    try {
+      const x = new URL(u);
+      return !x.username && !x.password;
+    } catch {
+      return false;
+    }
+  }, 'The URL must not contain a username or password; put credentials in a header instead');
+
+/** A generic webhook's secret: its URL and header values, encrypted together. */
+export type WebhookSecret = { url: string; headers: Record<string, string> };
+export const writeWebhookSecret = (s: WebhookSecret): string => JSON.stringify(s);
+/** Reads a webhook secret; older channels stored the plain URL. */
+export function readWebhookSecret(secret: string | undefined | null): WebhookSecret {
+  if (!secret) return { url: '', headers: {} };
+  if (secret.trimStart().startsWith('{')) {
+    try {
+      const v = JSON.parse(secret) as Partial<WebhookSecret>;
+      if (typeof v.url === 'string')
+        return { url: v.url, headers: v.headers && typeof v.headers === 'object' ? v.headers : {} };
+    } catch {
+      // Not JSON after all: treat it as a URL.
+    }
+  }
+  return { url: secret, headers: {} };
+}
 const Common = {
   name: z.string().trim().min(1).max(80),
   on: z.enum(['always', 'failures']).default('always'),
@@ -55,19 +91,19 @@ export const ChannelInput = z.discriminatedUnion('kind', [
     ...Common,
     kind: z.literal('slack'),
     config: SlackConfig,
-    secret: z.url().max(2000).optional(),
+    secret: WebhookUrl.optional(),
   }),
   z.object({
     ...Common,
     kind: z.literal('teams'),
     config: TeamsConfig,
-    secret: z.url().max(2000).optional(),
+    secret: WebhookUrl.optional(),
   }),
   z.object({
     ...Common,
     kind: z.literal('webhook'),
     config: WebhookConfig,
-    secret: z.url().max(2000).optional(),
+    secret: WebhookUrl.optional(),
   }),
 ]);
 export type ChannelInput = z.infer<typeof ChannelInput>;
@@ -194,12 +230,12 @@ export async function sendTelegram(
       signal: AbortSignal.timeout(15_000),
     });
   } catch (err) {
-    throw new Error(`Telegram could not be reached: ${(err as Error).message}`);
+    throw new Error(`Telegram could not be reached: ${networkReason(err)}`);
   }
   const body = (await res.json().catch(() => ({}))) as { ok?: boolean; description?: string };
   // Never echo the URL: it contains the bot token.
   if (!res.ok || body.ok === false)
-    throw new Error(`Telegram refused the message: ${body.description ?? res.status}`);
+    throw new Error(`Telegram refused the message: ${stripUrls(String(body.description ?? res.status))}`);
 }
 
 export async function sendEmail(
@@ -323,6 +359,21 @@ export function formatTeams(s: RunSummary): Record<string, unknown> {
   };
 }
 
+/** Removes anything URL-like (a webhook URL or bot API URL holds the token). */
+const stripUrls = (t: string) => t.replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, '<url>');
+
+/**
+ * Why fetch failed, without its message: Node quotes the URL there ("Failed to parse URL from …",
+ * "… a URL that includes credentials: https://user:pass@…"), and the URL holds the token.
+ */
+function networkReason(err: unknown): string {
+  const e = err as { name?: string; cause?: { code?: unknown } };
+  if (e.name === 'TimeoutError' || e.name === 'AbortError') return 'no answer within 15 s';
+  const code = e.cause?.code;
+  if (typeof code === 'string' && /^[A-Z0-9_]+$/.test(code)) return code;
+  return 'the URL is invalid or the network failed';
+}
+
 /** POSTs JSON to a webhook URL; errors never include the URL (it holds the token). */
 async function postJson(label: string, url: string, payload: unknown, headers: Record<string, string> = {}) {
   if (!url) throw new Error(`The ${label} webhook URL is missing`);
@@ -335,10 +386,10 @@ async function postJson(label: string, url: string, payload: unknown, headers: R
       signal: AbortSignal.timeout(15_000),
     });
   } catch (err) {
-    throw new Error(`${label} could not be reached: ${(err as Error).message}`);
+    throw new Error(`${label} could not be reached: ${networkReason(err)}`);
   }
   if (!res.ok) {
-    const body = (await res.text().catch(() => '')).slice(0, 200);
+    const body = stripUrls((await res.text().catch(() => '')).slice(0, 200));
     throw new Error(`${label} refused the message: ${res.status}${body ? ` ${body}` : ''}`);
   }
 }
@@ -377,14 +428,17 @@ export async function notify(
     case 'teams':
       await postJson('Teams', channel.secret ?? '', formatTeams(summary));
       break;
-    case 'webhook':
+    case 'webhook': {
+      const s = readWebhookSecret(channel.secret);
+      // Header values live in the secret; older channels kept them in the config.
       await postJson(
         'The webhook',
-        channel.secret ?? '',
+        s.url,
         { event: 'run.finished', summary, text: m.text },
-        WebhookConfig.parse(channel.config).headers,
+        { ...WebhookConfig.parse(channel.config).headers, ...s.headers },
       );
       break;
+    }
   }
   return true;
 }

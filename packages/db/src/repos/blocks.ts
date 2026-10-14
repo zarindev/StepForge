@@ -1,10 +1,18 @@
 import { newId, type StepInput } from '@stepforge/core';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { z } from 'zod';
 import type { StepForgeDb } from '../index.ts';
 import { applications, blocks, blockSteps, modules, scenarios, steps as scenarioSteps } from '../schema.ts';
-import { acceptElementLocator, elementUsage, getElement, type ElementRow } from './elements.ts';
+import {
+  acceptElementLocator,
+  dropDeletedElements,
+  elementExists,
+  elementUsage,
+  getElement,
+  type ElementRow,
+} from './elements.ts';
 import { invalid, notFound, now } from './errors.ts';
+import { requiredBlockInputs } from './modules.ts';
 import {
   getScenario,
   parseSteps,
@@ -324,8 +332,29 @@ export function createBlock(
 }
 
 export function updateBlock(db: StepForgeDb, id: string, input: Partial<z.input<typeof BlockInput>>): Block {
-  blockRow(db, id);
+  const current = blockRow(db, id);
   const { inputs, ...d } = BlockInput.partial().parse(input);
+  // Hooks pass no values: a block used as one cannot gain an input without a default.
+  const needed = inputs ? requiredBlockInputs(inputs) : [];
+  if (needed.length) {
+    const asHook = [
+      ...db
+        .select({ id: modules.id })
+        .from(modules)
+        .where(or(eq(modules.setupBlockId, id), eq(modules.teardownBlockId, id)))
+        .all(),
+      ...db
+        .select({ id: scenarios.id })
+        .from(scenarios)
+        .where(or(eq(scenarios.setupBlockId, id), eq(scenarios.teardownBlockId, id)))
+        .all(),
+    ];
+    if (asHook.length)
+      throw invalid(
+        `"${current.name}" runs as a hook (before or after each test), and hooks pass no values: ` +
+          `give the input ${needed.map((n) => `"${n}"`).join(', ')} a default, or remove the block from the hooks first.`,
+      );
+  }
   db.update(blocks)
     .set({ ...d, ...(inputs && { inputsJson: inputs }), updatedAt: now() })
     .where(eq(blocks.id, id))
@@ -383,6 +412,10 @@ export function hooksFor(db: StepForgeDb, scenarioId: string): { before: Hook[];
 
 type OwnedStep = { id?: string; type: string; params?: Record<string, unknown>; locators?: unknown[] };
 
+/**
+ * Finds a step by id, nested ones included. Nested steps saved without an id are named by the run after their
+ * parent: `<parentId>:t<n>` (then branch / loop body is `l<n>`) or `<parentId>:e<n>` (else branch).
+ */
 function findStep(list: OwnedStep[], id: string): OwnedStep | undefined {
   for (const s of list) {
     if (s.id === id) return s;
@@ -394,7 +427,12 @@ function findStep(list: OwnedStep[], id: string): OwnedStep | undefined {
       }
     }
   }
-  return undefined;
+  const synthetic = /^(.+):([tel])(\d+)$/.exec(id);
+  if (!synthetic) return undefined;
+  const parent = findStep(list, synthetic[1]!);
+  const nested = parent?.params?.[synthetic[2] === 'e' ? 'else' : 'steps'];
+  const hit = Array.isArray(nested) ? (nested[Number(synthetic[3])] as OwnedStep | undefined) : undefined;
+  return hit && typeof hit === 'object' ? hit : undefined;
 }
 
 export type StepOwner = {
@@ -446,7 +484,10 @@ export function stepOwner(db: StepForgeDb, scenarioId: string, runStepId: string
   const stepId = segments.at(-1)!;
   const step = findStep(owner.steps, stepId);
   if (!step) throw notFound('Step', runStepId);
-  const ref = (step.locators as { strategy?: string; value?: string }[] | undefined)?.[0];
+  // The element the run used first: refs to deleted elements are skipped, as the run skips them.
+  const ref = ((step.locators ?? []) as { strategy?: string; value?: string }[]).find(
+    (l) => l.strategy !== 'element' || (!!l.value && elementExists(db, l.value)),
+  );
   let element: StepOwner['element'];
   if (ref?.strategy === 'element' && ref.value) {
     try {
@@ -491,10 +532,9 @@ export function acceptLocator(
     owner.kind === 'block' ? getBlock(db, owner.id).steps : getScenario(db, owner.id).steps,
   ) as unknown as OwnedStep[];
   const step = findStep(list, owner.stepId)!;
-  step.locators = [
-    locator,
-    ...((step.locators ?? []) as unknown[]).filter((l) => JSON.stringify(l) !== JSON.stringify(locator)),
-  ];
+  // Refs to deleted elements are dropped: they point nowhere and would only get in the way.
+  const kept = dropDeletedElements(db, (step.locators ?? []) as { strategy?: string; value?: string }[]);
+  step.locators = [locator, ...kept.filter((l) => JSON.stringify(l) !== JSON.stringify(locator))];
   return owner.kind === 'block'
     ? { owner, block: saveBlockSteps(db, owner.id, list as never) }
     : { owner, scenario: saveSteps(db, owner.id, list as never) };

@@ -206,6 +206,19 @@ export function elementLocatorMap(db: StepForgeDb, applicationId: string): Recor
   );
 }
 
+/** True when `id` is a saved element (an `element` locator whose element was deleted points nowhere). */
+export function elementExists(db: StepForgeDb, id: string): boolean {
+  return !!db.select({ id: elements.id }).from(elements).where(eq(elements.id, id)).get();
+}
+
+/** A step's locators without `element` refs to deleted elements (the run skips those anyway). */
+export function dropDeletedElements<T extends { strategy?: string; value?: string }>(
+  db: StepForgeDb,
+  locators: T[],
+): T[] {
+  return locators.filter((l) => l.strategy !== 'element' || (!!l.value && elementExists(db, l.value)));
+}
+
 /** The suggested locator becomes the element's primary one (the old ones stay as fallbacks). */
 export function acceptElementLocator(db: StepForgeDb, id: string, locator: unknown): ElementRow {
   const e = elementRow(db, id);

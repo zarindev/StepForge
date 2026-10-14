@@ -90,7 +90,9 @@ class ApiSession implements ExecutorSession {
             version: p.version ? String(p.version) : undefined,
           })
         : undefined;
-    this.namespaces = (p.namespaces as Record<string, string>) ?? {};
+    // Kept for api.extract after this step; this step's own checks use the local copy.
+    const namespaces = (p.namespaces as Record<string, string>) ?? {};
+    this.namespaces = namespaces;
     const spec: RequestSpec = soap
       ? {
           method: 'POST',
@@ -190,16 +192,21 @@ class ApiSession implements ExecutorSession {
       assertions: extra,
       getTarget: (t) => {
         if (t === 'fault') return soapFault(response.text, response)?.message;
-        return responseTarget(response, t, this.namespaces);
+        return responseTarget(response, t, namespaces);
       },
-      evaluate: (a) => this.evaluate(a, response),
+      evaluate: (a) => this.evaluate(a, response, namespaces),
       metrics: [{ metric: 'api.response_time', value: response.timeMs, unit: 'ms' }],
     };
   }
 
-  private evaluate(a: Assertion, res: HttpResponse): AssertionResult | undefined {
+  private evaluate(
+    a: Assertion,
+    res: HttpResponse,
+    namespaces: Record<string, string>,
+  ): AssertionResult | undefined {
     if (a.operator !== 'matchesSchema') return undefined;
-    const value = a.target === 'body' || a.target === '$' ? res.body : responseTarget(res, a.target);
+    const value =
+      a.target === 'body' || a.target === '$' ? res.body : responseTarget(res, a.target, namespaces);
     const r = validateSchema(a.expected, value);
     return {
       target: a.target,
@@ -216,13 +223,15 @@ class ApiSession implements ExecutorSession {
     if (!this.last)
       throw new StepError('invalid_params', 'api.extract needs an earlier API request in this test');
     const res = this.last.response;
+    // The request's prefixes, plus any the extract step adds.
+    const namespaces = { ...this.namespaces, ...((p.namespaces as Record<string, string>) ?? {}) };
     const from = String(p.from ?? 'body');
     const value =
       from === 'status'
         ? res.status
         : from === 'header'
           ? res.headers[String(p.name ?? '').toLowerCase()]
-          : responseTarget(res, String(p.path ?? '$'), this.namespaces);
+          : responseTarget(res, String(p.path ?? '$'), namespaces);
     if (value === undefined && p.required !== false)
       throw new StepError(
         'assertion',
@@ -231,7 +240,7 @@ class ApiSession implements ExecutorSession {
     return {
       output: value,
       message: `Extracted ${JSON.stringify(value)?.slice(0, 120)}`,
-      getTarget: (t) => (t === 'value' ? value : responseTarget(res, t)),
+      getTarget: (t) => (t === 'value' ? value : responseTarget(res, t, namespaces)),
     };
   }
 
@@ -249,13 +258,20 @@ export function createApiExecutor(opts: { contracts?: ContractResolver } = {}): 
   };
 }
 
-/** Convenience used by the API Client: evaluate assertions against a response outside the engine. */
-export function checkAssertions(res: HttpResponse, assertions: Assertion[]): AssertionResult[] {
+/**
+ * Convenience used by the API Client: evaluate assertions against a response outside the engine.
+ * `namespaces` adds XPath prefixes, as on a request step.
+ */
+export function checkAssertions(
+  res: HttpResponse,
+  assertions: Assertion[],
+  namespaces?: Record<string, string>,
+): AssertionResult[] {
   return assertions.map((a) => {
     if (a.operator === 'matchesSchema') {
       const r = validateSchema(
         a.expected,
-        a.target === 'body' || a.target === '$' ? res.body : responseTarget(res, a.target),
+        a.target === 'body' || a.target === '$' ? res.body : responseTarget(res, a.target, namespaces),
       );
       return {
         target: a.target,
@@ -264,6 +280,6 @@ export function checkAssertions(res: HttpResponse, assertions: Assertion[]): Ass
         message: r.ok ? 'matches schema' : r.errors.join('; '),
       };
     }
-    return evaluateAssertion(a, responseTarget(res, a.target));
+    return evaluateAssertion(a, responseTarget(res, a.target, namespaces));
   });
 }

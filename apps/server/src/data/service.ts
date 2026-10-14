@@ -1,10 +1,10 @@
 import { StepError, VariableResolver } from '@stepforge/core';
 import type { StepForgeDb } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
-import { openClient } from '@stepforge/executor-db';
+import { checkPolicy, classifySql, DbError, openClient } from '@stepforge/executor-db';
 import type { DataPick, DataProvider } from '@stepforge/executor-util';
 import { JSONPath } from 'jsonpath-plus';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import type { DatabaseService } from '../database/service.ts';
 
@@ -53,6 +53,26 @@ export function parseCsv(text: string): LoadedRows {
   };
 }
 
+/**
+ * Where a CSV source may read from. Anyone with an API token can create a source and preview it, so the file
+ * must look like a data file: only .csv / .tsv / .txt (also after following symlinks). That keeps StepForge's
+ * own key, session and database files (data/.key, data/.session.json, data/stepforge.db) and other server files
+ * out of reach. Relative paths are taken from the data folder.
+ */
+const DATA_FILE = /\.(csv|tsv|txt)$/i;
+export function csvFilePath(dataDir: string, path: string): string {
+  const file = isAbsolute(path) ? path : resolve(dataDir, path);
+  let real = file;
+  try {
+    real = realpathSync(file);
+  } catch {
+    // a missing file is reported when it is read
+  }
+  if (!DATA_FILE.test(file) || !DATA_FILE.test(real))
+    throw new StepError('invalid_params', `A CSV data source must point to a .csv, .tsv or .txt file (got ${path})`);
+  return file;
+}
+
 const columnsOf = (rows: Row[]) => [...new Set(rows.flatMap((r) => Object.keys(r)))];
 
 /**
@@ -73,8 +93,7 @@ export class DataService {
       case 'table':
         return { columns: source.columnsJson, rows: source.rowsJson };
       case 'csv': {
-        const path = String(cfg.path);
-        const file = isAbsolute(path) ? path : resolve(this.dataDir, path);
+        const file = csvFilePath(this.dataDir, String(cfg.path));
         let text: string;
         try {
           text = readFileSync(file, 'utf8');
@@ -93,10 +112,23 @@ export class DataService {
             `No database connection named "${String(cfg.connection)}" in the ${env.name} environment`,
           );
         }
-        // Always read-only: a data source never changes the database.
-        const client = await openClient({ ...this.database.config(conn.id), readOnly: true });
+        // Always read-only: a data source never changes the database. Not every driver can enforce that
+        // (MSSQL, Mongo; Postgres accepts "SET SESSION ... READ WRITE; DELETE ..."), so the statement is checked
+        // like a query on a read-only connection first, and must be a single statement.
+        const dbCfg = { ...this.database.config(conn.id), readOnly: true, rollbackMode: false };
+        const query = String(cfg.query);
+        if (dbCfg.engine !== 'mongo' && classifySql(query, dbCfg.engine).statements.length > 1)
+          throw new StepError('invalid_params', 'A SQL data source runs one query; remove the extra statements');
         try {
-          const r = await client.query(String(cfg.query), [], { maxRows: MAX_ROWS });
+          await checkPolicy(dbCfg, query);
+        } catch (err) {
+          if (err instanceof DbError && err.code === 'blocked')
+            throw new StepError('invalid_params', 'A SQL data source only reads data; this query would change it');
+          throw err;
+        }
+        const client = await openClient(dbCfg);
+        try {
+          const r = await client.query(query, [], { maxRows: MAX_ROWS });
           return { columns: r.columns, rows: r.rows };
         } finally {
           await client.close();

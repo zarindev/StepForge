@@ -50,6 +50,8 @@ A block can also run automatically around tests:
   them. Modules with hooks show a small anchor in the tree.
 - **Scenario hooks:** a scenario's **Details** tab has its own *Before this test* / *After this test*, and lists
   the hooks it inherits from its modules.
+- A hook runs without inputs, so a block with a **required input** (one without a default) cannot be a hook; give the
+  input a default first.
 
 **Order:** before-hooks run outermost module first, the scenario's own last. After-hooks run the scenario's own
 first, outermost module last. A failing before-hook **skips the test**; after-hooks **always run**, even when the

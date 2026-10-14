@@ -248,4 +248,43 @@ describe('campaigns', () => {
     await ok('DELETE', `/api/campaigns/${campaignId}`);
     expect((await call('GET', `/api/schedules/${s.id}/runs`)).statusCode).toBe(404);
   }, 60_000);
+
+  it('a selection of manual tests only is refused before anything is queued', async () => {
+    const manualMod = (await ok('POST', `/api/applications/${appId}/modules`, { name: 'Manual only' })).id;
+    await ok('POST', `/api/modules/${manualMod}/scenarios`, {
+      name: 'Looks right',
+      execution: 'manual',
+      steps: [{ type: 'util.manual', params: { instruction: 'Check the logo' } }],
+    });
+    const c = await ok<{ id: string }>('POST', `/api/applications/${appId}/campaigns`, {
+      name: 'Manual campaign',
+      selection: { modules: [manualMod] },
+      environmentIds: [local, staging],
+    });
+    const res = await call('POST', `/api/campaigns/${c.id}/run`);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toMatch(/This campaign has no automated tests to run/);
+    expect((await ok<{ runs: unknown[] }>('GET', `/api/campaigns/${c.id}`)).runs).toHaveLength(0);
+  });
+
+  it('deleting an environment takes it out of campaigns, which still launch', async () => {
+    const extra = (
+      await ok('POST', `/api/applications/${appId}/environments`, {
+        name: 'Gone soon',
+        baseUrl: 'http://x.test',
+      })
+    ).id;
+    const c = await ok<{ id: string }>('POST', `/api/applications/${appId}/campaigns`, {
+      name: 'With a doomed environment',
+      selection: { scenarios: [scen.spec] },
+      environmentIds: [local, extra],
+    });
+    await ok('DELETE', `/api/environments/${extra}`);
+    const got = await ok<{ environmentIdsJson: string[] }>('GET', `/api/campaigns/${c.id}`);
+    expect(got.environmentIdsJson).toEqual([local]);
+    const started = await ok<{ id: string }>('POST', `/api/campaigns/${c.id}/run`);
+    const d = await waitDone(started.id);
+    expect(d.cells).toHaveLength(1);
+    expect(d.status).toBe('passed');
+  }, 60_000);
 });

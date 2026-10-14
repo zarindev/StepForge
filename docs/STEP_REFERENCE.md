@@ -61,7 +61,7 @@ How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth stagi
 | `download` | — (the locator is clicked) | keeps the file; assertion targets `fileName`, `size`, `content` (text up to 5 MB); output `{ fileName, size, path }` |
 | `waitForResponse` | `url` (part of the URL, or a glob like `**/api/orders*`), `method`, `status` | the first matching response since the test started that no earlier step took, else the next one; targets `status`, `body`, `url`, `header:<name>`, any JSONPath (`$.items[0].id`); output: the body |
 | `mockRoute` | `url`, `action` (`fulfill`/`abort`/`delay`/`remove`), `method`, `status`, `body`, `contentType`, `delayMs`, `times` | until the test ends (or `remove`); a new mock for the same `url` replaces the old one |
-| `setOffline` | `offline` (default true) | `false` goes back online |
+| `setOffline` | `state` (`offline` default, or `online`) | `online` goes back online (older steps may use `offline: false`) |
 | `storage` | `kind` (`cookie`/`local`/`session`), `action` (`get`/`set`/`remove`/`clear`), `name`, `value` | `get`: targets `value`, `exists`; output: the value |
 | `networkSummary` | `since` (`test` default, or `lastNavigation`: since the last `navigate`) | the page traffic as checks: targets `requests`, `bytes`, `kb`, `failed`, `thirdPartyRequests`, `thirdPartyHosts`, `hosts`, `thirdPartyHostNames`, `requests:<type>`, `bytes:<type>` (type = `script`, `image`, `fetch`, `document`, …) |
 | `setClock` | `action` (`set` = fixed time, `install` = runs from `time`, `fastForward` + `ms`), `time` (ISO date or epoch ms) | put `install` before `ui.navigate` so the page's timers use it |

@@ -99,6 +99,16 @@
   works as before.
 
 ### Fixed
+- A full review of this release fixed, among others: SQL data sources now refuse writes and extra statements on every
+  database; CSV sources only read `.csv`/`.tsv`/`.txt` files; webhook header values are stored encrypted; errors
+  never show webhook URLs or tokens; block inputs no longer leak into the caller's variables and their defaults are
+  resolved; a deleted saved element no longer breaks a step that has other locators; environment deletion keeps
+  campaigns working and importable; campaign launches are checked before they start; manual tests keep their
+  results when the scenario changes mid-run, never open two browsers, and merge results per step; mock routes per
+  method, globs starting with `/`, visual-checkpoint number checks, third-party detection for short domains, the
+  "back online" step, and Kafka waits on topics that do not exist yet. Exported Cypress projects log page errors
+  instead of failing on them. Visual baselines now live per application (existing ones are re-created on the next
+  run).
 - The recorder recorded a slow first page load twice (seen on Windows CI).
 - A step's screenshot is tried once more when the first try times out on a busy machine (a CI run had a step without
   its screenshot).

@@ -6,6 +6,7 @@ import { eq, inArray } from 'drizzle-orm';
 import type { EventBus } from '../context.ts';
 import { runDefaults } from '../routes/system.ts';
 import type { RunManager } from '../runner/manager.ts';
+import { expandScope } from '../runner/scope.ts';
 import type { SchedulerService } from '../scheduler/service.ts';
 
 const RANK: Record<string, number> = {
@@ -48,7 +49,8 @@ export class CampaignService {
     const c = repo.getCampaign(this.db, campaignId);
     const scope = repo.campaignScope(this.db, c);
     const matrix = repo.campaignMatrix(c);
-    for (const cell of matrix) repo.getEnvironment(this.db, cell.environmentId); // fails before queuing anything
+    if (!matrix.length)
+      throw new repo.RepoError(400, 'invalid', 'This campaign has no environments; edit it and choose one');
     return this.start(
       c,
       matrix.map((cell) => ({ ...cell, scope })),
@@ -91,19 +93,51 @@ export class CampaignService {
     cells: { environmentId: string; browser: string; viewport: string; scope: unknown }[],
     extra: { trigger: repo.CampaignRun['trigger']; parentId?: string; scheduleId?: string },
   ): repo.CampaignRunSummary {
+    // Everything is checked before the campaign run exists, so a refused launch leaves nothing behind.
+    // A rerun skips combinations whose environment was deleted or whose tests are now all manual.
+    const rerun = extra.trigger === 'rerun';
+    const runnable = cells.filter((cell) => {
+      try {
+        const env = repo.getEnvironment(this.db, cell.environmentId);
+        if (env.applicationId !== c.applicationId)
+          throw new repo.RepoError(400, 'invalid', 'Environment belongs to another application');
+      } catch (err) {
+        if (rerun) return false;
+        throw err;
+      }
+      return expandScope(this.db, c.applicationId, cell.scope as never).length > 0;
+    });
+    if (!runnable.length)
+      throw new repo.RepoError(
+        400,
+        'empty_scope',
+        rerun
+          ? 'Nothing to rerun: the failed tests are now manual, or their environments were deleted'
+          : 'This campaign has no automated tests to run (manual tests run in a manual run)',
+      );
     const cr = repo.createCampaignRun(this.db, c, extra);
     const options = RunOptionsInput.parse({ ...runDefaults(this.db), ...c.optionsJson });
-    for (const cell of cells)
-      this.runs.create(
-        {
-          applicationId: c.applicationId,
-          environmentId: cell.environmentId,
-          scope: cell.scope as never,
-          options: { ...options, browser: cell.browser as never, viewport: cell.viewport as never },
-          trigger: TRIGGER[extra.trigger],
-        },
-        { campaignRunId: cr.id, scheduleId: extra.scheduleId },
-      );
+    const created: string[] = [];
+    try {
+      for (const cell of runnable)
+        created.push(
+          this.runs.create(
+            {
+              applicationId: c.applicationId,
+              environmentId: cell.environmentId,
+              scope: cell.scope as never,
+              options: { ...options, browser: cell.browser as never, viewport: cell.viewport as never },
+              trigger: TRIGGER[extra.trigger],
+            },
+            { campaignRunId: cr.id, scheduleId: extra.scheduleId },
+          ).id,
+        );
+    } catch (err) {
+      // Not expected after the checks above; undo rather than leave a half-launched campaign run.
+      for (const id of created) this.runs.cancel(id);
+      if (!created.length) repo.deleteCampaignRun(this.db, cr.id);
+      throw err;
+    }
     this.bus.publish({ type: 'campaign.updated', campaignId: c.id, campaignRunId: cr.id });
     return repo.summarizeCampaignRun(this.db, cr);
   }

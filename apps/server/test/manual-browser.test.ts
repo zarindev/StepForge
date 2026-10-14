@@ -123,7 +123,8 @@ describe('manual tests and the tester’s browser', () => {
     await expect.poll(() => panel.innerText()).toContain('Open /checkout');
     expect(await panel.innerText()).toContain('Next: Press Pay');
 
-    if (process.env.STEPFORGE_SHOTS) await page.screenshot({ path: `${process.env.STEPFORGE_SHOTS}/manual-panel.png` });
+    if (process.env.STEPFORGE_SHOTS)
+      await page.screenshot({ path: `${process.env.STEPFORGE_SHOTS}/manual-panel.png` });
     await panel.getByRole('button', { name: '✓ Pass' }).click();
     await expect.poll(() => panel.innerText()).toContain('Expect: A receipt appears');
     await panel.getByRole('button', { name: 'Take a screenshot' }).click();
@@ -179,5 +180,73 @@ describe('manual tests and the tester’s browser', () => {
     ]);
     const linked = await ok<Checklist>('GET', `/api/run-items/${itemId}/manual`);
     expect(linked.results.find((r) => r.number === '2')!.bug?.code).toBe('BUG-001');
+  }, 60_000);
+
+  const manualRun = async () => {
+    const run = await ok<{ id: string }>('POST', '/api/runs', {
+      applicationId: appId,
+      environmentId: envId,
+      mode: 'manual',
+      scope: { type: 'scenarios', ids: [manualId] },
+    });
+    return (await ok<{ items: { id: string }[] }>('GET', `/api/runs/${run.id}`)).items[0]!.id;
+  };
+
+  it('opening twice at once starts one browser; finishing in the dashboard closes it', async () => {
+    const itemId = await manualRun();
+    const opened: unknown[] = [];
+    const listen = (e: { type: string; itemId?: string; open?: boolean }) => {
+      if (e.type === 'manual.browser' && e.itemId === itemId && e.open) opened.push(e);
+    };
+    ctx.bus.on('event', listen);
+    try {
+      const [a, b] = await Promise.all([
+        ok<{ url: string }>('POST', `/api/run-items/${itemId}/manual/browser`),
+        ok<{ url: string }>('POST', `/api/run-items/${itemId}/manual/browser`),
+      ]);
+      expect(a.url).toBe(b.url);
+      expect(opened).toHaveLength(1);
+    } finally {
+      ctx.bus.off('event', listen);
+    }
+    const page = ctx.manualBrowser.pageOf(itemId)!;
+    const panel = page.locator('stepforge-manual .panel');
+    await expect.poll(() => panel.innerText()).toContain('Open /checkout');
+
+    // Step 1 marked in the dashboard: the panel moves on to step 2 (the current step is not stuck).
+    await ok('PUT', `/api/run-items/${itemId}/manual`, { result: { number: '1', status: 'passed' } });
+    await expect.poll(() => panel.innerText()).toContain('Expect: A receipt appears');
+    // Going back to step 1 keeps it current until it gets a new result.
+    await panel.locator('select').selectOption('1');
+    await expect.poll(() => panel.innerText()).toContain('Step 1');
+    await panel.getByRole('button', { name: '✗ Fail' }).click();
+    await expect.poll(() => panel.innerText()).toContain('Step 2');
+
+    // A note typed before a screenshot is saved once, also when the step is then marked.
+    await panel.locator('textarea').fill('Spinner forever');
+    await panel.getByRole('button', { name: 'Take a screenshot' }).click();
+    await expect.poll(() => panel.innerText()).toContain('Screenshot (1)');
+    expect(await panel.locator('textarea').inputValue()).toBe('');
+    await panel.getByRole('button', { name: '✗ Fail' }).click();
+    await expect
+      .poll(
+        async () =>
+          (await ok<Checklist>('GET', `/api/run-items/${itemId}/manual`)).results.find(
+            (r) => r.number === '2',
+          )?.status,
+      )
+      .toBe('failed');
+    const step2 = (await ok<Checklist>('GET', `/api/run-items/${itemId}/manual`)).results.find(
+      (r) => r.number === '2',
+    )!;
+    expect(step2.note).toBe('Spinner forever');
+
+    // Finished from the dashboard: the browser closes and the test stays finished.
+    await ok('PUT', `/api/run-items/${itemId}/manual`, { done: true });
+    await expect.poll(() => ctx.manualBrowser.isOpen(itemId), { timeout: 15_000 }).toBe(false);
+    const after = await ok<Checklist>('GET', `/api/run-items/${itemId}/manual`);
+    expect(after.item.status).toBe('failed');
+    expect(after.browserOpen).toBe(false);
+    expect((await call('POST', `/api/run-items/${itemId}/manual/browser`)).statusCode).toBe(409);
   }, 60_000);
 });

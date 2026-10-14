@@ -181,11 +181,58 @@ export function updateDataSource(db: StepForgeDb, id: string, input: unknown): D
   const current = row(db, id);
   const d = DataSourceInput.parse(input);
   assertUnique(db, current.applicationId, d.name, id);
-  db.update(datasets)
-    .set({ ...values(d), updatedAt: now() })
-    .where(eq(datasets.id, id))
-    .run();
+  db.transaction(() => {
+    db.update(datasets)
+      .set({ ...values(d), updatedAt: now() })
+      .where(eq(datasets.id, id))
+      .run();
+    // Steps reference sources by name, so a rename carries over to them.
+    if (d.name !== current.name) renameInSteps(db, current.applicationId, current.name, d.name);
+  });
   return row(db, id);
+}
+
+/** Rewrites `params.source` of the application's `util.useData` steps (nested ones too) from one name to another. */
+function renameInSteps(db: StepForgeDb, applicationId: string, from: string, to: string) {
+  const rewrite = (type: string, params: Record<string, unknown>): Record<string, unknown> | undefined => {
+    let changed = false;
+    const next: Record<string, unknown> = { ...params };
+    if (type === 'util.useData' && params.source === from) {
+      next.source = to;
+      changed = true;
+    }
+    for (const key of ['steps', 'else']) {
+      const nested = params[key];
+      if (!Array.isArray(nested)) continue;
+      next[key] = nested.map((s: { type?: string; params?: Record<string, unknown> }) => {
+        const p = s && typeof s === 'object' && s.params ? rewrite(String(s.type), s.params) : undefined;
+        if (!p) return s;
+        changed = true;
+        return { ...s, params: p };
+      });
+    }
+    return changed ? next : undefined;
+  };
+  const scen = db
+    .select({ id: scenarios.id })
+    .from(scenarios)
+    .innerJoin(modules, eq(scenarios.moduleId, modules.id))
+    .where(eq(modules.applicationId, applicationId))
+    .all();
+  for (const sc of scen)
+    for (const r of db.select().from(scenarioSteps).where(eq(scenarioSteps.scenarioId, sc.id)).all()) {
+      const p = rewrite(r.type, r.paramsJson);
+      if (p) db.update(scenarioSteps).set({ paramsJson: p }).where(eq(scenarioSteps.id, r.id)).run();
+    }
+  for (const b of db
+    .select({ id: blocks.id })
+    .from(blocks)
+    .where(eq(blocks.applicationId, applicationId))
+    .all())
+    for (const r of db.select().from(blockSteps).where(eq(blockSteps.blockId, b.id)).all()) {
+      const p = rewrite(r.type, r.paramsJson);
+      if (p) db.update(blockSteps).set({ paramsJson: p }).where(eq(blockSteps.id, r.id)).run();
+    }
 }
 
 export function deleteDataSource(db: StepForgeDb, id: string): void {

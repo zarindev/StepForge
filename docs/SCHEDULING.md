@@ -91,7 +91,9 @@ gate and link — with optional extra headers (e.g. `Authorization`). Use it for
 Home Assistant, or your own service.
 
 Webhook URLs contain a token, so they are stored encrypted like passwords, never shown again, and never included in
-error messages.
+error messages. A webhook channel's header **values** are stored encrypted with the URL too (only the header names
+are shown); leave the fields empty when editing to keep what is stored. URLs with a user name or password in them are
+refused — put credentials in a header instead.
 
 ### Sending from the CLI
 

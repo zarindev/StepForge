@@ -8,7 +8,7 @@ import { CodeEditor } from './code-editor';
 import { useEditorCtx } from './context';
 import type { DraftStep } from './drafts';
 import { ElementField } from './element-field';
-import { getPath, NEEDS_LOCATOR, setPath, STEP_FIELDS, type FieldSpec } from './step-fields';
+import { getPath, NEEDS_LOCATOR, setField, STEP_FIELDS, type FieldSpec } from './step-fields';
 import { StepList, StepTypeSelect } from './step-list';
 
 function JsonEditor({
@@ -60,7 +60,7 @@ function TypedField({
 }) {
   const { scenarios, blocks, connections, inboxes, dataSources } = useEditorCtx();
   const value = getPath(params, spec.key);
-  const set = (v: unknown) => onParams(setPath(params, spec.key, v));
+  const set = (v: unknown) => onParams(setField(params, spec, v));
   const cls = spec.wide ? 'md:col-span-3' : '';
   switch (spec.kind) {
     case 'checkbox':
