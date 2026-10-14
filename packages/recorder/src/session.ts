@@ -141,15 +141,24 @@ export class RecordingSession {
     this.currentPage = this.page;
     this.push({ type: 'ui.navigate', params: { url: this.relative(this.opts.startUrl) } });
     this.lastActionAt = Date.now();
+    // The start page is already the first step: its own navigation (however slow) is not recorded again.
+    this.initialLoad = true;
     await this.page.goto(this.opts.startUrl).catch(() => {});
+    this.initialLoad = false;
     this.lastUrl = this.page.url();
     this.lastActionAt = 0; // only user actions (not the initial load) suppress navigation steps
   }
+
+  private initialLoad = false;
 
   private attach(p: Page): void {
     p.on('framenavigated', (frame) => {
       if (frame !== p.mainFrame() || this.state !== 'recording') return;
       const url = frame.url();
+      if (this.initialLoad && p === this.page) {
+        this.lastUrl = url;
+        return;
+      }
       if (url === this.lastUrl || url === 'about:blank') return;
       this.lastUrl = url;
       if (p !== this.currentPage) return; // popup navigations are covered by switchTab
