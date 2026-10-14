@@ -650,4 +650,46 @@ describe('UI executor', () => {
     expect(summary.message).toMatch(/^Incomplete: 2 more requests were not recorded \(over 2 in this test\)/);
     expect(summary.assertions.find((a) => a.target === 'truncated')).toMatchObject({ passed: false });
   });
+
+  it('Electron desktop app: the app’s windows are the test’s pages (a new window is like a tab), with video', async () => {
+    const appPath = new URL('../../../../demo/desktop-app', import.meta.url).pathname;
+    const css = (value: string) => [{ strategy: 'css' as const, value }];
+    const r = await run(
+      steps(
+        {
+          type: 'ui.fill',
+          params: { value: 'Buy milk' },
+          locators: [{ strategy: 'placeholder', value: 'Write a note' }],
+        },
+        { type: 'ui.click', locators: [{ strategy: 'testId', value: 'add-note' }] },
+        {
+          type: 'ui.assert',
+          params: { check: 'text', expected: '1 note' },
+          locators: [{ strategy: 'role', value: 'status' }],
+        },
+        {
+          type: 'ui.assert',
+          params: { check: 'title', expected: 'Notes' },
+        },
+        { type: 'ui.click', locators: css('#about') },
+        { type: 'ui.switchTab', params: { urlContains: 'about.html' } },
+        {
+          type: 'ui.assert',
+          params: { check: 'textContains', expected: 'demo desktop app' },
+          locators: css('p'),
+        },
+      ),
+      { electron: { appPath }, video: 'always' },
+    );
+    expect(r.status, r.steps.map((s) => `${s.type} ${s.status} ${s.message}`).join('\n')).toBe('passed');
+    expect(r.artifacts.some((a) => a.kind === 'video' && existsSync(a.path))).toBe(true);
+  }, 60_000);
+
+  it('Electron: a missing app gives a clear error', async () => {
+    const r = await run(steps({ type: 'ui.click', locators: [{ strategy: 'css', value: '#x' }] }), {
+      electron: { appPath: '/nowhere/app' },
+    });
+    expect(r.status).toBe('broken');
+    expect(r.steps[0]!.message).toContain('The app folder was not found: /nowhere/app');
+  });
 });

@@ -1,4 +1,5 @@
-import { VIEWPORT_PRESETS } from '@stepforge/core';
+import { launchElectron } from '@stepforge/executor-ui';
+import { VariableResolver, VIEWPORT_PRESETS, type ElectronLaunch } from '@stepforge/core';
 import type { StepForgeDb } from '@stepforge/db';
 import { schema } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
@@ -6,7 +7,7 @@ import { newId } from '@stepforge/core';
 import { eq } from 'drizzle-orm';
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { chromium, type BrowserContext, type Page } from 'playwright';
 import type { EventBus } from '../context.ts';
 import type { RunManager } from './manager.ts';
 import type { ManualRunService } from './manual.ts';
@@ -23,7 +24,8 @@ type Result = {
 };
 type Session = {
   runId: string;
-  browser: Browser;
+  /** Closes the browser (or the desktop app) the tester used. */
+  shut: () => Promise<void>;
   context: BrowserContext;
   page: Page;
   /** The recording starts with the browser context; clips are offsets into it. */
@@ -111,24 +113,46 @@ export class ManualBrowserService {
     const videoDir = join(this.artifactsRoot, 'runs', run.id, itemId, 'manual-video');
     mkdirSync(videoDir, { recursive: true });
 
-    const browser = await chromium.launch({ headless: this.headless });
+    // A desktop (Electron) app is opened itself, as its environment says; a web app in a browser.
+    const desktop = repo.getApplication(this.db, run.applicationId).platform === 'electron';
+    const launch = desktop
+      ? ((env?.browserDefaultsJson as { electron?: ElectronLaunch } | undefined)?.electron ?? {})
+      : undefined;
+    const electronApp = launch
+      ? await launchElectron(
+          new VariableResolver({
+            env: env ? { ...env.variablesJson, baseUrl: env.baseUrl, name: env.name } : {},
+            secret: {},
+          }).resolve(launch) as ElectronLaunch,
+          { timeoutMs: 30_000, recordVideoDir: videoDir },
+        ).catch((err: Error) => {
+          throw new repo.RepoError(400, 'invalid', err.message);
+        })
+      : undefined;
+    const browser = electronApp ? undefined : await chromium.launch({ headless: this.headless });
+    const shut = async () => {
+      if (electronApp) await electronApp.close().catch(() => {});
+      else await browser!.close().catch(() => {});
+    };
     let session: Session | undefined;
     try {
-      const context = await browser.newContext({
-        viewport,
-        ignoreHTTPSErrors: true,
-        ...(env && { baseURL: env.baseUrl }),
-        recordVideo: { dir: videoDir, size: viewport },
-      });
+      const context = electronApp
+        ? electronApp.context()
+        : await browser!.newContext({
+            viewport,
+            ignoreHTTPSErrors: true,
+            ...(env && { baseURL: env.baseUrl }),
+            recordVideo: { dir: videoDir, size: viewport },
+          });
       // Actions from this browser only ever touch this session.
       await context.exposeBinding('__sfManual', (_src, action: Record<string, unknown>) =>
         session && this.sessions.get(itemId) === session ? this.handle(itemId, action) : null,
       );
       await context.addInitScript({ content: TOOLBAR });
-      const page = await context.newPage();
+      const page = electronApp ? await electronApp.firstWindow() : await context.newPage();
       session = {
         runId: run.id,
-        browser,
+        shut,
         context,
         page,
         startedAt: Date.now(),
@@ -141,13 +165,14 @@ export class ManualBrowserService {
         .then((p) => this.rel(p))
         .catch(() => undefined);
     } catch (e) {
-      await browser.close().catch(() => {});
+      await shut();
       throw e;
     }
     const s = session;
     this.sessions.set(itemId, s);
     // The tester closing the window ends the session (the video is kept).
-    browser.on('disconnected', () => void this.end(itemId, s));
+    if (electronApp) electronApp.on('close', () => void this.end(itemId, s));
+    else browser!.on('disconnected', () => void this.end(itemId, s));
     s.page.on('close', () => void this.end(itemId, s));
     // The run may have finished (or the test been finished) while the browser started.
     const item = this.db.select().from(schema.runItems).where(eq(schema.runItems.id, itemId)).get();
@@ -161,8 +186,10 @@ export class ManualBrowserService {
       );
     }
 
-    const url = this.startUrl(itemId, env?.baseUrl);
-    await s.page.goto(url).catch(() => {});
+    const url = desktop ? s.page.url() : this.startUrl(itemId, env?.baseUrl);
+    if (!desktop) await s.page.goto(url).catch(() => {});
+    // The app's first window loaded before the panel was added: load it once more, now the session answers it.
+    else await s.page.reload().catch(() => {});
     this.bus.publish({ type: 'manual.browser', runId: run.id, itemId, open: true });
     return { open: true, url };
   }
@@ -343,8 +370,9 @@ export class ManualBrowserService {
     if (this.sessions.get(itemId) !== s) return s.closing ?? Promise.resolve();
     s.closing ??= (async () => {
       this.sessions.delete(itemId);
+      // Closing the context saves a browser's video; a desktop app's video is saved when the app closes.
       await s.context.close().catch(() => {});
-      await s.browser.close().catch(() => {});
+      await s.shut();
       try {
         if (s.video && existsSync(join(this.artifactsRoot, s.video))) {
           this.db

@@ -1,4 +1,4 @@
-import { newId, type StepInput } from '@stepforge/core';
+import { newId, VariableResolver, type ElectronLaunch, type StepInput } from '@stepforge/core';
 import type { StepForgeDb } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
 import { networkToApiSteps, RecordingSession, type RecorderSnapshot } from '@stepforge/recorder';
@@ -119,10 +119,21 @@ export class RecorderManager {
       d.startPath || '/',
       env.baseUrl.endsWith('/') ? env.baseUrl : `${env.baseUrl}/`,
     ).toString();
+    // A desktop (Electron) app is recorded in its own windows, started as its environment says.
+    const desktop = repo.getApplication(this.db, d.applicationId).platform === 'electron';
+    const electron = desktop
+      ? (new VariableResolver({
+          env: { ...env.variablesJson, baseUrl: env.baseUrl, name: env.name },
+          secret: repo.resolveSecrets(this.db, this.masterKey, env.id),
+        }).resolve(
+          (env.browserDefaultsJson as { electron?: ElectronLaunch }).electron ?? {},
+        ) as ElectronLaunch)
+      : undefined;
     const id = newId();
     const session = await RecordingSession.start({
       startUrl,
       baseUrl: env.baseUrl,
+      ...(electron && { electron }),
       // Test-only switches (CI has no display; E2E drives the recording browser over CDP).
       headless: d.headless || process.env.STEPFORGE_RECORDER_HEADLESS === '1',
       cdpPort: process.env.STEPFORGE_RECORDER_CDP_PORT

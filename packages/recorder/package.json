@@ -8,12 +8,12 @@
   },
   "dependencies": {
     "@stepforge/core": "*",
+    "@stepforge/executor-ui": "*",
     "@stepforge/importers": "*",
     "playwright": "1.63.0"
   },
   "devDependencies": {
     "@stepforge/demo-clinic": "*",
-    "@stepforge/executor-ui": "*",
     "@stepforge/executor-util": "*"
   }
 }

@@ -261,4 +261,40 @@ describe('recorder', () => {
     expect(steps[0]!.params).toMatchObject({ headers: { authorization: 'Bearer {{secret.apiToken}}' } });
     expect(steps[1]!.params).toMatchObject({ body: { a: 1 } });
   });
+
+  it('records in an Electron desktop app (no "open page" step) and the recording replays in the app', async () => {
+    const appPath = new URL('../../../demo/desktop-app', import.meta.url).pathname;
+    const session = await RecordingSession.start({ startUrl: 'app://notes', electron: { appPath } });
+    const page = session.page;
+    try {
+      await page.getByPlaceholder('Write a note').fill('Call the bank');
+      await page.getByTestId('add-note').click();
+      await page.getByText('1 note').waitFor();
+      await settle();
+    } finally {
+      await session.stop();
+    }
+    const steps = session.snapshot().steps;
+    expect(steps.map((s) => s.type)).toEqual(['ui.fill', 'ui.click']);
+
+    const replay = await runTestCase({
+      runId: 'R',
+      steps: steps.map((s) => ({
+        ...s,
+        id: newId(),
+        enabled: true,
+        continueOnFail: false,
+        retries: 0,
+        params: s.params ?? {},
+        locators: s.locators ?? [],
+        assertions: [],
+      })),
+      executors: [createUiExecutor(pool), utilExecutor],
+      options: { ...DEFAULT_RUN_OPTIONS, video: 'off', trace: 'off', electron: { appPath } },
+      artifactsDir: mkdtempSync(join(tmpdir(), 'sf-rec-el-')),
+    });
+    expect(replay.status, replay.steps.map((s) => `${s.type} ${s.status} ${s.message}`).join('\n')).toBe(
+      'passed',
+    );
+  }, 90_000);
 });

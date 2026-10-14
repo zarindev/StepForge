@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <title>Notes</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      font:
+        15px system-ui,
+        sans-serif;
+      background: #f4f6fa;
+      color: #0f172a;
+    "
+  >
+    <header
+      style="
+        background: #4338ca;
+        color: #fff;
+        padding: 12px 20px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      "
+    >
+      <strong>Notes</strong>
+      <span id="version" style="opacity: 0.8; font-size: 12px"></span>
+      <button id="about" style="margin-left: auto">About</button>
+    </header>
+    <main style="padding: 20px; max-width: 560px">
+      <form id="form" style="display: flex; gap: 8px">
+        <label for="note" style="position: absolute; left: -9999px">New note</label>
+        <input id="note" placeholder="Write a note" style="flex: 1; padding: 8px" />
+        <button type="submit" data-testid="add-note">Add note</button>
+      </form>
+      <p role="status" id="count" style="color: #475569">No notes yet</p>
+      <ul id="notes" aria-label="Notes"></ul>
+      <button id="clear" data-testid="clear-notes">Clear all</button>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>

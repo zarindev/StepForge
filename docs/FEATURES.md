@@ -47,6 +47,12 @@ touch, sites behind basic auth or client certificates, localised and time-zone-d
 features and visual regressions — with network waiting and mocking, offline mode, cookies and storage, a controllable
 clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
+## Test desktop apps
+
+Electron desktop apps on Windows, macOS and Linux: each environment starts the packaged app or its project folder,
+with arguments and environment variables. Every window is a tab for the test. Recording, manual testing, video,
+traces and diagnosis work as on the web. [DESKTOP_APPS.md](DESKTOP_APPS.md)
+
 ## Run tests
 
 - **Run dialog** — browser (Chromium, Firefox, WebKit; or installed Chrome/Edge per environment), size (desktop,
@@ -113,4 +119,4 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 The latest additions are in [WHATS_NEW.md](WHATS_NEW.md); planned work is in the README's
 [Coming next](../README.md#coming-next).
 
-- Native mobile and desktop apps: [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
+- Native mobile apps and Windows / macOS / Linux desktop apps (Electron is done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).

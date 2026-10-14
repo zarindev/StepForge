@@ -26,6 +26,8 @@ export const ApplicationInput = z.object({
   icon: z.string().max(40).default('app-window'),
   color: HexColor.default('#F97316'),
   category: z.string().max(60).default('web'),
+  /** web: tested in a browser; electron: an Electron desktop app, launched as configured in each environment. */
+  platform: z.enum(['web', 'electron']).default('web'),
   tags: z.array(z.string().max(40)).default([]),
 });
 export type ApplicationInput = z.infer<typeof ApplicationInput>;
@@ -37,6 +39,20 @@ export const VIEWPORT_PRESETS = {
   tablet: { width: 768, height: 1024 },
   mobile: { width: 390, height: 844 },
 } as const;
+
+/**
+ * How an environment starts an Electron desktop app: its executable (a packaged app), or an app folder / main script
+ * started with the Electron found in that project. Text values may use {{env.x}} / {{secret.x}}.
+ */
+export const ElectronLaunchInput = z
+  .object({
+    executablePath: z.string().max(1000).optional(),
+    appPath: z.string().max(1000).optional(),
+    args: z.array(z.string().max(1000)).max(50).default([]),
+    cwd: z.string().max(1000).optional(),
+    env: z.record(z.string(), z.string()).default({}),
+  })
+  .refine((e) => e.executablePath || e.appPath, 'Set the app executable or the app folder');
 
 /** An environment's browser settings (see BrowserSettings); text values may use {{secret.x}} / {{env.x}}. */
 export const BrowserSettingsInput = z.object({
@@ -91,6 +107,7 @@ export const EnvironmentInput = z.object({
       viewport: Viewport.optional(),
       headless: z.boolean().default(true),
       settings: BrowserSettingsInput.optional(),
+      electron: ElectronLaunchInput.optional(),
     })
     .default({ browser: 'chromium', headless: true }),
 });

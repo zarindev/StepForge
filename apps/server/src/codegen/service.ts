@@ -107,7 +107,7 @@ export function codegenInput(
       ]),
   );
   return {
-    application: { name: app.name, slug: app.slug },
+    application: { name: app.name, slug: app.slug, platform: app.platform },
     environment: {
       name: env.name,
       baseUrl: env.baseUrl,

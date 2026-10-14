@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **Electron desktop apps**: applications have a platform, _web_ or _desktop app (Electron)_ (migration 0014). A
+  desktop app's environment says how to start it: the packaged executable or the project folder (started with the
+  Electron installed there), arguments, the app's environment variables and a working folder; variables and secrets
+  work in each. Tests run in the app's windows (`ui.switchTab` reaches new windows), with video, traces, console,
+  network and diagnosis; the recorder and manual runs (with the panel and session video) open the app too. Exports
+  warn that UI tests of a desktop app open a browser. Demo app in `demo/desktop-app`. See
+  [docs/DESKTOP_APPS.md](docs/DESKTOP_APPS.md).
 - **Manual testing in the browser**: tests are **Automated** or **Manual** (Details → *How it is tested*; migration
   0013). Automated runs, schedules, campaigns and the CLI leave manual tests out; the Test Explorer shows them as
   *manual · pending* until they are run. **Run manually** (any test) opens the application in a browser with a

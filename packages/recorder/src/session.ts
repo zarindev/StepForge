@@ -1,6 +1,15 @@
+import { launchElectron } from '@stepforge/executor-ui';
 import { defaultParamsFor, type Locator, type StepInput } from './defaults.ts';
 import { readFileSync } from 'node:fs';
-import { chromium, type Browser, type BrowserContext, type Frame, type Page } from 'playwright';
+import type { ElectronLaunch } from '@stepforge/core';
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type ElectronApplication,
+  type Frame,
+  type Page,
+} from 'playwright';
 import { isNoise, type CapturedRequest } from '@stepforge/importers';
 
 const INJECTED = readFileSync(new URL('./injected.js', import.meta.url), 'utf8');
@@ -48,6 +57,8 @@ export type StartOptions = {
   viewport?: { width: number; height: number };
   /** Test-only: expose Chrome DevTools Protocol on this port so automation can drive the recording browser. */
   cdpPort?: number;
+  /** An Electron desktop app: record in its windows instead of a browser. */
+  electron?: ElectronLaunch;
   onChange?: (snapshot: RecorderSnapshot) => void;
   onStop?: (snapshot: RecorderSnapshot) => void;
 };
@@ -65,7 +76,8 @@ export class RecordingSession {
   readonly network: CapturedRequest[] = [];
   readonly secrets: Record<string, string> = {};
   page!: Page;
-  private browser!: Browser;
+  private browser?: Browser;
+  private electronApp?: ElectronApplication;
   private context!: BrowserContext;
   private seq = 0;
   private netSeq = 0;
@@ -117,6 +129,7 @@ export class RecordingSession {
   }
 
   private async launch(): Promise<void> {
+    if (this.opts.electron) return this.launchElectron();
     try {
       this.origin = this.opts.baseUrl
         ? new URL(this.opts.baseUrl).origin
@@ -368,6 +381,31 @@ export class RecordingSession {
   async stop(): Promise<RecorderSnapshot> {
     this.finish();
     await this.browser?.close().catch(() => {});
+    await this.electronApp?.close().catch(() => {});
     return this.snapshot();
+  }
+
+  /**
+   * A desktop app: the toolbar is injected into its windows. A run starts the app itself, so there is no "open page"
+   * first step; the first window is reloaded once so the toolbar is in it.
+   */
+  private async launchElectron(): Promise<void> {
+    this.origin = '';
+    this.electronApp = await launchElectron(this.opts.electron!, { timeoutMs: 30_000 });
+    this.context = this.electronApp.context();
+    await this.context.exposeBinding('__stepforgeEmit', (source, payload: Payload) =>
+      this.handle(source.page, source.frame, payload),
+    );
+    await this.context.addInitScript({ content: INJECTED });
+    this.electronApp.on('window', (p) => this.attach(p));
+    this.electronApp.on('close', () => this.finish());
+    this.page = await this.electronApp.firstWindow();
+    this.attach(this.page);
+    this.currentPage = this.page;
+    this.initialLoad = true;
+    await this.page.reload().catch(() => {});
+    this.initialLoad = false;
+    this.lastUrl = this.page.url();
+    this.lastActionAt = 0;
   }
 }

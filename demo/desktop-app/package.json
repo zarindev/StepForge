@@ -1,0 +1,8 @@
+{
+  "name": "@stepforge/demo-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StepForge demo desktop app (Electron) — by Md Zarin Tasnim",
+  "main": "main.cjs",
+  "license": "MIT"
+}

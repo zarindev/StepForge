@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `platform` text DEFAULT 'web' NOT NULL;

@@ -33,6 +33,7 @@ export type AppFormValues = {
   description: string;
   category: string;
   color: string;
+  platform: Application['platform'];
 };
 
 export function AppFormDialog({
@@ -56,6 +57,7 @@ export function AppFormDialog({
     description: initial?.description ?? '',
     category: initial?.category ?? 'web',
     color: initial?.color ?? APP_COLORS[0]!,
+    platform: initial?.platform ?? 'web',
   }));
   const [slugTouched, setSlugTouched] = useState(!!initial);
   const set = (patch: Partial<AppFormValues>) => setV((cur) => ({ ...cur, ...patch }));
@@ -65,7 +67,7 @@ export function AppFormDialog({
       open={open}
       onClose={onClose}
       title={initial ? 'Edit application' : 'New application'}
-      description="An application under test: a web app, an API or both."
+      description="An application under test: a web app, a desktop app, an API or all of them."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -103,6 +105,23 @@ export function AppFormDialog({
               set({ slug: e.target.value.toLowerCase() });
             }}
           />
+        </Field>
+        <Field
+          label="Platform"
+          hint={
+            v.platform === 'electron'
+              ? 'Each environment says which app to start (its executable or project folder).'
+              : 'Tests open the app in a browser at the environment’s address.'
+          }
+        >
+          <Select
+            aria-label="Platform"
+            value={v.platform}
+            onChange={(e) => set({ platform: e.target.value as Application['platform'] })}
+          >
+            <option value="web">Web app (in a browser)</option>
+            <option value="electron">Desktop app (Electron)</option>
+          </Select>
         </Field>
         <Field label="Description">
           <Textarea value={v.description} rows={2} onChange={(e) => set({ description: e.target.value })} />

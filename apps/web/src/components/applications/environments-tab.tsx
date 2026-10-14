@@ -29,7 +29,39 @@ type EnvForm = {
   browser: string;
   headless: boolean;
   settings: BrowserSettingsForm;
+  /** Desktop (Electron) apps: how to start the app. */
+  desktop: { executablePath: string; appPath: string; args: string; cwd: string; env: string };
 };
+
+type ElectronLaunch = {
+  executablePath?: string;
+  appPath?: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+};
+function desktopToForm(e: unknown): EnvForm['desktop'] {
+  const l = (e ?? {}) as ElectronLaunch;
+  return {
+    executablePath: l.executablePath ?? '',
+    appPath: l.appPath ?? '',
+    args: (l.args ?? []).join('\n'),
+    cwd: l.cwd ?? '',
+    env: toLines(l.env ?? {}),
+  };
+}
+function formToDesktop(d: EnvForm['desktop']): ElectronLaunch {
+  return {
+    ...(d.executablePath.trim() && { executablePath: d.executablePath.trim() }),
+    ...(d.appPath.trim() && { appPath: d.appPath.trim() }),
+    args: d.args
+      .split('\n')
+      .map((a) => a.trim())
+      .filter(Boolean),
+    ...(d.cwd.trim() && { cwd: d.cwd.trim() }),
+    env: parseVariables(d.env),
+  };
+}
 
 const toLines = (vars: Record<string, string>) =>
   Object.entries(vars)
@@ -61,7 +93,12 @@ export function EnvironmentsTab({ app }: { app: Application }) {
         baseUrl: f.baseUrl,
         isProduction: f.isProduction,
         variables: parseVariables(f.variables),
-        browserDefaults: { browser: f.browser, headless: f.headless, settings: formToSettings(f.settings) },
+        browserDefaults: {
+          browser: f.browser,
+          headless: f.headless,
+          settings: formToSettings(f.settings),
+          ...(app.platform === 'electron' && { electron: formToDesktop(f.desktop) }),
+        },
       };
       return editing === 'new' || !editing
         ? api(`/api/applications/${app.id}/environments`, { method: 'POST', json: body })
@@ -121,7 +158,9 @@ export function EnvironmentsTab({ app }: { app: Application }) {
                   <p className="mt-0.5 truncate font-mono text-xs text-muted">{env.baseUrl}</p>
                   <p className="mt-2 text-xs text-muted">
                     {Object.keys(env.variablesJson).length} variables ·{' '}
-                    {String(env.browserDefaultsJson.browser ?? 'chromium')}
+                    {app.platform === 'electron'
+                      ? 'desktop app'
+                      : String(env.browserDefaultsJson.browser ?? 'chromium')}
                   </p>
                 </div>
                 <Menu
@@ -149,6 +188,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
       {editing && (
         <EnvironmentDialog
           env={editing === 'new' ? undefined : editing}
+          desktop={app.platform === 'electron'}
           onClose={() => setEditing(null)}
           onSubmit={(f) => save.mutate(f)}
           busy={save.isPending}
@@ -170,12 +210,15 @@ export function EnvironmentsTab({ app }: { app: Application }) {
 
 function EnvironmentDialog({
   env,
+  desktop,
   onClose,
   onSubmit,
   busy,
   error,
 }: {
   env?: Environment;
+  /** The application is a desktop (Electron) app: ask how to start it instead of which browser to use. */
+  desktop?: boolean;
   onClose: () => void;
   onSubmit: (f: EnvForm) => void;
   busy: boolean;
@@ -183,13 +226,16 @@ function EnvironmentDialog({
 }) {
   const [f, setF] = useState<EnvForm>({
     name: env?.name ?? '',
-    baseUrl: env?.baseUrl ?? 'http://localhost:3000',
+    baseUrl: env?.baseUrl ?? (desktop ? 'app://local' : 'http://localhost:3000'),
     isProduction: env?.isProduction ?? false,
     variables: toLines(env?.variablesJson ?? {}),
     browser: String(env?.browserDefaultsJson.browser ?? 'chromium'),
     headless: (env?.browserDefaultsJson.headless as boolean | undefined) ?? true,
     settings: settingsToForm(env?.browserDefaultsJson.settings),
+    desktop: desktopToForm(env?.browserDefaultsJson.electron),
   });
+  const launchSet = !!(f.desktop.executablePath.trim() || f.desktop.appPath.trim());
+  const setDesktop = (p: Partial<EnvForm['desktop']>) => set({ desktop: { ...f.desktop, ...p } });
   const set = (p: Partial<EnvForm>) => setF((c) => ({ ...c, ...p }));
   return (
     <Dialog
@@ -201,7 +247,10 @@ function EnvironmentDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={!f.name || !f.baseUrl || busy} onClick={() => onSubmit(f)}>
+          <Button
+            disabled={!f.name || !f.baseUrl || (desktop && !launchSet) || busy}
+            onClick={() => onSubmit(f)}
+          >
             Save
           </Button>
         </>
@@ -217,7 +266,11 @@ function EnvironmentDialog({
               onChange={(e) => set({ name: e.target.value })}
             />
           </Field>
-          <Field label="Base URL" className="col-span-2">
+          <Field
+            label="Base URL"
+            className="col-span-2"
+            {...(desktop && { hint: 'A name for reports; the app itself is started below.' })}
+          >
             <Input
               value={f.baseUrl}
               className="font-mono"
@@ -234,20 +287,83 @@ function EnvironmentDialog({
             onChange={(e) => set({ variables: e.target.value })}
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Default browser">
-            <Select value={f.browser} onChange={(e) => set({ browser: e.target.value })}>
-              <option value="chromium">Chromium</option>
-              <option value="firefox">Firefox</option>
-              <option value="webkit">WebKit</option>
-            </Select>
-          </Field>
-          <div className="flex items-end gap-2 pb-2 text-sm">
-            <Switch checked={f.headless} onChange={(headless) => set({ headless })} label="Headless" />{' '}
-            Headless
+        {desktop ? (
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <p className="text-sm font-medium">Start the desktop app</p>
+            <p className="text-xs text-muted">
+              Set the packaged app’s executable, or the app’s project folder (it uses the Electron installed
+              in that project, like npm start). Variables work here: {'{{env.appFolder}}'}.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="App executable">
+                <Input
+                  aria-label="App executable"
+                  value={f.desktop.executablePath}
+                  className="font-mono text-xs"
+                  placeholder="/Applications/Notes.app/Contents/MacOS/Notes"
+                  onChange={(e) => setDesktop({ executablePath: e.target.value })}
+                />
+              </Field>
+              <Field label="or app project folder">
+                <Input
+                  aria-label="App project folder"
+                  value={f.desktop.appPath}
+                  className="font-mono text-xs"
+                  placeholder="/Users/me/code/notes"
+                  onChange={(e) => setDesktop({ appPath: e.target.value })}
+                />
+              </Field>
+              <Field label="Arguments" hint="One per line.">
+                <Textarea
+                  aria-label="Arguments"
+                  value={f.desktop.args}
+                  rows={2}
+                  className="font-mono text-xs"
+                  placeholder="--no-sandbox"
+                  onChange={(e) => setDesktop({ args: e.target.value })}
+                />
+              </Field>
+              <Field label="App environment variables" hint="One per line: KEY=value.">
+                <Textarea
+                  aria-label="App environment variables"
+                  value={f.desktop.env}
+                  rows={2}
+                  className="font-mono text-xs"
+                  placeholder="NODE_ENV=test"
+                  onChange={(e) => setDesktop({ env: e.target.value })}
+                />
+              </Field>
+            </div>
+            <Field label="Working folder" hint="Optional; relative paths start here.">
+              <Input
+                aria-label="Working folder"
+                value={f.desktop.cwd}
+                className="font-mono text-xs"
+                onChange={(e) => setDesktop({ cwd: e.target.value })}
+              />
+            </Field>
+            {!launchSet && (
+              <p className="text-xs text-fail">Set the app executable or the app project folder.</p>
+            )}
           </div>
-        </div>
-        <BrowserSettingsFields value={f.settings} onChange={(settings) => set({ settings })} />
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Default browser">
+                <Select value={f.browser} onChange={(e) => set({ browser: e.target.value })}>
+                  <option value="chromium">Chromium</option>
+                  <option value="firefox">Firefox</option>
+                  <option value="webkit">WebKit</option>
+                </Select>
+              </Field>
+              <div className="flex items-end gap-2 pb-2 text-sm">
+                <Switch checked={f.headless} onChange={(headless) => set({ headless })} label="Headless" />{' '}
+                Headless
+              </div>
+            </div>
+            <BrowserSettingsFields value={f.settings} onChange={(settings) => set({ settings })} />
+          </>
+        )}
         <div className="flex items-start gap-3 rounded-lg border border-fail/30 bg-fail/5 p-3">
           <Switch
             checked={f.isProduction}

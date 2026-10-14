@@ -19,6 +19,24 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | 13 | Public-repo polish, onboarding, fresh-clone test | ✅ Done (Windows/Ubuntu via CI after push) |
 | 14 | Showcase package, optional Electron | ✅ Done (Electron skipped: optional) |
 | 15 | Reuse, scale and integrations; every kind of web app | ✅ Done (11 of 11 features + web-app coverage) |
+| N1 | Native apps, step 1: Electron desktop apps | ✅ Done |
+
+---
+
+## N1 — Electron desktop apps (2026-10-14)
+
+**Delivered**
+- Application platform `web` / `electron` (migration 0014) and per-environment launch settings (executable or
+  project folder, arguments, environment variables, working folder; variables and secrets resolved).
+- UI executor: the app's windows are the test's pages; video, traces, console and network evidence.
+- Runner, recorder and manual runs (panel and session video) start the app from the environment.
+- Dashboard: platform on the application form, launch fields on the environment form, the recorder without a start
+  page for desktop apps. Export warns that desktop UI tests become browser tests.
+- Demo app `demo/desktop-app` (one planted bug); CI runs Linux tests under `xvfb-run`.
+
+**Tests**: executor (run, new window, video, missing app), server (run, planted-bug diagnosis, validation,
+export/import, manual run with the panel), recorder (record and replay), codegen warning, and an end-to-end test
+that creates a desktop app and its environment in the dashboard and runs a test. [DESKTOP_APPS.md](DESKTOP_APPS.md)
 
 ---
 

@@ -76,10 +76,12 @@ scenarios** are expanded, **test data and environment variables are filled in** 
 `{{env.baseUrl}}`), secrets stay as `{{secret.name}}` placeholders, and **saved elements** are described by their
 locators.
 
-## Web applications today
+## Web and desktop applications
 
-Manual testing opens a web browser (Chromium) at the run's screen size. Native mobile and desktop applications come
-with the native-app work — see [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
+For a web application, manual testing opens a web browser (Chromium) at the run's screen size. For an Electron desktop
+app it starts the app as the environment says, with the same panel in its window; closing the app finishes the
+session ([DESKTOP_APPS.md](DESKTOP_APPS.md)). Native mobile apps and other desktop apps come with the native-app
+work — see [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
 
 ## API
 

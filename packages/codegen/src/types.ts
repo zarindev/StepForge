@@ -34,7 +34,8 @@ export type CodegenScenario = {
 };
 
 export type CodegenInput = {
-  application: { name: string; slug: string };
+  /** `platform` `electron`: a desktop app (the exported tests still open a browser — see the warning). */
+  application: { name: string; slug: string; platform?: 'web' | 'electron' };
   environment: {
     name: string;
     baseUrl: string;

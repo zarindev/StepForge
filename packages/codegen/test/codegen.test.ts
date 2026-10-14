@@ -68,6 +68,18 @@ describe('values', () => {
 });
 
 describe('plan', () => {
+  it('warns that UI tests of a desktop (Electron) app are exported as browser tests', () => {
+    const desktop = buildPlan({
+      ...KITCHEN_SINK,
+      application: { ...KITCHEN_SINK.application, platform: 'electron' },
+    });
+    expect(desktop.warnings.map((w) => w.message)).toContainEqual(
+      expect.stringContaining('_electron.launch()'),
+    );
+    expect(buildPlan(KITCHEN_SINK).warnings.map((w) => w.message)).not.toContainEqual(
+      expect.stringContaining('_electron.launch()'),
+    );
+  });
   it('inlines blocks and called scenarios, collects secrets and variables, and reports what cannot be exported', () => {
     const plan = buildPlan(KITCHEN_SINK, { pom: true });
     expect(plan.secrets).toEqual(['adminPassword', 'apiToken']);

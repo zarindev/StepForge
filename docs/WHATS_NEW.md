@@ -2,6 +2,17 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — Electron desktop apps
+
+StepForge now tests **Electron desktop apps** on Windows, macOS and Linux. Set an application's platform to
+_Desktop app (Electron)_ and tell each environment how to start the app: the packaged executable or the project
+folder, with arguments and environment variables. Tests run in the app's windows (a new window is like a new tab),
+and recording, manual testing with the panel, video, traces and diagnosis all work as on the web. A small demo app,
+`demo/desktop-app`, shows how.
+→ [Desktop apps](DESKTOP_APPS.md)
+
+## October 2026 release
+
 **October 2026 — 13 new features**, all free, open source and running on your own computer. The full technical list
 is in the [CHANGELOG](../CHANGELOG.md); every feature below links to its guide.
 

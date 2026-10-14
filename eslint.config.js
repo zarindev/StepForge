@@ -42,6 +42,16 @@ export default tseslint.config(
     },
   },
   {
+    // The demo desktop app: its main process and preload are CommonJS (Electron), its window script runs in the page.
+    files: ['demo/desktop-app/**/*.cjs'],
+    languageOptions: { sourceType: 'commonjs', globals: { require: 'readonly', __dirname: 'readonly' } },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+  {
+    files: ['demo/desktop-app/renderer.js'],
+    languageOptions: { sourceType: 'script', globals: { window: 'readonly', document: 'readonly' } },
+  },
+  {
     files: ['**/*.{js,mjs}'],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly', URL: 'readonly', setTimeout: 'readonly' },

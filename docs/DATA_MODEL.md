@@ -42,6 +42,12 @@ erDiagram
   run_items ||--o{ bugs : raises
 ```
 
+## Applications
+
+`applications.platform` is `web` (default) or `electron` (migration 0014). For an `electron` application, each
+environment's `browser_defaults_json.electron` holds how to start the app: `executablePath` or `appPath`, `args`,
+`cwd` and `env` (see [DESKTOP_APPS.md](DESKTOP_APPS.md)).
+
 ## Deletion behaviour
 
 Deleting an application cascades to everything it owns. Deleting a test case keeps historic `run_items`

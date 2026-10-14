@@ -75,6 +75,15 @@ export type BrowserSettings = {
   javaScriptEnabled?: boolean;
 };
 
+/** How to start an Electron desktop app (see ElectronLaunchInput). */
+export type ElectronLaunch = {
+  executablePath?: string;
+  appPath?: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+};
+
 /** What an executor reports back for one step. */
 export type StepOutcome = {
   message?: string;
@@ -214,6 +223,8 @@ export type RunOptions = {
   device?: 'desktop' | 'tablet' | 'mobile';
   /** The environment's browser settings. */
   browserSettings?: BrowserSettings;
+  /** Set for an Electron desktop app: the UI steps run in the app's windows instead of a browser. */
+  electron?: ElectronLaunch;
   baseUrl?: string;
 };
 

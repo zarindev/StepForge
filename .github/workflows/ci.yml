@@ -26,9 +26,16 @@ jobs:
       - run: npm run typecheck
       # The unit tests drive Chromium too, so the browser is installed before them.
       - run: npx playwright install --with-deps chromium
-      - run: npm test
+      # The desktop-app tests open Electron windows: Linux runners need Electron's sandbox helper set up and a
+      # virtual display.
+      - name: Set up Electron (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+      - run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm test
       - run: npm run build
-      - run: npm run test:e2e
+      - run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

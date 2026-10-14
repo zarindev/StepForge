@@ -170,21 +170,27 @@ function StartPanel() {
                 ))}
               </Select>
             </Field>
-            <Field
-              label="Start page"
-              hint={
-                env
-                  ? `Opens ${env.baseUrl.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`
-                  : undefined
-              }
-            >
-              <Input
-                aria-label="Start page"
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                className="font-mono"
-              />
-            </Field>
+            {app?.platform === 'electron' ? (
+              <p className="self-end pb-2 text-sm text-muted">
+                Starts the desktop app as the environment says.
+              </p>
+            ) : (
+              <Field
+                label="Start page"
+                hint={
+                  env
+                    ? `Opens ${env.baseUrl.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`
+                    : undefined
+                }
+              >
+                <Input
+                  aria-label="Start page"
+                  value={path}
+                  onChange={(e) => setPath(e.target.value)}
+                  className="font-mono"
+                />
+              </Field>
+            )}
           </div>
           {envs.data?.length === 0 && (
             <p className="text-sm text-fail">Add an environment to this application first.</p>
@@ -195,7 +201,11 @@ function StartPanel() {
             onClick={() => start.mutate()}
           >
             <Circle className="h-3.5 w-3.5 fill-current text-fail" />{' '}
-            {start.isPending ? 'Opening browser…' : 'Start recording'}
+            {start.isPending
+              ? app?.platform === 'electron'
+                ? 'Starting the app…'
+                : 'Opening browser…'
+              : 'Start recording'}
           </Button>
         </CardBody>
       </Card>

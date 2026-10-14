@@ -10,6 +10,8 @@ export type Application = {
   icon: string;
   color: string;
   category: string;
+  /** `electron`: a desktop app started from the environment's launch settings. */
+  platform: 'web' | 'electron';
   tagsJson: string[];
   archived: boolean;
   createdAt: string;

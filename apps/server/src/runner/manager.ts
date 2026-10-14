@@ -7,6 +7,7 @@ import {
   VariableResolver,
   VIEWPORT_PRESETS,
   type BrowserSettings,
+  type ElectronLaunch,
   type RunOptions,
   type RunOptionsInput,
   type StepResult,
@@ -354,6 +355,13 @@ export class RunManager {
     const envScope = { ...env.variablesJson, baseUrl: env.baseUrl, name: env.name };
     const settings = (env.browserDefaultsJson as { settings?: BrowserSettings }).settings;
     // Placeholders (e.g. a basic-auth password from {{secret.x}}) are resolved here; the run never stores them.
+    // A desktop (Electron) app: tests start the app from the environment's launch settings instead of a browser.
+    if (repo.getApplication(this.db, run.applicationId).platform === 'electron') {
+      const launch = (env.browserDefaultsJson as { electron?: ElectronLaunch }).electron ?? {};
+      options.electron = new VariableResolver({ env: envScope, secret: secrets }).resolve(
+        launch,
+      ) as ElectronLaunch;
+    }
     if (settings)
       options.browserSettings = new VariableResolver({ env: envScope, secret: secrets }).resolve(
         settings,

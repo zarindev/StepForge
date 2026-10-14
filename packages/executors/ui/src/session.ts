@@ -18,6 +18,7 @@ import {
   devices,
   type Browser,
   type BrowserContext,
+  type ElectronApplication,
   type Dialog,
   type Locator,
   type Page,
@@ -25,6 +26,7 @@ import {
   type Route,
 } from 'playwright';
 import type { UiExecutorOptions } from './index.ts';
+import { launchElectron } from './electron.ts';
 import { baselineKey, compareWithBaseline, urlMatcher } from './visual.ts';
 import { highlight, inspectFailure } from './inspect.ts';
 import { buildLocator, resolveLocator, type Resolved, type Scope } from './locators.ts';
@@ -92,12 +94,14 @@ export class UiSession implements ExecutorSession {
     { pattern: string; matcher: (u: URL) => boolean; handler: (r: Route) => Promise<void> }
   >();
   private touch = false;
+  private electronApp?: ElectronApplication;
   /** The step running now, so each request records which step made it. */
   private currentStep = -1;
   private lastNavigation = -1;
 
   constructor(
-    private readonly browser: Browser,
+    /** Not used for an Electron app (it brings its own windows). */
+    private readonly browser: Browser | null,
     private readonly ctx: TestContext,
     private readonly options: UiExecutorOptions = {},
   ) {
@@ -108,6 +112,8 @@ export class UiSession implements ExecutorSession {
     const o = this.ctx.options;
     const settings = o.browserSettings ?? {};
     mkdirSync(this.ctx.artifactsDir, { recursive: true });
+    if (o.electron) return this.openElectron();
+    if (!this.browser) throw new StepError('unsupported', 'No browser for this test');
     // Phones and tablets: touch, and (Chromium/WebKit) a mobile browser identity. Firefox has no mobile mode.
     const device = o.device && o.device !== 'desktop' ? o.device : undefined;
     const profile =
@@ -133,6 +139,24 @@ export class UiSession implements ExecutorSession {
       await this.context.tracing.start({ screenshots: true, snapshots: true, sources: false });
     this.context.on('page', (p) => this.track(p));
     this.page = await this.context.newPage();
+    this.scope = this.page;
+    this.ctx.shared.set('ui.page', this.page);
+  }
+
+  /** An Electron desktop app: its windows are the test's pages (a new window is like a new tab). */
+  private async openElectron(): Promise<void> {
+    const o = this.ctx.options;
+    this.electronApp = await launchElectron(o.electron!, {
+      timeoutMs: o.defaultTimeoutMs,
+      ...(o.video !== 'off' && { recordVideoDir: this.videoDir }),
+    });
+    this.context = this.electronApp.context();
+    if (o.trace !== 'off')
+      await this.context.tracing.start({ screenshots: true, snapshots: true, sources: false });
+    this.electronApp.on('window', (p) => this.track(p));
+    this.page = await this.electronApp.firstWindow({ timeout: Math.max(o.defaultTimeoutMs, 30_000) });
+    await this.page.waitForLoadState('domcontentloaded').catch(() => {});
+    this.track(this.page);
     this.scope = this.page;
     this.ctx.shared.set('ui.page', this.page);
   }
@@ -1162,7 +1186,8 @@ export class UiSession implements ExecutorSession {
       .map((pg) => pg.video())
       .filter((v) => !!v);
     const firstVideo = this.pages[0]?.video() ?? videos[0];
-    await this.context.close();
+    if (this.electronApp) await this.electronApp.close().catch(() => {});
+    else await this.context.close();
     if (o.video !== 'off' && firstVideo) {
       const src = await firstVideo.path().catch(() => null);
       if (src && keep(o.video)) {

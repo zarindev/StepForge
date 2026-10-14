@@ -49,7 +49,7 @@ How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth stagi
 | `upload` | `files` (array of paths) or `file` | |
 | `dragDrop` | `target` (a locator list) | |
 | `scroll` | `x`, `y` (page wheel) | with a locator: scrolls it into view |
-| `switchTab` | `index` or `urlContains` | without params: newest tab |
+| `switchTab` | `index` or `urlContains` | without params: newest tab. In a desktop (Electron) app, each window is a tab ([DESKTOP_APPS.md](DESKTOP_APPS.md)) |
 | `closeTab` | — | switches to the remaining newest tab |
 | `handleDialog` | `action` (`accept`/`dismiss`), `promptText` | put it **before** the step that opens the dialog; other dialogs are dismissed |
 | `switchFrame` | `selector` (iframe CSS) or `main: true` | |

@@ -941,6 +941,12 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean } = {}): Pl
       usesEmail: flags.email,
     };
   });
+  if (input.application.platform === 'electron' && tests.some((t) => t.usesUi))
+    warnings.push({
+      message:
+        'This is a desktop (Electron) app: the exported UI tests open a browser at the base URL. Start the app ' +
+        "with Playwright's _electron.launch() instead (see docs/DESKTOP_APPS.md).",
+    });
   const all = tests.flatMap((t) => t.refs);
   const secrets = [...new Set([...all.filter((r) => r.scope === 'secret').map((r) => r.name)])].sort();
   const variables = [

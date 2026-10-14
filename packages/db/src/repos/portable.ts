@@ -37,6 +37,7 @@ export const ApplicationExport = z.object({
     icon: z.string().optional(),
     color: z.string().optional(),
     category: z.string().optional(),
+    platform: z.enum(['web', 'electron']).default('web'),
     tags: z.array(z.string()).default([]),
   }),
   environments: z
@@ -233,6 +234,7 @@ export function exportApplication(
       icon: app.icon,
       color: app.color,
       category: app.category,
+      platform: app.platform,
       tags: app.tagsJson,
     },
     environments: envs.map((e) => ({

@@ -3,6 +3,7 @@ import { chromium, firefox, webkit, type Browser } from 'playwright';
 import { UiSession } from './session.ts';
 
 export { buildLocator, describeLocator, resolveLocator } from './locators.ts';
+export { launchElectron, electronFor } from './electron.ts';
 
 /** One browser process per (type, headed) for a whole run; each test case gets a fresh context. */
 export class BrowserPool {
@@ -49,7 +50,8 @@ export function createUiExecutor(pool: BrowserPool, options: UiExecutorOptions =
   return {
     group: 'ui',
     async createSession(ctx: TestContext) {
-      const browser = await pool.get(ctx.options);
+      // An Electron app brings its own windows; everything else runs in a browser of the pool.
+      const browser = ctx.options.electron ? null : await pool.get(ctx.options);
       const session = new UiSession(browser, ctx, options);
       await session.open();
       return session;
