@@ -62,7 +62,15 @@ export class NativeSession implements ExecutorSession {
     });
     try {
       // The first test may boot the emulator or simulator and install (on iOS: build) Appium's helper app.
-      this.driver = await WebDriverSession.create(url, caps, pf.name === 'iOS' ? 900_000 : 420_000);
+      const timeout = pf.name === 'iOS' ? 900_000 : 420_000;
+      try {
+        this.driver = await WebDriverSession.create(url, caps, timeout);
+      } catch (err) {
+        // A connection dropped while the device or Appium's helper app was still starting: one more try.
+        if (!(err instanceof StepError && err.kind === 'network')) throw err;
+        await sleep(5000);
+        this.driver = await WebDriverSession.create(url, caps, timeout);
+      }
     } catch (err) {
       if (err instanceof StepError) throw err;
       throw new StepError('navigation', `The ${pf.name} app did not start: ${(err as Error).message}`);
