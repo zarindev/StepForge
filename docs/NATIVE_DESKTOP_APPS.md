@@ -78,6 +78,8 @@ Steps for desktop apps:
 Phone-only steps (swipe, long press on Windows, rotate, location, permissions, notifications) explain that they are
 for phone apps. Web-page steps (tabs, network faking, storage…) explain that they are for browsers.
 
+Each step waits up to **30 seconds** by default, as for phone apps; a run's or a step's own timeout still applies.
+
 ## Evidence
 
 Screenshots (every step or at failures) and, at a failure, the element tree of the app (XML) with each element's

@@ -133,6 +133,9 @@ These are hover, right-click, uploads, drag and drop (use **Swipe** with a targe
 storage, clock control, downloads, visual checkpoints and page performance. API, database, email and utility steps work in the same
 test as usual. For example, one test can create a patient through the API, then check that it appears in the app.
 
+Each step of a phone app waits up to **30 seconds** by default (browser steps: the setting in Settings), because
+devices answer more slowly than a browser. A run's own step timeout, or a step's timeout, still applies.
+
 ## Evidence
 
 Every test keeps:

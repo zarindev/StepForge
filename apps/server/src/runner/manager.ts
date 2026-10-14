@@ -382,6 +382,10 @@ export class RunManager {
     // Placeholders (e.g. a basic-auth password from {{secret.x}}) are resolved here; the run never stores them.
     // A desktop (Electron) app: tests start the app from the environment's launch settings instead of a browser.
     const platform = repo.getApplication(this.db, run.applicationId).platform;
+    // Phone and native desktop apps answer through Appium, slower than a browser (the first steps of a fresh app
+    // on a slow machine take many seconds): their steps wait up to 30 s unless the run sets its own time.
+    if (['android', 'ios', 'macos', 'windows'].includes(platform) && opts.timeoutMs === undefined)
+      options.defaultTimeoutMs = Math.max(options.defaultTimeoutMs, 30_000);
     if (platform === 'macos') {
       const launch = (env.browserDefaultsJson as { macos?: MacLaunch }).macos ?? {};
       options.macos = new VariableResolver({ env: envScope, secret: secrets }).resolve(launch) as MacLaunch;
