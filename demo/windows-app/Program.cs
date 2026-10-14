@@ -19,14 +19,14 @@ internal static class Program
 
 internal sealed class MainForm : Form
 {
-    private readonly FlowLayoutPanel signIn = Column();
-    private readonly FlowLayoutPanel patients = Column();
-    private readonly TextBox email = Field("email", "Email");
-    private readonly TextBox password = Field("password", "Password");
-    private readonly Label error = Text("error", "");
-    private readonly TextBox patientName = Field("patient_name", "Patient name");
-    private readonly Label counter = Text("patient_count", "No patients yet");
-    private readonly FlowLayoutPanel list = Column();
+    private readonly FlowLayoutPanel signIn = MakeColumn();
+    private readonly FlowLayoutPanel patients = MakeColumn();
+    private readonly TextBox email = MakeField("email", "Email");
+    private readonly TextBox password = MakeField("password", "Password");
+    private readonly Label error = MakeLabel("error", "");
+    private readonly TextBox patientName = MakeField("patient_name", "Patient name");
+    private readonly Label counter = MakeLabel("patient_count", "No patients yet");
+    private readonly FlowLayoutPanel list = MakeColumn();
     private int count;
 
     public MainForm()
@@ -36,14 +36,14 @@ internal sealed class MainForm : Form
         password.UseSystemPasswordChar = true;
         error.ForeColor = Color.Firebrick;
 
-        var signInButton = Button("sign_in", "Sign in");
+        var signInButton = MakeButton("sign_in", "Sign in");
         signInButton.Click += (_, _) => SubmitSignIn();
         signIn.Controls.AddRange(new Control[] { email, password, signInButton, error });
 
-        var add = Button("add_patient", "Add patient");
+        var add = MakeButton("add_patient", "Add patient");
         add.Click += (_, _) => AddPatient();
-        var signOut = Button("sign_out", "Sign out");
-        signOut.Click += (_, _) => Show(signIn);
+        var signOut = MakeButton("sign_out", "Sign out");
+        signOut.Click += (_, _) => ShowScreen(signIn);
         list.Name = "patient_list";
         list.AccessibleName = "Patients";
         patients.Controls.AddRange(new Control[] { patientName, add, counter, list, signOut });
@@ -63,10 +63,10 @@ internal sealed class MainForm : Form
         Controls.Add(signIn);
         Controls.Add(patients);
         Controls.Add(menu);
-        Show(signIn);
+        ShowScreen(signIn);
     }
 
-    private void Show(Control screen)
+    private void ShowScreen(Control screen)
     {
         signIn.Visible = screen == signIn;
         patients.Visible = screen == patients;
@@ -77,7 +77,7 @@ internal sealed class MainForm : Form
         if (email.Text.Trim() == "nurse@careclinic.test" && password.Text == "CareClinic1")
         {
             error.Text = "";
-            Show(patients);
+            ShowScreen(patients);
         }
         else
         {
@@ -106,7 +106,7 @@ internal sealed class MainForm : Form
         counter.Text = "No patients yet";
     }
 
-    private static FlowLayoutPanel Column() => new()
+    private static FlowLayoutPanel MakeColumn() => new()
     {
         FlowDirection = FlowDirection.TopDown,
         Dock = DockStyle.Fill,
@@ -115,7 +115,7 @@ internal sealed class MainForm : Form
         AutoSize = true,
     };
 
-    private static TextBox Field(string id, string placeholder) => new()
+    private static TextBox MakeField(string id, string placeholder) => new()
     {
         Name = id,
         AccessibleName = placeholder,
@@ -123,7 +123,7 @@ internal sealed class MainForm : Form
         Width = 300,
     };
 
-    private static Label Text(string id, string text) => new() { Name = id, Text = text, AutoSize = true };
+    private static Label MakeLabel(string id, string text) => new() { Name = id, Text = text, AutoSize = true };
 
-    private static Button Button(string id, string text) => new() { Name = id, Text = text, AutoSize = true };
+    private static Button MakeButton(string id, string text) => new() { Name = id, Text = text, AutoSize = true };
 }
