@@ -2,6 +2,16 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — macOS and Windows desktop apps
+
+StepForge now tests **native desktop apps**: Mac apps on a Mac and Windows apps (Win32, WPF, WinForms, UWP) on Windows
+10 or 11, through Appium's Mac2 and NovaWindows drivers, which StepForge installs itself. Set an application's
+platform to _macOS app_ or _Windows app_. Each environment then names the app (a bundle id or .app; an .exe or Store
+app id). Tests use the same steps, plus **menus** (`File > Save`), **keyboard shortcuts** (`Meta+S`, `Control+N`) and
+**dialog buttons**. `stepforge doctor native --platform macos|windows` checks the setup, including macOS's Automation
+Mode. Demo apps: CareClinic for macOS (AppKit) and for Windows (WinForms), with the same planted bug as the phone apps.
+→ [macOS and Windows apps](NATIVE_DESKTOP_APPS.md)
+
 ## Update — phone gestures, recording and diagnosis
 
 Phone apps (Android and iOS) get their own steps: **swipe** (or drag one element onto another), **long press**,

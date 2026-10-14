@@ -97,7 +97,15 @@ export function ApplicationDetailPage() {
             <Badge>{a.category}</Badge>
             {a.platform !== 'web' && (
               <Badge tone="indigo">
-                {{ android: 'Android app', ios: 'iOS app', electron: 'Desktop app' }[a.platform]}
+                {
+                  {
+                    android: 'Android app',
+                    ios: 'iOS app',
+                    electron: 'Desktop app',
+                    macos: 'macOS app',
+                    windows: 'Windows app',
+                  }[a.platform]
+                }
               </Badge>
             )}
             {a.archived && <Badge tone="skip">Archived</Badge>}

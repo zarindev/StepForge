@@ -108,6 +108,23 @@ export type IosLaunch = {
   capabilities?: Record<string, unknown>;
 };
 
+/** How to start a native macOS app (see MacLaunchInput). */
+export type MacLaunch = {
+  bundleId?: string;
+  appPath?: string;
+  arguments?: string[];
+  environment?: Record<string, string>;
+  capabilities?: Record<string, unknown>;
+};
+
+/** How to start a native Windows app (see WindowsLaunchInput). */
+export type WindowsLaunch = {
+  app?: string;
+  arguments?: string;
+  workingDir?: string;
+  capabilities?: Record<string, unknown>;
+};
+
 /** What an executor reports back for one step. */
 export type StepOutcome = {
   message?: string;
@@ -253,6 +270,10 @@ export type RunOptions = {
   android?: AndroidLaunch;
   /** Set for an iOS app: the UI steps run in the app through Appium (XCUITest). */
   ios?: IosLaunch;
+  /** Set for a native macOS app (Appium Mac2). */
+  macos?: MacLaunch;
+  /** Set for a native Windows app (Appium NovaWindows). */
+  windows?: WindowsLaunch;
   baseUrl?: string;
 };
 

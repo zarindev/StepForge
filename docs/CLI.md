@@ -29,7 +29,7 @@ stepforge export  --app <slug> --out <file>
 stepforge import  --file <file> [--slug <new-slug>]
 stepforge secret  set --app <slug> --env <name> --key <NAME> (--from-env <VAR> | value on stdin)
 stepforge codegen --app <slug> --target <id> --out <dir> [--env <name>] [--tag|--module|--scenario] [--pom] [--ci github,gitlab]
-stepforge doctor  native [--platform android|ios] [--json]
+stepforge doctor  native [--platform android|ios|macos|windows] [--json]
 ```
 
 Every command accepts `--data-dir <dir>` (default: `./data`, or `STEPFORGE_DATA_DIR`) and `--help`.
@@ -106,7 +106,8 @@ Writes a ready-to-run project (or document) into a folder: `stepforge codegen --
 
 Checks this computer for testing phone apps. **Android:** Java, the Android SDK, adb, the emulator, emulators and
 connected phones, and Appium with its Android driver. **iOS** (macOS only): Xcode, whether the command-line tools use
-it, the simulators, and Appium with its iOS driver. Every missing item says how to fix it. `--platform android|ios`
+it, the simulators, and Appium with its iOS driver. **macOS apps:** Xcode, Automation Mode and the Mac2
+driver. **Windows apps:** Windows PowerShell and the NovaWindows driver. Every missing item says how to fix it. `--platform android|ios|macos|windows`
 checks one platform. The exit code is 0 when that platform (or, without `--platform`, at least one) is ready, and 2
 when not. See [ANDROID_APPS.md](ANDROID_APPS.md) and [IOS_APPS.md](IOS_APPS.md).
 

@@ -215,7 +215,50 @@ jobs:
       - run: npm run appium:install
       - run: npx tsx scripts/build-ios-demo.ts
       - run: ./stepforge.sh doctor native --platform ios
+        # Printed for the log; the tests below fail on their own if something is missing.
+        continue-on-error: true
       # One simulator: the test files take turns.
       - run: npx vitest run --no-file-parallelism packages/executors/native/test/ios.test.ts apps/server/test/ios-apps.test.ts
         env:
           STEPFORGE_TEST_IOS: '1'
+
+  macos-desktop:
+    # Native macOS apps: the demo app (demo/macos-app, AppKit) through Appium (Mac2). Automation Mode lets XCTest
+    # drive apps without a password prompt.
+    name: macOS desktop app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run appium:install
+      - run: sudo automationmodetool enable-automationmode-without-authentication
+      - run: npx tsx scripts/build-macos-demo.ts
+      - run: ./stepforge.sh doctor native --platform macos
+        # Printed for the log; the tests below fail on their own if something is missing.
+        continue-on-error: true
+      - run: npx vitest run packages/executors/native/test/desktop.test.ts
+        env:
+          STEPFORGE_TEST_MACOS: '1'
+
+  windows-desktop:
+    # Native Windows apps: the demo app (demo/windows-app, WinForms, built with .NET) through Appium (NovaWindows).
+    name: Windows desktop app
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run appium:install
+      - run: dotnet build demo/windows-app -c Release -o demo/windows-app/build
+      - run: node apps/cli/bin/stepforge.mjs doctor native --platform windows
+        continue-on-error: true
+      - run: npx vitest run packages/executors/native/test/desktop.test.ts
+        env:
+          STEPFORGE_TEST_WINDOWS: '1'

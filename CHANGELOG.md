@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- **macOS and Windows desktop apps**: new platforms _macOS app_ and _Windows app_. Environments name the app: a
+  bundle id or .app (with arguments and environment variables) for macOS; an .exe or Store app id (with arguments and
+  a working folder) for Windows. The native executor drives them through Appium's Mac2 4.4.0 (XCTest; locators via
+  accessibility ids, predicates and class chains) and NovaWindows 1.4.5 (UI Automation; AutomationId, Name, XPath
+  over control types) drivers, installed by `appium:install` on the matching system. New step `ui.menu`
+  (`File > Save`); `ui.press` takes shortcuts (`Meta+S`, `Control+Shift+N`) as W3C key actions; `ui.handleDialog`
+  presses a dialog's button; `ui.appState` launches and closes the app. macOS screens are recorded with XCTest's
+  recorder. `doctor native --platform macos|windows` (Xcode, Automation Mode, PowerShell, drivers). Demo apps in
+  `demo/macos-app` (Swift/AppKit, `scripts/build-macos-demo.ts`) and `demo/windows-app` (C#/WinForms, `dotnet
+  build`). CI jobs on macOS and Windows runners. See [docs/NATIVE_DESKTOP_APPS.md](docs/NATIVE_DESKTOP_APPS.md).
 - **Phone gestures, recording and diagnosis** (Android and iOS): new steps `ui.swipe` (direction, or drag onto a
   `target`), `ui.longPress`, `ui.scrollTo`, `ui.back` (also the browser's Back button), `ui.hideKeyboard`,
   `ui.rotate`, `ui.appState` (launch, close, background, reset), `ui.deepLink`, `ui.setLocation`, `ui.permission`

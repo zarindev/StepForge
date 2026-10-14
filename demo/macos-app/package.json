@@ -1,0 +1,9 @@
+{
+  "name": "@stepforge/demo-macos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CareClinic for macOS: a small AppKit app for StepForge's macOS tests (built into build/CareClinic.app on a Mac with Xcode)",
+  "scripts": {
+    "build": "tsx ../../scripts/build-macos-demo.ts"
+  }
+}

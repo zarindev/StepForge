@@ -10,13 +10,32 @@ export const APPIUM_VERSION = '3.8.0';
 export const UIAUTOMATOR2_VERSION = '8.7.0';
 /** The iOS driver (Apache-2.0); installed on macOS only, since iOS testing needs Xcode. */
 export const XCUITEST_VERSION = '12.18.1';
+/** Native desktop drivers (Apache-2.0): macOS through Apple's XCTest; Windows through UI Automation. */
+export const MAC2_VERSION = '4.4.0';
+export const NOVAWINDOWS_VERSION = '1.4.5';
 
 /** The drivers this computer can use: Android everywhere, iOS on a Mac. */
-export function wantedDrivers(): { name: 'uiautomator2' | 'xcuitest'; version: string; label: string }[] {
+export function wantedDrivers(): {
+  name: 'uiautomator2' | 'xcuitest' | 'mac2' | 'novawindows';
+  version: string;
+  label: string;
+}[] {
   return [
     { name: 'uiautomator2', version: UIAUTOMATOR2_VERSION, label: 'the Android driver (UiAutomator2)' },
     ...(process.platform === 'darwin'
-      ? [{ name: 'xcuitest' as const, version: XCUITEST_VERSION, label: 'the iOS driver (XCUITest)' }]
+      ? [
+          { name: 'xcuitest' as const, version: XCUITEST_VERSION, label: 'the iOS driver (XCUITest)' },
+          { name: 'mac2' as const, version: MAC2_VERSION, label: 'the macOS driver (Mac2)' },
+        ]
+      : []),
+    ...(process.platform === 'win32'
+      ? [
+          {
+            name: 'novawindows' as const,
+            version: NOVAWINDOWS_VERSION,
+            label: 'the Windows driver (NovaWindows)',
+          },
+        ]
       : []),
   ];
 }

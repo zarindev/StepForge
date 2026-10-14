@@ -692,7 +692,10 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     case 'ui.setLocation':
     case 'ui.permission':
     case 'ui.pushNotification':
-      out.push(todo(ctx, step, 'phone-app steps are not exported yet (Appium export is planned)'));
+    case 'ui.menu':
+      out.push(
+        todo(ctx, step, 'phone and desktop-app steps are not exported yet (Appium export is planned)'),
+      );
       break;
     default:
       out.push(todo(ctx, step, 'this step type has no exporter'));
@@ -960,7 +963,12 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean } = {}): Pl
         'This is a desktop (Electron) app: the exported UI tests open a browser at the base URL. Start the app ' +
         "with Playwright's _electron.launch() instead (see docs/DESKTOP_APPS.md).",
     });
-  const phone = { android: 'an Android', ios: 'an iOS' }[input.application.platform as 'android' | 'ios'];
+  const phone = {
+    android: 'an Android',
+    ios: 'an iOS',
+    macos: 'a macOS desktop',
+    windows: 'a Windows desktop',
+  }[input.application.platform as 'android' | 'ios' | 'macos' | 'windows'];
   if (phone && tests.some((t) => t.usesUi))
     warnings.push({
       message:

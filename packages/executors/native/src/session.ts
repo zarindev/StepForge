@@ -11,7 +11,14 @@ import {
 } from '@stepforge/core';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { androidPlatform, iosPlatform, type Direction, type NativePlatform } from './platforms.ts';
+import {
+  androidPlatform,
+  iosPlatform,
+  macPlatform,
+  windowsPlatform,
+  type Direction,
+  type NativePlatform,
+} from './platforms.ts';
 import { WebDriverError, WebDriverSession, type ElementRef } from './webdriver.ts';
 
 const pad = (n: number) => String(n).padStart(3, '0');
@@ -37,7 +44,9 @@ export class NativeSession implements ExecutorSession {
     const o = ctx.options;
     if (o.ios) this.platform = iosPlatform(o.ios);
     else if (o.android) this.platform = androidPlatform(o.android);
-    else throw new StepError('invalid_params', 'No Android or iOS app is set for this test');
+    else if (o.macos) this.platform = macPlatform(o.macos);
+    else if (o.windows) this.platform = windowsPlatform(o.windows);
+    else throw new StepError('invalid_params', 'No phone or desktop app is set for this test');
   }
 
   async open(): Promise<void> {
@@ -341,6 +350,7 @@ export class NativeSession implements ExecutorSession {
           const max = Number(p.maxSwipes ?? 10);
           // Look, swipe, look again, until the element shows or the screen stops moving.
           let ended = false;
+          let stuck = 0;
           for (let i = 0; ; i++) {
             try {
               found = await this.find(step.locators, 500, ctx.signal);
@@ -354,10 +364,13 @@ export class NativeSession implements ExecutorSession {
                 `Scrolled ${direction} ${i} time(s) and the element did not show. Tried: ${step.locators.map(describe).join(' | ')}`,
                 { tried: step.locators },
               );
-            // The end is reached when a swipe no longer changes the screen.
+            // The end is reached when two swipes in a row no longer change the screen (after the scroll settles).
             const before = await this.driver.source().catch(() => '');
             await this.scroll(direction);
-            ended = before !== '' && (await this.driver.source().catch(() => '')) === before;
+            await sleep(400);
+            const same = before !== '' && (await this.driver.source().catch(() => '')) === before;
+            stuck = same ? stuck + 1 : 0;
+            ended = stuck >= 2;
           }
           outcome = { message: 'Scrolled to the element' };
           break;
@@ -368,7 +381,20 @@ export class NativeSession implements ExecutorSession {
         case 'hideKeyboard':
           await this.platform.hideKeyboard(this.driver);
           break;
+        case 'menu': {
+          // A menu path: "File > Save" (macOS menu bar, Windows menus).
+          const path = String(p.path ?? '')
+            .split('>')
+            .map((x) => x.trim())
+            .filter(Boolean);
+          if (!path.length) throw new StepError('invalid_params', 'Name the menu path, e.g. File > Save');
+          await this.platform.menu(this.driver, path);
+          outcome = { message: `Chose ${path.join(' > ')}` };
+          break;
+        }
         case 'rotate': {
+          if (this.platform.kind === 'desktop')
+            throw new StepError('unsupported', 'Rotating is for phone apps');
           const orientation = p.orientation === 'portrait' ? 'PORTRAIT' : 'LANDSCAPE';
           await this.driver.setOrientation(orientation);
           outcome = { message: `Turned to ${orientation.toLowerCase()}` };
@@ -449,7 +475,7 @@ export class NativeSession implements ExecutorSession {
         default:
           throw new StepError(
             'unsupported',
-            `"${step.type}" is not available in ${this.platform.name} apps yet (it is a web-page step); see docs/${this.platform.name === 'iOS' ? 'IOS' : 'ANDROID'}_APPS.md`,
+            `"${step.type}" is not available in ${this.platform.name} apps yet (it is a web-page step); see docs/${({ iOS: 'IOS', Android: 'ANDROID', macOS: 'DESKTOP', Windows: 'DESKTOP' } as const)[this.platform.name]}_APPS.md`,
           );
       }
     } catch (err) {
@@ -598,6 +624,7 @@ export class NativeSession implements ExecutorSession {
   }
 
   private async readDeviceLog(): Promise<void> {
+    if (!this.platform.log.type) return; // desktop apps: no device log
     const lines = await this.driver.logs(this.platform.log.type).catch(() => []);
     this.deviceLog.push(...lines);
     if (this.deviceLog.length > 5000) this.deviceLog.splice(0, this.deviceLog.length - 5000);
@@ -616,7 +643,7 @@ export class NativeSession implements ExecutorSession {
         artifacts.push({ kind: 'video', path });
       }
     }
-    if (o.captureLogs) {
+    if (o.captureLogs && this.platform.log.type) {
       // The device log (logcat, or the iOS system log) is the app's console; a crash is reported as an error.
       const { type, crash } = this.platform.log;
       await this.readDeviceLog();

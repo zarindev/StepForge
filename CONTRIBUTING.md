@@ -40,6 +40,10 @@ iOS tests (macOS with Xcode) run on a simulator when `STEPFORGE_TEST_IOS` is set
 first iPhone simulator:
 `STEPFORGE_TEST_IOS=1 npx vitest run --no-file-parallelism packages/executors/native/test/ios.test.ts apps/server/test/ios-apps.test.ts`.
 
+macOS and Windows desktop tests run with `STEPFORGE_TEST_MACOS=1` (a Mac with Xcode and Automation Mode on) or
+`STEPFORGE_TEST_WINDOWS=1` (Windows, after `dotnet build demo/windows-app -c Release -o demo/windows-app/build`):
+`npx vitest run packages/executors/native/test/desktop.test.ts`. They use the mouse and keyboard while they run.
+
 ## Layout
 
 `packages/core` (step model, engine), `packages/executors/*` (UI, API, DB, email, perf, util), `packages/db`

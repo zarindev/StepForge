@@ -27,10 +27,11 @@ export const ApplicationInput = z.object({
   color: HexColor.default('#F97316'),
   category: z.string().max(60).default('web'),
   /**
-   * web: tested in a browser; electron: an Electron desktop app; android / ios: a phone app (through Appium). Desktop
-   * and phone apps are started as configured in each environment.
+   * web: tested in a browser; electron: an Electron desktop app; android / ios: a phone app; macos / windows: a
+   * native desktop app (phone and native desktop apps run through Appium). Apps are started as configured in each
+   * environment.
    */
-  platform: z.enum(['web', 'electron', 'android', 'ios']).default('web'),
+  platform: z.enum(['web', 'electron', 'android', 'ios', 'macos', 'windows']).default('web'),
   tags: z.array(z.string().max(40)).default([]),
 });
 export type ApplicationInput = z.infer<typeof ApplicationInput>;
@@ -94,6 +95,32 @@ export const IosLaunchInput = z
   })
   .refine((a) => a.app || a.bundleId, "Set the app (.app or .ipa) or the installed app's bundle id");
 
+/**
+ * How an environment starts a native macOS app (on a Mac with Xcode): an installed app's bundle id (e.g.
+ * com.apple.TextEdit) or the .app's path, with launch arguments and environment variables. Text values may use
+ * {{env.x}} / {{secret.x}}.
+ */
+export const MacLaunchInput = z
+  .object({
+    bundleId: z.string().max(300).optional(),
+    appPath: z.string().max(1000).optional(),
+    arguments: z.array(z.string().max(1000)).max(50).default([]),
+    environment: z.record(z.string(), z.string()).default({}),
+    capabilities: z.record(z.string(), z.unknown()).default({}),
+  })
+  .refine((a) => a.bundleId || a.appPath, "Set the app's bundle id or its .app path");
+
+/**
+ * How an environment starts a native Windows app (Win32, WPF, WinForms, UWP): the .exe path or a Store app's id
+ * (AUMID), its arguments and working folder. Text values may use {{env.x}} / {{secret.x}}.
+ */
+export const WindowsLaunchInput = z.object({
+  app: z.string().min(1, "Set the app's .exe path or its app id").max(1000),
+  arguments: z.string().max(2000).optional(),
+  workingDir: z.string().max(1000).optional(),
+  capabilities: z.record(z.string(), z.unknown()).default({}),
+});
+
 /** An environment's browser settings (see BrowserSettings); text values may use {{secret.x}} / {{env.x}}. */
 export const BrowserSettingsInput = z.object({
   channel: z.enum(['chrome', 'msedge']).optional(),
@@ -150,6 +177,8 @@ export const EnvironmentInput = z.object({
       electron: ElectronLaunchInput.optional(),
       android: AndroidLaunchInput.optional(),
       ios: IosLaunchInput.optional(),
+      macos: MacLaunchInput.optional(),
+      windows: WindowsLaunchInput.optional(),
     })
     .default({ browser: 'chromium', headless: true }),
 });

@@ -35,7 +35,7 @@ Commands
   import    Create an application from an export
   secret    Store an environment secret (encrypted), e.g. in CI after "import"
   codegen   Export tests as a ready-to-run project (Playwright, Cypress, Selenium, API, docs)
-  doctor    doctor native [--platform android|ios] — check this computer for testing phone apps
+  doctor    doctor native [--platform android|ios|macos|windows] — check this computer for phone and desktop apps
 
 run
   --app <slug>          Application (required)
@@ -619,17 +619,20 @@ const COMMANDS: Record<string, Handler> = {
  */
 async function doctor(c: Ctx, v: Values, io: Io): Promise<number> {
   const platform = typeof v.platform === 'string' ? v.platform : undefined;
-  if (platform && platform !== 'android' && platform !== 'ios')
-    throw new UsageError('--platform must be android or ios');
+  const PLATFORMS = ['android', 'ios', 'macos', 'windows'] as const;
+  if (platform && !PLATFORMS.includes(platform as never))
+    throw new UsageError('--platform must be android, ios, macos or windows');
   const status = await nativeDoctor(c.ctx.config.toolsDir);
-  const shown = (['android', 'ios'] as const).filter((p) => !platform || p === platform);
+  const shown = PLATFORMS.filter((p) => !platform || p === platform);
   const ready = shown.some((p) => status[p].ready);
   if (v.json) {
     io.out(JSON.stringify(status, null, 2));
     return ready ? EXIT.passed : EXIT.error;
   }
   for (const p of shown) {
-    io.out(`${p === 'android' ? 'Android' : 'iOS'}${status[p].ready ? ' — ready' : ' — not ready'}`);
+    io.out(
+      `${{ android: 'Android', ios: 'iOS', macos: 'macOS apps', windows: 'Windows apps' }[p]}${status[p].ready ? ' — ready' : ' — not ready'}`,
+    );
     for (const check of status[p].checks) {
       io.out(`  ${check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`);
       if (!check.ok && check.fix) io.out(`      → ${check.fix}`);

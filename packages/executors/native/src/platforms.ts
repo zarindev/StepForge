@@ -1,17 +1,34 @@
-import { StepError, type AndroidLaunch, type IosLaunch, type Locator } from '@stepforge/core';
+import {
+  StepError,
+  type AndroidLaunch,
+  type IosLaunch,
+  type Locator,
+  type MacLaunch,
+  type WindowsLaunch,
+} from '@stepforge/core';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { listSimulators } from './ios.ts';
-import { androidQueries, iosQueries, type Query } from './locators.ts';
+import {
+  androidQueries,
+  iosQueries,
+  macQueries,
+  predicateLiteral,
+  windowsQueries,
+  xpathLiteral,
+  type Query,
+} from './locators.ts';
 import type { ElementRef, WebDriverSession } from './webdriver.ts';
 
 /** What differs between Android and iOS for the same steps. */
 export type NativePlatform = {
-  name: 'Android' | 'iOS';
+  name: 'Android' | 'iOS' | 'macOS' | 'Windows';
+  /** Phone (touch, device) or desktop (mouse, keyboard, menus). */
+  kind: 'phone' | 'desktop';
   /** The Appium driver this platform needs. */
-  driver: 'uiautomator2' | 'xcuitest';
+  driver: 'uiautomator2' | 'xcuitest' | 'mac2' | 'novawindows';
   capabilities(): Record<string, unknown>;
   queries(l: Locator): Query[];
   isChecked(d: WebDriverSession, el: ElementRef): Promise<boolean>;
@@ -44,6 +61,8 @@ export type NativePlatform = {
   dialog(d: WebDriverSession, accept: boolean, buttonLabel?: string): Promise<void>;
   /** 1 not running, 2–3 in the background, 4 on screen (Appium's app states). */
   queryAppState(d: WebDriverSession): Promise<number | undefined>;
+  /** Desktop apps: opens a menu path such as ["File", "Save"]. */
+  menu(d: WebDriverSession, path: string[]): Promise<void>;
 };
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -191,6 +210,7 @@ export function androidCapabilities(launch: AndroidLaunch): Record<string, unkno
 export function androidPlatform(launch: AndroidLaunch): NativePlatform {
   return {
     name: 'Android',
+    kind: 'phone',
     driver: 'uiautomator2',
     capabilities: () => androidCapabilities(launch),
     queries: androidQueries,
@@ -211,10 +231,8 @@ export function androidPlatform(launch: AndroidLaunch): NativePlatform {
       ])),
     doubleTap: async (d, el) => void (await d.execute('mobile: doubleClickGesture', [{ elementId: el }])),
     async scroll(d, direction) {
-      const size = (await d.execute('mobile: deviceScreenInfo').catch(() => null)) as {
-        realDisplaySize?: string;
-      } | null;
-      const [w, h] = (size?.realDisplaySize ?? '1080x2400').split('x').map(Number) as [number, number];
+      // The app window's size (pixels on Android).
+      const { width: w, height: h } = await d.windowSize();
       const more = await d.execute('mobile: scrollGesture', [
         {
           left: Math.round(w * 0.1),
@@ -228,6 +246,7 @@ export function androidPlatform(launch: AndroidLaunch): NativePlatform {
       return more === true;
     },
     log: { type: 'logcat', crash: /FATAL EXCEPTION|ANR in / },
+    menu: phoneOnlyMenu,
     record: appiumRecording,
     appId: cachedAppId(
       async (d) =>
@@ -241,10 +260,8 @@ export function androidPlatform(launch: AndroidLaunch): NativePlatform {
       const area = el
         ? { elementId: el }
         : await (async () => {
-            const size = (await d.execute('mobile: deviceScreenInfo').catch(() => null)) as {
-              realDisplaySize?: string;
-            } | null;
-            const [w, h] = (size?.realDisplaySize ?? '1080x2400').split('x').map(Number) as [number, number];
+            // The app window's size (pixels on Android).
+            const { width: w, height: h } = await d.windowSize();
             return {
               left: Math.round(w * 0.1),
               top: Math.round(h * 0.2),
@@ -348,6 +365,7 @@ const IOS_TEXT_KEYS: Record<string, string> = { Enter: '\n', Tab: '\t', Backspac
 export function iosPlatform(launch: IosLaunch): NativePlatform {
   return {
     name: 'iOS',
+    kind: 'phone',
     driver: 'xcuitest',
     capabilities: () => iosCapabilities(launch),
     queries: iosQueries,
@@ -379,6 +397,7 @@ export function iosPlatform(launch: IosLaunch): NativePlatform {
       return true;
     },
     log: { type: 'syslog', crash: /Terminating app due to uncaught exception|crashed/ },
+    menu: phoneOnlyMenu,
     async record(d) {
       const udid = String(d.capabilities.udid ?? d.capabilities['appium:udid'] ?? '');
       const simulator = !!udid && listSimulators().some((s) => s.udid === udid);
@@ -461,6 +480,259 @@ export function iosPlatform(launch: IosLaunch): NativePlatform {
             'The app may not show notifications: grant the notifications permission first (Permission step), on a simulator',
           );
         throw err;
+      }
+    },
+  };
+}
+
+const phoneOnlyMenu = async (): Promise<void> => {
+  throw new StepError(
+    'unsupported',
+    'Menu bars are for desktop apps; in a phone app tap the menu button instead',
+  );
+};
+
+/** A step that only makes sense on a phone (or a simulator), explained on a desktop. */
+const notOnDesktop = (what: string) => async (): Promise<never> => {
+  throw new StepError(
+    'unsupported',
+    `${what} is for phone apps; desktop apps use the mouse, keyboard and menus`,
+  );
+};
+
+/** W3C key values for the key names steps use; modifiers joined with "+" ("Control+S", "Meta+Shift+N"). */
+const W3C_KEYS: Record<string, string> = {
+  Enter: '\uE007',
+  Return: '\uE007',
+  Tab: '\uE004',
+  Escape: '\uE00C',
+  Backspace: '\uE003',
+  Delete: '\uE017',
+  Space: ' ',
+  ArrowLeft: '\uE012',
+  ArrowUp: '\uE013',
+  ArrowRight: '\uE014',
+  ArrowDown: '\uE015',
+  Home: '\uE011',
+  End: '\uE010',
+  PageUp: '\uE00E',
+  PageDown: '\uE00F',
+  Shift: '\uE008',
+  Control: '\uE009',
+  Ctrl: '\uE009',
+  Alt: '\uE00A',
+  Option: '\uE00A',
+  Meta: '\uE03D',
+  Command: '\uE03D',
+  Cmd: '\uE03D',
+  ...Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`F${i + 1}`, String.fromCharCode(0xe031 + i)])),
+};
+
+/** Presses a key or a shortcut ("Control+S") with W3C key actions: modifiers down, the key, modifiers up. */
+export async function pressShortcut(d: WebDriverSession, combo: string): Promise<void> {
+  const parts = combo
+    .split('+')
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (!parts.length) throw new StepError('invalid_params', 'Name a key, e.g. Enter or Control+S');
+  const keys = parts.map((k) => {
+    const v = W3C_KEYS[k] ?? W3C_KEYS[k[0]!.toUpperCase() + k.slice(1)] ?? (k.length === 1 ? k : undefined);
+    if (v === undefined) throw new StepError('invalid_params', `Unknown key "${k}" in "${combo}"`);
+    return v;
+  });
+  const down = keys.map((value) => ({ type: 'keyDown', value }));
+  const up = [...keys].reverse().map((value) => ({ type: 'keyUp', value }));
+  await d.actions([{ type: 'key', id: 'keyboard', actions: [...down, ...up] }]);
+}
+
+/** The Appium capabilities for an environment's macOS launch settings. */
+export function macCapabilities(launch: MacLaunch): Record<string, unknown> {
+  if (!launch.bundleId && !launch.appPath)
+    throw new StepError('invalid_params', "Set the app's bundle id or its .app path in the environment");
+  return {
+    platformName: 'mac',
+    'appium:automationName': 'Mac2',
+    ...(launch.bundleId && { 'appium:bundleId': launch.bundleId }),
+    ...(launch.appPath && { 'appium:appPath': appFile(launch.appPath) }),
+    ...(launch.arguments?.length && { 'appium:arguments': launch.arguments }),
+    ...(launch.environment &&
+      Object.keys(launch.environment).length && { 'appium:environment': launch.environment }),
+    'appium:newCommandTimeout': 300,
+    // The first test builds Appium's helper (WebDriverAgentMac) with Xcode.
+    'appium:serverStartupTimeout': 600_000,
+    'appium:skipAppKill': false,
+    ...(launch.capabilities ?? {}),
+  };
+}
+
+export function macPlatform(launch: MacLaunch): NativePlatform {
+  const app = () => (launch.bundleId ? { bundleId: launch.bundleId } : { path: appFile(launch.appPath!) });
+  return {
+    name: 'macOS',
+    kind: 'desktop',
+    driver: 'mac2',
+    capabilities: () => macCapabilities(launch),
+    queries: macQueries,
+    isChecked: async (d, el) => ['1', 'true'].includes((await d.attribute(el, 'value')) ?? ''),
+    async pressKey(d, key, el) {
+      if (el) await d.click(el);
+      await pressShortcut(d, key);
+    },
+    deepLink: async (d, url) =>
+      void (await d.execute('macos: deepLink', [
+        { url, ...(launch.bundleId && { bundleId: launch.bundleId }) },
+      ])),
+    doubleTap: async (d, el) => void (await d.execute('macos: doubleClick', [{ elementId: el }])),
+    async scroll(d, direction) {
+      await d.execute('macos: scroll', [
+        { x: 400, y: 300, deltaX: 0, deltaY: direction === 'down' ? -200 : 200 },
+      ]);
+      return true;
+    },
+    log: { type: '', crash: /$^/ },
+    async record(d) {
+      try {
+        await d.execute('macos: startNativeScreenRecording', [{ fps: 10 }]);
+      } catch {
+        return null;
+      }
+      return async () => {
+        const b64 = await d.execute('macos: stopNativeScreenRecording', [{}], 120_000).catch(() => null);
+        return typeof b64 === 'string' && b64 ? Buffer.from(b64, 'base64') : null;
+      };
+    },
+    appId: async () => launch.bundleId ?? launch.appPath ?? '',
+    longPress: async (d, el, ms) =>
+      void (await d.execute('macos: press', [{ elementId: el, duration: ms / 1000 }])),
+    swipe: async (d, direction, _percent, el) =>
+      void (await d.execute('macos: swipe', [{ direction, ...(el && { elementId: el }) }])),
+    async drag(d, from, to) {
+      const [a, b] = await Promise.all([d.rect(from), d.rect(to)]);
+      await d.execute('macos: clickAndDrag', [
+        {
+          startX: Math.round(a.x + a.width / 2),
+          startY: Math.round(a.y + a.height / 2),
+          endX: Math.round(b.x + b.width / 2),
+          endY: Math.round(b.y + b.height / 2),
+          duration: 1,
+        },
+      ]);
+    },
+    setLocation: notOnDesktop('Setting the location'),
+    async appState(d, action) {
+      if (action === 'launch') await d.execute('macos: activateApp', [app()]);
+      else if (action === 'close') await d.execute('macos: terminateApp', [app()]);
+      else
+        throw new StepError('unsupported', `"${action}" is for phone apps; close and launch the app instead`);
+    },
+    permission: notOnDesktop('Granting permissions'),
+    pushNotification: notOnDesktop('Sending notifications'),
+    hideKeyboard: async () => {},
+    dialog: async (d, accept, buttonLabel) => {
+      // macOS dialogs (sheets, alerts) are ordinary elements: press their button.
+      const label = buttonLabel ?? (accept ? 'OK' : 'Cancel');
+      const els = await d.findAll(
+        '-ios class chain',
+        `**/XCUIElementTypeButton[\`title == ${predicateLiteral(label)}\`]`,
+      );
+      if (!els.length) throw new StepError('timeout', `no such alert: no "${label}" button`);
+      await d.click(els[0]!);
+    },
+    async queryAppState(d) {
+      const s = await d.execute('macos: queryAppState', [app()]).catch(() => undefined);
+      return typeof s === 'number' ? s : undefined;
+    },
+    async menu(d, path) {
+      for (const [i, title] of path.entries()) {
+        const type = i === 0 ? 'XCUIElementTypeMenuBarItem' : 'XCUIElementTypeMenuItem';
+        const els = await d.findAll(
+          '-ios class chain',
+          `**/${type}[\`title == ${predicateLiteral(title)}\`]`,
+        );
+        if (!els.length)
+          throw new StepError(
+            'element_not_found',
+            `No menu ${i === 0 ? '' : 'item '}"${title}" (in ${path.join(' > ')})`,
+          );
+        await d.click(els[0]!);
+      }
+    },
+  };
+}
+
+/** The Appium capabilities for an environment's Windows launch settings. */
+export function windowsCapabilities(launch: WindowsLaunch): Record<string, unknown> {
+  if (!launch.app)
+    throw new StepError('invalid_params', "Set the app's .exe path or its app id in the environment");
+  // A path is checked; an app id (AUMID, e.g. Microsoft.WindowsCalculator_8wekyb3d8bbwe!App) is passed as is.
+  const isPath = /[\\/]|\.exe$/i.test(launch.app);
+  return {
+    platformName: 'Windows',
+    'appium:automationName': 'NovaWindows',
+    'appium:app': isPath ? appFile(launch.app) : launch.app,
+    ...(launch.arguments && { 'appium:appArguments': launch.arguments }),
+    ...(launch.workingDir && { 'appium:appWorkingDir': launch.workingDir }),
+    'appium:newCommandTimeout': 300,
+    'ms:waitForAppLaunch': 15,
+    'appium:shouldCloseApp': true,
+    ...(launch.capabilities ?? {}),
+  };
+}
+
+export function windowsPlatform(launch: WindowsLaunch): NativePlatform {
+  return {
+    name: 'Windows',
+    kind: 'desktop',
+    driver: 'novawindows',
+    capabilities: () => windowsCapabilities(launch),
+    queries: windowsQueries,
+    // UI Automation's toggle state: On / Off.
+    isChecked: async (d, el) =>
+      /^(on|1|true)$/i.test((await d.attribute(el, 'Toggle.ToggleState').catch(() => null)) ?? ''),
+    async pressKey(d, key, el) {
+      if (el) await d.click(el);
+      await pressShortcut(d, key);
+    },
+    deepLink: notOnDesktop('Opening a deep link'),
+    doubleTap: async (d, el) => {
+      await d.click(el);
+      await d.click(el);
+    },
+    async scroll(d, direction) {
+      await d.execute('windows: scroll', [{ deltaY: direction === 'down' ? -360 : 360 }]);
+      return true;
+    },
+    log: { type: '', crash: /$^/ },
+    record: appiumRecording,
+    appId: async () => launch.app ?? '',
+    longPress: notOnDesktop('A long press'),
+    swipe: notOnDesktop('A swipe'),
+    async drag(d, from, to) {
+      await d.execute('windows: clickAndDrag', [{ startElementId: from, endElementId: to }]);
+    },
+    setLocation: notOnDesktop('Setting the location'),
+    async appState(d, action) {
+      if (action === 'launch') await d.execute('windows: launchApp');
+      else if (action === 'close') await d.execute('windows: closeApp');
+      else
+        throw new StepError('unsupported', `"${action}" is for phone apps; close and launch the app instead`);
+    },
+    permission: notOnDesktop('Granting permissions'),
+    pushNotification: notOnDesktop('Sending notifications'),
+    hideKeyboard: async () => {},
+    dialog: async (d, accept, buttonLabel) => {
+      const label = buttonLabel ?? (accept ? 'OK' : 'Cancel');
+      const els = await d.findAll('xpath', `//Window//Button[@Name=${xpathLiteral(label)}]`);
+      if (!els.length) throw new StepError('timeout', `no such alert: no "${label}" button`);
+      await d.click(els[0]!);
+    },
+    queryAppState: async () => undefined,
+    async menu(d, path) {
+      for (const title of path) {
+        const els = await d.findAll('xpath', `//MenuItem[@Name=${xpathLiteral(title)}]`);
+        if (!els.length)
+          throw new StepError('element_not_found', `No menu item "${title}" (in ${path.join(' > ')})`);
+        await d.click(els[0]!);
       }
     },
   };

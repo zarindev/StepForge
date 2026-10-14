@@ -7,7 +7,9 @@ desktop apps are built with Electron (editors, chat apps, internal tools). Each 
 in the app's windows, and closes the app. Recording, manual testing, evidence and diagnosis work as they do on the
 web.
 
-This is step N1 of the [native apps plan](NATIVE_APPS_PLAN.md). Android, iOS and other desktop apps come next.
+This is step N1 of the [native apps plan](NATIVE_APPS_PLAN.md). Native (non-Electron) Mac and Windows apps are covered in
+[NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md); phone apps in [ANDROID_APPS.md](ANDROID_APPS.md) and
+[IOS_APPS.md](IOS_APPS.md).
 
 ## Set up a desktop app
 

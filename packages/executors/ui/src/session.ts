@@ -84,6 +84,7 @@ const PHONE_ONLY = new Set([
   'setLocation',
   'permission',
   'pushNotification',
+  'menu',
 ]);
 
 export class UiSession implements ExecutorSession {
@@ -665,10 +666,17 @@ export class UiSession implements ExecutorSession {
           break;
         }
         default:
+          if (name === 'menu')
+            throw new StepError(
+              'unsupported',
+              this.electronApp
+                ? 'An Electron app’s menu bar is not part of its pages: press the menu’s keyboard shortcut instead (Press, e.g. Control+S)'
+                : '"ui.menu" is for desktop apps (macOS, Windows); in a browser click the page’s own menu',
+            );
           if (PHONE_ONLY.has(name))
             throw new StepError(
               'unsupported',
-              `"${step.type}" is for Android and iOS apps; in a browser use clicks, scrolling and navigation`,
+              `"${step.type}" is for phone and desktop apps; in a browser use clicks, scrolling and navigation`,
             );
           throw new StepError('unsupported', `Unknown UI step "${step.type}"`);
       }

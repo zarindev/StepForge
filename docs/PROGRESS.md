@@ -23,6 +23,27 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | N2 | Native apps, step 2: native foundation and Android apps | ✅ Done |
 | N3 | Native apps, step 3: iOS apps | ✅ Done |
 | N4 | Native apps, step 4: gestures, phone recorder, phone diagnosis, device campaigns | ✅ Done |
+| N5 | Native apps, step 5: macOS and Windows desktop apps | ✅ Done |
+
+---
+
+## N5 — macOS and Windows desktop apps (2026-10-14)
+
+**Delivered**
+- Platforms `macos` and `windows` with launch settings; Mac2 and NovaWindows adapters in the native executor
+  (locators, shortcuts as W3C key actions, menus, dialog buttons, launch/close, macOS screen recording).
+- Step `ui.menu`; `ui.press` shortcuts; phone-only steps explain themselves on desktops.
+- `doctor native --platform macos|windows` (Xcode, Automation Mode, PowerShell, drivers); dashboard forms and status.
+- Demo apps: CareClinic for macOS (AppKit, built with swiftc) and for Windows (WinForms, built with .NET in CI).
+- CI jobs `macos-desktop` and `windows-desktop`.
+- README: the Coming next and Features tables were mixed up by an earlier edit and are repaired.
+- CI fixes from the N4 run: the simulator list overflowed its output buffer on CI Macs (iOS); Android swipes used a
+  fixed screen size instead of the window's, and scroll-to now needs two unchanged swipes to give up; the first
+  browser test on Windows gets 60 s.
+
+**Tests**: locator mappings, capabilities and shortcuts (always); the same desktop scenario (sign in, a shortcut, a
+menu, a dialog, the planted bug) on macOS and Windows, in CI (not run locally: it takes over the mouse and keyboard); dashboard end-to-end test for the forms.
+[NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md)
 
 ---
 

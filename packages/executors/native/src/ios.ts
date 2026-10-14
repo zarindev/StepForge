@@ -6,7 +6,9 @@ const run = (cmd: string, args: string[]): string | undefined => {
     return execFileSync(cmd, args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 30_000,
+      timeout: 60_000,
+      // The simulator list is large when many iOS versions are installed (CI machines).
+      maxBuffer: 256 * 1024 * 1024,
     }).trim();
   } catch {
     return undefined;
@@ -21,6 +23,23 @@ export function xcodeVersion(): string | undefined {
 /** Where the command-line developer tools point (Xcode's folder, or the stand-alone command-line tools). */
 export function xcodeSelected(): string | undefined {
   return run('xcode-select', ['-p']);
+}
+
+/** Whether macOS lets automation (XCTest) drive apps without asking for a password each time. */
+export function automationMode(): 'enabled' | 'needs-password' | 'disabled' | undefined {
+  if (process.platform !== 'darwin') return undefined;
+  try {
+    const out = execFileSync('automationmodetool', [], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 15_000,
+    });
+    if (/Automation Mode is enabled/i.test(out))
+      return /requires user authentication/i.test(out) ? 'needs-password' : 'enabled';
+    return 'disabled';
+  } catch {
+    return undefined;
+  }
 }
 
 export type Simulator = { udid: string; name: string; runtime: string; state: string };

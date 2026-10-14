@@ -173,7 +173,12 @@ function StartPanel() {
                 ))}
               </Select>
             </Field>
-            {app?.platform === 'android' || app?.platform === 'ios' ? (
+            {app?.platform === 'macos' || app?.platform === 'windows' ? (
+              <p className="self-end pb-2 text-sm text-muted">
+                Recording {app.platform === 'macos' ? 'macOS' : 'Windows'} apps is planned. Add the steps in
+                the editor for now.
+              </p>
+            ) : app?.platform === 'android' || app?.platform === 'ios' ? (
               <p className="self-end pb-2 text-sm text-muted">
                 Starts the app on the {app.platform === 'ios' ? 'simulator or iPhone' : 'emulator or phone'};
                 you use it from its screen here.
@@ -205,7 +210,7 @@ function StartPanel() {
           )}
           <Button
             data-tour="recorder-button"
-            disabled={!envId || start.isPending}
+            disabled={!envId || start.isPending || app?.platform === 'macos' || app?.platform === 'windows'}
             onClick={() => start.mutate()}
           >
             <Circle className="h-3.5 w-3.5 fill-current text-fail" />{' '}

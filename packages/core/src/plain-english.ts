@@ -201,6 +201,9 @@ export function describeStep(step: AnyStep): string {
     case 'ui.hideKeyboard':
       s = 'Hide the keyboard';
       break;
+    case 'ui.menu':
+      s = `Choose ${String(p.path ?? '')} from the menu`;
+      break;
     case 'ui.rotate':
       s = `Turn the device to ${String(p.orientation ?? 'landscape')}`;
       break;

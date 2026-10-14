@@ -1,0 +1,9 @@
+{
+  "name": "@stepforge/demo-windows",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CareClinic for Windows: a small WinForms app for StepForge's Windows tests (dotnet build -c Release -o build, on Windows)",
+  "scripts": {
+    "build": "dotnet build -c Release -o build"
+  }
+}

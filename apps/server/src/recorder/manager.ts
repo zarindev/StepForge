@@ -143,6 +143,12 @@ export class RecorderManager {
         env: { ...env.variablesJson, baseUrl: env.baseUrl, name: env.name },
         secret: repo.resolveSecrets(this.db, this.masterKey, env.id),
       });
+    if (platform === 'macos' || platform === 'windows')
+      throw new repo.RepoError(
+        400,
+        'invalid',
+        `Recording ${platform === 'macos' ? 'macOS' : 'Windows'} apps is planned; add the steps in the editor for now`,
+      );
     if (platform === 'android' || platform === 'ios') {
       // A phone app: started through Appium; the dashboard shows its screen and sends the taps.
       if (!this.appium) throw new repo.RepoError(400, 'invalid', 'Phone apps are not available here');

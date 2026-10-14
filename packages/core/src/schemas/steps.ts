@@ -50,6 +50,8 @@ export const STEP_CATALOGUE = {
     'setLocation',
     'permission',
     'pushNotification',
+    // Native desktop apps (macOS, Windows).
+    'menu',
   ],
   api: ['request', 'graphql', 'extract', 'soap', 'kafkaProduce', 'kafkaConsume', 'ftp'],
   db: ['query', 'mongoFind', 'runScript', 'callProcedure', 'extract', 'dataQualityCheck'],

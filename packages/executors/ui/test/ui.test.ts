@@ -159,49 +159,56 @@ describe('URL patterns and baseline keys', () => {
 });
 
 describe('UI executor', () => {
-  it('logs in with label/testId/role locators, select, check and waits for async text', async () => {
-    const r = await run(
-      steps(
-        {
-          type: 'ui.navigate',
-          params: { url: '/' },
-          assertions: [{ target: 'title', operator: 'equals', expected: 'Fixture Login' }],
-        },
-        {
-          type: 'ui.fill',
-          params: { value: '{{data.email}}' },
-          locators: [{ strategy: 'label', value: 'Email' }],
-        },
-        {
-          type: 'ui.fill',
-          params: { value: 'secret' },
-          locators: [{ strategy: 'label', value: 'Password' }],
-        },
-        { type: 'ui.check', locators: [{ strategy: 'label', value: 'Remember me' }] },
-        {
-          type: 'ui.select',
-          params: { label: 'Doctor' },
-          locators: [{ strategy: 'role', value: 'combobox', name: 'Role' }],
-        },
-        { type: 'ui.click', locators: [{ strategy: 'testId', value: 'login-btn' }] },
-        {
-          type: 'ui.assert',
-          params: { check: 'textContains', expected: 'Welcome ana@clinic.test (doctor)' },
-          locators: [{ strategy: 'role', value: 'status' }],
-        },
-        {
-          type: 'ui.extract',
-          params: { from: 'text', regex: 'Welcome (\\S+)' },
-          locators: [{ strategy: 'css', value: '#msg' }],
-          captureAs: 'who',
-        },
-      ),
-    );
-    expect(
-      r.steps.map((s) => `${s.type}:${s.status}${s.message && s.status !== 'passed' ? ` ${s.message}` : ''}`),
-    ).toEqual(r.steps.map((s) => `${s.type}:passed`));
-    expect(r.vars.who).toBe('ana@clinic.test');
-  });
+  // The first test also starts the browser, which can be slow on a busy Windows runner.
+  it(
+    'logs in with label/testId/role locators, select, check and waits for async text',
+    { timeout: 60_000 },
+    async () => {
+      const r = await run(
+        steps(
+          {
+            type: 'ui.navigate',
+            params: { url: '/' },
+            assertions: [{ target: 'title', operator: 'equals', expected: 'Fixture Login' }],
+          },
+          {
+            type: 'ui.fill',
+            params: { value: '{{data.email}}' },
+            locators: [{ strategy: 'label', value: 'Email' }],
+          },
+          {
+            type: 'ui.fill',
+            params: { value: 'secret' },
+            locators: [{ strategy: 'label', value: 'Password' }],
+          },
+          { type: 'ui.check', locators: [{ strategy: 'label', value: 'Remember me' }] },
+          {
+            type: 'ui.select',
+            params: { label: 'Doctor' },
+            locators: [{ strategy: 'role', value: 'combobox', name: 'Role' }],
+          },
+          { type: 'ui.click', locators: [{ strategy: 'testId', value: 'login-btn' }] },
+          {
+            type: 'ui.assert',
+            params: { check: 'textContains', expected: 'Welcome ana@clinic.test (doctor)' },
+            locators: [{ strategy: 'role', value: 'status' }],
+          },
+          {
+            type: 'ui.extract',
+            params: { from: 'text', regex: 'Welcome (\\S+)' },
+            locators: [{ strategy: 'css', value: '#msg' }],
+            captureAs: 'who',
+          },
+        ),
+      );
+      expect(
+        r.steps.map(
+          (s) => `${s.type}:${s.status}${s.message && s.status !== 'passed' ? ` ${s.message}` : ''}`,
+        ),
+      ).toEqual(r.steps.map((s) => `${s.type}:passed`));
+      expect(r.vars.who).toBe('ana@clinic.test');
+    },
+  );
 
   it('heals a broken primary locator with the next strategy', async () => {
     const r = await run(

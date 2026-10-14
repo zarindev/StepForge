@@ -158,3 +158,133 @@ export function iosQueries(l: Locator): Query[] {
       throw new StepError('invalid_params', `The locator "${l.strategy}" is not available for iOS apps`);
   }
 }
+
+/** Mac element types for the web's ARIA roles (each becomes one class-chain query). */
+const MAC_ROLE_TYPES: Record<string, string[]> = {
+  button: ['XCUIElementTypeButton'],
+  textbox: ['XCUIElementTypeTextField', 'XCUIElementTypeSecureTextField', 'XCUIElementTypeTextView'],
+  searchbox: ['XCUIElementTypeSearchField'],
+  checkbox: ['XCUIElementTypeCheckBox'],
+  switch: ['XCUIElementTypeSwitch', 'XCUIElementTypeCheckBox'],
+  radio: ['XCUIElementTypeRadioButton'],
+  combobox: ['XCUIElementTypePopUpButton', 'XCUIElementTypeComboBox'],
+  menuitem: ['XCUIElementTypeMenuItem', 'XCUIElementTypeMenuBarItem'],
+  img: ['XCUIElementTypeImage'],
+  image: ['XCUIElementTypeImage'],
+  link: ['XCUIElementTypeLink'],
+  text: ['XCUIElementTypeStaticText'],
+  heading: ['XCUIElementTypeStaticText'],
+  list: ['XCUIElementTypeTable', 'XCUIElementTypeOutline', 'XCUIElementTypeList'],
+  slider: ['XCUIElementTypeSlider'],
+  tab: ['XCUIElementTypeTab', 'XCUIElementTypeRadioButton'],
+};
+
+/**
+ * The Appium (Mac2) queries for one StepForge locator in a macOS app, best first: test id → accessibility
+ * identifier; label → identifier, then label or title; placeholder → placeholder value; text → title, label or value
+ * (exact, then contained); role → element type with that title or label; XPath as is.
+ */
+export function macQueries(l: Locator): Query[] {
+  const v = predicateLiteral(l.value);
+  switch (l.strategy) {
+    case 'testId':
+      return [{ using: 'accessibility id', value: l.value }];
+    case 'label':
+      return [{ using: 'accessibility id', value: l.value }, pred(`label == ${v} OR title == ${v}`)];
+    case 'placeholder':
+      return [pred(`placeholderValue == ${v}`)];
+    case 'text':
+      return [
+        pred(`title == ${v} OR label == ${v} OR value == ${v}`),
+        pred(`title CONTAINS ${v} OR label CONTAINS ${v} OR value CONTAINS ${v}`),
+      ];
+    case 'role': {
+      const types = MAC_ROLE_TYPES[l.value.toLowerCase()];
+      if (!types)
+        throw new StepError(
+          'invalid_params',
+          `The role "${l.value}" has no macOS equivalent; use a test id, text or XPath (roles: ${Object.keys(MAC_ROLE_TYPES).join(', ')})`,
+        );
+      const n = l.name ? predicateLiteral(l.name) : undefined;
+      return types.map((t) => ({
+        using: '-ios class chain',
+        value: n ? `**/${t}[\`title == ${n} OR label == ${n} OR placeholderValue == ${n}\`]` : `**/${t}`,
+      }));
+    }
+    case 'xpath':
+      return [{ using: 'xpath', value: l.value }];
+    case 'css':
+      throw new StepError(
+        'invalid_params',
+        'CSS locators work on web pages; in a macOS app use a test id (accessibility identifier), text, a role or XPath',
+      );
+    default:
+      throw new StepError('invalid_params', `The locator "${l.strategy}" is not available for macOS apps`);
+  }
+}
+
+/** Windows UI Automation control types for the web's ARIA roles. */
+const WINDOWS_ROLE_TYPES: Record<string, string[]> = {
+  button: ['Button', 'SplitButton'],
+  textbox: ['Edit', 'Document'],
+  searchbox: ['Edit'],
+  checkbox: ['CheckBox'],
+  switch: ['CheckBox', 'Button'],
+  radio: ['RadioButton'],
+  combobox: ['ComboBox'],
+  menuitem: ['MenuItem'],
+  img: ['Image'],
+  image: ['Image'],
+  link: ['Hyperlink'],
+  text: ['Text'],
+  heading: ['Text', 'Header'],
+  list: ['List', 'DataGrid', 'Tree'],
+  listitem: ['ListItem', 'DataItem', 'TreeItem'],
+  slider: ['Slider'],
+  progressbar: ['ProgressBar'],
+  tab: ['TabItem'],
+};
+
+/**
+ * The Appium (NovaWindows) queries for one StepForge locator in a Windows app, best first: test id → AutomationId;
+ * label and text → Name (exact, then contained); placeholder → the field's Name or HelpText; role → control type with
+ * that Name; XPath as is (control types as tags: //Button[@Name='Save']).
+ */
+export function windowsQueries(l: Locator): Query[] {
+  const v = xpathLiteral(l.value);
+  switch (l.strategy) {
+    case 'testId':
+      return [{ using: 'accessibility id', value: l.value }];
+    case 'label':
+      return [
+        { using: 'name', value: l.value },
+        { using: 'accessibility id', value: l.value },
+      ];
+    case 'placeholder':
+      return [{ using: 'xpath', value: `//Edit[@Name=${v} or @HelpText=${v}]` }];
+    case 'text':
+      return [
+        { using: 'name', value: l.value },
+        { using: 'xpath', value: `//*[contains(@Name, ${v})]` },
+      ];
+    case 'role': {
+      const types = WINDOWS_ROLE_TYPES[l.value.toLowerCase()];
+      if (!types)
+        throw new StepError(
+          'invalid_params',
+          `The role "${l.value}" has no Windows equivalent; use a test id, text or XPath (roles: ${Object.keys(WINDOWS_ROLE_TYPES).join(', ')})`,
+        );
+      const named = l.name ? `[@Name=${xpathLiteral(l.name)}]` : '';
+      return [{ using: 'xpath', value: types.map((t) => `//${t}${named}`).join(' | ') }];
+    }
+    case 'xpath':
+      return [{ using: 'xpath', value: l.value }];
+    case 'css':
+      throw new StepError(
+        'invalid_params',
+        'CSS locators work on web pages; in a Windows app use a test id (AutomationId), text, a role or XPath',
+      );
+    default:
+      throw new StepError('invalid_params', `The locator "${l.strategy}" is not available for Windows apps`);
+  }
+}

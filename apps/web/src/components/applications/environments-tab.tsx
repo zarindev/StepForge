@@ -8,6 +8,16 @@ import {
   androidToForm,
   formToAndroid,
   formToIos,
+  formToMac,
+  formToWindows,
+  macLaunchSet,
+  macToForm,
+  MacLaunchFields,
+  windowsLaunchSet,
+  windowsToForm,
+  WindowsLaunchFields,
+  type MacForm,
+  type WindowsForm,
   iosLaunchSet,
   iosToForm,
   IosLaunchFields,
@@ -48,6 +58,8 @@ type EnvForm = {
   android: AndroidForm;
   /** iOS apps: which app and simulator or iPhone. */
   ios: IosForm;
+  macos: MacForm;
+  windows: WindowsForm;
 };
 
 type ElectronLaunch = {
@@ -117,6 +129,8 @@ export function EnvironmentsTab({ app }: { app: Application }) {
           ...(app.platform === 'electron' && { electron: formToDesktop(f.desktop) }),
           ...(app.platform === 'android' && { android: formToAndroid(f.android) }),
           ...(app.platform === 'ios' && { ios: formToIos(f.ios) }),
+          ...(app.platform === 'macos' && { macos: formToMac(f.macos) }),
+          ...(app.platform === 'windows' && { windows: formToWindows(f.windows) }),
         },
       };
       return editing === 'new' || !editing
@@ -145,7 +159,10 @@ export function EnvironmentsTab({ app }: { app: Application }) {
 
   return (
     <div className="space-y-4">
-      {(app.platform === 'android' || app.platform === 'ios') && <NativeStatusCard platform={app.platform} />}
+      {(app.platform === 'android' ||
+        app.platform === 'ios' ||
+        app.platform === 'macos' ||
+        app.platform === 'windows') && <NativeStatusCard platform={app.platform} />}
       <div className="flex justify-between">
         <p className="text-sm text-muted">
           Where tests run. Use {'{{env.baseUrl}}'} and {'{{env.<variable>}}'} in steps.
@@ -184,7 +201,11 @@ export function EnvironmentsTab({ app }: { app: Application }) {
                         ? 'Android app'
                         : app.platform === 'ios'
                           ? 'iOS app'
-                          : String(env.browserDefaultsJson.browser ?? 'chromium')}
+                          : app.platform === 'macos'
+                            ? 'macOS app'
+                            : app.platform === 'windows'
+                              ? 'Windows app'
+                              : String(env.browserDefaultsJson.browser ?? 'chromium')}
                   </p>
                 </div>
                 <Menu
@@ -215,6 +236,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
           desktop={app.platform === 'electron'}
           android={app.platform === 'android'}
           ios={app.platform === 'ios'}
+          nativeDesktop={app.platform === 'macos' || app.platform === 'windows' ? app.platform : undefined}
           onClose={() => setEditing(null)}
           onSubmit={(f) => save.mutate(f)}
           busy={save.isPending}
@@ -239,6 +261,7 @@ function EnvironmentDialog({
   desktop,
   android,
   ios,
+  nativeDesktop,
   onClose,
   onSubmit,
   busy,
@@ -251,6 +274,8 @@ function EnvironmentDialog({
   android?: boolean;
   /** The application is an iOS app: ask which app and simulator or iPhone. */
   ios?: boolean;
+  /** A native desktop app (macOS or Windows): how to start it. */
+  nativeDesktop?: 'macos' | 'windows';
   onClose: () => void;
   onSubmit: (f: EnvForm) => void;
   busy: boolean;
@@ -258,7 +283,8 @@ function EnvironmentDialog({
 }) {
   const [f, setF] = useState<EnvForm>({
     name: env?.name ?? '',
-    baseUrl: env?.baseUrl ?? (desktop || android || ios ? 'app://local' : 'http://localhost:3000'),
+    baseUrl:
+      env?.baseUrl ?? (desktop || android || ios || nativeDesktop ? 'app://local' : 'http://localhost:3000'),
     isProduction: env?.isProduction ?? false,
     variables: toLines(env?.variablesJson ?? {}),
     browser: String(env?.browserDefaultsJson.browser ?? 'chromium'),
@@ -267,6 +293,8 @@ function EnvironmentDialog({
     desktop: desktopToForm(env?.browserDefaultsJson.electron),
     android: androidToForm(env?.browserDefaultsJson.android),
     ios: iosToForm(env?.browserDefaultsJson.ios),
+    macos: macToForm(env?.browserDefaultsJson.macos),
+    windows: windowsToForm(env?.browserDefaultsJson.windows),
   });
   const launchSet = !!(f.desktop.executablePath.trim() || f.desktop.appPath.trim());
   const setDesktop = (p: Partial<EnvForm['desktop']>) => set({ desktop: { ...f.desktop, ...p } });
@@ -288,6 +316,8 @@ function EnvironmentDialog({
               (desktop && !launchSet) ||
               (android && !androidLaunchSet(f.android)) ||
               (ios && !iosLaunchSet(f.ios)) ||
+              (nativeDesktop === 'macos' && !macLaunchSet(f.macos)) ||
+              (nativeDesktop === 'windows' && !windowsLaunchSet(f.windows)) ||
               busy
             }
             onClick={() => onSubmit(f)}
@@ -310,7 +340,7 @@ function EnvironmentDialog({
           <Field
             label="Base URL"
             className="col-span-2"
-            {...((desktop || android || ios) && {
+            {...((desktop || android || ios || nativeDesktop) && {
               hint: 'A name for reports; the app itself is started below.',
             })}
           >
@@ -330,7 +360,11 @@ function EnvironmentDialog({
             onChange={(e) => set({ variables: e.target.value })}
           />
         </Field>
-        {ios ? (
+        {nativeDesktop === 'macos' ? (
+          <MacLaunchFields value={f.macos} onChange={(a) => set({ macos: a })} />
+        ) : nativeDesktop === 'windows' ? (
+          <WindowsLaunchFields value={f.windows} onChange={(a) => set({ windows: a })} />
+        ) : ios ? (
           <IosLaunchFields value={f.ios} onChange={(a) => set({ ios: a })} />
         ) : android ? (
           <AndroidLaunchFields value={f.android} onChange={(a) => set({ android: a })} />

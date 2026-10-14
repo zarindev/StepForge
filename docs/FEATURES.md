@@ -47,6 +47,12 @@ touch, sites behind basic auth or client certificates, localised and time-zone-d
 features and visual regressions — with network waiting and mocking, offline mode, cookies and storage, a controllable
 clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
+## Test macOS and Windows apps
+
+Native Mac apps and Windows apps (Win32, WPF, WinForms, UWP) through Appium (Mac2, NovaWindows), installed and
+started by StepForge. Each environment names the app; tests add menus, keyboard shortcuts and dialog buttons to the
+usual steps. [NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md)
+
 ## Phone gestures, recording and diagnosis
 
 Swipe, long press, scroll to, back, rotate, app state, deep links, location, permissions, dialogs and push
@@ -140,5 +146,5 @@ traces and diagnosis work as on the web. [DESKTOP_APPS.md](DESKTOP_APPS.md)
 The latest additions are in [WHATS_NEW.md](WHATS_NEW.md); planned work is in the README's
 [Coming next](../README.md#coming-next).
 
-- Windows / macOS / Linux desktop apps (Electron, Android, iOS, gestures and the phone recorder are done):
-  [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
+- Linux desktop apps and image matching, and Appium / Maestro export (Electron, Android, iOS, gestures, the phone
+  recorder, macOS and Windows are done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).

@@ -12,6 +12,8 @@ type PlatformStatus = {
 export type NativeStatus = {
   android: PlatformStatus;
   ios: PlatformStatus & { supported: boolean };
+  macos: PlatformStatus & { supported: boolean };
+  windows: PlatformStatus & { supported: boolean };
   installing: boolean;
   avds: string[];
   devices: { serial: string; state: string; model?: string; emulator: boolean }[];
@@ -347,7 +349,7 @@ export function IosLaunchFields({ value: f, onChange }: { value: IosForm; onChan
 }
 
 /** What this computer has for testing Android or iOS apps, with how to fix what is missing, and installing Appium. */
-export function NativeStatusCard({ platform }: { platform: 'android' | 'ios' }) {
+export function NativeStatusCard({ platform }: { platform: 'android' | 'ios' | 'macos' | 'windows' }) {
   const status = useNativeStatus();
   const qc = useQueryClient();
   const install = useMutation({
@@ -360,7 +362,7 @@ export function NativeStatusCard({ platform }: { platform: 'android' | 'ios' }) 
   });
   if (!status.data) return null;
   const p = status.data[platform];
-  const name = platform === 'ios' ? 'iOS' : 'Android';
+  const name = { ios: 'iOS', android: 'Android', macos: 'macOS', windows: 'Windows' }[platform];
   const appiumMissing = p.checks.some((c) => c.name.startsWith('Appium') && !c.ok);
   return (
     <section aria-label={`${name} on this computer`} className="rounded-lg border border-border p-4">
@@ -393,5 +395,204 @@ export function NativeStatusCard({ platform }: { platform: 'android' | 'ios' }) 
         ))}
       </ul>
     </section>
+  );
+}
+
+/** macOS desktop apps: an installed app's bundle id or a .app, with arguments and environment variables. */
+type MacLaunch = {
+  bundleId?: string;
+  appPath?: string;
+  arguments?: string[];
+  environment?: Record<string, string>;
+  capabilities?: Record<string, unknown>;
+};
+export type MacForm = {
+  bundleId: string;
+  appPath: string;
+  arguments: string;
+  environment: string;
+  capabilities: string;
+};
+const lines = (v: Record<string, string>) =>
+  Object.entries(v)
+    .map(([k, x]) => `${k}=${x}`)
+    .join('\n');
+const parseLines = (t: string) => {
+  const out: Record<string, string> = {};
+  for (const l of t.split('\n')) {
+    const i = l.indexOf('=');
+    if (i > 0) out[l.slice(0, i).trim()] = l.slice(i + 1).trim();
+  }
+  return out;
+};
+export function macToForm(v: unknown): MacForm {
+  const a = (v ?? {}) as MacLaunch;
+  return {
+    bundleId: a.bundleId ?? '',
+    appPath: a.appPath ?? '',
+    arguments: (a.arguments ?? []).join('\n'),
+    environment: lines(a.environment ?? {}),
+    capabilities:
+      a.capabilities && Object.keys(a.capabilities).length ? JSON.stringify(a.capabilities, null, 2) : '',
+  };
+}
+export function formToMac(f: MacForm): MacLaunch {
+  const t = (s: string) => s.trim() || undefined;
+  return {
+    bundleId: t(f.bundleId),
+    appPath: t(f.appPath),
+    arguments: f.arguments
+      .split('\n')
+      .map((x) => x.trim())
+      .filter(Boolean),
+    environment: parseLines(f.environment),
+    capabilities: parseCapabilities(f.capabilities),
+  };
+}
+export const macLaunchSet = (f: MacForm) => !!(f.bundleId.trim() || f.appPath.trim());
+
+export function MacLaunchFields({ value: f, onChange }: { value: MacForm; onChange: (f: MacForm) => void }) {
+  const set = (p: Partial<MacForm>) => onChange({ ...f, ...p });
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      <p className="text-sm font-medium">Start the macOS app</p>
+      <p className="text-xs text-muted">
+        An installed app by its bundle id, or a .app anywhere on this Mac. Tests use the mouse and keyboard of
+        this Mac while they run.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Bundle id">
+          <Input
+            aria-label="Bundle id"
+            value={f.bundleId}
+            className="font-mono text-xs"
+            placeholder="com.example.MyApp"
+            onChange={(e) => set({ bundleId: e.target.value })}
+          />
+        </Field>
+        <Field label="or the app (.app)">
+          <Input
+            aria-label="App path"
+            value={f.appPath}
+            className="font-mono text-xs"
+            placeholder="/Applications/MyApp.app"
+            onChange={(e) => set({ appPath: e.target.value })}
+          />
+        </Field>
+        <Field label="Arguments" hint="One per line.">
+          <Textarea
+            aria-label="Arguments"
+            value={f.arguments}
+            rows={2}
+            className="font-mono text-xs"
+            onChange={(e) => set({ arguments: e.target.value })}
+          />
+        </Field>
+        <Field label="App environment variables" hint="One per line: KEY=value.">
+          <Textarea
+            aria-label="App environment variables"
+            value={f.environment}
+            rows={2}
+            className="font-mono text-xs"
+            onChange={(e) => set({ environment: e.target.value })}
+          />
+        </Field>
+      </div>
+      <Field label="Extra Appium capabilities" hint="Optional JSON.">
+        <Textarea
+          aria-label="Extra Appium capabilities"
+          value={f.capabilities}
+          rows={2}
+          className="font-mono text-xs"
+          onChange={(e) => set({ capabilities: e.target.value })}
+        />
+      </Field>
+      {!macLaunchSet(f) && <p className="text-xs text-fail">Set the bundle id or the app.</p>}
+    </div>
+  );
+}
+
+/** Windows desktop apps: an .exe or a Store app's id, its arguments and working folder. */
+type WindowsLaunch = {
+  app?: string;
+  arguments?: string;
+  workingDir?: string;
+  capabilities?: Record<string, unknown>;
+};
+export type WindowsForm = { app: string; arguments: string; workingDir: string; capabilities: string };
+export function windowsToForm(v: unknown): WindowsForm {
+  const a = (v ?? {}) as WindowsLaunch;
+  return {
+    app: a.app ?? '',
+    arguments: a.arguments ?? '',
+    workingDir: a.workingDir ?? '',
+    capabilities:
+      a.capabilities && Object.keys(a.capabilities).length ? JSON.stringify(a.capabilities, null, 2) : '',
+  };
+}
+export function formToWindows(f: WindowsForm): WindowsLaunch {
+  const t = (s: string) => s.trim() || undefined;
+  return {
+    app: t(f.app),
+    arguments: t(f.arguments),
+    workingDir: t(f.workingDir),
+    capabilities: parseCapabilities(f.capabilities),
+  };
+}
+export const windowsLaunchSet = (f: WindowsForm) => !!f.app.trim();
+
+export function WindowsLaunchFields({
+  value: f,
+  onChange,
+}: {
+  value: WindowsForm;
+  onChange: (f: WindowsForm) => void;
+}) {
+  const set = (p: Partial<WindowsForm>) => onChange({ ...f, ...p });
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      <p className="text-sm font-medium">Start the Windows app</p>
+      <p className="text-xs text-muted">
+        The app’s .exe, or a Store app’s id (for example Microsoft.WindowsCalculator_8wekyb3d8bbwe!App). Tests
+        use the mouse and keyboard of this computer while they run.
+      </p>
+      <Field label="App (.exe or app id)">
+        <Input
+          aria-label="App file"
+          value={f.app}
+          className="font-mono text-xs"
+          placeholder="C:\\Program Files\\MyApp\\MyApp.exe"
+          onChange={(e) => set({ app: e.target.value })}
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Arguments">
+          <Input
+            aria-label="Arguments"
+            value={f.arguments}
+            className="font-mono text-xs"
+            onChange={(e) => set({ arguments: e.target.value })}
+          />
+        </Field>
+        <Field label="Working folder">
+          <Input
+            aria-label="Working folder"
+            value={f.workingDir}
+            className="font-mono text-xs"
+            onChange={(e) => set({ workingDir: e.target.value })}
+          />
+        </Field>
+      </div>
+      <Field label="Extra Appium capabilities" hint="Optional JSON.">
+        <Textarea
+          aria-label="Extra Appium capabilities"
+          value={f.capabilities}
+          rows={2}
+          className="font-mono text-xs"
+          onChange={(e) => set({ capabilities: e.target.value })}
+        />
+      </Field>
+      {!windowsLaunchSet(f) && <p className="text-xs text-fail">Set the app.</p>}
+    </div>
   );
 }

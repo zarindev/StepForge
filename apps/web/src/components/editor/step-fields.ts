@@ -252,6 +252,16 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
     { key: 'direction', label: 'Direction', kind: 'select', options: ['down', 'up'] },
     { key: 'maxSwipes', label: 'At most (swipes)', kind: 'number', hint: 'Default 10' },
   ],
+  'ui.menu': [
+    {
+      key: 'path',
+      label: 'Menu path',
+      kind: 'text',
+      placeholder: 'File > Save',
+      hint: 'Menu names joined with >',
+      wide: true,
+    },
+  ],
   'ui.rotate': [
     { key: 'orientation', label: 'Orientation', kind: 'select', options: ['landscape', 'portrait'] },
   ],

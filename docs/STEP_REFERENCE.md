@@ -47,7 +47,7 @@ How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth stagi
 | `fill` | `value` | replaces the content |
 | `type` | `value`, `delay` (ms per key) | types key by key |
 | `clear` | — | |
-| `press` | `key` (e.g. `Enter`, `Control+A`) | on the locator, or the page when no locator |
+| `press` | `key` (e.g. `Enter`, `Control+A`) | on the locator, or the page when no locator; macOS/Windows apps: shortcuts such as `Meta+S`, `Control+Shift+N` |
 | `select` | `value` or `label` or `index` | output: selected value |
 | `check` / `uncheck` | — | |
 | `upload` | `files` (array of paths) or `file` | |
@@ -80,6 +80,7 @@ How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth stagi
 | `setLocation` | `latitude`, `longitude` | phone apps (emulators, simulators) |
 | `permission` | `permission` (`camera`, `location`, `microphone`, `contacts`, `photos`, `notifications`, `calendar` or a platform name), `action` (`grant`/`revoke`) | phone apps; iOS notifications: answer the app's dialog with `handleDialog` |
 | `pushNotification` | `title`, `body` | iOS simulators |
+| `menu` | `path` (`File > Save`) | macOS and Windows apps: opens the menu path from the menu bar |
 
 `ui.assert` checks: `visible`, `hidden`, `text`, `textContains`, `textMatches` (regex), `value`, `count`,
 `attribute` (+ `attribute` name), `enabled`, `disabled`, `checked`, `unchecked`, `url`, `urlContains`,
