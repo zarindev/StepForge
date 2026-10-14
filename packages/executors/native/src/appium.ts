@@ -17,6 +17,8 @@ export const NOVAWINDOWS_VERSION = '1.4.5';
 /** The drivers this computer can use: Android everywhere, iOS on a Mac. */
 export function wantedDrivers(): {
   name: 'uiautomator2' | 'xcuitest' | 'mac2' | 'novawindows';
+  /** Installed from npm when Appium does not know the driver by name. */
+  npm?: string;
   version: string;
   label: string;
 }[] {
@@ -32,6 +34,7 @@ export function wantedDrivers(): {
       ? [
           {
             name: 'novawindows' as const,
+            npm: 'appium-novawindows-driver',
             version: NOVAWINDOWS_VERSION,
             label: 'the Windows driver (NovaWindows)',
           },
@@ -203,7 +206,10 @@ export async function installAppium(toolsDir: string, log: (m: string) => void =
     log(`Installing ${d.label} ${d.version}…`);
     await exec(
       node,
-      [main, 'driver', 'install', `${d.name}@${d.version}`],
+      // Appium's own list knows most drivers by name; others (NovaWindows) are installed as npm packages.
+      d.npm
+        ? [main, 'driver', 'install', '--source=npm', `${d.npm}@${d.version}`]
+        : [main, 'driver', 'install', `${d.name}@${d.version}`],
       { cwd: root, env: { ...process.env, APPIUM_HOME: home } },
       log,
     );

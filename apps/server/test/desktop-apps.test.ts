@@ -96,7 +96,8 @@ describe('desktop (Electron) apps', () => {
         ...addNote('one'),
         ...addNote('two'),
         ...addNote('three'),
-        { ...count('3 notes'), timeoutMs: 2000 },
+        // Enough for a slow Windows runner to find the counter (it then shows the wrong count).
+        { ...count('3 notes'), timeoutMs: 6000 },
       ],
     });
     const run = await runOne(s.id);
