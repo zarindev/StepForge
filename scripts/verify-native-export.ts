@@ -319,12 +319,46 @@ const RUNNERS: Partial<Record<TargetId, Runner>> = {
 const has = (tool: string) =>
   spawnSync(tool, ['--version'], { stdio: 'ignore', shell: process.platform === 'win32' }).status === 0;
 
+/** The last lines a command printed (for the CI annotation of a failure). */
+let tail: string[] = [];
+
 function run(cmd: string, args: string[], cwd: string, env: NodeJS.ProcessEnv): Promise<number> {
   return new Promise((done) => {
     console.log(`  $ ${cmd} ${args.join(' ')}`);
-    const p = spawn(cmd, args, { cwd, env, stdio: 'inherit', shell: process.platform === 'win32' });
+    tail = [];
+    const p = spawn(cmd, args, {
+      cwd,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    });
+    const keep = (out: NodeJS.WriteStream) => (b: Buffer) => {
+      out.write(b);
+      tail.push(
+        ...b
+          .toString()
+          .split('\n')
+          .filter((l) => l.trim()),
+      );
+      tail = tail.slice(-60);
+    };
+    p.stdout!.on('data', keep(process.stdout));
+    p.stderr!.on('data', keep(process.stderr));
     p.on('exit', (code) => done(code ?? 1));
   });
+}
+
+/** On GitHub Actions, a failure's last lines as an error annotation (public, unlike the job log). */
+function annotate(target: string, lines: string[]): void {
+  if (!process.env.GITHUB_ACTIONS) return;
+  const text = lines
+    .join('\n')
+    // eslint-disable-next-line no-control-regex
+    .replace(/\u001b\[[0-9;]*m/g, '')
+    .replace(/%/g, '%25')
+    .replace(/\r/g, '')
+    .replace(/\n/g, '%0A');
+  console.log(`::error title=Exported ${target} project (${platform})::${text}`);
 }
 
 const wanted = (
@@ -388,6 +422,7 @@ try {
       }
       if (!code) break;
     }
+    if (code && !values['wrong-password']) annotate(target, tail);
     results.push([
       target,
       values['wrong-password']
