@@ -30,11 +30,12 @@ steps such as "Open /checkout", which read as instructions too.
    environment → **Start manual run**. With _Open the browser now_ (on by default), StepForge opens a browser at the
    test's first page.
 2. **The browser** shows the application with a **StepForge panel** on top (drag it anywhere, minimise it):
+   in the order you work through a step:
    - the current step and what to **expect**, and the **next** step;
-   - **✓ Pass**, **✗ Fail**, **⊘ Blocked** (could not be done), **→ Skip** — the panel moves on to the next step;
-   - a **note** for what happened;
+   - **Actual result** — what you see when it differs from the expected result (it fills the bug report later);
    - **📷 Screenshot** — the page without the panel, kept with the step (as many as you like);
    - **● Record clip / ■ Stop clip** — marks a part of the screen recording for the step;
+   - **✓ Pass**, **✗ Fail**, **⊘ Blocked** (could not be done), **→ Skip** — the panel moves on to the next step;
    - a list to jump to any step, and **Finish test**.
 3. **The whole browser session is recorded** as a video. When the browser closes (Finish test, Close browser, or
    closing the window), the video becomes the test's evidence, and each clip plays its part of it.
@@ -50,7 +51,7 @@ colours and three line widths, with undo and clear. **Save marked-up copy** keep
 ## Reporting a bug
 
 A failed or blocked step has **Report a bug**: a title, **how it should behave** (filled from the step's expected
-result), **how it behaves** (filled from your note) and the severity. The bug appears on the **Bugs** page with the
+result), **how it behaves** (filled from the actual result you wrote) and the severity. The bug appears on the **Bugs** page with the
 steps to reproduce (the test's steps up to that one), the environment and the step's screenshot; the step links to it
 (BUG-001…). Bug exports (PDF, Markdown, Jira and Trello CSV, Excel) include it like any other bug.
 

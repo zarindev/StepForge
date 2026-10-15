@@ -85,12 +85,13 @@
         ${
           cur
             ? `<div><div class="num">Step ${esc(cur.number)}</div><div class="step">${esc(what)}</div>${expect ? `<div class="expect">Expect: ${esc(expect)}</div>` : ''}</div>
-        <div class="row">${mark('passed', '✓ Pass', 'pass')}${mark('failed', '✗ Fail', 'fail')}${mark('blocked', '⊘ Blocked', 'block')}${mark('skipped', '→ Skip', '')}</div>
-        <textarea data-note placeholder="What happened? (kept with the step; write the bug report in StepForge)">${esc(note)}</textarea>
+        <label class="num" for="sf-actual">Actual result</label>
+        <textarea id="sf-actual" data-note aria-label="Actual result" placeholder="What you see, if it differs from the expected result (report the bug in StepForge)">${esc(note)}</textarea>
         <div class="row">
           <button class="b" data-shot aria-label="Take a screenshot">📷 Screenshot${cur.screenshots ? ` (${cur.screenshots})` : ''}</button>
           <button class="b ${state.recording ? 'rec' : ''}" data-clip aria-label="${state.recording ? 'Stop the clip' : 'Record a clip'}">${state.recording ? '■ Stop clip' : '● Record clip'}</button>
-        </div>`
+        </div>
+        <div class="row">${mark('passed', '✓ Pass', 'pass')}${mark('failed', '✗ Fail', 'fail')}${mark('blocked', '⊘ Blocked', 'block')}${mark('skipped', '→ Skip', '')}</div>`
             : `<div class="done">All steps recorded.</div>`
         }
         <select data-go aria-label="Go to step">${steps
