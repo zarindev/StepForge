@@ -2,10 +2,10 @@
 .github/workflows/stepforge-tests.yml (35 lines)
 .gitignore (3 lines)
 config.yaml (5 lines)
-flows/gestures-and-device-steps.yaml (87 lines)
+flows/gestures-and-device-steps.yaml (84 lines)
 flows/patients-sign-in-and-add-a-patient-tc-1.yaml (11 lines)
 flows/patients-sign-in-and-add-a-patient-tc-2.yaml (11 lines)
-flows/steps/patients-sign-in-and-add-a-patient.yaml (49 lines)
+flows/steps/patients-sign-in-and-add-a-patient.yaml (55 lines)
 README.md (67 lines)
 
 Warnings:

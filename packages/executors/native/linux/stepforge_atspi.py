@@ -26,7 +26,12 @@ gi.require_version("Atspi", "2.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Atspi, Gdk  # noqa: E402
 
-ELEMENT_KEY = "element-6066-11e4-a386-3a7b2b1c0e5f"
+# The W3C element key, and the older JSON Wire key some clients still read.
+ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
+
+
+def element_ref(ref):
+    return {ELEMENT_KEY: ref, "ELEMENT": ref}
 LOCK = threading.Lock()  # AT-SPI calls are not thread-safe: one request at a time
 
 
@@ -301,12 +306,12 @@ def handle(method, parts, body):
         if rest == ["element"]:
             if not found:
                 raise WdError("no such element", "No element matches", 404)
-            return {ELEMENT_KEY: s.ref(found[0])}
-        return [{ELEMENT_KEY: s.ref(a)} for a in found]
+            return element_ref(s.ref(found[0]))
+        return [element_ref(s.ref(a)) for a in found]
     if rest == ["element", "active"]:
         for a, d in walk(s.app):
             if d and "focused" in states(a):
-                return {ELEMENT_KEY: s.ref(a)}
+                return element_ref(s.ref(a))
         raise WdError("no such element", "Nothing has the focus", 404)
     if len(rest) >= 3 and rest[0] == "element":
         acc = s.element(rest[1])

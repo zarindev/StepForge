@@ -174,6 +174,10 @@ function printOps(ops: Op[], c: Ctx, ind: string): void {
           out(`- tapOn: ${sel(s)}`);
           if (op.action !== 'type') out('- eraseText');
           if (t) out(`- inputText: ${yq(t)}`);
+          // Maestro types with the on-screen keyboard, which stays open and can cover the next element (StepForge's
+          // runs type without it): close it, once (on Android it presses Back).
+          out('- hideKeyboard:');
+          out('    optional: true');
         } else if (op.action === 'check' || op.action === 'uncheck') {
           out('- runFlow:');
           out('    when:');
@@ -378,15 +382,13 @@ function appOp(
         out('- tapOn: { id: "BackButton" }');
         break;
       }
-      // Maestro types with the on-screen keyboard, and Android's Back first closes it: close it, then go back.
-      out('- hideKeyboard:');
-      out('    optional: true');
+      // The keyboard is closed after each text entry, so Back goes back (with it open, Android's Back closes it).
       out('- back');
       break;
     case 'hideKeyboard':
-      // As in StepForge, nothing to do when no keyboard is open.
-      out('- hideKeyboard:');
-      out('    optional: true');
+      // Already closed after each text entry. Maestro's hideKeyboard presses Back on Android, so a second one would
+      // leave the screen.
+      out('# (the keyboard is closed after each text entry)');
       break;
     case 'rotate':
       out(`- setOrientation: ${str(0) === 'portrait' ? 'PORTRAIT' : 'LANDSCAPE_LEFT'}`);

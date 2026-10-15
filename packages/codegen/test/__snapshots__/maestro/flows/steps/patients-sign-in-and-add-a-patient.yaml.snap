@@ -7,10 +7,14 @@ appId: ${APP_ID}
 - tapOn: { text: "Email" }
 - eraseText
 - inputText: "nurse@careclinic.test"
+- hideKeyboard:
+    optional: true
 # Type "{{secret.nursePassword}}" into the element "password"
 - tapOn: { id: "password" }
 - eraseText
 - inputText: "${MAESTRO_NURSE_PASSWORD}"
+- hideKeyboard:
+    optional: true
 # Click the "Sign in" button
 - tapOn: { text: "Sign in" }
 # Check that the element "patient_count" reads "No patients yet"
@@ -19,6 +23,8 @@ appId: ${APP_ID}
 - tapOn: { text: "Patient name" }
 - eraseText
 - inputText: "${name}"
+- hideKeyboard:
+    optional: true
 # Tap "Add patient"
 - tapOn: { text: ".*Add patient.*" }
 # Check that the element "patient_count" contains "1"

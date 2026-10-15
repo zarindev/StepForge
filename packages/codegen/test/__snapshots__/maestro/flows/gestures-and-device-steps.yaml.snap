@@ -27,11 +27,8 @@ tags: ["p2"]
 # Double-click the element "avatar"
 - doubleTapOn: { id: "avatar" }
 # Hide the keyboard
-- hideKeyboard:
-    optional: true
+# (the keyboard is closed after each text entry)
 # Go back
-- hideKeyboard:
-    optional: true
 - back
 # Turn the device to landscape
 - setOrientation: LANDSCAPE_LEFT

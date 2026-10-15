@@ -106,9 +106,9 @@ API, documentation and test-case targets work for every application.
 - Test cases become one flow each (`flows/<scenario>-tc-1.yaml`), running the scenario's steps in
   `flows/steps/` with that row's data. `{{data.x}}` becomes `${x}`, `{{env.x}}` `${X}` (with the exported value),
   `{{vars.x}}` `${output.x}`, and `{{secret.x}}` `${MAESTRO_X}` (Maestro reads `MAESTRO_*` variables from the shell).
-- Where the platforms differ, the flows do what StepForge does: on Android, *Back* first closes the on-screen keyboard
-  Maestro types with; on iOS, *Back* taps the navigation bar's back button, and a deep link answers iOS's "Open in …?"
-  prompt.
+- Where Maestro differs, the flows do what StepForge does: Maestro types with the on-screen keyboard, so each text
+  entry closes it again (it would cover the next field, and Android's *Back* would only close it); on iOS, *Back* taps
+  the navigation bar's back button, and a deep link answers iOS's "Open in …?" prompt.
 - Not in Maestro (TODO): putting the app in the background for a while, permissions after launch, notifications, menus,
   drag and drop, fixed waits, and API, database and email steps.
 - Maestro does not install the app (`adb install` / `xcrun simctl install` first) and needs its id: the package or

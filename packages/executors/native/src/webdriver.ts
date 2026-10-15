@@ -2,7 +2,7 @@ import { request } from 'node:http';
 import { StepError } from '@stepforge/core';
 
 /** The W3C WebDriver key for an element reference. */
-const ELEMENT = 'element-6066-11e4-a386-3a7b2b1c0e5f';
+const ELEMENT = 'element-6066-11e4-a52e-4f735466cecf';
 
 export type ElementRef = string;
 
