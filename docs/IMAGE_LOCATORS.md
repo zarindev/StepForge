@@ -4,8 +4,8 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 
 Some things on a screen have no id, label or text to find them by: a pin on a map, an icon drawn in a canvas, a
 button inside a game, a remote desktop, a chart. An **image locator** finds them by a small **picture** of them, in a
-screenshot taken at that moment. It works for every kind of app: web pages, Electron, Android, iOS, macOS and
-Windows.
+screenshot taken at that moment. It works for every kind of app: web pages, Electron, Android, iOS, macOS,
+Windows and Linux.
 
 Use it as a last resort. Ids and text survive redesigns; a picture breaks when the element's look changes.
 

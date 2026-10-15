@@ -161,8 +161,7 @@ from the dashboard is planned. On a server, run StepForge (or the CLI) inside a 
 ## Not yet
 
 Recording desktop apps from the dashboard, and the manual-test panel inside a desktop app, are planned. For now, add
-steps in the editor; the element tree from a failed run shows the identifiers and names to use. Linux desktop apps come
-with step N6.
+steps in the editor; the element tree from a failed run shows the identifiers and names to use.
 
 ## Troubleshooting
 
