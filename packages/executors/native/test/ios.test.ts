@@ -100,7 +100,15 @@ describe.skipIf(!SIM)('iOS app on a simulator (CareClinic mobile)', () => {
         ...opts,
       },
       artifactsDir,
-    }).then((r) => ({ ...r, artifactsDir }));
+    }).then((r) => ({ ...r, artifactsDir, error: r.error && `${r.error}${onScreen(r.artifacts)}` }));
+  };
+  // CI's screenshots are out of reach: a failure also says what was on the screen (labels and values of its elements).
+  const onScreen = (artifacts: { kind: string; path: string }[]) => {
+    const tree = artifacts.find((a) => a.kind === 'dom');
+    if (!tree) return '';
+    const seen = new Set<string>();
+    for (const m of readFileSync(tree.path, 'utf8').matchAll(/ (?:label|value)="([^"]+)"/g)) seen.add(m[1]!);
+    return ` [on screen: ${[...seen].slice(0, 40).join(' | ')}]`;
   };
   const signIn = (password = 'CareClinic1') =>
     steps(
