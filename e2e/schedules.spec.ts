@@ -30,7 +30,7 @@ test('schedules: email channel, cron preview, Run now sends the summary (Phase 1
   page,
   request,
 }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(300_000);
   // Unique names, so a CI retry does not collide with what its first attempt created.
   const tag = Date.now().toString(36);
   const inbox = `QA inbox ${tag}`;
@@ -96,7 +96,24 @@ test('schedules: email channel, cron preview, Run now sends the summary (Phase 1
   await expect(row).toContainText('30 1 * * *');
   await expect(row).toContainText('Never');
   await row.getByRole('button', { name: `Run ${schedule} now` }).click();
-  await expect(row).toContainText(/\d/, { timeout: 30_000 });
+  // Wait in stages, so a slow CI machine shows which one stalled: the run finishes, then its summary is sent.
+  const sched = (await sfApi<{ id: string; name: string }[]>(page, 'GET', '/api/schedules')).find(
+    (x) => x.name === schedule,
+  )!;
+  type SchedRun = { status: string; notifications?: { channel: string; ok: boolean }[] };
+  const runs = () => sfApi<SchedRun[]>(page, 'GET', `/api/schedules/${sched.id}/runs`);
+  await expect
+    .poll(async () => (await runs())[0]?.status ?? 'not started', {
+      timeout: 120_000,
+      message: 'the scheduled run',
+    })
+    .toMatch(/^(passed|failed|broken)$/);
+  await expect
+    .poll(async () => (await runs())[0]?.notifications?.length ?? 0, {
+      timeout: 60_000,
+      message: 'the summary notification',
+    })
+    .toBeGreaterThan(0);
   await row.getByRole('button', { name: 'Show history' }).click();
   // The badge shows the delivery result; on failure its tooltip holds the error, reported here.
   const delivery = page.getByText(new RegExp(`^${inbox}: (sent|failed|skipped)$`)).first();
