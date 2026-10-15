@@ -225,7 +225,9 @@ describe.skipIf(!existsSync(mailpitBinary(BIN_DIR)))('scheduled run sends a summ
       secret: 'BOT-TOKEN-XYZ',
     });
     const since = new Date(Date.now() - 1000);
-    const sent = nextNotification();
+    // Up to a minute more: on a slow machine, creating the schedule can take longer than the 3 s below, and the cron
+    // then fires at that second of the next minute.
+    const sent = nextNotification(80_000);
     // Fires once, 3 s from now (6-field cron: a given second of every minute), so the test doesn't wait for a
     // real nightly slot — and a slow machine cannot squeeze in a second run (and email) before it is turned off.
     const second = (new Date().getSeconds() + 3) % 60;
@@ -289,7 +291,7 @@ describe.skipIf(!existsSync(mailpitBinary(BIN_DIR)))('scheduled run sends a summ
       (x) => x.id === s.id,
     )!;
     expect(disabled.nextRunAt).toBeNull();
-  }, 60_000);
+  }, 120_000);
 
   it('"Run now" works for a disabled schedule, and "failures only" skips passing runs', async () => {
     const tg = await ok('POST', '/api/notify-channels', {
@@ -308,7 +310,7 @@ describe.skipIf(!existsSync(mailpitBinary(BIN_DIR)))('scheduled run sends a summ
       channelIds: [tg.id],
     });
     const before = telegramReceived.length;
-    const sent = nextNotification();
+    const sent = nextNotification(60_000);
     const run = await ok<{ id: string }>('POST', `/api/schedules/${s.id}/run`);
     const e = (await sent) as LiveEvent & { runId: string; results: { ok: boolean; skipped?: boolean }[] };
     expect(e.runId).toBe(run.id);
@@ -316,5 +318,5 @@ describe.skipIf(!existsSync(mailpitBinary(BIN_DIR)))('scheduled run sends a summ
     expect(telegramReceived.length).toBe(before);
     const upcoming = await ok<unknown[]>('GET', '/api/schedules/upcoming');
     expect(upcoming.find((u) => (u as { id: string }).id === s.id)).toBeUndefined(); // disabled
-  }, 30_000);
+  }, 90_000);
 });

@@ -206,8 +206,17 @@ export async function kafkaConsume(p: Record<string, unknown>, ctx: StepContext)
             if (matches(m)) resolve(m);
           },
         })
-        .then(() => {
-          for (const o of offsets) consumer.seek({ topic, partition: o.partition, offset: o.offset });
+        .then(async () => {
+          // run() can return before the consumer group is set up, and seek() throws until it is: try again shortly.
+          for (let i = 0; ; i++) {
+            try {
+              for (const o of offsets) consumer.seek({ topic, partition: o.partition, offset: o.offset });
+              return;
+            } catch (err) {
+              if (i >= 50 || !/not initialized|run must be called/i.test((err as Error).message)) throw err;
+              await new Promise((r) => setTimeout(r, 100));
+            }
+          }
         })
         .catch(reject);
     });
