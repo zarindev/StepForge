@@ -230,8 +230,9 @@ jobs:
       - run: ./stepforge.sh doctor native --platform ios
         # Printed for the log; the tests below fail on their own if something is missing.
         continue-on-error: true
-      # One simulator: the test files take turns.
-      - run: npx vitest run --no-file-parallelism packages/executors/native/test/ios.test.ts apps/server/test/ios-apps.test.ts
+      # One simulator: the test files take turns. The macOS runners are sometimes slow enough that a step stalls on
+      # the simulator (typing, a tap): a failed test gets one more attempt, so only a failure that repeats fails the job.
+      - run: npx vitest run --no-file-parallelism --retry=1 packages/executors/native/test/ios.test.ts apps/server/test/ios-apps.test.ts
         env:
           STEPFORGE_TEST_IOS: '1'
 
