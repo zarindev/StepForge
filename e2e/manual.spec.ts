@@ -118,7 +118,16 @@ test('manual testing: a manual test is pending until run; Run manually opens the
   await expect(page.getByText('1 failed')).toBeVisible();
   const timeline = page.getByRole('list', { name: 'Step timeline' });
   await expect(timeline).toContainText('The logo is missing on the printout');
-  // The browser session's recording is the test's video.
-  await expect(page.getByRole('tab', { name: 'Video' })).toBeVisible({ timeout: 30_000 });
+  // The browser session's recording is the test's video, and it plays (its file is named page@….webm).
+  await page.getByRole('tab', { name: 'Video' }).click({ timeout: 30_000 });
+  const duration = await page.getByLabel('Test video').evaluate(
+    (v: HTMLVideoElement) =>
+      new Promise<number>((resolve, reject) => {
+        if (v.readyState >= 1) return resolve(v.duration);
+        v.addEventListener('loadedmetadata', () => resolve(v.duration));
+        v.addEventListener('error', () => reject(new Error(`The video did not load (${v.error?.code})`)));
+      }),
+  );
+  expect(duration).toBeGreaterThan(0);
   await shot(page, 'manual-result');
 });

@@ -21,7 +21,17 @@ export function sessionToken(): string {
 
 /** URL of an evidence file; the token travels as a query param because <img>/<video> cannot set headers. */
 export function artifactUrl(path: string): string {
-  return `/api/artifacts/files/${path.split('/').map(encodeURIComponent).join('/')}?token=${encodeURIComponent(sessionToken())}`;
+  return `/api/artifacts/files/${path.split('/').map(pathSegment).join('/')}?token=${encodeURIComponent(sessionToken())}`;
+}
+
+/**
+ * A file name as a URL path segment. Characters a path may hold as they are (`@`, `+`, `:`…) stay unencoded: the
+ * evidence route does not find a file whose name has them encoded (a manual test's video is `page@….webm`).
+ */
+export function pathSegment(name: string): string {
+  return encodeURIComponent(name).replace(/%(40|3A|2B|21|24|26|27|28|29|2A|2C|3B|3D)/gi, (m) =>
+    decodeURIComponent(m),
+  );
 }
 
 /** Opens Playwright's Trace Viewer (served locally) on a trace artifact. */
