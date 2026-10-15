@@ -67,13 +67,17 @@ def extents(acc):
     return (r.x, r.y, r.width, r.height) if r else None
 
 
-def text_of(acc):
+def field_text(acc):
+    """A text field's own content ("" when empty; never its name or placeholder)."""
     t = safe(acc.get_text_iface)
-    if t:
-        value = safe(lambda: t.get_text(0, t.get_character_count()), "")
-        if value:
-            return value
-    return safe(acc.get_name, "") or ""
+    if not t:
+        return ""
+    return safe(lambda: t.get_text(0, t.get_character_count()), "") or ""
+
+
+def text_of(acc):
+    """What an element shows: a field's or label's text, else its accessible name."""
+    return field_text(acc) or safe(acc.get_name, "") or ""
 
 
 def walk(acc, depth=0):
@@ -309,7 +313,8 @@ def handle(method, parts, body):
             s.click(acc)
             return None
         if cmd == "value":
-            s.set_text(acc, text_of(acc) + body.get("text", ""))
+            # Typing adds to the field's own text (never to its name or placeholder).
+            s.set_text(acc, field_text(acc) + body.get("text", ""))
             return None
         if cmd == "clear":
             s.set_text(acc, "")
