@@ -11,7 +11,8 @@ import { api } from '@/lib/api';
 import { useEditorCtx, type ElementOption } from './context';
 import { LocatorEditor } from './locator-editor';
 
-const describe = (l: Locator) => `${l.strategy}=${l.value}${l.name ? ` "${l.name}"` : ''}`;
+const describe = (l: Locator) =>
+  l.strategy === 'image' ? 'image (a picture)' : `${l.strategy}=${l.value}${l.name ? ` "${l.name}"` : ''}`;
 
 /**
  * The element a step acts on: a saved element of the application (shared — fix it once, every step follows) or

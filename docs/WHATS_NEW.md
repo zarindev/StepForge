@@ -2,6 +2,15 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — image locators
+
+Some elements have nothing to find them by: a pin on a map, an icon in a canvas, a game, a remote desktop. An
+**image locator** finds them by a small picture of them, in a screenshot, on web pages, Electron, Android, iOS,
+macOS and Windows. Add it in a step's locators (**image** → **Choose picture**); clicks, hovers and taps happen at
+the match, and visible / hidden checks look for it on the screen. A miss says how close the best place came (_best
+match 62%, needs 90%_). Matching is built in (no OpenCV or other native install).
+→ [Image locators](IMAGE_LOCATORS.md)
+
 ## Update — macOS and Windows desktop apps
 
 StepForge now tests **native desktop apps**: Mac apps on a Mac and Windows apps (Win32, WPF, WinForms, UWP) on Windows

@@ -24,13 +24,18 @@ export function buildLocator(scope: Scope, l: StepLocator): Locator {
       return scope.locator(l.value);
     case 'xpath':
       return scope.locator(`xpath=${l.value}`);
+    case 'image':
+      // Pictures are found in a screenshot, not in the page (see UiSession).
+      throw new StepError('invalid_params', 'An image locator is matched against a screenshot');
     case 'element':
       // The engine replaces element references with the element's locators before a step runs.
       throw new StepError('invalid_params', `The saved element ${l.value} was not found`);
   }
 }
 
-export const describeLocator = (l: StepLocator) => `${l.strategy}=${l.value}${l.name ? ` "${l.name}"` : ''}`;
+export const describeLocator = (l: StepLocator) =>
+  // A picture is shown as "image", not as its data.
+  l.strategy === 'image' ? 'image' : `${l.strategy}=${l.value}${l.name ? ` "${l.name}"` : ''}`;
 
 export type Resolved = { locator: Locator; used: StepLocator; index: number; matches: number };
 

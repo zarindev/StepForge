@@ -5,7 +5,8 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 **Status: N1 (Electron desktop apps, [DESKTOP_APPS.md](DESKTOP_APPS.md)), N2 (Android apps,
 [ANDROID_APPS.md](ANDROID_APPS.md)), N3 (iOS apps, [IOS_APPS.md](IOS_APPS.md)), N4 (gestures, the phone recorder, phone
 diagnosis and device campaigns) and N5 (macOS and Windows apps, [NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md)) are
-done; N6–N7 are planned.**
+done. In N6, image locators are done ([IMAGE_LOCATORS.md](IMAGE_LOCATORS.md)) and Linux desktop apps are
+planned, as is N7.**
 StepForge tests web applications (including mobile web, see [WEB_APPS.md](WEB_APPS.md)), Electron desktop apps, and
 Android and iOS apps. This page is the plan for testing **native** apps — Android, iOS, Windows, macOS and
 Linux desktop apps — with the same scenarios, steps, runs, evidence, diagnosis, campaigns and exports, while keeping
@@ -82,7 +83,7 @@ fresh-clone check on the operating systems it supports.
 | N3 — iOS ✅ done | XCUITest driver, simulator management (`xcrun simctl`), signing guidance for real iPhones, iOS demo build | macOS | M |
 | N4 — Mobile gestures and recorder ✅ done | The native steps above; native recorder with screen mirror and element tree; native diagnosis rules; device campaigns | as N2/N3 | L |
 | N5 — Windows and macOS desktop ✅ done | NovaWindows (or FlaUI) and Mac2 drivers; desktop steps (menus, windows, keyboard shortcuts); demo desktop app | Windows / macOS | M |
-| N6 — Linux desktop and image fallback | AT-SPI helper for GTK/Qt; OpenCV image matching as a last-resort locator for any platform | Linux (images: all) | M |
+| N6 — Linux desktop and image fallback (images ✅ done, with a built-in matcher instead of OpenCV) | AT-SPI helper for GTK/Qt; OpenCV image matching as a last-resort locator for any platform | Linux (images: all) | M |
 | N7 — Export and CI | Appium (JS, Python, Java) and Maestro export targets; CI templates: Android emulator on Linux runners, iOS simulator on macOS runners, Windows runners | all | M |
 
 Recommended order: **N1 first** (small, reuses everything, covers many "desktop apps" people use), then **N2**

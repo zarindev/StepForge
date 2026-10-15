@@ -76,6 +76,7 @@ Tests use the same `ui.*` steps as web and Android apps. Locators are translated
 | **Text** `Sign in` | The label or value, exact, then containing it |
 | **Role** `button "Sign in"` | Buttons, text fields (`textbox`, including secure fields), switches (`checkbox`, `switch`), pickers (`combobox`), images, links, static texts, tables… with that label or name |
 | **XPath** | Used as is, against the screen's element tree (`XCUIElementTypeButton`…) |
+| **Image** | A picture of the element, found on the screen ([image locators](IMAGE_LOCATORS.md)) |
 | CSS | Not available: CSS is for web pages |
 
 The steps work as on Android ([table](ANDROID_APPS.md#writing-tests)), with these differences:

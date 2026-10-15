@@ -18,7 +18,11 @@ const STATUS_TEXT: Record<number, string> = {
 };
 
 export const describeLocator = (l: LocatorLike) =>
-  l.strategy === 'role' ? `role=${l.value}${l.name ? ` "${l.name}"` : ''}` : `${l.strategy}=${l.value}`;
+  l.strategy === 'image'
+    ? 'image (a picture)'
+    : l.strategy === 'role'
+      ? `role=${l.value}${l.name ? ` "${l.name}"` : ''}`
+      : `${l.strategy}=${l.value}`;
 
 const fmt = (v: unknown): string =>
   v === undefined ? 'nothing' : v === null ? 'null' : typeof v === 'string' ? `"${v}"` : JSON.stringify(v);

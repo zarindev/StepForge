@@ -47,6 +47,8 @@ export function describeTarget(locators: Locator[] = []): string {
       return q(l.value);
     case 'element':
       return 'a saved element';
+    case 'image':
+      return 'the picture';
     case 'testId':
       return `the element ${q(l.value)}`;
     case 'css':

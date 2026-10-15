@@ -172,8 +172,11 @@ const CHECKS: Check[] = [
   'titleContains',
 ];
 
-const el = (step: CodegenStep): El | null =>
-  step.locators.length ? { loc: step.locators[0]!, alts: step.locators.slice(1) } : null;
+/** The step's locators for export: image locators (pictures) have no code equivalent and are left out. */
+const el = (step: CodegenStep): El | null => {
+  const locs = step.locators.filter((l) => l.strategy !== 'image');
+  return locs.length ? { loc: locs[0]!, alts: locs.slice(1) } : null;
+};
 
 const p = (step: CodegenStep) => step.params ?? {};
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -240,7 +243,16 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
   const group = step.type.split('.')[0];
   if (group === 'ui') ctx.flags.ui = true;
   const needEl = (): El | null => {
-    if (!e) out.push(todo(ctx, step, 'the step has no locator'));
+    if (!e)
+      out.push(
+        todo(
+          ctx,
+          step,
+          step.locators.length
+            ? 'image locators (pictures) are not exported; add an id, text or CSS locator'
+            : 'the step has no locator',
+        ),
+      );
     return e;
   };
 

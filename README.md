@@ -68,6 +68,8 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 **Just added — iOS, Android and desktop apps:**
 
+- **Image locators**: find an element by a small picture of it, on any platform, for maps, canvases, games and
+  anything without ids or text ([guide](docs/IMAGE_LOCATORS.md)).
 - **macOS and Windows apps**: native Mac and Windows desktop apps through Appium (Mac2, NovaWindows), with menus,
   keyboard shortcuts and dialogs ([guide](docs/NATIVE_DESKTOP_APPS.md)).
 - **Phone gestures, recording and diagnosis**: swipe, long press, scroll to, back, rotate, app state, deep links,
@@ -114,7 +116,7 @@ Planned work, in order — all of it free, open source and local:
 | ✅ | **iOS apps** | Done — see [iOS apps](docs/IOS_APPS.md) |
 | ✅ | **Mobile gestures and a native recorder** | Done — see [recording phone apps](docs/ANDROID_APPS.md#recording) |
 | ✅ | **Windows and macOS desktop apps** | Done — see [macOS and Windows apps](docs/NATIVE_DESKTOP_APPS.md) |
-| 1 | **Linux desktop apps and image matching** | GTK/Qt apps, and image-based locators as a last resort |
+| 1 | **Linux desktop apps** | GTK/Qt apps through Linux's accessibility layer (image locators are done — see [Image locators](docs/IMAGE_LOCATORS.md)) |
 | 2 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
 | — | **More code export** | The newest steps (page conditions, network, SOAP / Kafka / FTP) exported instead of marked TODO |
 | — | **Desktop installer** | Start StepForge with a double-click instead of a terminal |
@@ -131,6 +133,7 @@ Every feature, grouped by what you want to do: **[docs/FEATURES.md](docs/FEATURE
 | **Any web app** | ✅ SPAs, PWAs, canvas and map apps, mobile web with touch · wait for and fake API responses, go offline · file downloads · cookies and storage · control the clock · per-environment language, time zone, location, dark mode, basic auth, headers, proxy, client certificates, installed Chrome/Edge — see [docs/WEB_APPS.md](docs/WEB_APPS.md) |
 | **iOS apps** | ✅ iPhone and iPad apps on the iOS Simulator or a real iPhone, from a Mac with Xcode · Appium + XCUITest installed and started by StepForge · a .app / .ipa or an installed bundle id per environment · accessibility ids, labels, placeholders, roles and XPath · screen recording, system log, element tree at failures — see [docs/IOS_APPS.md](docs/IOS_APPS.md) |
 | **Phone apps: gestures and recording** | ✅ Swipe, long press, scroll to, back, rotate, open / close / background / reset the app, deep links, location, permissions, dialogs, push notifications (iOS simulators) · record by clicking the phone's screen in the dashboard · diagnosis of crashes, dialogs, keyboard and off-screen elements · campaigns across devices — see [docs/ANDROID_APPS.md](docs/ANDROID_APPS.md#gestures-and-device-steps) |
+| **Image locators** | ✅ Find elements by a picture of them (map pins, canvas, games, remote desktops) on web, Electron, Android, iOS, macOS and Windows · click, hover, tap, visible / hidden · says how close the best match came — see [docs/IMAGE_LOCATORS.md](docs/IMAGE_LOCATORS.md) |
 | **macOS and Windows apps** | ✅ Native Mac apps (AppKit, SwiftUI) and Windows apps (Win32, WPF, WinForms, UWP) through Appium (Mac2, NovaWindows), installed and started by StepForge · a bundle id / .app or an .exe / Store app per environment · menus (`File > Save`), keyboard shortcuts, dialogs · accessibility ids, names, roles and XPath — see [docs/NATIVE_DESKTOP_APPS.md](docs/NATIVE_DESKTOP_APPS.md) |
 | **Android apps** | ✅ Native Android apps on an emulator or a USB phone, from Windows, macOS or Linux · Appium + UiAutomator2 installed and started by StepForge · an .apk or an installed app per environment · ids, text, hints, roles and XPath · screen recording, device log, element tree at failures · `stepforge doctor native` — see [docs/ANDROID_APPS.md](docs/ANDROID_APPS.md) |
 | **Desktop apps** | ✅ Electron apps on Windows, macOS and Linux · start the packaged app or its project folder per environment · every window is a tab · recorder, manual testing, video, traces and diagnosis — see [docs/DESKTOP_APPS.md](docs/DESKTOP_APPS.md) |
@@ -484,6 +487,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | [Features](docs/FEATURES.md) | Every feature in one page |
 | [Step reference](docs/STEP_REFERENCE.md) | Every step type, its parameters and checks |
 | [Testing every kind of web app](docs/WEB_APPS.md) | SPAs, PWAs, canvas, downloads, network mocking, visual checkpoints, browser settings |
+| [Image locators](docs/IMAGE_LOCATORS.md) | Find elements by a picture of them, on every platform |
 | [iOS apps](docs/IOS_APPS.md) · [Android apps](docs/ANDROID_APPS.md) · [macOS and Windows apps](docs/NATIVE_DESKTOP_APPS.md) · [Electron apps](docs/DESKTOP_APPS.md) | iPhone and iPad apps, Android apps, native Mac and Windows desktop apps, and Electron desktop apps |
 | [Blocks and hooks](docs/BLOCKS.md) · [Elements](docs/ELEMENTS.md) · [Test data](docs/TEST_DATA.md) | Reuse: shared steps, before/after each test, shared elements, data sources |
 | [Campaigns](docs/CAMPAIGNS.md) · [Manual testing](docs/MANUAL_RUNS.md) · [Scheduling](docs/SCHEDULING.md) · [CLI](docs/CLI.md) | Running: test sets across browsers and sizes, tests done by hand, cron, notifications, CI |
@@ -515,6 +519,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] iOS apps (simulators and iPhones, from a Mac)
 - [x] Phone gestures and device steps, recording phone apps from their screen, phone-app diagnosis, device campaigns
 - [x] macOS and Windows desktop apps (menus, shortcuts, dialogs)
+- [x] Image locators (find elements by a picture, on every platform)
 - [ ] Next: see [Coming next](#coming-next)
 
 ## Contributing

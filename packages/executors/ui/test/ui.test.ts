@@ -265,6 +265,54 @@ describe('UI executor', () => {
     expect(r.steps.filter((s) => s.status !== 'passed').map((s) => `${s.position}:${s.message}`)).toEqual([]);
   });
 
+  it('image locators: clicks a picture of the button, checks a picture is shown or gone, explains a miss', async () => {
+    const shot = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/' } },
+        { type: 'ui.screenshot', locators: [{ strategy: 'testId', value: 'login-btn' }] },
+      ),
+    );
+    const picture = shot.steps[1]!.screenshotPath!;
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/' } },
+        {
+          type: 'ui.fill',
+          params: { value: 'ana@clinic.test' },
+          locators: [{ strategy: 'label', value: 'Email' }],
+        },
+        {
+          type: 'ui.assert',
+          params: { check: 'visible' },
+          locators: [{ strategy: 'image', value: picture }],
+        },
+        { type: 'ui.click', locators: [{ strategy: 'image', value: picture }] },
+        {
+          type: 'ui.assert',
+          params: { check: 'textContains', expected: 'Welcome ana@clinic.test' },
+          locators: [{ strategy: 'css', value: '#msg' }],
+        },
+      ),
+    );
+    expect(r.steps.map((s) => `${s.type}:${s.status} ${s.message ?? ''}`).join('\n'), r.error).not.toMatch(
+      /:failed/,
+    );
+    expect(r.steps[3]!.message).toMatch(/Clicked the picture \(\d+% match\)/);
+    // A page without that button: the picture is "hidden", and clicking it explains the miss.
+    const other = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/other.html' } },
+        { type: 'ui.assert', params: { check: 'hidden' }, locators: [{ strategy: 'image', value: picture }] },
+        { type: 'ui.click', locators: [{ strategy: 'image', value: picture }], timeoutMs: 1500 },
+      ),
+    );
+    expect(other.steps[1]!.status).toBe('passed');
+    expect(other.status).toBe('failed');
+    expect(other.error).toMatch(
+      /The picture was not found on the screen within 1500 ms \(best match \d+%, needs 90%\)/,
+    );
+  });
+
   it('fails clearly and keeps evidence: screenshot, DOM, console, network, video, trace', async () => {
     const r = await run(
       steps(

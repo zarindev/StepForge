@@ -19,10 +19,14 @@ import {
   type Direction,
   type NativePlatform,
 } from './platforms.ts';
+import { findPicture, withImages } from './images.ts';
 import { WebDriverError, WebDriverSession, type ElementRef } from './webdriver.ts';
 
 const pad = (n: number) => String(n).padStart(3, '0');
-const describe = (l: Locator) => `${l.strategy}=${l.value}${l.name ? ` "${l.name}"` : ''}`;
+const describe = (l: Locator) =>
+  l.strategy === 'image'
+    ? `image (needs ${Math.round((l.threshold ?? 0.9) * 100)}%)`
+    : `${l.strategy}=${l.value}${l.name ? ` "${l.name}"` : ''}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Found = { el: ElementRef; used: Locator; index: number; matches: number };
@@ -75,6 +79,8 @@ export class NativeSession implements ExecutorSession {
       if (err instanceof StepError) throw err;
       throw new StepError('navigation', `The ${pf.name} app did not start: ${(err as Error).message}`);
     }
+    // Image locators: their matches act like elements (taps at the match).
+    this.driver = withImages(this.driver, pf.kind === 'phone' ? 'touch' : 'mouse');
     this.ctx.shared.set('native.driver', this.driver);
     // Older device log lines are not this test's.
     await this.driver.logs(pf.log.type).catch(() => []);
@@ -84,11 +90,20 @@ export class NativeSession implements ExecutorSession {
   /** Finds the element with the ranked locators, waiting up to the timeout. A lower-ranked match is "healed". */
   private async find(locators: Locator[], timeoutMs: number, signal?: AbortSignal): Promise<Found> {
     if (!locators.length) throw new StepError('invalid_params', 'This step needs at least one locator');
-    const queries = locators.map((l) => this.platform.queries(l));
+    // Image locators are matched against a screenshot instead of the element tree.
+    const queries = locators.map((l) => (l.strategy === 'image' ? [] : this.platform.queries(l)));
     const deadline = Date.now() + timeoutMs;
+    let bestPicture: number | undefined;
     for (;;) {
       if (signal?.aborted) throw new StepError('aborted', 'Run was cancelled');
       for (const [index, qs] of queries.entries()) {
+        const l = locators[index]!;
+        if (l.strategy === 'image') {
+          const { ref, match } = await findPicture(this.driver, l);
+          if (ref) return { el: ref, used: l, index, matches: 1 };
+          bestPicture = Math.max(bestPicture ?? 0, match.score);
+          continue;
+        }
         for (const q of qs) {
           const els = await this.driver.findAll(q.using, q.value).catch((err) => {
             if (err instanceof WebDriverError && err.error === 'invalid selector')
@@ -104,7 +119,10 @@ export class NativeSession implements ExecutorSession {
       if (Date.now() >= deadline)
         throw new StepError(
           'element_not_found',
-          `No element found within ${timeoutMs} ms. Tried: ${locators.map(describe).join(' | ')}`,
+          `No element found within ${timeoutMs} ms. Tried: ${locators.map(describe).join(' | ')}` +
+            (bestPicture !== undefined
+              ? ` (the picture's best match on screen: ${Math.round(bestPicture * 100)}%)`
+              : ''),
           { tried: locators },
         );
       await sleep(250);
@@ -113,6 +131,7 @@ export class NativeSession implements ExecutorSession {
 
   /** How many elements the first locator matches now (no waiting). */
   private async count(l: Locator): Promise<number> {
+    if (l.strategy === 'image') return (await findPicture(this.driver, l)).ref ? 1 : 0;
     for (const q of this.platform.queries(l)) {
       const n = (await this.driver.findAll(q.using, q.value).catch(() => [])).length;
       if (n) return n;

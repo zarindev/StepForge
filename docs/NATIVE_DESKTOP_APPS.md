@@ -64,6 +64,7 @@ The `ui.*` steps work as for other apps. Locators are translated to each system'
 | **Text** | Title, label or value (exact, then contained) | Name (exact, then contained) |
 | **Role** `button "Save"` | Element type with that title or label (button, textbox, checkbox, radio, combobox, menuitem, text, link, list, tab…) | Control type with that Name (Button, Edit, CheckBox, RadioButton, ComboBox, MenuItem, Text, Hyperlink, List…) |
 | **XPath** | Over `XCUIElementType…` elements | Over control types: `//Button[@Name='Save']` |
+| **Image** | A picture of the element, found on the screen ([image locators](IMAGE_LOCATORS.md)) | The same |
 
 Steps for desktop apps:
 

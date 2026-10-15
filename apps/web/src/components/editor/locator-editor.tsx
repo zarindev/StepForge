@@ -4,7 +4,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 
-const STRATEGIES: Locator['strategy'][] = ['testId', 'role', 'label', 'placeholder', 'text', 'css', 'xpath'];
+const STRATEGIES: Locator['strategy'][] = [
+  'testId',
+  'role',
+  'label',
+  'placeholder',
+  'text',
+  'css',
+  'xpath',
+  'image',
+];
 const HINT: Record<string, string> = {
   testId: 'data-testid value',
   role: 'ARIA role, e.g. button',
@@ -13,7 +22,19 @@ const HINT: Record<string, string> = {
   text: 'Visible text',
   css: 'CSS selector',
   xpath: 'XPath',
+  image: 'A picture of the element (PNG)',
 };
+
+/** A PNG file as a data URL (the picture travels with the step, also in exports). */
+const readPicture = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    if (file.type !== 'image/png')
+      return reject(new Error('Choose a PNG picture (crop one from a screenshot)'));
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error ?? new Error('Could not read the picture'));
+    r.readAsDataURL(file);
+  });
 
 /** Ranked locator list: the first is used; the others are self-healing fallbacks. */
 export function LocatorEditor({ value, onChange }: { value: Locator[]; onChange: (v: Locator[]) => void }) {
@@ -55,13 +76,58 @@ export function LocatorEditor({ value, onChange }: { value: Locator[]; onChange:
               <option key={s}>{s}</option>
             ))}
           </Select>
-          <Input
-            aria-label={`Locator ${i + 1} value`}
-            className="h-8 flex-1 font-mono text-xs"
-            placeholder={HINT[l.strategy]}
-            value={l.value}
-            onChange={(e) => update(i, { value: e.target.value })}
-          />
+          {l.strategy === 'image' ? (
+            <div className="flex flex-1 items-center gap-2">
+              {l.value.startsWith('data:image/png') ? (
+                <img
+                  src={l.value}
+                  alt={`Locator ${i + 1} picture`}
+                  className="h-8 max-w-[160px] rounded border border-border object-contain"
+                />
+              ) : (
+                <span className="text-xs text-muted">{l.value || 'No picture yet'}</span>
+              )}
+              <label className="cursor-pointer rounded-md border border-border px-2 py-1 text-xs hover:bg-elevated">
+                {l.value ? 'Replace picture' : 'Choose picture'}
+                <input
+                  type="file"
+                  accept="image/png"
+                  aria-label={`Locator ${i + 1} picture file`}
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      update(i, { value: await readPicture(file) });
+                    } catch (err) {
+                      alert((err as Error).message);
+                    }
+                  }}
+                />
+              </label>
+              <Input
+                aria-label={`Locator ${i + 1} match`}
+                title="How close the screen must match the picture (50–100 %)"
+                className="h-8 w-20 text-xs"
+                type="number"
+                min={50}
+                max={100}
+                value={Math.round((l.threshold ?? 0.9) * 100)}
+                onChange={(e) =>
+                  update(i, { threshold: Math.min(1, Math.max(0.5, Number(e.target.value) / 100)) })
+                }
+              />
+              <span className="text-[11px] text-muted">% match</span>
+            </div>
+          ) : (
+            <Input
+              aria-label={`Locator ${i + 1} value`}
+              className="h-8 flex-1 font-mono text-xs"
+              placeholder={HINT[l.strategy]}
+              value={l.value}
+              onChange={(e) => update(i, { value: e.target.value })}
+            />
+          )}
           {l.strategy === 'role' && (
             <Input
               aria-label={`Locator ${i + 1} name`}

@@ -87,6 +87,7 @@ Tests use the same `ui.*` steps as web apps. Locators are translated to Android,
 | **Text** `Sign in` | Exact text, then text that contains it, then a content description |
 | **Role** `button "Sign in"` | Buttons, text fields (`textbox`), check boxes, switches, radio buttons, spinners (`combobox`), images, lists… with that text |
 | **XPath** | Used as is, against the screen's element tree (see the _element tree_ evidence below) |
+| **Image** | A picture of the element, found on the screen — for anything without ids or text ([image locators](IMAGE_LOCATORS.md)) |
 | CSS | Not available: CSS is for web pages |
 
 React Native's `testID` and Flutter's semantics labels arrive as resource ids or content descriptions, so **Test id**

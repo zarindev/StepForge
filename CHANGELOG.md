@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- **Image locators**: a new locator strategy `image` (a PNG picture, stored in the step as a data URL, or a `.png`
+  path; `threshold` 0.5–1, default 0.9) found in a screenshot by a built-in matcher (`@stepforge/image-match`:
+  normalized cross-correlation on grayscale, coarse-to-fine; no native dependency). Web and Electron: click,
+  double-click, right-click, hover, tap and visible / hidden checks and waits at the match, in ranked order with the
+  other locators. Phone and desktop apps: the match acts like an element (taps, long presses, typing, visible),
+  through W3C pointer actions. A miss reports the best score. The step editor uploads the picture with a preview and
+  a % match field; exports leave image locators out (picture-only steps become a TODO). See
+  [docs/IMAGE_LOCATORS.md](docs/IMAGE_LOCATORS.md).
 - **macOS and Windows desktop apps**: new platforms _macOS app_ and _Windows app_. Environments name the app: a
   bundle id or .app (with arguments and environment variables) for macOS; an .exe or Store app id (with arguments and
   a working folder) for Windows. The native executor drives them through Appium's Mac2 4.4.0 (XCTest; locators via

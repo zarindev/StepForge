@@ -24,6 +24,22 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | N3 | Native apps, step 3: iOS apps | ✅ Done |
 | N4 | Native apps, step 4: gestures, phone recorder, phone diagnosis, device campaigns | ✅ Done |
 | N5 | Native apps, step 5: macOS and Windows desktop apps | ✅ Done |
+| N6 | Native apps, step 6: image locators (✅ done) and Linux desktop apps (planned) | Partly done |
+
+---
+
+## N6, part 1 — image locators (2026-10-15)
+
+**Delivered**
+- `@stepforge/image-match`: normalized cross-correlation on grayscale, coarse-to-fine (pure TypeScript + pngjs).
+- Locator strategy `image` (+ `threshold`) in the browser / Electron executor (click, double-click, right-click,
+  hover, tap, visible / hidden checks and waits) and the phone / desktop executor (a match acts like an element).
+- Step editor: picture upload, preview, % match. Exports leave pictures out. Messages show "image", not the data.
+
+**Tests**: the matcher (exact, darker screen, absent picture, small pictures, flat pictures refused, speed on a phone
+screenshot); clicking a picture of a button and visible / hidden / miss in the browser; the same on the iOS
+simulator and the Android emulator (a look-alike Sign out button scores 0.83 and is not confused); exports; the
+editor upload (E2E).
 
 ---
 

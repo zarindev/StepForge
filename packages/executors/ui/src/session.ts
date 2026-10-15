@@ -11,7 +11,7 @@ import {
   formatBytes,
   type NetworkEntry as CoreNetworkEntry,
 } from '@stepforge/core';
-import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { JSONPath } from 'jsonpath-plus';
 import {
@@ -30,6 +30,7 @@ import { launchElectron } from './electron.ts';
 import { baselineKey, compareWithBaseline, urlMatcher } from './visual.ts';
 import { highlight, inspectFailure } from './inspect.ts';
 import { buildLocator, resolveLocator, type Resolved, type Scope } from './locators.ts';
+import { findImage, pngFromDataUrl } from '@stepforge/image-match';
 import { checkPageMetrics, collectPageMetrics, WEB_VITALS_INIT_SCRIPT } from '@stepforge/perf';
 
 type NetworkEntry = CoreNetworkEntry & { startedAt: number };
@@ -256,6 +257,122 @@ export class UiSession implements ExecutorSession {
     return resolveLocator(this.scope, locators, ctx.timeoutMs, ctx.signal);
   }
 
+  /**
+   * Image locators: steps that act on a place (click, double-click, right-click, hover, tap) or check that
+   * something is shown (assert / wait for visible or hidden) can use a picture found in a screenshot. Locators
+   * are tried in their ranked order on every poll: a page element listed before the picture wins when it matches.
+   * Returns undefined when the step has no image locator, or a page locator matched (the usual path then runs).
+   */
+  private async imageStep(
+    step: RunnableStep,
+    name: string,
+    p: Record<string, unknown>,
+    ctx: StepContext,
+  ): Promise<StepOutcome | undefined> {
+    if (!step.locators.some((l) => l.strategy === 'image')) return undefined;
+    const check =
+      name === 'assert'
+        ? String(p.check ?? 'visible')
+        : name === 'waitFor'
+          ? String(p.state ?? 'visible')
+          : '';
+    const acts = ['click', 'dblclick', 'rightclick', 'hover', 'tap'].includes(name);
+    const shows = ['visible', 'hidden', 'detached'].includes(check);
+    if (!acts && !shows)
+      throw new StepError(
+        'invalid_params',
+        `An image locator can click, hover, tap or check that something is shown; for "${step.type}" add a locator with an id, text or CSS`,
+      );
+    const wantHidden = check === 'hidden' || check === 'detached';
+    const pictures = step.locators.map((l) => {
+      if (l.strategy !== 'image') return undefined;
+      const png = pngFromDataUrl(l.value) ?? (existsSync(l.value) ? readFileSync(l.value) : undefined);
+      if (!png)
+        throw new StepError(
+          'invalid_params',
+          'An image locator needs a PNG picture (upload it in the step, or a .png path)',
+        );
+      return png;
+    });
+    const deadline = Date.now() + ctx.timeoutMs;
+    let best = 0;
+    for (;;) {
+      if (ctx.signal.aborted) throw new StepError('aborted', 'Run was cancelled');
+      let hit: { index: number; x: number; y: number; score: number } | undefined;
+      let domIndex: number | undefined;
+      const shot = await this.page.screenshot();
+      // CSS pixels per screenshot pixel (device scale factor; an Electron window has no fixed viewport).
+      const cssWidth =
+        this.page.viewportSize()?.width ?? (await this.page.evaluate(() => window.innerWidth).catch(() => 0));
+      const k = cssWidth ? cssWidth / shot.readUInt32BE(16) : 1;
+      for (const [index, l] of step.locators.entries()) {
+        const png = pictures[index];
+        if (png) {
+          const m = findImage(shot, png, { threshold: l.threshold ?? 0.9 });
+          best = Math.max(best, m.score);
+          if (m.found) {
+            hit = { index, x: (m.x + m.width / 2) * k, y: (m.y + m.height / 2) * k, score: m.score };
+            break;
+          }
+        } else {
+          const loc = buildLocator(this.scope, l);
+          const n = await loc.count().catch(() => 0);
+          if (
+            n > 0 &&
+            (!shows ||
+              (await loc
+                .first()
+                .isVisible()
+                .catch(() => false)))
+          ) {
+            domIndex = index;
+            break;
+          }
+        }
+      }
+      if (wantHidden && !hit && domIndex === undefined)
+        return { message: 'The picture is not on the screen', output: true };
+      // A page element matched first: the usual locator path does the step.
+      if (!wantHidden && domIndex !== undefined) return undefined;
+      if (hit && !wantHidden) {
+        const used = step.locators[hit.index]!;
+        const outcome: StepOutcome = {
+          message: `${{ click: 'Clicked', dblclick: 'Double-clicked', rightclick: 'Right-clicked', hover: 'Hovered', tap: 'Tapped' }[name] ?? 'Found'} the picture (${Math.round(hit.score * 100)}% match)`,
+          output: { x: Math.round(hit.x), y: Math.round(hit.y), score: hit.score },
+          ...(hit.index > 0 && { healedLocator: { from: step.locators[0]!, to: used } }),
+        };
+        if (name === 'click') await this.page.mouse.click(hit.x, hit.y);
+        else if (name === 'dblclick') await this.page.mouse.dblclick(hit.x, hit.y);
+        else if (name === 'rightclick') await this.page.mouse.click(hit.x, hit.y, { button: 'right' });
+        else if (name === 'hover') await this.page.mouse.move(hit.x, hit.y);
+        else if (name === 'tap')
+          await this.page.touchscreen.tap(hit.x, hit.y).catch(() => this.page.mouse.click(hit!.x, hit!.y));
+        return outcome;
+      }
+      if (Date.now() >= deadline) {
+        const tried = step.locators
+          .map((l) => (l.strategy === 'image' ? 'image' : `${l.strategy}=${l.value}`))
+          .join(' | ');
+        if (wantHidden)
+          throw new StepError(
+            'assertion',
+            `Expected the picture to be gone, but it is still on the screen. Tried: ${tried}`,
+          );
+        throw new StepError(
+          name === 'assert' ? 'assertion' : 'element_not_found',
+          `The picture was not found on the screen within ${ctx.timeoutMs} ms (best match ${Math.round(best * 100)}%, needs ${Math.round((step.locators.find((l) => l.strategy === 'image')?.threshold ?? 0.9) * 100)}%). Tried: ${tried}`,
+          {
+            tried: step.locators.map((l) => ({
+              ...l,
+              value: l.strategy === 'image' ? '(picture)' : l.value,
+            })),
+          },
+        );
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
   /** Page conditions for util.if / util.loop: polls until the check holds or the (short) wait runs out. */
   async probe(req: ProbeRequest, ctx: StepContext): Promise<{ ok: boolean; detail: string }> {
     if (!req.locators.length) throw new StepError('invalid_params', 'A page condition needs an element');
@@ -320,366 +437,372 @@ export class UiSession implements ExecutorSession {
     let outcome: StepOutcome = {};
 
     try {
-      switch (name) {
-        case 'navigate': {
-          this.lastNavigation = step.position;
-          const url = String(p.url ?? '');
-          if (!url) throw new StepError('invalid_params', 'navigate needs a "url"');
-          const res = await this.page.goto(url, { waitUntil: (p.waitUntil as 'load') ?? 'load', timeout });
-          this.scope = this.page;
-          outcome = {
-            message: `Opened ${this.page.url()}${res ? ` (${res.status()})` : ''}`,
-            output: this.page.url(),
-          };
-          const status = res?.status();
-          outcome.getTarget = (t) => (t === 'status' ? status : this.pageTarget(t));
-          if (this.ctx.options.pageMetrics) {
-            const m = await collectPageMetrics(this.page, { timeoutMs: timeout });
-            outcome.metrics = checkPageMetrics(m).rows;
-            outcome.perf = { kind: 'pageMetrics', metrics: m };
-          }
-          break;
-        }
-        case 'click':
-        case 'dblclick':
-        case 'hover':
-        case 'tap': {
-          await needs();
-          // x/y: a point inside the element (canvas apps, maps, charts), from its top-left corner.
-          const position =
-            p.x !== undefined && p.x !== '' && p.y !== undefined && p.y !== ''
-              ? { x: Number(p.x), y: Number(p.y) }
-              : undefined;
-          const opts = { timeout, force: !!p.force, trial: false, ...(position && { position }) };
-          if (name === 'click')
-            await resolved!.locator.click({ ...opts, button: (p.button as 'left') ?? 'left' });
-          else if (name === 'dblclick') await resolved!.locator.dblclick(opts);
-          else if (name === 'tap') {
-            if (!this.touch)
-              throw new StepError(
-                'invalid_params',
-                'Tapping needs a touch screen: run on the phone or tablet size',
-              );
-            await resolved!.locator.tap(opts);
-          } else await resolved!.locator.hover(opts);
-          break;
-        }
-        case 'rightclick':
-          await needs();
-          await resolved!.locator.click({ button: 'right', timeout });
-          break;
-        case 'fill':
-          await needs();
-          await resolved!.locator.fill(String(p.value ?? ''), { timeout });
-          break;
-        case 'type':
-          await needs();
-          await resolved!.locator.pressSequentially(String(p.value ?? ''), {
-            delay: Number(p.delay ?? 30),
-            timeout,
-          });
-          break;
-        case 'clear':
-          await needs();
-          await resolved!.locator.clear({ timeout });
-          break;
-        case 'press':
-          if (step.locators.length) {
-            await needs();
-            await resolved!.locator.press(String(p.key ?? 'Enter'), { timeout });
-          } else await this.page.keyboard.press(String(p.key ?? 'Enter'));
-          break;
-        case 'select': {
-          await needs();
-          const option =
-            p.label !== undefined
-              ? { label: String(p.label) }
-              : p.index !== undefined
-                ? { index: Number(p.index) }
-                : String(p.value ?? '');
-          const chosen = await resolved!.locator.selectOption(option, { timeout });
-          outcome = { output: chosen[0], message: `Selected ${chosen.join(', ')}` };
-          break;
-        }
-        case 'check':
-          await needs();
-          await resolved!.locator.check({ timeout });
-          break;
-        case 'uncheck':
-          await needs();
-          await resolved!.locator.uncheck({ timeout });
-          break;
-        case 'upload': {
-          await needs();
-          const files = Array.isArray(p.files) ? p.files.map(String) : [String(p.file ?? '')];
-          await resolved!.locator.setInputFiles(files, { timeout });
-          break;
-        }
-        case 'dragDrop': {
-          await needs();
-          const targetLocators = Array.isArray(p.target) ? (p.target as RunnableStep['locators']) : [];
-          const target = await this.resolve(step, ctx, targetLocators);
-          await resolved!.locator.dragTo(target.locator, { timeout });
-          break;
-        }
-        case 'scroll':
-          if (step.locators.length) {
-            await needs();
-            await resolved!.locator.scrollIntoViewIfNeeded({ timeout });
-          } else await this.page.mouse.wheel(Number(p.x ?? 0), Number(p.y ?? 600));
-          break;
-        case 'switchTab': {
-          const pages = this.context.pages();
-          let target: Page | undefined;
-          const deadline = Date.now() + timeout;
-          while (!target && Date.now() < deadline) {
-            const list = this.context.pages();
-            target =
-              p.index !== undefined
-                ? list[Number(p.index)]
-                : (list.find((pg) => (p.urlContains ? pg.url().includes(String(p.urlContains)) : false)) ??
-                  (p.urlContains ? undefined : list[list.length - 1]));
-            if (!target) await new Promise((r) => setTimeout(r, 200));
-          }
-          if (!target) throw new StepError('element_not_found', `No tab matched (${pages.length} open)`);
-          await target.bringToFront();
-          await target.waitForLoadState('domcontentloaded', { timeout }).catch(() => {});
-          this.page = target;
-          this.scope = target;
-          this.ctx.shared.set('ui.page', target);
-          outcome = { message: `Switched to ${target.url()}` };
-          break;
-        }
-        case 'closeTab': {
-          await this.page.close();
-          const remaining = this.context.pages();
-          if (!remaining.length) throw new StepError('invalid_params', 'Closed the last tab');
-          this.page = remaining[remaining.length - 1]!;
-          this.scope = this.page;
-          this.ctx.shared.set('ui.page', this.page);
-          break;
-        }
-        case 'handleDialog':
-          this.pendingDialog = {
-            action: p.action === 'dismiss' ? 'dismiss' : 'accept',
-            promptText: p.promptText ? String(p.promptText) : undefined,
-          };
-          outcome = { message: `Next dialog will be ${this.pendingDialog.action}ed` };
-          break;
-        case 'switchFrame':
-          if (p.main || !p.selector) {
+      // A step with an image locator that the screen answers (instead of a page element) is done at the picture.
+      const image = await this.imageStep(step, name, p, ctx);
+      if (image) outcome = image;
+      else
+        switch (name) {
+          case 'navigate': {
+            this.lastNavigation = step.position;
+            const url = String(p.url ?? '');
+            if (!url) throw new StepError('invalid_params', 'navigate needs a "url"');
+            const res = await this.page.goto(url, { waitUntil: (p.waitUntil as 'load') ?? 'load', timeout });
             this.scope = this.page;
-            outcome = { message: 'Switched to main document' };
-          } else {
-            this.scope = this.page.frameLocator(String(p.selector));
-            outcome = { message: `Switched to frame ${String(p.selector)}` };
-          }
-          break;
-        case 'waitFor':
-          if (step.locators.length) {
-            const state =
-              (p.state as 'visible' | 'hidden' | 'attached' | 'detached' | undefined) ?? 'visible';
-            if (state === 'hidden' || state === 'detached') {
-              await buildLocator(this.scope, step.locators[0]!).first().waitFor({ state, timeout });
-            } else {
-              await needs();
-              await resolved!.locator.waitFor({ state, timeout });
+            outcome = {
+              message: `Opened ${this.page.url()}${res ? ` (${res.status()})` : ''}`,
+              output: this.page.url(),
+            };
+            const status = res?.status();
+            outcome.getTarget = (t) => (t === 'status' ? status : this.pageTarget(t));
+            if (this.ctx.options.pageMetrics) {
+              const m = await collectPageMetrics(this.page, { timeoutMs: timeout });
+              outcome.metrics = checkPageMetrics(m).rows;
+              outcome.perf = { kind: 'pageMetrics', metrics: m };
             }
-          } else if (p.url) {
-            await this.page.waitForURL(
-              String(p.url).startsWith('/') && !String(p.url).includes('*')
-                ? `**${String(p.url)}`
-                : String(p.url),
-              { timeout },
-            );
-          } else {
-            await this.page.waitForLoadState((p.loadState as 'load') ?? 'load', { timeout });
+            break;
           }
-          break;
-        case 'back':
-          // The browser's Back button.
-          await this.page.goBack({ timeout });
-          break;
-        case 'screenshot': {
-          const path = join(this.ctx.artifactsDir, `shot-${pad(step.position)}.png`);
-          if (step.locators.length) {
+          case 'click':
+          case 'dblclick':
+          case 'hover':
+          case 'tap': {
             await needs();
-            await resolved!.locator.screenshot({ path, timeout });
-          } else await this.page.screenshot({ path, fullPage: !!p.fullPage });
-          outcome = {
-            screenshotPath: path,
-            artifacts: [{ kind: 'screenshot', path, stepId: step.id }],
-            message: 'Screenshot saved',
-          };
-          break;
-        }
-        case 'extract': {
-          const value = await this.extract(step, ctx, p, (r) => (resolved = r));
-          outcome = {
-            output: value,
-            message: `Extracted ${JSON.stringify(value)}`,
-            getTarget: (t) => (t === 'value' || t === 'output' ? value : this.pageTarget(t)),
-          };
-          break;
-        }
-        case 'assert':
-          outcome = await this.assert(step, ctx, p, (r) => (resolved = r));
-          break;
-        case 'visualCheckpoint':
-          outcome = await this.visualCheckpoint(step, ctx, p, needs, () => resolved);
-          break;
-        case 'download': {
-          await needs();
-          const [download] = await Promise.all([
-            this.page.waitForEvent('download', { timeout }),
-            resolved!.locator.click({ timeout }),
-          ]);
-          const fileName = download.suggestedFilename();
-          const path = join(
-            this.ctx.artifactsDir,
-            `download-${pad(step.position)}-${fileName.replace(/[^\w.-]+/g, '_')}`,
-          );
-          await download.saveAs(path);
-          const failure = await download.failure();
-          if (failure) throw new StepError('network', `The download failed: ${failure}`);
-          const size = statSync(path).size;
-          const info = { fileName, size, path };
-          let text: string | undefined;
-          const content = () => (text ??= size <= 5_000_000 ? readFileSync(path, 'utf8') : '');
-          outcome = {
-            output: info,
-            message: `Downloaded ${fileName} (${size} bytes)`,
-            getTarget: (t) =>
-              t === 'fileName'
-                ? fileName
-                : t === 'size'
-                  ? size
-                  : t === 'content'
-                    ? content()
-                    : this.pageTarget(t),
-          };
-          break;
-        }
-        case 'waitForResponse':
-          outcome = await this.waitForResponse(p, timeout, ctx);
-          break;
-        case 'mockRoute':
-          outcome = await this.mockRoute(p);
-          break;
-        case 'setOffline': {
-          // `state` (offline/online) wins; older steps have only `offline`, where missing means offline.
-          const offline =
-            p.state !== undefined && p.state !== ''
-              ? String(p.state) !== 'online'
-              : p.offline === undefined
-                ? true
-                : !!p.offline && p.offline !== 'false';
-          await this.context.setOffline(offline);
-          outcome = { message: offline ? 'The browser is offline' : 'The browser is back online' };
-          break;
-        }
-        case 'storage':
-          outcome = await this.storage(p);
-          break;
-        case 'networkSummary': {
-          // Requests still finishing are counted once their size is known.
-          await this.page
-            .waitForLoadState('networkidle', { timeout: Math.min(timeout, 5000) })
-            .catch(() => {});
-          // Since the test started, or since the last ui.navigate (one page's traffic).
-          const since = p.since === 'lastNavigation' ? this.lastNavigation : -1;
-          const entries = this.network.filter((e) => since < 0 || (e.step ?? -1) >= since);
-          const s = summarizeNetwork(entries, this.ctx.options.baseUrl);
-          let dropped = 0;
-          for (const [at, n] of this.droppedRequests) if (since < 0 || at >= since) dropped += n;
-          const truncated = dropped > 0;
-          const kinds = s.byType.map((g) => `${g.requests} ${g.key}`).join(', ');
-          const summary = `${s.requests} request${s.requests === 1 ? '' : 's'}, ${formatBytes(s.bytes)}${s.failed ? `, ${s.failed} failed` : ''}${s.thirdPartyHosts ? `, ${s.thirdPartyHosts} third-party host(s)` : ''}${kinds ? ` — ${kinds}` : ''}`;
-          const incomplete = `Incomplete: ${dropped} more request${dropped === 1 ? ' was' : 's were'} not recorded (over ${this.maxNetworkEntries} in this test), so totals and budgets cannot be trusted`;
-          outcome = {
-            output: {
-              requests: s.requests,
-              bytes: s.bytes,
-              failed: s.failed,
-              thirdPartyHosts: s.thirdPartyHosts,
-              ...(truncated && { truncated, droppedRequests: dropped }),
-            },
-            message: truncated ? `${incomplete}. ${summary}` : summary,
-            response: { body: truncated ? { ...s, truncated, droppedRequests: dropped } : s },
-            // A budget checked against part of the traffic would pass falsely.
-            ...(truncated && {
-              assertions: [
-                {
-                  target: 'truncated',
-                  operator: 'equals',
-                  expected: false,
-                  actual: true,
-                  passed: false,
-                  message: incomplete,
-                },
-              ],
-            }),
-            getTarget: (t) => {
-              const flat: Record<string, unknown> = {
-                truncated,
-                droppedRequests: dropped,
+            // x/y: a point inside the element (canvas apps, maps, charts), from its top-left corner.
+            const position =
+              p.x !== undefined && p.x !== '' && p.y !== undefined && p.y !== ''
+                ? { x: Number(p.x), y: Number(p.y) }
+                : undefined;
+            const opts = { timeout, force: !!p.force, trial: false, ...(position && { position }) };
+            if (name === 'click')
+              await resolved!.locator.click({ ...opts, button: (p.button as 'left') ?? 'left' });
+            else if (name === 'dblclick') await resolved!.locator.dblclick(opts);
+            else if (name === 'tap') {
+              if (!this.touch)
+                throw new StepError(
+                  'invalid_params',
+                  'Tapping needs a touch screen: run on the phone or tablet size',
+                );
+              await resolved!.locator.tap(opts);
+            } else await resolved!.locator.hover(opts);
+            break;
+          }
+          case 'rightclick':
+            await needs();
+            await resolved!.locator.click({ button: 'right', timeout });
+            break;
+          case 'fill':
+            await needs();
+            await resolved!.locator.fill(String(p.value ?? ''), { timeout });
+            break;
+          case 'type':
+            await needs();
+            await resolved!.locator.pressSequentially(String(p.value ?? ''), {
+              delay: Number(p.delay ?? 30),
+              timeout,
+            });
+            break;
+          case 'clear':
+            await needs();
+            await resolved!.locator.clear({ timeout });
+            break;
+          case 'press':
+            if (step.locators.length) {
+              await needs();
+              await resolved!.locator.press(String(p.key ?? 'Enter'), { timeout });
+            } else await this.page.keyboard.press(String(p.key ?? 'Enter'));
+            break;
+          case 'select': {
+            await needs();
+            const option =
+              p.label !== undefined
+                ? { label: String(p.label) }
+                : p.index !== undefined
+                  ? { index: Number(p.index) }
+                  : String(p.value ?? '');
+            const chosen = await resolved!.locator.selectOption(option, { timeout });
+            outcome = { output: chosen[0], message: `Selected ${chosen.join(', ')}` };
+            break;
+          }
+          case 'check':
+            await needs();
+            await resolved!.locator.check({ timeout });
+            break;
+          case 'uncheck':
+            await needs();
+            await resolved!.locator.uncheck({ timeout });
+            break;
+          case 'upload': {
+            await needs();
+            const files = Array.isArray(p.files) ? p.files.map(String) : [String(p.file ?? '')];
+            await resolved!.locator.setInputFiles(files, { timeout });
+            break;
+          }
+          case 'dragDrop': {
+            await needs();
+            const targetLocators = Array.isArray(p.target) ? (p.target as RunnableStep['locators']) : [];
+            const target = await this.resolve(step, ctx, targetLocators);
+            await resolved!.locator.dragTo(target.locator, { timeout });
+            break;
+          }
+          case 'scroll':
+            if (step.locators.length) {
+              await needs();
+              await resolved!.locator.scrollIntoViewIfNeeded({ timeout });
+            } else await this.page.mouse.wheel(Number(p.x ?? 0), Number(p.y ?? 600));
+            break;
+          case 'switchTab': {
+            const pages = this.context.pages();
+            let target: Page | undefined;
+            const deadline = Date.now() + timeout;
+            while (!target && Date.now() < deadline) {
+              const list = this.context.pages();
+              target =
+                p.index !== undefined
+                  ? list[Number(p.index)]
+                  : (list.find((pg) => (p.urlContains ? pg.url().includes(String(p.urlContains)) : false)) ??
+                    (p.urlContains ? undefined : list[list.length - 1]));
+              if (!target) await new Promise((r) => setTimeout(r, 200));
+            }
+            if (!target) throw new StepError('element_not_found', `No tab matched (${pages.length} open)`);
+            await target.bringToFront();
+            await target.waitForLoadState('domcontentloaded', { timeout }).catch(() => {});
+            this.page = target;
+            this.scope = target;
+            this.ctx.shared.set('ui.page', target);
+            outcome = { message: `Switched to ${target.url()}` };
+            break;
+          }
+          case 'closeTab': {
+            await this.page.close();
+            const remaining = this.context.pages();
+            if (!remaining.length) throw new StepError('invalid_params', 'Closed the last tab');
+            this.page = remaining[remaining.length - 1]!;
+            this.scope = this.page;
+            this.ctx.shared.set('ui.page', this.page);
+            break;
+          }
+          case 'handleDialog':
+            this.pendingDialog = {
+              action: p.action === 'dismiss' ? 'dismiss' : 'accept',
+              promptText: p.promptText ? String(p.promptText) : undefined,
+            };
+            outcome = { message: `Next dialog will be ${this.pendingDialog.action}ed` };
+            break;
+          case 'switchFrame':
+            if (p.main || !p.selector) {
+              this.scope = this.page;
+              outcome = { message: 'Switched to main document' };
+            } else {
+              this.scope = this.page.frameLocator(String(p.selector));
+              outcome = { message: `Switched to frame ${String(p.selector)}` };
+            }
+            break;
+          case 'waitFor':
+            if (step.locators.length) {
+              const state =
+                (p.state as 'visible' | 'hidden' | 'attached' | 'detached' | undefined) ?? 'visible';
+              if (state === 'hidden' || state === 'detached') {
+                await buildLocator(this.scope, step.locators[0]!).first().waitFor({ state, timeout });
+              } else {
+                await needs();
+                await resolved!.locator.waitFor({ state, timeout });
+              }
+            } else if (p.url) {
+              await this.page.waitForURL(
+                String(p.url).startsWith('/') && !String(p.url).includes('*')
+                  ? `**${String(p.url)}`
+                  : String(p.url),
+                { timeout },
+              );
+            } else {
+              await this.page.waitForLoadState((p.loadState as 'load') ?? 'load', { timeout });
+            }
+            break;
+          case 'back':
+            // The browser's Back button.
+            await this.page.goBack({ timeout });
+            break;
+          case 'screenshot': {
+            const path = join(this.ctx.artifactsDir, `shot-${pad(step.position)}.png`);
+            if (step.locators.length) {
+              await needs();
+              await resolved!.locator.screenshot({ path, timeout });
+            } else await this.page.screenshot({ path, fullPage: !!p.fullPage });
+            outcome = {
+              screenshotPath: path,
+              artifacts: [{ kind: 'screenshot', path, stepId: step.id }],
+              message: 'Screenshot saved',
+            };
+            break;
+          }
+          case 'extract': {
+            const value = await this.extract(step, ctx, p, (r) => (resolved = r));
+            outcome = {
+              output: value,
+              message: `Extracted ${JSON.stringify(value)}`,
+              getTarget: (t) => (t === 'value' || t === 'output' ? value : this.pageTarget(t)),
+            };
+            break;
+          }
+          case 'assert':
+            outcome = await this.assert(step, ctx, p, (r) => (resolved = r));
+            break;
+          case 'visualCheckpoint':
+            outcome = await this.visualCheckpoint(step, ctx, p, needs, () => resolved);
+            break;
+          case 'download': {
+            await needs();
+            const [download] = await Promise.all([
+              this.page.waitForEvent('download', { timeout }),
+              resolved!.locator.click({ timeout }),
+            ]);
+            const fileName = download.suggestedFilename();
+            const path = join(
+              this.ctx.artifactsDir,
+              `download-${pad(step.position)}-${fileName.replace(/[^\w.-]+/g, '_')}`,
+            );
+            await download.saveAs(path);
+            const failure = await download.failure();
+            if (failure) throw new StepError('network', `The download failed: ${failure}`);
+            const size = statSync(path).size;
+            const info = { fileName, size, path };
+            let text: string | undefined;
+            const content = () => (text ??= size <= 5_000_000 ? readFileSync(path, 'utf8') : '');
+            outcome = {
+              output: info,
+              message: `Downloaded ${fileName} (${size} bytes)`,
+              getTarget: (t) =>
+                t === 'fileName'
+                  ? fileName
+                  : t === 'size'
+                    ? size
+                    : t === 'content'
+                      ? content()
+                      : this.pageTarget(t),
+            };
+            break;
+          }
+          case 'waitForResponse':
+            outcome = await this.waitForResponse(p, timeout, ctx);
+            break;
+          case 'mockRoute':
+            outcome = await this.mockRoute(p);
+            break;
+          case 'setOffline': {
+            // `state` (offline/online) wins; older steps have only `offline`, where missing means offline.
+            const offline =
+              p.state !== undefined && p.state !== ''
+                ? String(p.state) !== 'online'
+                : p.offline === undefined
+                  ? true
+                  : !!p.offline && p.offline !== 'false';
+            await this.context.setOffline(offline);
+            outcome = { message: offline ? 'The browser is offline' : 'The browser is back online' };
+            break;
+          }
+          case 'storage':
+            outcome = await this.storage(p);
+            break;
+          case 'networkSummary': {
+            // Requests still finishing are counted once their size is known.
+            await this.page
+              .waitForLoadState('networkidle', { timeout: Math.min(timeout, 5000) })
+              .catch(() => {});
+            // Since the test started, or since the last ui.navigate (one page's traffic).
+            const since = p.since === 'lastNavigation' ? this.lastNavigation : -1;
+            const entries = this.network.filter((e) => since < 0 || (e.step ?? -1) >= since);
+            const s = summarizeNetwork(entries, this.ctx.options.baseUrl);
+            let dropped = 0;
+            for (const [at, n] of this.droppedRequests) if (since < 0 || at >= since) dropped += n;
+            const truncated = dropped > 0;
+            const kinds = s.byType.map((g) => `${g.requests} ${g.key}`).join(', ');
+            const summary = `${s.requests} request${s.requests === 1 ? '' : 's'}, ${formatBytes(s.bytes)}${s.failed ? `, ${s.failed} failed` : ''}${s.thirdPartyHosts ? `, ${s.thirdPartyHosts} third-party host(s)` : ''}${kinds ? ` — ${kinds}` : ''}`;
+            const incomplete = `Incomplete: ${dropped} more request${dropped === 1 ? ' was' : 's were'} not recorded (over ${this.maxNetworkEntries} in this test), so totals and budgets cannot be trusted`;
+            outcome = {
+              output: {
                 requests: s.requests,
                 bytes: s.bytes,
-                kb: Math.round(s.bytes / 100) / 10,
                 failed: s.failed,
-                thirdPartyRequests: s.thirdPartyRequests,
                 thirdPartyHosts: s.thirdPartyHosts,
-                hosts: s.byHost.map((h) => h.key),
-                thirdPartyHostNames: s.byHost.filter((h) => h.thirdParty).map((h) => h.key),
-              };
-              if (t in flat) return flat[t];
-              // requests:script, bytes:image …
-              const m = /^(requests|bytes):(.+)$/.exec(t);
-              if (m) {
-                const g = s.byType.find((x) => x.key === m[2]);
-                return g ? (m[1] === 'requests' ? g.requests : g.bytes) : 0;
-              }
-              return this.pageTarget(t);
-            },
-          };
-          break;
-        }
-        case 'setClock': {
-          const action = String(p.action ?? 'set');
-          const time =
-            p.time !== undefined && p.time !== ''
-              ? new Date(isNaN(Number(p.time)) ? String(p.time) : Number(p.time))
-              : undefined;
-          if (time && isNaN(time.getTime()))
-            throw new StepError('invalid_params', `Not a date: ${String(p.time)}`);
-          if (action === 'fastForward') {
-            await this.page.clock.fastForward(Number(p.ms ?? 60_000));
-            outcome = { message: `Moved the clock forward ${Number(p.ms ?? 60_000)} ms` };
-          } else if (action === 'install') {
-            await this.page.clock.install(time ? { time } : {});
-            outcome = { message: `The page clock starts at ${(time ?? new Date()).toISOString()} and runs` };
-          } else {
-            if (!time) throw new StepError('invalid_params', 'setClock needs a "time"');
-            await this.page.clock.setFixedTime(time);
-            outcome = { message: `The page clock is fixed at ${time.toISOString()}` };
+                ...(truncated && { truncated, droppedRequests: dropped }),
+              },
+              message: truncated ? `${incomplete}. ${summary}` : summary,
+              response: { body: truncated ? { ...s, truncated, droppedRequests: dropped } : s },
+              // A budget checked against part of the traffic would pass falsely.
+              ...(truncated && {
+                assertions: [
+                  {
+                    target: 'truncated',
+                    operator: 'equals',
+                    expected: false,
+                    actual: true,
+                    passed: false,
+                    message: incomplete,
+                  },
+                ],
+              }),
+              getTarget: (t) => {
+                const flat: Record<string, unknown> = {
+                  truncated,
+                  droppedRequests: dropped,
+                  requests: s.requests,
+                  bytes: s.bytes,
+                  kb: Math.round(s.bytes / 100) / 10,
+                  failed: s.failed,
+                  thirdPartyRequests: s.thirdPartyRequests,
+                  thirdPartyHosts: s.thirdPartyHosts,
+                  hosts: s.byHost.map((h) => h.key),
+                  thirdPartyHostNames: s.byHost.filter((h) => h.thirdParty).map((h) => h.key),
+                };
+                if (t in flat) return flat[t];
+                // requests:script, bytes:image …
+                const m = /^(requests|bytes):(.+)$/.exec(t);
+                if (m) {
+                  const g = s.byType.find((x) => x.key === m[2]);
+                  return g ? (m[1] === 'requests' ? g.requests : g.bytes) : 0;
+                }
+                return this.pageTarget(t);
+              },
+            };
+            break;
           }
-          break;
+          case 'setClock': {
+            const action = String(p.action ?? 'set');
+            const time =
+              p.time !== undefined && p.time !== ''
+                ? new Date(isNaN(Number(p.time)) ? String(p.time) : Number(p.time))
+                : undefined;
+            if (time && isNaN(time.getTime()))
+              throw new StepError('invalid_params', `Not a date: ${String(p.time)}`);
+            if (action === 'fastForward') {
+              await this.page.clock.fastForward(Number(p.ms ?? 60_000));
+              outcome = { message: `Moved the clock forward ${Number(p.ms ?? 60_000)} ms` };
+            } else if (action === 'install') {
+              await this.page.clock.install(time ? { time } : {});
+              outcome = {
+                message: `The page clock starts at ${(time ?? new Date()).toISOString()} and runs`,
+              };
+            } else {
+              if (!time) throw new StepError('invalid_params', 'setClock needs a "time"');
+              await this.page.clock.setFixedTime(time);
+              outcome = { message: `The page clock is fixed at ${time.toISOString()}` };
+            }
+            break;
+          }
+          default:
+            if (name === 'menu')
+              throw new StepError(
+                'unsupported',
+                this.electronApp
+                  ? 'An Electron app’s menu bar is not part of its pages: press the menu’s keyboard shortcut instead (Press, e.g. Control+S)'
+                  : '"ui.menu" is for desktop apps (macOS, Windows); in a browser click the page’s own menu',
+              );
+            if (PHONE_ONLY.has(name))
+              throw new StepError(
+                'unsupported',
+                `"${step.type}" is for phone and desktop apps; in a browser use clicks, scrolling and navigation`,
+              );
+            throw new StepError('unsupported', `Unknown UI step "${step.type}"`);
         }
-        default:
-          if (name === 'menu')
-            throw new StepError(
-              'unsupported',
-              this.electronApp
-                ? 'An Electron app’s menu bar is not part of its pages: press the menu’s keyboard shortcut instead (Press, e.g. Control+S)'
-                : '"ui.menu" is for desktop apps (macOS, Windows); in a browser click the page’s own menu',
-            );
-          if (PHONE_ONLY.has(name))
-            throw new StepError(
-              'unsupported',
-              `"${step.type}" is for phone and desktop apps; in a browser use clicks, scrolling and navigation`,
-            );
-          throw new StepError('unsupported', `Unknown UI step "${step.type}"`);
-      }
     } catch (err) {
       mapError(err);
     }

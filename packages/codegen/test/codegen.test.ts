@@ -68,6 +68,41 @@ describe('values', () => {
 });
 
 describe('plan', () => {
+  it('leaves image locators out of exports; a step with only a picture becomes a TODO', () => {
+    const base = KITCHEN_SINK.scenarios[0]!;
+    const plan = buildPlan({
+      ...KITCHEN_SINK,
+      scenarios: [
+        {
+          ...base,
+          steps: [
+            {
+              id: 's1',
+              type: 'ui.click',
+              params: {},
+              assertions: [],
+              locators: [
+                { strategy: 'image', value: 'data:image/png;base64,AAAA' },
+                { strategy: 'testId', value: 'pin' },
+              ],
+            },
+            {
+              id: 's2',
+              type: 'ui.click',
+              params: {},
+              assertions: [],
+              locators: [{ strategy: 'image', value: 'data:image/png;base64,AAAA' }],
+            },
+          ] as never,
+        },
+      ],
+    });
+    expect(JSON.stringify(plan.tests[0]!.ops)).not.toContain('data:image');
+    expect(plan.warnings.map((w) => w.message)).toContain(
+      'image locators (pictures) are not exported; add an id, text or CSS locator',
+    );
+  });
+
   it('warns that UI tests of a desktop (Electron) app are exported as browser tests', () => {
     const desktop = buildPlan({
       ...KITCHEN_SINK,

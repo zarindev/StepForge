@@ -33,6 +33,7 @@ If the first one fails but a later one matches, the step passes and is marked **
 | `text` | visible text (exact) | `{"strategy":"text","value":"Delete record"}` |
 | `css` | CSS selector | `{"strategy":"css","value":"#msg"}` |
 | `xpath` | XPath (last resort) | `{"strategy":"xpath","value":"//table//tr[2]"}` |
+| `image` | a picture of the element (PNG data URL, or a `.png` path) found in a screenshot; `threshold` (0.5–1, default 0.9) — for things without ids or text; click, hover, tap, visible / hidden — see [IMAGE_LOCATORS.md](IMAGE_LOCATORS.md) | `{"strategy":"image","value":"data:image/png;base64,…","threshold":0.9}` |
 | `element` | id of a saved element of the application; replaced at run (and export) time by that element's current locators, so fixing the element fixes every step using it — see [ELEMENTS.md](ELEMENTS.md) | `{"strategy":"element","value":"01J…"}` |
 
 ## UI steps (`ui.*`) — available since Phase 3

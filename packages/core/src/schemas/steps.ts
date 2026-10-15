@@ -102,6 +102,8 @@ export const LocatorStrategy = z.enum([
   'css',
   'xpath',
   'element',
+  // A picture of the element (a PNG data URL), found in a screenshot: the last resort for anything without ids.
+  'image',
 ]);
 export const Locator = z.object({
   strategy: LocatorStrategy,
@@ -109,6 +111,8 @@ export const Locator = z.object({
   /** For role locators: the accessible name. */
   name: z.string().optional(),
   score: z.number().min(0).max(100).optional(),
+  /** Image locators: how close the screen must match the picture (0.5–1, default 0.9). */
+  threshold: z.number().min(0.5).max(1).optional(),
 });
 export type Locator = z.infer<typeof Locator>;
 

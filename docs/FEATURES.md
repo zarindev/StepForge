@@ -47,6 +47,11 @@ touch, sites behind basic auth or client certificates, localised and time-zone-d
 features and visual regressions — with network waiting and mocking, offline mode, cookies and storage, a controllable
 clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
+## Image locators
+
+Find an element by a small picture of it, in a screenshot, when it has no id, label or text (maps, canvas, games,
+remote desktops), on every platform. [IMAGE_LOCATORS.md](IMAGE_LOCATORS.md)
+
 ## Test macOS and Windows apps
 
 Native Mac apps and Windows apps (Win32, WPF, WinForms, UWP) through Appium (Mac2, NovaWindows), installed and

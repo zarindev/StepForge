@@ -1,0 +1,16 @@
+{
+  "name": "@stepforge/image-match",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Finds a small picture inside a screenshot (normalized cross-correlation), for image locators. By Md Zarin Tasnim.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
+  }
+}

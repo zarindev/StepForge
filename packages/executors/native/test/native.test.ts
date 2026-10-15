@@ -232,4 +232,60 @@ describe.skipIf(!AVD)('Android app on an emulator (CareClinic mobile)', () => {
     expect(r.error ?? null).toBeNull();
     expect(r.status).toBe('passed');
   }, 600_000);
+
+  it('image locators: a picture of the Sign in button taps it; a picture that is not on screen says how close it came', async () => {
+    // The picture: a screenshot of the button itself (same scale as the screen).
+    const shot = await run(
+      steps({ type: 'ui.screenshot', locators: [{ strategy: 'testId', value: 'sign_in' }] }),
+    );
+    const picture = shot.steps[0]!.screenshotPath!;
+    expect(existsSync(picture)).toBe(true);
+    const r = await run(
+      steps(
+        {
+          type: 'ui.fill',
+          params: { value: 'nurse@careclinic.test' },
+          locators: [{ strategy: 'testId', value: 'email' }],
+        },
+        {
+          type: 'ui.fill',
+          params: { value: 'CareClinic1' },
+          locators: [{ strategy: 'testId', value: 'password' }],
+        },
+        { type: 'ui.click', locators: [{ strategy: 'image', value: picture }] },
+        {
+          type: 'ui.assert',
+          params: { check: 'visible' },
+          locators: [{ strategy: 'testId', value: 'patient_count' }],
+        },
+      ),
+    );
+    expect(r.error ?? null).toBeNull();
+    expect(r.status).toBe('passed');
+    // On the patients screen there is no Sign in button.
+    const missing = await run(
+      steps(
+        {
+          type: 'ui.fill',
+          params: { value: 'nurse@careclinic.test' },
+          locators: [{ strategy: 'testId', value: 'email' }],
+        },
+        {
+          type: 'ui.fill',
+          params: { value: 'CareClinic1' },
+          locators: [{ strategy: 'testId', value: 'password' }],
+        },
+        { type: 'ui.click', locators: [{ strategy: 'testId', value: 'sign_in' }] },
+        // Wait for the patients screen: until then the Sign in button is still on screen.
+        {
+          type: 'ui.assert',
+          params: { check: 'visible' },
+          locators: [{ strategy: 'testId', value: 'patient_count' }],
+        },
+        { type: 'ui.click', locators: [{ strategy: 'image', value: picture }], timeoutMs: 3000 },
+      ),
+    );
+    expect(missing.status).toBe('failed');
+    expect(missing.error).toMatch(/Tried: image \(needs 90%\) \(the picture's best match on screen: \d+%\)/);
+  }, 600_000);
 });
