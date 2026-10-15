@@ -120,6 +120,12 @@ As for Android: manual tests of an iOS app are marked on the run page while the 
 **Record** shows the app's screen in the dashboard, and taps, typing, swipes and checks there become steps
 ([how](ANDROID_APPS.md#recording)).
 
+## Code export
+
+**Exports** turns iOS tests into an Appium project (Python + pytest, TypeScript + WebdriverIO, or Java + JUnit 5)
+or Maestro flows, with the environment's app and simulator as capabilities and a GitHub Actions workflow on a macOS
+runner. See [CODEGEN.md](CODEGEN.md#phone-and-desktop-apps-appium-maestro).
+
 ## Running in CI
 
 GitHub's macOS runners come with Xcode and simulators. StepForge's own CI runs its iOS tests like this:

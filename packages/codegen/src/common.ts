@@ -66,6 +66,15 @@ export function envEntries(plan: Plan): { key: string; value: string; comment?: 
   }
   if (plan.tests.some((t) => t.usesEmail))
     out.push({ key: 'MAILPIT_URL', value: 'http://127.0.0.1:8025', comment: 'Mailpit web/API address' });
+  if (plan.native) {
+    out.push({
+      key: 'APPIUM_URL',
+      value: 'http://127.0.0.1:4723',
+      comment:
+        plan.native === 'linux' ? "StepForge's Linux helper (tools/stepforge_atspi.py)" : 'The Appium server',
+    });
+    out.push({ key: 'APP', value: '', comment: 'The app to test, instead of the one in the capabilities' });
+  }
   return out;
 }
 

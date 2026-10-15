@@ -106,6 +106,11 @@ export function codegenInput(
         { name: b.name, steps: steps(repo.getBlock(db, b.id).steps), inputs: b.inputsJson },
       ]),
   );
+  // An Electron, phone or desktop app's launch settings (the Electron, Appium and Maestro exports start the app).
+  const launch =
+    app.platform !== 'web'
+      ? (env.browserDefaultsJson[app.platform] as Record<string, unknown> | undefined)
+      : undefined;
   return {
     application: { name: app.name, slug: app.slug, platform: app.platform },
     environment: {
@@ -116,6 +121,7 @@ export function codegenInput(
         .listSecrets(db, env.id)
         .map((s) => s.key)
         .filter((k) => SECRET_NAME.test(k)),
+      ...(launch && { launch }),
     },
     connections: repo
       .listConnections(db, applicationId)
@@ -159,6 +165,15 @@ export class CodegenService {
 
   async build(applicationId: string, body: unknown) {
     const req = CodegenRequest.parse(body);
+    // Appium and Maestro are for phone and desktop apps (Maestro: Android and iOS).
+    const info = TARGETS.find((t) => t.id === req.target)!;
+    const platform = repo.getApplication(this.db, applicationId).platform;
+    if (info.platforms && !info.platforms.includes(platform as never))
+      throw new repo.RepoError(
+        400,
+        'invalid',
+        `The ${info.label} export is for ${info.platforms.length > 2 ? 'phone and desktop apps' : 'Android and iOS apps'}; this is a ${platform === 'web' ? 'web' : platform} app`,
+      );
     const input = codegenInput(this.db, applicationId, req);
     const project = await generate(input, { target: req.target, pom: req.pom, ci: req.ci });
     return { req, input, project };

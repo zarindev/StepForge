@@ -8,5 +8,5 @@
     "playwright.config.ts",
     "e2e/**/*.ts"
   ],
-  "exclude": ["**/node_modules", "**/dist", "data"]
+  "exclude": ["**/node_modules", "**/dist", "data", "packages/codegen/runtime/ts/app.ts"]
 }

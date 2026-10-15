@@ -75,5 +75,13 @@ for (const platform of ['macos', 'windows', 'linux'] as const) {
           ? { app: 'C:\\Apps\\CareClinic.exe', arguments: '/demo' }
           : { app: 'python3', arguments: ['demo/linux-app/careclinic.py'] },
     );
+
+    // Code export: Appium instead of the browser targets (Maestro is for phone apps only).
+    await page.getByRole('link', { name: 'Exports' }).click();
+    await page.getByRole('combobox', { name: 'Application' }).selectOption({ label: appName });
+    await expect(page.getByRole('radio', { name: /Appium \+ pytest/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('radio', { name: /Appium \+ WebdriverIO/ })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /Maestro/ })).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: /Selenium \+ pytest/ })).toBeVisible();
   });
 }

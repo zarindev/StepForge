@@ -3,6 +3,22 @@
 ## [Unreleased]
 
 ### Added
+- **Appium and Maestro export** (N7): four new targets for phone and desktop apps — `appium-py` (Appium-Python-Client
+  + pytest), `appium-ts` (WebdriverIO + Mocha, TypeScript), `appium-java` (java-client + JUnit 5, Maven) for Android,
+  iOS, macOS, Windows and Linux, and `maestro` (YAML flows) for Android and iOS. The plan gets a native mode: phone and
+  desktop steps become `app` operations, and each element carries the Appium selectors the native executor's own
+  locator mapping gives on that platform (`@stepforge/executor-native/locators`). Capabilities come from the
+  environment's launch settings (`APPIUM_URL`, `APP` override). Each Appium project ships a runtime helper
+  (`runtime/py/app.py`, `runtime/ts/app.ts`, `runtime/java/App.java`) that mirrors the executor's per-platform
+  behaviour; Linux exports include `tools/stepforge_atspi.py`. Maestro flows map test cases to one flow each, secrets to
+  `MAESTRO_*` variables, and close the keyboard before Android's Back. GitHub Actions workflows per platform; GitLab is
+  not generated for these apps. The Exports page and `codegen --list` show the targets for the application's platform;
+  the server refuses them for web apps (400).
+- **Electron export**: for an Electron app with launch settings, the Playwright Test export starts the app with
+  `_electron.launch()` (`support/electron.ts`): each test's `page` is the app's first window.
+- `scripts/verify-native-export.ts` runs the exported projects against the demo apps (Android, iOS, macOS, Windows,
+  Linux, Electron), with `--wrong-password` to check that failures fail; the `android`, `ios`, `macos-desktop`,
+  `windows-desktop`, `linux-desktop` and `exported-code` CI jobs run it.
 - **Linux desktop apps**: a new platform _Linux app_ (GTK, Qt). An environment gives the app's command, arguments,
   environment variables and working folder. StepForge's own helper (`packages/executors/native/linux/
   stepforge_atspi.py`, Python + PyGObject) drives the app through AT-SPI and speaks the WebDriver subset the native
@@ -155,6 +171,10 @@
   block (so every test using it is fixed); run results group failures by the block step they share.
 
 ### Changed
+- The plain-English description of `ui.handleDialog` reads "Accept the next dialog" (or "Press "Clear" in the dialog")
+  instead of "… browser dialog", since phone and desktop apps use it too.
+- StepForge's Linux helper accepts capabilities in `firstMatch` and answers `timeouts` and `window`, for WebDriver
+  clients other than StepForge's own.
 - **Node.js 22 or newer is now required** (was 20). Node 20 reached end of life in April 2026, better-sqlite3 no
   longer publishes Node 20 binaries (so installing on Windows needed a C++ build), and the SQL Server driver's Azure
   packages need Node 22. CI and the CI files of exported projects use Node 22.

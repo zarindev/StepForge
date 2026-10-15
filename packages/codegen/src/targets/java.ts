@@ -1,11 +1,24 @@
 import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime } from '../common.ts';
+import {
+  APP_KEY,
+  capabilities,
+  driverSetup,
+  GITLAB_NATIVE,
+  linuxHelper,
+  nativeCi,
+  nativeNotes,
+  PLATFORM_NAMES,
+} from '../native.ts';
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
 import { javaInt, javaBlock, javaJson, javaStr, javaText, javaVal } from '../lang/java.ts';
 import type { CodegenOptions, GeneratedProject, TargetId } from '../types.ts';
-import { camel, envName, parseString, pascal, snake, uniquer } from '../values.ts';
+import { camel, envName, parseString, pascal, snake, uniquer, type Val } from '../values.ts';
 
-/** Java 17 + JUnit 5 + Maven: Selenium (with REST Assured for API steps), or REST Assured only. */
-type Flavor = 'selenium' | 'api';
+/**
+ * Java 17 + JUnit 5 + Maven: Selenium or Appium (phone and desktop apps), with REST Assured for API steps; or REST
+ * Assured only.
+ */
+type Flavor = 'selenium' | 'appium' | 'api';
 
 export function locatorJava(l: Loc): string {
   const v = (s: string) => javaText(parseString(s));
@@ -31,7 +44,15 @@ type State = {
 const next = (s: State, k: string) => `${k}${(s.n[k] = (s.n[k] ?? 0) + 1)}`;
 const constName = (s: string) => snake(s).toUpperCase().replace(/^_/, '');
 
+/** Appium selectors for support/App.java: List.of(by(strategy, value), …). */
+const queriesJava = (e: El) =>
+  `List.of(${(e.queries ?? []).map((q) => `by(${javaStr(q.using)}, ${javaText(parseString(q.value))})`).join(', ')})`;
+
+/** A helper argument: text as a String, other values as they are. */
+const javaArg = (v: Val) => (v.t === 'str' || v.t === 'ref' ? javaText(v) : javaVal(v));
+
 function el(s: State, e: El): string {
+  if (s.flavor === 'appium') return queriesJava(e);
   if (e.pom) {
     s.pages.add(e.pom.page);
     return `${s.plan.pages.get(e.pom.page)!.className}.${constName(e.pom.name)}`;
@@ -60,6 +81,10 @@ function uiOp(op: Op, s: State, out: (l: string) => void): boolean {
     'closeTab',
   ];
   if (!ui.includes(op.op)) return false;
+  if (s.flavor === 'appium') {
+    appiumOp(op, s, out);
+    return true;
+  }
   if (s.flavor === 'api') {
     out(`// TODO(StepForge): browser step skipped (${op.op}); this export contains API tests only`);
     return true;
@@ -147,6 +172,48 @@ function uiOp(op: Op, s: State, out: (l: string) => void): boolean {
       break;
   }
   return true;
+}
+
+function appiumOp(op: Op, s: State, out: (l: string) => void): void {
+  switch (op.op) {
+    case 'act': {
+      const l = el(s, op.el);
+      const v = op.value ? javaText(op.value) : '""';
+      const call: Record<string, string> = {
+        click: `app.click(${l});`,
+        dblclick: `app.doubleClick(${l});`,
+        fill: `app.fill(${l}, ${v});`,
+        type: `app.type(${l}, ${v});`,
+        clear: `app.clear(${l});`,
+        check: `app.setChecked(${l}, true);`,
+        uncheck: `app.setChecked(${l}, false);`,
+        scrollIntoView: `app.scrollTo(${l});`,
+      };
+      out(call[op.action] ?? `// TODO(StepForge): ${op.action} is not available in phone and desktop apps`);
+      break;
+    }
+    case 'press':
+      out(`app.press(${javaStr(op.key)}${op.el ? `, ${el(s, op.el)}` : ''});`);
+      break;
+    case 'assert':
+      out(
+        `app.expect(${javaStr(op.check)}, ${op.el ? el(s, op.el) : 'List.of()'}, ${op.expected ? (op.check === 'count' ? javaVal(op.expected) : javaText(op.expected)) : 'null'}, ${op.attribute ? javaStr(op.attribute) : 'null'});`,
+      );
+      break;
+    case 'read': {
+      const value = `app.read(${javaStr(op.source)}, ${op.el ? el(s, op.el) : 'List.of()'}, ${op.attribute ? javaStr(op.attribute) : 'null'})`;
+      out(`vars.put(${javaStr(op.into)}, ${op.regex ? `capture(${value}, ${javaStr(op.regex)})` : value});`);
+      break;
+    }
+    case 'waitFor':
+      out(`app.waitFor(${el(s, op.el)}, ${javaStr(op.state)});`);
+      break;
+    case 'screenshot':
+      out(`app.screenshot(${javaStr(op.name)}, ${op.el ? el(s, op.el) : 'null'});`);
+      break;
+    default:
+      out(`// TODO(StepForge): ${op.op} is a web-page step; phone and desktop apps have no equivalent`);
+  }
 }
 
 function printOps(ops: Op[], s: State, ind: string): void {
@@ -341,6 +408,9 @@ function printOps(ops: Op[], s: State, ind: string): void {
         }
         break;
       }
+      case 'app':
+        out(`app.${op.method}(${[...op.els.map((x) => el(s, x)), ...op.args.map(javaArg)].join(', ')});`);
+        break;
       default:
         break;
     }
@@ -361,6 +431,7 @@ function testClass(
   printOps(t.ops, s, '    ');
   const code = s.lines.join('\n').replace(/\/\/.*$/gm, '');
   const browser = flavor === 'selenium' && t.usesUi;
+  const appium = flavor === 'appium' && t.usesUi;
   const cases = t.scenario.testCases;
   const method = camel(t.scenario.name, 'scenario');
   const tags = [...t.scenario.tags.map((x) => snake(x)), t.scenario.priority.toLowerCase()];
@@ -370,12 +441,14 @@ function testClass(
       ? ['import static org.junit.jupiter.api.Assertions.assertEquals;']
       : []),
     ...(/\bgiven\(\)/.test(code) ? ['import static io.restassured.RestAssured.given;'] : []),
+    ...(/\bby\(/.test(code) ? ['import static support.App.by;'] : []),
     ...['capture', 'check', 'compare', 'field', 'pick', 'text']
       .filter((h) => new RegExp(`\\b${h}\\(`).test(code))
       .map((h) => `import static support.Checks.${h};`),
     '',
     ...(/ContentType\./.test(code) ? ['import io.restassured.http.ContentType;'] : []),
     'import java.util.HashMap;',
+    ...(/\bList\./.test(code) ? ['import java.util.List;'] : []),
     'import java.util.Map;',
     ...(/\btestStart\b/.test(code) ? ['import java.time.Instant;'] : []),
     ...(cases.length ? ['import java.util.stream.Stream;'] : []),
@@ -389,7 +462,11 @@ function testClass(
     'import org.junit.jupiter.api.DisplayName;',
     'import org.junit.jupiter.api.Tag;',
     ...(/\bApi\./.test(code) ? ['import support.Api;'] : []),
-    ...(browser ? ['import support.BrowserTest;'] : ['import support.ApiTest;']),
+    ...(browser
+      ? ['import support.BrowserTest;']
+      : appium
+        ? ['import support.AppTest;']
+        : ['import support.ApiTest;']),
     ...(/\bLoc\./.test(code) ? ['import support.Browser.Loc;'] : []),
     ...(/\bConfig\./.test(code) ? ['import support.Config;'] : []),
     ...(/\bDb\./.test(code) ? ['import support.Db;'] : []),
@@ -411,7 +488,7 @@ function testClass(
     '',
     ...tags.map((x) => `@Tag(${javaStr(x)})`),
     `@DisplayName(${javaStr([...t.scenario.modulePath, t.scenario.name].join(' › '))})`,
-    `class ${className} extends ${browser ? 'BrowserTest' : 'ApiTest'} {`,
+    `class ${className} extends ${browser ? 'BrowserTest' : appium ? 'AppTest' : 'ApiTest'} {`,
     ...(cases.length
       ? [
           '  static Stream<Arguments> testCases() {',
@@ -454,7 +531,7 @@ function pom(plan: Plan, flavor: Flavor): string {
     '         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">',
     '  <modelVersion>4.0.0</modelVersion>',
     '  <groupId>tests</groupId>',
-    `  <artifactId>${slug}-${flavor === 'selenium' ? 'selenium' : 'api'}-tests</artifactId>`,
+    `  <artifactId>${slug}-${flavor}-tests</artifactId>`,
     '  <version>1.0.0</version>',
     `  <name>${plan.input.application.name} tests</name>`,
     '  <properties>',
@@ -468,6 +545,7 @@ function pom(plan: Plan, flavor: Flavor): string {
     dep('net.datafaker', 'datafaker', '2.4.2'),
     dep('io.github.cdimascio', 'dotenv-java', '3.1.0'),
     ...(flavor === 'selenium' ? [dep('org.seleniumhq.selenium', 'selenium-java', '4.27.0')] : []),
+    ...(flavor === 'appium' ? [dep('io.appium', 'java-client', '10.1.1')] : []),
     ...(any || engines.has('pg') ? [dep('org.postgresql', 'postgresql', '42.7.4')] : []),
     ...(any || engines.has('mysql') ? [dep('com.mysql', 'mysql-connector-j', '9.1.0')] : []),
     ...(any || engines.has('sqlite') ? [dep('org.xerial', 'sqlite-jdbc', '3.47.1.0')] : []),
@@ -536,6 +614,42 @@ function configJava(plan: Plan): string {
   ].join('\n');
 }
 
+/** The capabilities StepForge starts the app with, overridable with APPIUM_URL and APP. */
+function capabilitiesJava(plan: Plan): string {
+  const platform = plan.native!;
+  const key = javaStr(APP_KEY[platform]);
+  return [
+    'package support;',
+    '',
+    'import java.nio.file.Files;',
+    'import java.nio.file.Path;',
+    'import java.util.HashMap;',
+    'import java.util.Map;',
+    '',
+    `/** ${CREDIT}. ${PLATFORM_NAMES[platform]}: the capabilities StepForge starts the app with (from the ${plan.input.environment.name} environment). */`,
+    'public final class Capabilities {',
+    `  public static final String PLATFORM = ${javaStr(platform)};`,
+    '',
+    '  private Capabilities() {}',
+    '',
+    '  public static String appiumUrl() {',
+    '    String url = Config.get("APPIUM_URL");',
+    '    return url != null && !url.isEmpty() ? url : "http://127.0.0.1:4723";',
+    '  }',
+    '',
+    '  public static Map<String, Object> get() {',
+    `    Map<String, Object> caps = new HashMap<>(${javaVal(capabilities(platform, plan.input.environment.launch))});`,
+    '    String app = Config.get("APP");',
+    `    if (app != null && !app.isEmpty()) caps.put(${key}, app);`,
+    `    Object path = caps.get(${key});`,
+    `    if (path instanceof String p && !p.isEmpty() && Files.exists(Path.of(p))) caps.put(${key}, Path.of(p).toAbsolutePath().toString());`,
+    '    return caps;',
+    '  }',
+    '}',
+    '',
+  ].join('\n');
+}
+
 const BASES = (flavor: Flavor) => ({
   'src/test/java/support/ApiTest.java': [
     'package support;',
@@ -556,6 +670,49 @@ const BASES = (flavor: Flavor) => ({
     '}',
     '',
   ].join('\n'),
+  ...(flavor === 'appium' && {
+    'src/test/java/support/AppTest.java': [
+      'package support;',
+      '',
+      'import org.junit.jupiter.api.AfterEach;',
+      'import org.junit.jupiter.api.BeforeEach;',
+      'import org.junit.jupiter.api.extension.AfterTestExecutionCallback;',
+      'import org.junit.jupiter.api.extension.ExtendWith;',
+      'import org.junit.jupiter.api.extension.ExtensionContext;',
+      '',
+      `/** ${CREDIT}. Base class for app tests: the app starts before each test and closes after it. */`,
+      '@ExtendWith(AppTest.Screenshots.class)',
+      'public abstract class AppTest extends ApiTest {',
+      '  protected App app;',
+      '',
+      '  @BeforeEach',
+      '  void startApp() throws Exception {',
+      '    app = App.start(Capabilities.appiumUrl(), Capabilities.get(), Capabilities.PLATFORM);',
+      '  }',
+      '',
+      '  @AfterEach',
+      '  void closeApp() {',
+      '    if (app != null) app.driver().quit();',
+      '  }',
+      '',
+      '  /** A failed test keeps a screenshot of the screen. */',
+      '  static final class Screenshots implements AfterTestExecutionCallback {',
+      '    @Override',
+      '    public void afterTestExecution(ExtensionContext context) {',
+      '      if (context.getExecutionException().isEmpty()) return;',
+      '      if (context.getRequiredTestInstance() instanceof AppTest test && test.app != null) {',
+      '        try {',
+      '          test.app.screenshot(context.getDisplayName().replaceAll("[^\\\\w.-]+", "-") + "-failed", null);',
+      '        } catch (Exception ignored) {',
+      '          // the app may have gone',
+      '        }',
+      '      }',
+      '    }',
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  }),
   ...(flavor === 'selenium' && {
     'src/test/java/support/BrowserTest.java': [
       'package support;',
@@ -621,6 +778,11 @@ export function generateJava(
   for (const f of ['Checks', 'J', 'Api', 'Fake', 'Db'] as const)
     files[`src/test/java/support/${f}.java`] = runtime(`java/${f}.java`);
   if (/\bMail\./.test(all)) files['src/test/java/support/Mail.java'] = runtime('java/Mail.java');
+  if (flavor === 'appium') {
+    files['src/test/java/support/App.java'] = runtime('java/App.java');
+    files['src/test/java/support/Capabilities.java'] = capabilitiesJava(plan);
+    if (plan.native === 'linux') files['tools/stepforge_atspi.py'] = linuxHelper();
+  }
   if (flavor === 'selenium') {
     files['src/test/java/support/Browser.java'] = runtime('java/Browser.java');
     files['src/test/resources/find.js'] = runtime('selenium/find.js');
@@ -640,7 +802,27 @@ export function generateJava(
       ].join('\n');
   }
   Object.assign(files, plan.sqlFiles);
-  Object.assign(files, ciFiles(plan, 'java', o.ci));
+  if (flavor === 'appium' && plan.native) {
+    Object.assign(
+      files,
+      nativeCi(
+        plan,
+        plan.native,
+        {
+          setup: [
+            '      - uses: actions/setup-java@v4',
+            '        with:',
+            '          distribution: temurin',
+            "          java-version: '17'",
+          ],
+          test: 'mvn -B test',
+        },
+        o.ci,
+        plan.native !== 'linux',
+      ),
+    );
+    if (o.ci?.includes('gitlab')) warnings.push(GITLAB_NATIVE);
+  } else Object.assign(files, ciFiles(plan, 'java', o.ci));
   files['.env.example'] = envExample(plan);
   files['.gitignore'] = ['target/', '.env', 'screenshots/', ''].join('\n');
   files['README.md'] = readme(
@@ -649,8 +831,10 @@ export function generateJava(
       title:
         flavor === 'selenium'
           ? 'Selenium tests (Java + JUnit 5)'
-          : 'API tests (Java + REST Assured + JUnit 5)',
-      install: ['# Java 17+ and Maven 3.9+'],
+          : flavor === 'appium'
+            ? `Appium tests (Java + JUnit 5) — ${PLATFORM_NAMES[plan.native!]}`
+            : 'API tests (Java + REST Assured + JUnit 5)',
+      install: ['# Java 17+ and Maven 3.9+', ...(flavor === 'appium' ? driverSetup(plan.native!) : [])],
       run: [
         'mvn test                      # all tests (reports in target/surefire-reports)',
         'mvn test -Dgroups=smoke       # one tag',
@@ -661,7 +845,8 @@ export function generateJava(
         ...(plan.pages.size && flavor === 'selenium'
           ? ['`src/test/java/pages/` — page objects (one locator per element)']
           : []),
-        '`src/test/java/support/` — configuration, REST Assured base class, helpers',
+        `\`src/test/java/support/\` — configuration, ${flavor === 'appium' ? 'Appium capabilities, the app helper (App.java), ' : ''}REST Assured base class, helpers`,
+        ...(flavor === 'appium' && plan.native === 'linux' ? ["`tools/` — StepForge's Linux helper"] : []),
         ...(Object.keys(plan.sqlFiles).length ? ['`sql/` — the SQL of each database step'] : []),
       ],
       notes: [
@@ -670,6 +855,7 @@ export function generateJava(
               'Elements are found by role, label, text and test id like in StepForge (src/test/resources/find.js); every lookup and check waits up to 10 s.',
             ]
           : []),
+        ...(flavor === 'appium' ? nativeNotes(plan.native!) : []),
         `Exported on ${day(plan.input)}; re-export from StepForge after changing the scenarios.`,
       ],
     },

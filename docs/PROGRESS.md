@@ -25,6 +25,25 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | N4 | Native apps, step 4: gestures, phone recorder, phone diagnosis, device campaigns | ✅ Done |
 | N5 | Native apps, step 5: macOS and Windows desktop apps | ✅ Done |
 | N6 | Native apps, step 6: image locators and Linux desktop apps | ✅ Done |
+| N7 | Native apps, step 7: Appium and Maestro export, Electron export, CI workflows | ✅ Done |
+
+---
+
+## N7 — Appium and Maestro export (2026-10-15)
+
+**Delivered**
+- Targets `appium-py`, `appium-ts`, `appium-java` (Android, iOS, macOS, Windows, Linux) and `maestro` (Android, iOS);
+  a native mode in the plan (app operations; elements with the executor's own Appium selectors); capabilities from the
+  environment's launch settings; a runtime helper per language mirroring the executor's per-platform behaviour; Linux
+  exports with StepForge's AT-SPI helper; GitHub Actions workflows per platform.
+- Electron apps: the Playwright Test export starts the app (`_electron.launch()`).
+- Exports page and CLI list the targets for the application's platform; the server refuses them for web apps.
+- `scripts/verify-native-export.ts` runs the exported projects against the demo apps.
+
+**Tests**: snapshots and validity (TypeScript, Python, JSON, YAML) for every native target on every platform; plan
+mapping; server export with launch settings and no secret value; Exports page (E2E). Run on an Android emulator and an
+iOS simulator: every target 3/3 (and a wrong password fails the tests that use it); Electron 3/3. CI runs the exports
+in the `android`, `ios`, `macos-desktop`, `windows-desktop`, `linux-desktop` and `exported-code` jobs.
 
 ---
 

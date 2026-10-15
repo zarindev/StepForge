@@ -114,7 +114,7 @@ function TargetPicker({
 }
 
 const FIRST_FILE = [
-  /\.spec\.ts$|\.cy\.js$|\/test_[^/]+\.py$|Test\.java$/,
+  /\.spec\.ts$|\.test\.ts$|\.cy\.js$|\/test_[^/]+\.py$|Test\.java$|^flows\/[^/]+\.yaml$/,
   /\.feature$/,
   /(^|\/)script\.js$|requests\.sh$/,
   /postman_collection\.json$/,
@@ -215,7 +215,19 @@ export function ExportsPage() {
   const [pom, setPom] = useState(false);
   const [ci, setCi] = useState<string[]>(['github']);
   const [preview, setPreview] = useState<CodegenPreview | null>(null);
-  const info = targets.data?.find((t) => t.id === target);
+  // Appium and Maestro are for phone and desktop apps (Maestro: Android and iOS only).
+  const available = useMemo(
+    () => (targets.data ?? []).filter((t) => !t.platforms || t.platforms.includes(app?.platform ?? 'web')),
+    [targets.data, app?.platform],
+  );
+  const info = available.find((t) => t.id === target);
+  const native = !!app && app.platform !== 'web' && app.platform !== 'electron';
+  useEffect(() => {
+    if (!targets.data || !app) return;
+    // A phone or desktop app starts on Appium; a web app on Playwright.
+    if (native && (!info || info.group === 'UI and hybrid')) setTarget('appium-py');
+    else if (!info) setTarget('playwright-ts');
+  }, [targets.data, app?.id, native]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (envs.data?.length && !envs.data.some((e) => e.id === environmentId))
@@ -383,7 +395,7 @@ export function ExportsPage() {
             ) : targets.isPending ? (
               <Skeleton className="h-40 w-full" />
             ) : (
-              <TargetPicker targets={targets.data ?? []} value={target} onChange={setTarget} />
+              <TargetPicker targets={available} value={target} onChange={setTarget} />
             )}
             {(info?.pom || info?.ci) && (
               <div className="space-y-2 rounded-lg border border-border p-3">

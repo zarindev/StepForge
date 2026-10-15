@@ -1,0 +1,25 @@
+.env.example (15 lines)
+.github/workflows/stepforge-tests.yml (44 lines)
+.gitignore (8 lines)
+conftest.py (38 lines)
+pytest.ini (9 lines)
+README.md (59 lines)
+requirements.txt (7 lines)
+support/__init__.py (1 lines)
+support/api.py (41 lines)
+support/app.py (495 lines)
+support/config.py (51 lines)
+support/helpers.py (285 lines)
+tests/__init__.py (1 lines)
+tests/patients/__init__.py (1 lines)
+tests/patients/test_sign_in_and_add_a_patient.py (52 lines)
+tests/test_gestures_and_device_steps.py (77 lines)
+
+Warnings:
+- Gestures and device steps | ui.navigate | phone and desktop apps have no pages to open; use a deep link (myapp://…) instead
+- Gestures and device steps | ui.click | its locators (CSS) do not exist in phone and desktop apps; add an id, text, label or XPath locator
+- Gestures and device steps | ui.click | image locators (pictures) are not exported; add an id, text, label locator
+- Gestures and device steps | ui.hover | this is a web-page step; phone and desktop apps have no equivalent
+- Gestures and device steps | ui.switchTab | this is a web-page step; phone and desktop apps have no equivalent
+- Gestures and device steps | ui.assert | phone and desktop apps have no URL or page title to check
+-  |  | GitLab CI is not generated for phone and desktop apps (its shared runners have no emulator, simulator or desktop session); the GitHub Actions workflow is

@@ -55,9 +55,9 @@ Covers the whole UI catalogue.
 19. Drag the element "item-a" onto the element "basket"
 20. Scroll down the page
 21. Scroll to the element "footer"
-22. Accept the next browser dialog
+22. Accept the next dialog
 23. Click the element "//button[@id='remove']"
-24. Dismiss the next browser dialog
+24. Dismiss the next dialog
 25. Switch into the frame "iframe#payment"
 26. Type "4242 4242 4242 4242" into the field with placeholder "Card number"
 27. Return to the main page

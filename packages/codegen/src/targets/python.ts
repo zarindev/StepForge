@@ -1,14 +1,24 @@
 import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime, testPath } from '../common.ts';
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
+import {
+  APP_KEY,
+  capabilities,
+  driverSetup,
+  GITLAB_NATIVE,
+  linuxHelper,
+  nativeCi,
+  nativeNotes,
+  PLATFORM_NAMES,
+} from '../native.ts';
 import { pyInt, pyBlock, pyJson, pyStr, pyText, pyVal } from '../lang/py.ts';
 import type { CodegenOptions, GeneratedProject, TargetId } from '../types.ts';
 import { envName, parseString, snake } from '../values.ts';
 
 /**
- * Python + pytest: Playwright (sync API), Selenium, or API only (requests). API, database and email steps are
- * printed the same way for all three; only the browser part differs.
+ * Python + pytest: Playwright (sync API), Selenium, Appium (phone and desktop apps) or API only (requests). API,
+ * database and email steps are printed the same way for all; only the app or browser part differs.
  */
-type Flavor = 'playwright' | 'selenium' | 'api';
+type Flavor = 'playwright' | 'selenium' | 'appium' | 'api';
 
 export function locatorPw(root: string, l: Loc): string {
   const v = (s: string) => pyText(parseString(s));
@@ -58,7 +68,13 @@ type State = {
 
 const next = (s: State, k: string) => `${k}${(s.n[k] = (s.n[k] ?? 0) + 1)}`;
 
+/** Appium selectors as a list of (strategy, value) tuples for support/app.py. */
+export function queriesPy(e: El): string {
+  return `[${(e.queries ?? []).map((q) => `(${pyStr(q.using)}, ${pyText(parseString(q.value))})`).join(', ')}]`;
+}
+
 function el(s: State, e: El): string {
+  if (s.flavor === 'appium') return queriesPy(e);
   if (e.pom && s.root === s.pageVar) {
     const cls = s.plan.pages.get(e.pom.page)!.className;
     s.pages.add(e.pom.page);
@@ -89,7 +105,68 @@ const PW_ASSERT: Record<string, (l: string, e: string, a?: string) => string> = 
   titleContains: (l, e) => `expect(${l}).to_have_title(re.compile(re.escape(${e})))`,
 };
 
+function appiumOp(op: Op, s: State, out: (l: string) => void): boolean {
+  switch (op.op) {
+    case 'act': {
+      const l = el(s, op.el);
+      const v = op.value ? pyText(op.value) : '""';
+      const call: Record<string, string> = {
+        click: `app.click(${l})`,
+        dblclick: `app.double_click(${l})`,
+        fill: `app.fill(${l}, ${v})`,
+        type: `app.type(${l}, ${v})`,
+        clear: `app.clear(${l})`,
+        check: `app.set_checked(${l}, True)`,
+        uncheck: `app.set_checked(${l}, False)`,
+        scrollIntoView: `app.scroll_to(${l})`,
+      };
+      out(call[op.action] ?? `# TODO(StepForge): ${op.action} is not available in phone and desktop apps`);
+      return true;
+    }
+    case 'press':
+      out(`app.press(${pyStr(op.key)}${op.el ? `, ${el(s, op.el)}` : ''})`);
+      return true;
+    case 'assert':
+      out(
+        `app.expect(${pyStr(op.check)}, ${op.el ? el(s, op.el) : '[]'}${op.expected ? `, expected=${op.check === 'count' ? pyVal(op.expected) : pyText(op.expected)}` : ''}${op.attribute ? `, attribute=${pyStr(op.attribute)}` : ''})`,
+      );
+      return true;
+    case 'read': {
+      const value = `app.read(${pyStr(op.source)}, ${op.el ? el(s, op.el) : '[]'}${op.attribute ? `, attribute=${pyStr(op.attribute)}` : ''})`;
+      out(`vars[${pyStr(op.into)}] = ${op.regex ? `capture(${value}, ${pyStr(op.regex)})` : value}`);
+      return true;
+    }
+    case 'waitFor':
+      out(`app.wait_for(${el(s, op.el)}, ${pyStr(op.state)})`);
+      return true;
+    case 'screenshot':
+      out(`app.screenshot(${pyStr(op.name)}${op.el ? `, ${el(s, op.el)}` : ''})`);
+      return true;
+    case 'app':
+      out(
+        `app.${snake(op.method)}(${[...op.els.map((x) => el(s, x)), ...op.args.map((a) => pyVal(a))].join(', ')})`,
+      );
+      return true;
+    case 'goto':
+    case 'select':
+    case 'upload':
+    case 'drag':
+    case 'scroll':
+    case 'waitUrl':
+    case 'waitLoad':
+    case 'dialog':
+    case 'frame':
+    case 'tab':
+    case 'closeTab':
+      out(`# TODO(StepForge): ${op.op} is a web-page step; phone and desktop apps have no equivalent`);
+      return true;
+    default:
+      return false;
+  }
+}
+
 function uiOp(op: Op, s: State, out: (l: string) => void, warn: (m: string) => void): boolean {
+  if (s.flavor === 'appium') return appiumOp(op, s, out);
   if (s.flavor === 'api') {
     if (['comment', 'todo'].includes(op.op)) return false;
     const ui = [
@@ -469,7 +546,7 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
           : s.lastMail
             ? `mail.link(${s.lastMail}${op.contains ? `, contains=${pyText(op.contains)}` : ''}${op.index !== undefined ? `, index=${op.index}` : ''})`
             : '""';
-        if (s.usesUi && s.flavor !== 'api')
+        if (s.usesUi && s.flavor !== 'api' && s.flavor !== 'appium')
           out(s.flavor === 'playwright' ? `${s.pageVar}.goto(${url})` : `browser.goto(${url})`);
         else {
           const r = next(s, 'res');
@@ -522,6 +599,7 @@ function testFile(plan: Plan, t: TestPlan, flavor: Flavor, warn: (m: string) => 
   const fixtures = [
     ...(flavor === 'playwright' && (t.usesUi || tabs) ? ['page'] : []),
     ...(flavor === 'selenium' && t.usesUi ? ['browser'] : []),
+    ...(flavor === 'appium' && t.usesUi ? ['app'] : []),
     ...(/\bhttp\b/.test(code) ? ['http'] : []),
   ];
   const cases = t.scenario.testCases;
@@ -615,6 +693,7 @@ function pageFile(plan: Plan, key: string, flavor: Flavor): string {
 const TITLES: Record<Flavor, string> = {
   playwright: 'Playwright tests (Python + pytest)',
   selenium: 'Selenium tests (Python + pytest)',
+  appium: 'Appium tests (Python + pytest)',
   api: 'API tests (Python + pytest + requests)',
 };
 
@@ -650,6 +729,7 @@ export function generatePython(
     'requests>=2.32',
     ...(flavor === 'playwright' ? ['pytest-playwright>=0.7'] : []),
     ...(flavor === 'selenium' ? ['selenium>=4.27'] : []),
+    ...(flavor === 'appium' ? ['Appium-Python-Client>=4.0'] : []),
     ...(any || engines.has('pg') ? ['psycopg[binary]>=3.2'] : []),
     ...(any || engines.has('mysql') ? ['PyMySQL>=1.1'] : []),
     '',
@@ -675,6 +755,9 @@ export function generatePython(
     '',
     'from support.config import env',
     ...(flavor === 'selenium' ? ['from support.browser import Browser'] : []),
+    ...(flavor === 'appium'
+      ? ['from support.app import App', 'from support.config import APPIUM_URL, CAPABILITIES, PLATFORM']
+      : []),
     '',
     '',
     '@pytest.fixture',
@@ -717,6 +800,33 @@ export function generatePython(
           '    driver.quit()',
         ]
       : []),
+    ...(flavor === 'appium'
+      ? [
+          '',
+          '',
+          '@pytest.fixture',
+          'def app(request):',
+          `    """The app, started for each test through ${plan.native === 'linux' ? "StepForge's Linux helper" : 'Appium'} and closed after it."""`,
+          '    from appium import webdriver',
+          '    from appium.options.common import AppiumOptions',
+          '',
+          '    driver = webdriver.Remote(APPIUM_URL, options=AppiumOptions().load_capabilities(CAPABILITIES))',
+          '    app = App(driver, PLATFORM)',
+          '    yield app',
+          '    # A failed test keeps a screenshot of the screen.',
+          '    report = getattr(request.node, "rep_call", None)',
+          '    if report is not None and report.failed:',
+          '        app.screenshot(f"{request.node.name}-failed")',
+          '    driver.quit()',
+          '',
+          '',
+          '@pytest.hookimpl(hookwrapper=True)',
+          'def pytest_runtest_makereport(item, call):',
+          '    outcome = yield',
+          '    report = outcome.get_result()',
+          '    setattr(item, f"rep_{report.when}", report)',
+        ]
+      : []),
     '',
   ].join('\n');
   files['support/__init__.py'] = '';
@@ -749,6 +859,20 @@ export function generatePython(
     'def absolute(url):',
     '    return url if url.startswith(("http://", "https://")) else urljoin(env["base_url"].rstrip("/") + "/", url.lstrip("/"))',
     '',
+    ...(flavor === 'appium' && plan.native
+      ? [
+          '',
+          `# ${PLATFORM_NAMES[plan.native]}: the capabilities StepForge starts the app with (from the ${plan.input.environment.name} environment).`,
+          `PLATFORM = ${pyStr(plan.native)}`,
+          'APPIUM_URL = os.environ.get("APPIUM_URL", "http://127.0.0.1:4723")',
+          `CAPABILITIES = ${pyVal(capabilities(plan.native, plan.input.environment.launch))}`,
+          'if os.environ.get("APP"):',
+          `    CAPABILITIES[${pyStr(APP_KEY[plan.native])}] = os.environ["APP"]`,
+          `if os.path.exists(CAPABILITIES.get(${pyStr(APP_KEY[plan.native])}) or ""):`,
+          `    CAPABILITIES[${pyStr(APP_KEY[plan.native])}] = os.path.abspath(CAPABILITIES[${pyStr(APP_KEY[plan.native])}])`,
+          '',
+        ]
+      : []),
   ].join('\n');
   files['support/helpers.py'] = runtime('py/helpers.py');
   files['support/api.py'] = runtime('py/api.py');
@@ -757,6 +881,10 @@ export function generatePython(
   if (flavor === 'selenium') {
     files['support/browser.py'] = runtime('py/browser.py');
     files['support/find.js'] = runtime('selenium/find.js');
+  }
+  if (flavor === 'appium') {
+    files['support/app.py'] = runtime('py/app.py');
+    if (plan.native === 'linux') files['tools/stepforge_atspi.py'] = linuxHelper();
   }
   if (/switch_tab\(/.test(all) && flavor === 'playwright')
     files['support/tabs.py'] = [
@@ -796,7 +924,27 @@ export function generatePython(
       files[`${dir}/__init__.py`] ??= '';
     }
   Object.assign(files, plan.sqlFiles);
-  Object.assign(files, ciFiles(plan, flavor === 'playwright' ? 'python-playwright' : 'python', o.ci));
+  if (flavor === 'appium' && plan.native) {
+    Object.assign(
+      files,
+      nativeCi(
+        plan,
+        plan.native,
+        {
+          setup: [
+            '      - uses: actions/setup-python@v5',
+            '        with:',
+            "          python-version: '3.12'",
+            '      - run: pip install -r requirements.txt',
+          ],
+          test: 'pytest',
+        },
+        o.ci,
+        plan.native !== 'linux',
+      ),
+    );
+    if (o.ci?.includes('gitlab')) warnings.push(GITLAB_NATIVE);
+  } else Object.assign(files, ciFiles(plan, flavor === 'playwright' ? 'python-playwright' : 'python', o.ci));
   files['.env.example'] = envExample(plan);
   files['.gitignore'] = [
     '.venv/',
@@ -812,6 +960,7 @@ export function generatePython(
     'python -m venv .venv && . .venv/bin/activate   # Windows: .venv\\Scripts\\activate',
     'pip install -r requirements.txt',
     ...(flavor === 'playwright' ? ['python -m playwright install chromium'] : []),
+    ...(flavor === 'appium' && plan.native ? driverSetup(plan.native) : []),
   ];
   files['README.md'] = readme(
     { ...plan, warnings },
@@ -827,7 +976,8 @@ export function generatePython(
       layout: [
         '`tests/` — one module per scenario, grouped by module folder; test cases are parametrised',
         ...(plan.pages.size && flavor !== 'api' ? ['`pages/` — page objects'] : []),
-        '`support/` — configuration (environment variables, secrets) and helpers',
+        `\`support/\` — configuration (environment variables, secrets${flavor === 'appium' ? ', Appium capabilities' : ''}) and helpers`,
+        ...(flavor === 'appium' && plan.native === 'linux' ? ["`tools/` — StepForge's Linux helper"] : []),
         ...(Object.keys(plan.sqlFiles).length ? ['`sql/` — the SQL of each database step'] : []),
       ],
       notes: [
@@ -836,6 +986,7 @@ export function generatePython(
               'Elements are found by role, label, text and test id like in StepForge (support/find.js), and every lookup and check waits up to 10 s.',
             ]
           : []),
+        ...(flavor === 'appium' && plan.native ? nativeNotes(plan.native) : []),
         `Exported on ${day(plan.input)}; re-export from StepForge after changing the scenarios.`,
       ],
     },

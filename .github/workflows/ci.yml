@@ -58,6 +58,8 @@ jobs:
       - run: npm run mailpit:install
       - run: npx playwright install --with-deps chromium
       - run: npm run verify:export
+      # An Electron app's export starts the app itself (N7): the demo notes app, in a virtual display.
+      - run: xvfb-run -a npx tsx scripts/verify-native-export.ts --platform electron
 
   fresh-clone:
     # Phase 13: a fresh clone with only Node + Git → setup → start → onboarding → demo workspace → a run that
@@ -185,6 +187,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run appium:install
+      # Maestro (open source) for the exported Maestro flows; it sends no usage data.
+      - run: curl -fsSL "https://get.maestro.mobile.dev" | bash
+        env:
+          MAESTRO_CLI_NO_ANALYTICS: '1'
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -200,8 +206,10 @@ jobs:
           target: google_apis
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          # One emulator: the test files take turns.
-          script: STEPFORGE_TEST_ANDROID=1 npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts
+          # One emulator: the test files take turns. Then the exported Appium and Maestro projects run on it (N7).
+          script: |
+            STEPFORGE_TEST_ANDROID=1 npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts
+            MAESTRO=$HOME/.maestro/bin/maestro npx tsx scripts/verify-native-export.ts --platform android --targets appium-py,appium-ts,appium-java,maestro
       - if: steps.android-1.outcome == 'failure'
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -210,8 +218,10 @@ jobs:
           target: google_apis
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          # One emulator: the test files take turns.
-          script: STEPFORGE_TEST_ANDROID=1 npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts
+          # One emulator: the test files take turns. Then the exported Appium and Maestro projects run on it (N7).
+          script: |
+            STEPFORGE_TEST_ANDROID=1 npx vitest run --no-file-parallelism packages/executors/native apps/server/test/android-apps.test.ts
+            MAESTRO=$HOME/.maestro/bin/maestro npx tsx scripts/verify-native-export.ts --platform android --targets appium-py,appium-ts,appium-java,maestro
 
   ios:
     # iOS apps: the demo app (demo/ios-app, built with Xcode's compiler) on a simulator, through Appium (XCUITest).
@@ -235,6 +245,8 @@ jobs:
       - run: npx vitest run --no-file-parallelism --retry=1 packages/executors/native/test/ios.test.ts apps/server/test/ios-apps.test.ts
         env:
           STEPFORGE_TEST_IOS: '1'
+      # The exported Appium projects on the same simulator (N7), with one more attempt for the same reason.
+      - run: npx tsx scripts/verify-native-export.ts --platform ios --simulator auto --attempts 2 --targets appium-py,appium-ts
 
   macos-desktop:
     # Native macOS apps: the demo app (demo/macos-app, AppKit) through Appium (Mac2). Automation Mode lets XCTest
@@ -257,6 +269,8 @@ jobs:
       - run: npx vitest run packages/executors/native/test/desktop.test.ts
         env:
           STEPFORGE_TEST_MACOS: '1'
+      # The exported Appium projects against the same app (N7).
+      - run: npx tsx scripts/verify-native-export.ts --platform macos --targets appium-py,appium-ts,appium-java
 
   windows-desktop:
     # Native Windows apps: the demo app (demo/windows-app, WinForms, built with .NET) through Appium (NovaWindows).
@@ -276,6 +290,8 @@ jobs:
       - run: npx vitest run packages/executors/native/test/desktop.test.ts
         env:
           STEPFORGE_TEST_WINDOWS: '1'
+      # The exported Appium projects against the same app (N7).
+      - run: npx tsx scripts/verify-native-export.ts --platform windows --targets appium-py,appium-ts,appium-java
 
   linux-desktop:
     # Linux desktop apps: the demo GTK app (demo/linux-app) through StepForge's AT-SPI helper, in a D-Bus session
@@ -292,9 +308,11 @@ jobs:
       - name: Install GTK and the accessibility layer
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-atspi-2.0 at-spi2-core xvfb dbus-x11
+          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-atspi-2.0 at-spi2-core xvfb dbus-x11 python3-venv
       - run: dbus-run-session -- xvfb-run -a node apps/cli/bin/stepforge.mjs doctor native --platform linux
         continue-on-error: true
       - run: dbus-run-session -- xvfb-run -a npx vitest run packages/executors/native/test/linux.test.ts
         env:
           STEPFORGE_TEST_LINUX: '1'
+      # The exported projects against the same app, through StepForge's helper (N7).
+      - run: dbus-run-session -- xvfb-run -a npx tsx scripts/verify-native-export.ts --platform linux --targets appium-py,appium-ts,appium-java

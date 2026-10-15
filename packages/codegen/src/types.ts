@@ -34,7 +34,10 @@ export type CodegenScenario = {
 };
 
 export type CodegenInput = {
-  /** `platform` electron / android / ios: the exported UI tests still open a browser — see the warning. */
+  /**
+   * `platform`: web and Electron apps export to the browser targets (Electron UI tests open a browser — see the
+   * warning); phone and desktop apps export to Appium and Maestro.
+   */
   application: {
     name: string;
     slug: string;
@@ -47,6 +50,11 @@ export type CodegenInput = {
     variables: Record<string, string>;
     /** Names only. */
     secretKeys: string[];
+    /**
+     * How the environment starts a phone or desktop app (its Android / iOS / macOS / Windows / Linux launch
+     * settings, as stored), for the Appium and Maestro exports. Values may hold {{env.x}} placeholders.
+     */
+    launch?: Record<string, unknown>;
   };
   connections: { name: string; engine: 'pg' | 'mysql' | 'mssql' | 'sqlite' | 'mongo' }[];
   inboxes: { name: string; kind: 'mailpit' | 'imap' }[];
@@ -63,6 +71,9 @@ export type CodegenInput = {
 };
 
 export type CiProvider = 'github' | 'gitlab';
+
+export type AppPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'linux';
+export const APP_PLATFORMS: AppPlatform[] = ['android', 'ios', 'macos', 'windows', 'linux'];
 
 export type CodegenOptions = {
   target: TargetId;
@@ -93,6 +104,10 @@ export const TARGET_IDS = [
   'k6',
   'postman',
   'curl',
+  'appium-ts',
+  'appium-py',
+  'appium-java',
+  'maestro',
   'docs-markdown',
   'docs-gherkin',
   'docs-xlsx',

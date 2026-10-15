@@ -45,7 +45,15 @@ describe('code export', () => {
   it('lists the targets', async () => {
     const targets = await ok<{ id: string }[]>('GET', '/api/codegen/targets');
     expect(targets.map((t) => t.id)).toEqual(TARGETS.map((t) => t.id));
-    expect(targets).toHaveLength(13);
+    expect(targets).toHaveLength(17);
+  });
+
+  it('refuses the Appium and Maestro exports for a web app', async () => {
+    const res = await call('POST', `/api/applications/${appId}/codegen/preview`, { target: 'appium-py' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toBe(
+      'The Appium + pytest export is for phone and desktop apps; this is a web app',
+    );
   });
 
   it('previews a Playwright project with warnings', async () => {
@@ -72,7 +80,8 @@ describe('code export', () => {
   });
 
   it('never writes a secret value into any target', async () => {
-    for (const t of TARGETS) {
+    // A web app: the browser, API and document targets (phone and desktop apps: android-apps.test.ts).
+    for (const t of TARGETS.filter((x) => !x.platforms)) {
       const res = await call('POST', `/api/applications/${appId}/codegen/download`, {
         target: t.id,
         pom: t.pom,

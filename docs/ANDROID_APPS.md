@@ -189,6 +189,13 @@ Give each device its own environment (one emulator, one phone, one iPhone simula
 A campaign runs a phone app once per environment, with one combined report. The browsers and screen sizes of the
 campaign only apply to web apps.
 
+## Code export
+
+**Exports** turns Android tests into an Appium project (Python + pytest, TypeScript + WebdriverIO, or Java + JUnit 5)
+or Maestro flows, with the environment's app and emulator as capabilities and a GitHub Actions workflow that starts an
+emulator. Each step keeps the Appium selectors StepForge uses, best first. See
+[CODEGEN.md](CODEGEN.md#phone-and-desktop-apps-appium-maestro).
+
 ## Running in CI
 
 The same tests run from the CLI (`stepforge run --app careclinic-mobile --env Emulator`). Linux CI runners can start an

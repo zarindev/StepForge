@@ -2,7 +2,7 @@ import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime, testPat
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
 import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject } from '../types.ts';
-import { camel, envName, kebab, parseString } from '../values.ts';
+import { camel, envName, kebab, parseString, val } from '../values.ts';
 
 /** Playwright Test (TypeScript): UI with locators or page objects, API through the request fixture, DB and email helpers. */
 
@@ -35,7 +35,9 @@ export function locatorTs(root: string, l: Loc): string {
   }
 }
 
-type State = {
+export type State = {
+  /** Playwright (browser), or Appium through WebdriverIO (phone and desktop apps, see appium-ts.ts). */
+  flavor?: 'playwright' | 'appium';
   lines: string[];
   pageVar: string;
   root: string;
@@ -48,7 +50,7 @@ type State = {
   imports: Set<string>;
 };
 
-const next = (s: State, k: string) => `${k}${(s.n[k] = (s.n[k] ?? 0) + 1)}`;
+export const next = (s: State, k: string) => `${k}${(s.n[k] = (s.n[k] ?? 0) + 1)}`;
 
 function loc(s: State, e: El): string {
   if (e.pom && s.root === s.pageVar) {
@@ -79,9 +81,85 @@ const ASSERT: Record<string, (l: string, e: string, attr?: string) => string> = 
   titleContains: (l, e) => `${l}).toHaveTitle(containing(${e}))`,
 };
 
-function printOps(ops: Op[], s: State, ind: string): void {
+/** Appium selectors as [strategy, value] pairs for support/app.ts. */
+export const queriesTs = (e: El) =>
+  `[${(e.queries ?? []).map((q) => `[${jsStr(q.using)}, ${jsText(parseString(q.value))}]`).join(', ')}]`;
+
+/** Phone and desktop-app steps (WebdriverIO + support/app.ts); false for the steps shared with the web. */
+function appiumOp(op: Op, out: (line: string) => void): boolean {
+  const q = queriesTs;
+  switch (op.op) {
+    case 'act': {
+      const v = op.value ? jsText(op.value) : "''";
+      const call: Record<string, string> = {
+        click: `click(${q(op.el)})`,
+        dblclick: `doubleClick(${q(op.el)})`,
+        fill: `fill(${q(op.el)}, ${v})`,
+        type: `type(${q(op.el)}, ${v})`,
+        clear: `clear(${q(op.el)})`,
+        check: `setChecked(${q(op.el)}, true)`,
+        uncheck: `setChecked(${q(op.el)}, false)`,
+        scrollIntoView: `scrollTo(${q(op.el)})`,
+      };
+      out(
+        call[op.action]
+          ? `await app.${call[op.action]};`
+          : `// TODO(StepForge): ${op.action} is not available in phone and desktop apps`,
+      );
+      return true;
+    }
+    case 'press':
+      out(`await app.press(${jsStr(op.key)}${op.el ? `, ${q(op.el)}` : ''});`);
+      return true;
+    case 'assert': {
+      const args = [
+        jsStr(op.check),
+        op.el ? q(op.el) : '[]',
+        ...(op.expected || op.attribute
+          ? [op.expected ? (op.check === 'count' ? jsNum(op.expected) : jsText(op.expected)) : 'undefined']
+          : []),
+        ...(op.attribute ? [jsStr(op.attribute)] : []),
+      ];
+      out(`await app.expect(${args.join(', ')});`);
+      return true;
+    }
+    case 'read': {
+      const value = `await app.read(${jsStr(op.source)}, ${op.el ? q(op.el) : '[]'}${op.attribute ? `, ${jsStr(op.attribute)}` : ''})`;
+      out(`vars.${op.into} = ${op.regex ? `capture(String(${value}), ${jsStr(op.regex)})` : value};`);
+      return true;
+    }
+    case 'waitFor':
+      out(`await app.waitFor(${q(op.el)}, ${jsStr(op.state)});`);
+      return true;
+    case 'screenshot':
+      out(`await app.screenshot(${jsStr(op.name)}${op.el ? `, ${q(op.el)}` : ''});`);
+      return true;
+    case 'app':
+      out(`await app.${op.method}(${[...op.els.map(q), ...op.args.map((a) => jsVal(a))].join(', ')});`);
+      return true;
+    case 'goto':
+    case 'select':
+    case 'upload':
+    case 'drag':
+    case 'scroll':
+    case 'waitUrl':
+    case 'waitLoad':
+    case 'dialog':
+    case 'frame':
+    case 'tab':
+    case 'closeTab':
+      out(`// TODO(StepForge): ${op.op} is a web-page step; phone and desktop apps have no equivalent`);
+      return true;
+    default:
+      return false;
+  }
+}
+
+export function printOps(ops: Op[], s: State, ind: string): void {
   const out = (line: string) => s.lines.push(`${ind}${line}`);
+  const appium = s.flavor === 'appium';
   for (const op of ops) {
+    if (appium && appiumOp(op, out)) continue;
     switch (op.op) {
       case 'comment':
         out(`// ${op.text}`);
@@ -219,7 +297,7 @@ function printOps(ops: Op[], s: State, ind: string): void {
                 : op.bodyType === 'raw'
                   ? [`data: ${jsText(op.body)},`]
                   : [`json: ${jsVal(op.body, i2)},`];
-        out(`const ${r} = await api(request, {`);
+        out(appium ? `const ${r} = await api({` : `const ${r} = await api(request, {`);
         out(`  method: ${jsStr(op.method)},`);
         out(`  url: ${jsVal(op.url)},`);
         if (headers.length) out(`  headers: { ${headers.join(', ')} },`);
@@ -227,7 +305,7 @@ function printOps(ops: Op[], s: State, ind: string): void {
         for (const b of body) out(`  ${b}`);
         out('});');
         for (const a of op.asserts) {
-          if (a.target === 'status' && a.operator === 'equals')
+          if (a.target === 'status' && a.operator === 'equals' && !appium)
             out(`expect(${r}.status, 'status').toBe(${jsVal(a.expected)});`);
           else
             out(
@@ -262,7 +340,7 @@ function printOps(ops: Op[], s: State, ind: string): void {
         break;
       case 'wait':
         out(
-          s.usesUi
+          s.usesUi && !appium
             ? `await ${s.pageVar}.waitForTimeout(${op.ms});`
             : `await new Promise((resolve) => setTimeout(resolve, ${op.ms}));`,
         );
@@ -365,10 +443,10 @@ function printOps(ops: Op[], s: State, ind: string): void {
           : s.lastMail
             ? `mail.link(${s.lastMail}, { ${[...(op.contains ? [`contains: ${jsText(op.contains)}`] : []), ...(op.index !== undefined ? [`index: ${op.index}`] : [])].join(', ')} })`
             : "''";
-        if (s.usesUi) out(`await ${s.pageVar}.goto(${url});`);
+        if (s.usesUi && !appium) out(`await ${s.pageVar}.goto(${url});`);
         else {
           const r = next(s, 'res');
-          out(`const ${r} = await api(request, { method: 'GET', url: ${url} });`);
+          out(`const ${r} = await api(${appium ? '' : 'request, '}{ method: 'GET', url: ${url} });`);
           s.lastApi = r;
         }
         break;
@@ -377,7 +455,7 @@ function printOps(ops: Op[], s: State, ind: string): void {
   }
 }
 
-function needs(t: TestPlan) {
+export function needs(t: TestPlan) {
   const flat: Op[] = [];
   const walk = (ops: Op[]) =>
     ops.forEach((o) => {
@@ -400,7 +478,7 @@ function needs(t: TestPlan) {
   };
 }
 
-const usedHelpers = (code: string) =>
+export const usedHelpers = (code: string) =>
   ['check', 'compare', 'pick', 'fake', 'field', 'capture', 'containing', 'random', 'runId'].filter((h) =>
     new RegExp(`\\b${h}\\b[.(]?`).test(code.replace(/\/\/.*$/gm, '')),
   );
@@ -429,7 +507,10 @@ function specFile(plan: Plan, t: TestPlan, path: string): string {
 
   const head = [
     ...headerLines(plan.input, t.scenario).map((l) => `// ${l}`),
-    "import { test, expect } from '@playwright/test';",
+    // An Electron app: the test's page is the app's first window (support/electron.ts starts the app).
+    electronLaunch(plan)
+      ? `import { test, expect } from '${up}support/electron';`
+      : "import { test, expect } from '@playwright/test';",
     ...(/\benv\b|\bsecret\(/.test(body)
       ? [
           `import { ${['env', 'secret'].filter((x) => new RegExp(`\\b${x}\\b`).test(body)).join(', ')} } from '${up}support/config';`,
@@ -512,6 +593,94 @@ function configFile(plan: Plan): string {
   ].join('\n');
 }
 
+/** An Electron app's launch settings (executable or app folder), when the environment has them. */
+const electronLaunch = (plan: Plan) =>
+  plan.input.application.platform === 'electron' ? plan.input.environment.launch : undefined;
+
+/** Starts the Electron app for each test, as StepForge does (Playwright's _electron.launch()). */
+function electronFile(plan: Plan): string {
+  const l = electronLaunch(plan)!;
+  const opt = (k: string) => (typeof l[k] === 'string' && l[k] ? jsVal(val(l[k])) : 'undefined');
+  const launchLines = [
+    'const LAUNCH = {',
+    `  executablePath: ${opt('executablePath')} as string | undefined,`,
+    `  appPath: ${opt('appPath')} as string | undefined,`,
+    `  args: ${jsVal(val(Array.isArray(l.args) ? l.args : []))} as string[],`,
+    `  cwd: ${opt('cwd')} as string | undefined,`,
+    `  env: ${jsVal(val(l.env && typeof l.env === 'object' ? l.env : {}))} as Record<string, string>,`,
+    '};',
+  ];
+  return [
+    `// ${CREDIT}`,
+    "import { _electron, test as base, type ElectronApplication } from '@playwright/test';",
+    "import { existsSync, statSync } from 'node:fs';",
+    "import { createRequire } from 'node:module';",
+    "import { dirname, isAbsolute, join, resolve } from 'node:path';",
+    // {{env.x}} in the launch settings reads the exported configuration.
+    ...(/\benv\b/.test(launchLines.join('\n').replace(/env: /, ''))
+      ? ["import { env } from './config';"]
+      : []),
+    '',
+    "export { expect } from '@playwright/test';",
+    '',
+    `/** How the ${plan.input.environment.name} environment starts the app. APP: another executable, app folder or main script. */`,
+    ...launchLines,
+    '',
+    '/** The Electron of an app folder or main script: the `electron` package installed in that project, as `npm start` uses it. */',
+    'function electronFor(appPath: string): string | undefined {',
+    '  const start = statSync(appPath).isFile() ? dirname(appPath) : appPath;',
+    '  try {',
+    "    const bin = createRequire(join(resolve(start), 'package.json'))('electron') as unknown;",
+    "    return typeof bin === 'string' && existsSync(bin) ? bin : undefined;",
+    '  } catch {',
+    '    return undefined;',
+    '  }',
+    '}',
+    '',
+    'async function launch(): Promise<ElectronApplication> {',
+    '  const cwd = LAUNCH.cwd ? resolve(LAUNCH.cwd) : undefined;',
+    '  const abs = (p: string) => (isAbsolute(p) ? p : resolve(cwd ?? process.cwd(), p));',
+    '  const override = process.env.APP;',
+    '  const args = [...LAUNCH.args];',
+    '  let executablePath = LAUNCH.executablePath && abs(LAUNCH.executablePath);',
+    '  let appPath = LAUNCH.appPath && abs(LAUNCH.appPath);',
+    '  if (override) {',
+    '    const p = abs(override);',
+    '    if (statSync(p).isDirectory() || /\\.(c|m)?js$/.test(p)) [appPath, executablePath] = [p, undefined];',
+    '    else [executablePath, appPath] = [p, undefined];',
+    '  }',
+    '  if (appPath) {',
+    '    executablePath = electronFor(appPath);',
+    '    if (!executablePath)',
+    "      throw new Error(`No Electron found for ${appPath}: install it in the app's project (npm install electron), or set APP to the app executable`);",
+    '    args.unshift(appPath);',
+    '  }',
+    "  if (!executablePath) throw new Error('Set APP to the app executable or its folder');",
+    '  const childEnv: Record<string, string> = {};',
+    '  for (const [k, v] of Object.entries(process.env)) if (v !== undefined) childEnv[k] = v;',
+    '  // Set in terminals of VS Code-based editors: it makes Electron behave like plain Node.js.',
+    '  delete childEnv.ELECTRON_RUN_AS_NODE;',
+    '  return _electron.launch({ executablePath, args, cwd, env: { ...childEnv, ...LAUNCH.env } });',
+    '}',
+    '',
+    "/** Each test starts the app; its `page` is the app's first window (other windows are its other pages). */",
+    'export const test = base.extend<{ electronApp: ElectronApplication }>({',
+    '  // eslint-disable-next-line no-empty-pattern',
+    '  electronApp: async ({}, use) => {',
+    '    const app = await launch();',
+    '    await use(app);',
+    '    await app.close();',
+    '  },',
+    '  page: async ({ electronApp }, use) => {',
+    '    const page = await electronApp.firstWindow();',
+    "    await page.waitForLoadState('domcontentloaded');",
+    '    await use(page);',
+    '  },',
+    '});',
+    '',
+  ].join('\n');
+}
+
 function pageFile(plan: Plan, key: string): string {
   const p = plan.pages.get(key)!;
   return [
@@ -533,6 +702,11 @@ function pageFile(plan: Plan, key: string): string {
 
 export function generatePlaywrightTs(plan: Plan, o: CodegenOptions): GeneratedProject {
   const files: Record<string, string> = {};
+  const electron = !!electronLaunch(plan);
+  // The tests start the Electron app themselves: no browser warning.
+  const warnings = electron
+    ? plan.warnings.filter((w) => !w.message.includes('_electron.launch()'))
+    : plan.warnings;
   const slug = kebab(plan.input.application.slug || plan.input.application.name);
   for (const t of plan.tests) {
     const path = testPath(t, (b) => `${b}.spec.ts`);
@@ -580,7 +754,9 @@ export function generatePlaywrightTs(plan: Plan, o: CodegenOptions): GeneratedPr
     "    trace: 'retain-on-failure',",
     "    screenshot: 'only-on-failure',",
     '  },',
-    "  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],",
+    electron
+      ? "  // The app's own window (support/electron.ts), not a browser.\n  projects: [{ name: 'electron' }],"
+      : "  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],",
     '});',
     '',
   ].join('\n');
@@ -604,6 +780,7 @@ export function generatePlaywrightTs(plan: Plan, o: CodegenOptions): GeneratedPr
   );
   files['support/config.ts'] = configFile(plan);
   files['support/helpers.ts'] = runtime('ts/helpers.ts');
+  if (electron) files['support/electron.ts'] = electronFile(plan);
   if (plan.tests.some((t) => needs(t).api)) files['support/api.ts'] = runtime('ts/api.ts');
   if (anyDb) files['support/db.ts'] = runtime('ts/db.ts');
   if (plan.tests.some((t) => needs(t).mail)) files['support/mail.ts'] = runtime('ts/mail.ts');
@@ -611,31 +788,47 @@ export function generatePlaywrightTs(plan: Plan, o: CodegenOptions): GeneratedPr
   for (const key of plan.pages.keys())
     files[`pages/${plan.pages.get(key)!.className}.ts`] = pageFile(plan, key);
   Object.assign(files, plan.sqlFiles);
-  Object.assign(files, ciFiles(plan, 'node-playwright', o.ci));
-  files['README.md'] = readme(plan, {
-    title: 'Playwright tests (TypeScript)',
-    install: ['npm install', 'npx playwright install chromium'],
-    run: [
-      'npx playwright test            # all tests',
-      'npx playwright test --headed   # watch the browser',
-      'npx playwright show-report     # HTML report',
-    ],
-    layout: [
-      '`tests/` — one spec per scenario, grouped by module; one test per test case',
-      ...(plan.pages.size ? ['`pages/` — page objects (one class per page, one getter per element)'] : []),
-      '`support/` — configuration (environment variables, secrets) and helpers',
-      ...(Object.keys(plan.sqlFiles).length ? ['`sql/` — the SQL of each database step'] : []),
-      '`results/junit.xml` — JUnit results for CI',
-    ],
-    notes: [
-      'Locators are the first (best-ranked) locator StepForge recorded. StepForge falls back to the others at run time ("self-healing"); exported tests do not.',
-      `Exported on ${day(plan.input)}; re-export from StepForge after changing the scenarios.`,
-    ],
-  });
+  const ci = ciFiles(plan, 'node-playwright', o.ci);
+  // Electron opens real windows: on Linux runners, in a virtual display.
+  if (electron)
+    for (const k of Object.keys(ci))
+      ci[k] = ci[k]!.replace('- run: npx playwright test', '- run: xvfb-run -a npx playwright test').replace(
+        '    - npx playwright test',
+        '    - xvfb-run -a npx playwright test',
+      );
+  Object.assign(files, ci);
+  files['README.md'] = readme(
+    { ...plan, warnings },
+    {
+      title: electron ? 'Playwright tests of an Electron app (TypeScript)' : 'Playwright tests (TypeScript)',
+      install: ['npm install', 'npx playwright install chromium'],
+      run: [
+        'npx playwright test            # all tests',
+        'npx playwright test --headed   # watch the browser',
+        'npx playwright show-report     # HTML report',
+      ],
+      layout: [
+        '`tests/` — one spec per scenario, grouped by module; one test per test case',
+        ...(plan.pages.size ? ['`pages/` — page objects (one class per page, one getter per element)'] : []),
+        '`support/` — configuration (environment variables, secrets) and helpers',
+        ...(Object.keys(plan.sqlFiles).length ? ['`sql/` — the SQL of each database step'] : []),
+        '`results/junit.xml` — JUnit results for CI',
+      ],
+      notes: [
+        ...(electron
+          ? [
+              "Each test starts the Electron app (support/electron.ts, from the environment's launch settings) and closes it; its `page` is the app's first window. Set `APP` to test another build. Linux servers need a display: `xvfb-run -a npx playwright test`.",
+            ]
+          : []),
+        'Locators are the first (best-ranked) locator StepForge recorded. StepForge falls back to the others at run time ("self-healing"); exported tests do not.',
+        `Exported on ${day(plan.input)}; re-export from StepForge after changing the scenarios.`,
+      ],
+    },
+  );
   return {
     target: 'playwright-ts',
     files,
-    warnings: plan.warnings,
+    warnings,
     run: 'npm install && npx playwright install chromium && npx playwright test',
   };
 }

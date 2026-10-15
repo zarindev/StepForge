@@ -694,11 +694,13 @@ export type UpcomingSchedule = {
 export type CodegenTarget = {
   id: string;
   label: string;
-  group: 'UI and hybrid' | 'API' | 'Documentation';
+  group: 'UI and hybrid' | 'Phone and desktop apps' | 'API' | 'Documentation';
   language: string;
   pom: boolean;
   ci: boolean;
   apiOnly: boolean;
+  /** Only for these app platforms (phone and desktop apps); absent = any application. */
+  platforms?: string[];
 };
 export type CodegenPreview = {
   target: string;

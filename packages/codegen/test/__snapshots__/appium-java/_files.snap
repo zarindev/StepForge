@@ -1,0 +1,26 @@
+.env.example (15 lines)
+.github/workflows/stepforge-tests.yml (44 lines)
+.gitignore (4 lines)
+pom.xml (62 lines)
+README.md (58 lines)
+src/test/java/support/Api.java (30 lines)
+src/test/java/support/ApiTest.java (17 lines)
+src/test/java/support/App.java (638 lines)
+src/test/java/support/AppTest.java (39 lines)
+src/test/java/support/Capabilities.java (28 lines)
+src/test/java/support/Checks.java (210 lines)
+src/test/java/support/Config.java (41 lines)
+src/test/java/support/Db.java (74 lines)
+src/test/java/support/Fake.java (74 lines)
+src/test/java/support/J.java (34 lines)
+src/test/java/tests/GesturesAndDeviceStepsTest.java (89 lines)
+src/test/java/tests/patients/SignInAndAddAPatientTest.java (77 lines)
+
+Warnings:
+- Gestures and device steps | ui.navigate | phone and desktop apps have no pages to open; use a deep link (myapp://…) instead
+- Gestures and device steps | ui.click | its locators (CSS) do not exist in phone and desktop apps; add an id, text, label or XPath locator
+- Gestures and device steps | ui.click | image locators (pictures) are not exported; add an id, text, label locator
+- Gestures and device steps | ui.hover | this is a web-page step; phone and desktop apps have no equivalent
+- Gestures and device steps | ui.switchTab | this is a web-page step; phone and desktop apps have no equivalent
+- Gestures and device steps | ui.assert | phone and desktop apps have no URL or page title to check
+-  |  | GitLab CI is not generated for phone and desktop apps (its shared runners have no emulator, simulator or desktop session); the GitHub Actions workflow is

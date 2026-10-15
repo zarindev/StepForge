@@ -95,8 +95,9 @@ printf '%s' "$ADMIN_PASSWORD" | ./stepforge.sh secret set --app careclinic --env
 ### `codegen`
 
 Writes a ready-to-run project (or document) into a folder: `stepforge codegen --list` shows the targets
-(`playwright-ts`, `cypress-js`, `selenium-java`, `k6`, `postman`, `docs-gherkin`…). `--pom` uses page objects,
-`--ci github,gitlab` adds CI files. Warnings (steps that need attention) are printed. See [CODEGEN.md](CODEGEN.md).
+(`playwright-ts`, `cypress-js`, `selenium-java`, `appium-py`, `maestro`, `k6`, `postman`, `docs-gherkin`…), and
+which platforms the Appium and Maestro targets are for. `--pom` uses page objects, `--ci github,gitlab` adds CI files.
+Warnings (steps that need attention) are printed. See [CODEGEN.md](CODEGEN.md).
 
 ```bash
 ./stepforge.sh codegen --app careclinic --target playwright-ts --out ../careclinic-tests --ci github

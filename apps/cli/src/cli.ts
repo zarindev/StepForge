@@ -543,7 +543,9 @@ const secretCmd: Handler = async (c, v, io) => {
 const codegenCmd: Handler = async (c, v, io) => {
   if (v.list) {
     for (const t of TARGETS)
-      io.out(`${t.id.padEnd(16)} ${t.label} (${t.language})${t.pom ? ' · --pom' : ''}`);
+      io.out(
+        `${t.id.padEnd(16)} ${t.label} (${t.language})${t.pom ? ' · --pom' : ''}${t.platforms ? ` · ${t.platforms.join(', ')} apps` : ''}`,
+      );
     return EXIT.passed;
   }
   const { db } = c.ctx;

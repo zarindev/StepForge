@@ -43,6 +43,9 @@ test('exports: preview, page objects, download and history (Phase 12)', async ({
 
   await page.goto('/exports');
   await expect(page.getByLabel('Application', { exact: true })).toHaveValue(imported.applicationId);
+  // A web app: no Appium or Maestro targets (they are for phone and desktop apps).
+  await expect(page.getByRole('radio', { name: /Playwright Test/ })).toBeVisible();
+  await expect(page.getByRole('radio', { name: /Appium|Maestro/ })).toHaveCount(0);
   await page.getByRole('radio', { name: /Playwright Test/ }).click();
   await page.getByRole('button', { name: 'Preview' }).click();
   const files = page.getByTestId('export-files');

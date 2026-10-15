@@ -165,7 +165,10 @@ export function describeStep(step: AnyStep): string {
       s = 'Close the current tab';
       break;
     case 'ui.handleDialog':
-      s = `${p.action === 'dismiss' ? 'Dismiss' : 'Accept'} the next browser dialog`;
+      // Browser dialogs, and the alerts and sheets of phone and desktop apps.
+      s = p.buttonLabel
+        ? `Press ${q(p.buttonLabel)} in the dialog`
+        : `${p.action === 'dismiss' ? 'Dismiss' : 'Accept'} the next dialog`;
       break;
     case 'ui.switchFrame':
       s = p.main || !p.selector ? 'Return to the main page' : `Switch into the frame ${q(p.selector)}`;

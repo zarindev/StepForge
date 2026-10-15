@@ -279,7 +279,9 @@ def handle(method, parts, body):
     if parts == ["status"]:
         return {"ready": True, "message": "StepForge Linux helper"}
     if parts == ["session"] and method == "POST":
-        caps = (body.get("capabilities") or {}).get("alwaysMatch") or {}
+        # W3C: alwaysMatch plus the first firstMatch entry (clients put the capabilities in either).
+        requested = body.get("capabilities") or {}
+        caps = {**(requested.get("alwaysMatch") or {}), **((requested.get("firstMatch") or [{}])[0] or {})}
         s = Session(caps)
         sid = uuid.uuid4().hex
         SESSIONS[sid] = s
@@ -357,6 +359,11 @@ def handle(method, parts, body):
         return None
     if rest == ["se", "log"]:
         return []
+    # Asked by some WebDriver clients when a session starts; lookups wait in the client, not here.
+    if rest == ["timeouts"]:
+        return None if method == "POST" else {"implicit": 0, "pageLoad": 300000, "script": 30000}
+    if rest == ["window"]:
+        return "main"
     raise WdError("unknown command", f"Not available for Linux apps: {method} /{'/'.join(rest)}", 404)
 
 

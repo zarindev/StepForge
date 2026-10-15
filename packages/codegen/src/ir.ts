@@ -1,5 +1,13 @@
-import { describeStep } from '@stepforge/core';
-import type { CodegenInput, CodegenScenario, CodegenStep, Warning } from './types.ts';
+import { describeStep, type Locator } from '@stepforge/core';
+import {
+  androidQueries,
+  iosQueries,
+  linuxQueries,
+  macQueries,
+  windowsQueries,
+  type Query,
+} from '@stepforge/executor-native/locators';
+import type { AppPlatform, CodegenInput, CodegenScenario, CodegenStep, Warning } from './types.ts';
 import { camel, isStatic, pascal, plain, str, uniquer, val, type Ref, type Val } from './values.ts';
 
 /**
@@ -7,7 +15,35 @@ import { camel, isStatic, pascal, plain, str, uniquer, val, type Ref, type Val }
  * express becomes a `todo` op (a `TODO(StepForge)` comment plus a warning), never silently broken code.
  */
 export type Loc = { strategy: string; value: string; name?: string };
-export type El = { loc: Loc; alts: Loc[]; pom?: { page: string; name: string } };
+/** `queries`: for phone and desktop apps, the Appium selectors of all its locators, best first. */
+export type El = { loc: Loc; alts: Loc[]; pom?: { page: string; name: string }; queries?: Query[] };
+export type { Query };
+
+/**
+ * Phone and desktop-app actions (Appium and Maestro exports), printed as calls of the exported project's helper:
+ * `app.<method>(...els, ...args)`.
+ */
+export type AppMethod =
+  | 'select'
+  | 'scroll'
+  | 'swipe'
+  | 'swipeOn'
+  | 'drag'
+  | 'longPress'
+  | 'scrollTo'
+  | 'back'
+  | 'hideKeyboard'
+  | 'rotate'
+  | 'launchApp'
+  | 'closeApp'
+  | 'resetApp'
+  | 'backgroundApp'
+  | 'deepLink'
+  | 'setLocation'
+  | 'permission'
+  | 'pushNotification'
+  | 'menu'
+  | 'handleDialog';
 
 export type Check =
   | 'visible'
@@ -121,7 +157,8 @@ export type Op =
       pattern?: string;
       into: string;
     }
-  | { op: 'emailOpenLink'; contains?: Val; index?: number; url?: Val };
+  | { op: 'emailOpenLink'; contains?: Val; index?: number; url?: Val }
+  | { op: 'app'; method: AppMethod; els: El[]; args: Val[] };
 
 export type TestPlan = {
   scenario: CodegenScenario;
@@ -149,6 +186,8 @@ export type Plan = {
   warnings: Warning[];
   secrets: string[];
   variables: string[];
+  /** The phone or desktop platform of an Appium or Maestro export, else null. */
+  native: AppPlatform | null;
 };
 
 const MAX_DEPTH = 5;
@@ -172,10 +211,34 @@ const CHECKS: Check[] = [
   'titleContains',
 ];
 
-/** The step's locators for export: image locators (pictures) have no code equivalent and are left out. */
-const el = (step: CodegenStep): El | null => {
-  const locs = step.locators.filter((l) => l.strategy !== 'image');
-  return locs.length ? { loc: locs[0]!, alts: locs.slice(1) } : null;
+const QUERIES: Record<AppPlatform, (l: Locator) => Query[]> = {
+  android: androidQueries,
+  ios: iosQueries,
+  macos: macQueries,
+  windows: windowsQueries,
+  linux: linuxQueries,
+};
+
+/** A locator's Appium selectors on that platform, as StepForge itself finds the element; [] when it has none. */
+export function queriesOf(platform: AppPlatform, l: Loc): Query[] {
+  try {
+    return QUERIES[platform](l as Locator);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The step's locators for export: image locators (pictures) have no code equivalent and are left out. For phone and
+ * desktop apps, locators with no Appium equivalent (CSS) are left out too.
+ */
+const elOf = (locators: Loc[], platform: AppPlatform | null): El | null => {
+  const locs = locators.filter((l) => l.strategy !== 'image');
+  if (!platform) return locs.length ? { loc: locs[0]!, alts: locs.slice(1) } : null;
+  const usable = locs.filter((l) => queriesOf(platform, l).length);
+  return usable.length
+    ? { loc: usable[0]!, alts: usable.slice(1), queries: usable.flatMap((l) => queriesOf(platform, l)) }
+    : null;
 };
 
 const p = (step: CodegenStep) => step.params ?? {};
@@ -226,6 +289,8 @@ type Ctx = {
   slug: string;
   tmp: () => string;
   flags: { ui: boolean; api: boolean; db: boolean; email: boolean };
+  /** Set for the Appium and Maestro exports of a phone or desktop app. */
+  native: AppPlatform | null;
 };
 
 function todo(ctx: Ctx, step: CodegenStep, message: string): Op {
@@ -238,7 +303,7 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     return [{ op: 'comment', text: `Disabled in StepForge: ${describeStep(step as never)}` }];
   const q = p(step);
   const out: Op[] = [];
-  const e = el(step);
+  const e = elOf(step.locators, ctx.native);
   const into = step.captureAs;
   const group = step.type.split('.')[0];
   if (group === 'ui') ctx.flags.ui = true;
@@ -248,13 +313,17 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
         todo(
           ctx,
           step,
-          step.locators.length
-            ? 'image locators (pictures) are not exported; add an id, text or CSS locator'
-            : 'the step has no locator',
+          !step.locators.length
+            ? 'the step has no locator'
+            : ctx.native && step.locators.some((l) => l.strategy !== 'image')
+              ? 'its locators (CSS) do not exist in phone and desktop apps; add an id, text, label or XPath locator'
+              : `image locators (pictures) are not exported; add an id, text${ctx.native ? ', label' : ' or CSS'} locator`,
         ),
       );
     return e;
   };
+
+  if (ctx.native && group === 'ui' && nativeStep(ctx, step, e, needEl, out)) return out;
 
   switch (step.type) {
     case 'ui.navigate':
@@ -705,9 +774,7 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     case 'ui.permission':
     case 'ui.pushNotification':
     case 'ui.menu':
-      out.push(
-        todo(ctx, step, 'phone and desktop-app steps are not exported yet (Appium export is planned)'),
-      );
+      out.push(todo(ctx, step, 'phone and desktop-app steps are exported by the Appium and Maestro exports'));
       break;
     default:
       out.push(todo(ctx, step, 'this step type has no exporter'));
@@ -754,6 +821,149 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     }
   }
   return out;
+}
+
+const WEB_ONLY = new Set([
+  'ui.hover',
+  'ui.rightclick',
+  'ui.upload',
+  'ui.switchTab',
+  'ui.closeTab',
+  'ui.switchFrame',
+  'ui.download',
+  'ui.waitForResponse',
+  'ui.mockRoute',
+  'ui.setOffline',
+  'ui.storage',
+  'ui.setClock',
+  'ui.networkSummary',
+]);
+
+/**
+ * UI steps of a phone or desktop app that differ from the web: app actions, and web-page steps that have no
+ * equivalent (TODO). Returns false for the steps shared with the web (click, fill, assert…), handled as usual.
+ */
+function nativeStep(ctx: Ctx, step: CodegenStep, e: El | null, needEl: () => El | null, out: Op[]): boolean {
+  const q = p(step);
+  const app = (method: AppMethod, els: El[], ...args: unknown[]) =>
+    out.push({ op: 'app', method, els, args: args.map(val) });
+  const withEl = (f: (x: El) => void) => {
+    const x = needEl();
+    if (x) f(x);
+  };
+  if (WEB_ONLY.has(step.type)) {
+    out.push(todo(ctx, step, 'this is a web-page step; phone and desktop apps have no equivalent'));
+    return true;
+  }
+  switch (step.type) {
+    case 'ui.navigate': {
+      const url = String(q.url ?? '');
+      if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^https?:/i.test(url)) app('deepLink', [], url);
+      else
+        out.push(
+          todo(
+            ctx,
+            step,
+            'phone and desktop apps have no pages to open; use a deep link (myapp://…) instead',
+          ),
+        );
+      return true;
+    }
+    case 'ui.tap':
+      withEl((x) => out.push({ op: 'act', action: 'click', el: x }));
+      return true;
+    case 'ui.select':
+      withEl((x) => app('select', [x], q.label ?? q.value ?? ''));
+      return true;
+    case 'ui.scroll':
+      if (e) app('scrollTo', [e], 'down', 10);
+      else app('scroll', [], num(q.y, 600) < 0 ? 'up' : 'down');
+      return true;
+    case 'ui.swipe':
+    case 'ui.dragDrop': {
+      const target = Array.isArray(q.target) ? elOf(q.target as Loc[], ctx.native) : null;
+      if (step.type === 'ui.dragDrop' || (Array.isArray(q.target) && q.target.length)) {
+        withEl((x) => {
+          if (target) app('drag', [x, target]);
+          else out.push(todo(ctx, step, 'the drop target has no usable locator'));
+        });
+        return true;
+      }
+      const direction = String(q.direction ?? 'up');
+      const percent = num(q.percent, 0.75);
+      if (step.locators.length) withEl((x) => app('swipeOn', [x], direction, percent));
+      else app('swipe', [], direction, percent);
+      return true;
+    }
+    case 'ui.longPress':
+      withEl((x) => app('longPress', [x], num(q.durationMs, 1000)));
+      return true;
+    case 'ui.scrollTo':
+      withEl((x) => app('scrollTo', [x], q.direction === 'up' ? 'up' : 'down', num(q.maxSwipes, 10)));
+      return true;
+    case 'ui.back':
+      app('back', []);
+      return true;
+    case 'ui.hideKeyboard':
+      app('hideKeyboard', []);
+      return true;
+    case 'ui.rotate':
+      app('rotate', [], q.orientation === 'portrait' ? 'portrait' : 'landscape');
+      return true;
+    case 'ui.appState': {
+      const action = String(q.action ?? 'launch');
+      if (action === 'background')
+        app(
+          'backgroundApp',
+          [],
+          q.seconds === undefined || q.seconds === '' ? -1 : num(Number(q.seconds), -1),
+        );
+      else if (action === 'close') app('closeApp', []);
+      else if (action === 'reset') app('resetApp', []);
+      else app('launchApp', []);
+      return true;
+    }
+    case 'ui.deepLink':
+      app('deepLink', [], q.url ?? '');
+      return true;
+    case 'ui.setLocation':
+      app('setLocation', [], num(Number(q.latitude), 0), num(Number(q.longitude), 0));
+      return true;
+    case 'ui.permission':
+      app('permission', [], String(q.permission ?? ''), q.action !== 'revoke');
+      return true;
+    case 'ui.pushNotification':
+      app('pushNotification', [], q.title ?? '', q.body ?? '');
+      return true;
+    case 'ui.menu':
+      app('menu', [], q.path ?? '');
+      return true;
+    case 'ui.handleDialog':
+      app('handleDialog', [], q.action !== 'dismiss', q.buttonLabel ? q.buttonLabel : null);
+      return true;
+    case 'ui.waitFor':
+      if (!e) {
+        out.push(todo(ctx, step, 'in phone and desktop apps, wait for an element (set a locator)'));
+        return true;
+      }
+      return false;
+    case 'ui.assert': {
+      const check = String(q.check ?? 'visible');
+      if (check.startsWith('url') || check.startsWith('title')) {
+        out.push(todo(ctx, step, 'phone and desktop apps have no URL or page title to check'));
+        return true;
+      }
+      return false;
+    }
+    case 'ui.extract':
+      if (['url', 'title'].includes(String(q.from ?? ''))) {
+        out.push(todo(ctx, step, 'phone and desktop apps have no URL or page title to read'));
+        return true;
+      }
+      return false;
+    default:
+      return false;
+  }
 }
 
 function authOf(a: unknown): Auth | null {
@@ -933,11 +1143,17 @@ function elsOf(op: Op): El[] {
   const out: El[] = [];
   if ('el' in op && op.el) out.push(op.el);
   if (op.op === 'drag') out.push(op.to);
+  if (op.op === 'app') out.push(...op.els);
   return out;
 }
 
 /** Builds the plan shared by every generator. */
-export function buildPlan(input: CodegenInput, opts: { pom?: boolean } = {}): Plan {
+export function buildPlan(input: CodegenInput, opts: { pom?: boolean; native?: boolean } = {}): Plan {
+  const platform = input.application.platform;
+  const native =
+    opts.native && platform && platform !== 'web' && platform !== 'electron'
+      ? (platform as AppPlatform)
+      : null;
   const warnings: Warning[] = [];
   const sqlFiles: Record<string, string> = {};
   const slugs = uniquer();
@@ -954,6 +1170,7 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean } = {}): Pl
       slug,
       tmp: () => `actual${++n}`,
       flags,
+      native,
     };
     const ops = listOps(ctx, scenario.steps, 0);
     const refs: Ref[] = [];
@@ -982,11 +1199,11 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean } = {}): Pl
     windows: 'a Windows desktop',
     linux: 'a Linux desktop',
   }[input.application.platform as 'android' | 'ios' | 'macos' | 'windows' | 'linux'];
-  if (phone && tests.some((t) => t.usesUi))
+  if (phone && !native && tests.some((t) => t.usesUi))
     warnings.push({
       message:
-        `This is ${phone} app: the exported UI tests open a browser at the base URL. Exports to Appium are ` +
-        'planned (see docs/NATIVE_APPS_PLAN.md); API, database and email steps export as usual.',
+        `This is ${phone} app: the exported UI tests open a browser at the base URL. Use the Appium or ` +
+        'Maestro export for its screens; API, database and email steps export as usual here.',
     });
   const all = tests.flatMap((t) => t.refs);
   const secrets = [...new Set([...all.filter((r) => r.scope === 'secret').map((r) => r.name)])].sort();
@@ -1004,6 +1221,7 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean } = {}): Pl
     warnings,
     secrets,
     variables,
+    native,
   };
 }
 

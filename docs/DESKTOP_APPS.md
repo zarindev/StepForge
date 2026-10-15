@@ -64,7 +64,7 @@ finishes the session. See [Manual testing](MANUAL_RUNS.md).
 | Screen sizes and mobile devices | The app decides its window size |
 | Language, time zone, location, proxy and the other browser settings | Set them in the app or through its arguments and environment variables |
 | Web Vitals and Lighthouse | Web pages only |
-| Code export | Exported UI tests open a browser at the base URL, and the export warns about this. Start the app with Playwright's `_electron.launch()` in the exported project |
+| Code export | The Playwright Test export starts the app from the environment's settings (`_electron.launch()`), as StepForge does ([details](CODEGEN.md#phone-and-desktop-apps-appium-maestro)); the other browser targets export browser tests and warn |
 
 ## Running in CI
 

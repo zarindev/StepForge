@@ -12,11 +12,15 @@ chosen. Earlier downloads are listed under *Earlier exports* and can be download
 
 | Target | Id | What you get |
 |---|---|---|
-| **Playwright Test** (TypeScript) | `playwright-ts` | `playwright.config.ts`, one spec per scenario, page objects (optional), helpers for API, DB, email |
+| **Playwright Test** (TypeScript) | `playwright-ts` | `playwright.config.ts`, one spec per scenario, page objects (optional), helpers for API, DB, email; for an Electron app, the tests start the app |
 | Playwright + pytest (Python) | `playwright-py` | pytest-playwright tests, `conftest.py`, page objects (optional) |
 | **Cypress** (JavaScript) | `cypress-js` | `cypress.config.js`, Testing Library queries, Node tasks for DB and email, page objects (optional) |
 | **Selenium + pytest** (Python) | `selenium-py` | Chrome tests through a small `Browser` helper, page objects (optional) |
 | Selenium + JUnit 5 (Java) | `selenium-java` | Maven project, one class per scenario, REST Assured for API steps, page objects (optional) |
+| **Appium + pytest** (Python) | `appium-py` | Phone and desktop apps (Android, iOS, macOS, Windows, Linux): the app's Appium capabilities, one test per scenario, an `App` helper that does each step as StepForge does |
+| Appium + WebdriverIO (TypeScript) | `appium-ts` | The same with WebdriverIO and Mocha |
+| Appium + JUnit 5 (Java) | `appium-java` | The same as a Maven project (Appium java-client) |
+| **Maestro flows** (YAML) | `maestro` | Android and iOS apps: one flow per scenario (one per test case), for the Maestro CLI |
 | pytest + requests | `pytest-requests` | API scenarios only |
 | REST Assured + JUnit 5 (Java) | `rest-assured` | API scenarios only, Maven project |
 | k6 script | `k6` | API scenarios as k6 groups with checks (1 VU, 1 iteration; fails when a check fails) |
@@ -67,6 +71,61 @@ load tests in functional suites, MongoDB and data-quality steps, IMAP inboxes, O
 multi-tab / iframes / drag and drop in Cypress, JavaScript *Run script* steps in Python and Java, browser steps in
 API-only targets.
 
+## Phone and desktop apps (Appium, Maestro)
+
+An application's **platform** decides the targets: phone and desktop apps get **Appium** (Python, TypeScript, Java)
+and, for Android and iOS, **Maestro**; web and Electron apps get the browser targets. (The browser targets still
+export a phone or desktop app's API, database and email steps, and warn that its UI tests would open a browser.) The
+API, documentation and test-case targets work for every application.
+
+**Appium projects**
+
+- **Starting the app:** the capabilities StepForge itself starts the app with, made from the environment's launch
+  settings (app file, package or bundle id, emulator or simulator, arguments…), in `support/config.py` /
+  `support/config.ts` / `Capabilities.java`. `APPIUM_URL` names the Appium server (default `http://127.0.0.1:4723`),
+  and `APP` replaces the app file. Each test starts the app and closes it; a failed test keeps a screenshot in
+  `screenshots/`.
+- **Locators:** each step lists the **Appium selectors StepForge uses on that platform**, best first (`accessibility
+  id`, `-android uiautomator`, `-ios predicate string`, XPath…), and the helper takes the first that matches. All of a
+  step's locators are exported, so the fallbacks StepForge uses at run time work in the exported tests too. CSS
+  locators have no Appium equivalent and are left out; a step with only CSS (or only a picture) becomes a TODO.
+- **Steps:** a small helper shipped with each project (`support/app.py`, `support/app.ts`, `App.java`) does every
+  phone and desktop step the way StepForge does on each platform: waiting lookups and checks (30 s), fill, check,
+  select, press keys and shortcuts, swipe, scroll to, long press, back, hide the keyboard, rotate, the app's state
+  (launch, close, reset, background), deep links, location, permissions, notifications, dialogs and menus.
+  Web-page steps (tabs, frames, hover, uploads, network faking) become TODOs.
+- **Linux apps:** Appium has no Linux driver, so a Linux export includes StepForge's own AT-SPI helper
+  (`tools/stepforge_atspi.py`, open source, part of StepForge), which speaks the same WebDriver protocol. Start it with
+  `python3 tools/stepforge_atspi.py --port 4723` in the desktop session.
+
+**Maestro flows**
+
+- Maestro finds an element by its **id** or its **text** (label, placeholder): each step uses the first of its locators
+  Maestro can express. Text locators keep StepForge's meaning (exact or contained). XPath locators and fallbacks are
+  not exported.
+- Test cases become one flow each (`flows/<scenario>-tc-1.yaml`), running the scenario's steps in
+  `flows/steps/` with that row's data. `{{data.x}}` becomes `${x}`, `{{env.x}}` `${X}` (with the exported value),
+  `{{vars.x}}` `${output.x}`, and `{{secret.x}}` `${MAESTRO_X}` (Maestro reads `MAESTRO_*` variables from the shell).
+- Where the platforms differ, the flows do what StepForge does: on Android, *Back* first closes the on-screen keyboard
+  Maestro types with; on iOS, *Back* taps the navigation bar's back button, and a deep link answers iOS's "Open in …?"
+  prompt.
+- Not in Maestro (TODO): putting the app in the background for a while, permissions after launch, notifications, menus,
+  drag and drop, fixed waits, and API, database and email steps.
+- Maestro does not install the app (`adb install` / `xcrun simctl install` first) and needs its id: the package or
+  bundle id from the environment, or `APP_ID`. The README and CI file set `MAESTRO_CLI_NO_ANALYTICS=1`, so Maestro sends
+  no usage data.
+
+**CI:** the GitHub Actions workflow fits the platform: an Android emulator on a Linux runner, an iOS simulator or a Mac
+app on a macOS runner, a Windows runner, or a Linux runner with a virtual display and the accessibility bus; it
+installs Appium and the platform's driver (or Maestro) and starts it. Build or download the app in the marked step and
+set `APP`. GitLab CI files are not generated for phone and desktop apps (shared runners have no emulator, simulator or
+desktop session).
+
+**Electron apps:** the Playwright Test export starts the app from the environment's settings with Playwright's
+`_electron.launch()` (`support/electron.ts`): each test's `page` is the app's first window, and its other windows are
+the other pages, as in StepForge. `APP` replaces the executable or app folder; Linux servers need `xvfb-run`. The other
+browser targets keep exporting Electron tests as browser tests, with a warning.
+
 ## Verified
 
 `npm run verify:export` starts CareClinic and Mailpit, imports the suite in
@@ -96,5 +155,26 @@ vacuous. The documents (Markdown, Gherkin, Excel) were opened and read back. Uni
 fixture that uses every step type and check that all generated TypeScript/JavaScript parses, all Python compiles,
 the shell script passes `bash -n`, JSON parses, and that a secret value never appears.
 
-Not verified: the generated GitHub Actions / GitLab CI files themselves (no runners were used), Windows, and the
-`exported-code` CI job on GitHub (this repository has no remote yet).
+Not verified: the generated GitHub Actions / GitLab CI files themselves (no runners were used), and Windows.
+
+### Phone, desktop and Electron apps
+
+`npx tsx scripts/verify-native-export.ts --platform <android|ios|macos|windows|linux|electron> --targets …` exports a
+CareClinic suite for the demo app of that platform (phone: sign in and add a patient for two test cases, then every
+gesture and device step; desktop: sign in, add a patient, a shortcut, a menu and its dialog; Electron: notes, a second
+window, test data), installs each exported project's own dependencies and runs it against the app. CI runs it in the
+`android`, `ios`, `macos-desktop`, `windows-desktop`, `linux-desktop` and `exported-code` jobs.
+
+Run on 2026-10-15 on macOS 27.0.1 (Apple silicon), Appium 3.8.0:
+
+| Device | Driver | Appium + pytest | Appium + WebdriverIO | Appium + JUnit 5 | Maestro |
+|---|---|---|---|---|---|
+| Android emulator (Android 15, arm64) | UiAutomator2 8.7.0 | 3/3 passed | 3/3 passed | 3/3 passed | 3/3 flows passed |
+| iOS 27 simulator (iPhone 17, Xcode 27.0) | XCUITest 12.18.1 | 3/3 passed | 3/3 passed | 3/3 passed | 3/3 flows passed |
+
+The Electron export (Playwright Test, demo notes app) passed 3/3. Tools: Python 3.13.1 with Appium-Python-Client
+6.0.7 and pytest 9.1.1; WebdriverIO 9.32.0, Mocha 11.8.0, TypeScript 5.9.3 (the project also type-checks); Temurin
+21.0.12, Maven 3.9.9, Appium java-client 10.1.1; Maestro 2.11.0. With a wrong password, the two tests that sign in
+with the password secret failed in every Android target and the gestures test (its own password) passed, so passing
+results are not vacuous. The macOS, Windows and Linux desktop exports were not run on a local computer (desktop tests
+take over the mouse); the CI jobs above run them.

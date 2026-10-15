@@ -114,6 +114,44 @@ describe('Android apps', () => {
     expect(got.matrix.map((m) => m.environmentId)).toEqual([envId, phone.id]);
   });
 
+  it("exports to Appium and Maestro with the environment's launch settings, never a secret value", async () => {
+    await ok('PUT', `/api/environments/${envId}/secrets`, { key: 'nursePassword', value: 'N0t-In-Exports' });
+    const s = await ok('POST', `/api/modules/${moduleId}/scenarios`, { name: 'Sign in (export)' });
+    await ok('PUT', `/api/scenarios/${s.id}/steps`, {
+      steps: [
+        {
+          type: 'ui.fill',
+          params: { value: '{{secret.nursePassword}}' },
+          locators: [{ strategy: 'testId', value: 'password' }],
+        },
+        { type: 'ui.swipe', params: { direction: 'up' } },
+      ],
+    });
+    const scope = { type: 'scenarios', ids: [s.id] };
+    const py = await ok<{ files: { path: string; content?: string }[]; run: string }>(
+      'POST',
+      `/api/applications/${appId}/codegen/preview`,
+      { target: 'appium-py', environmentId: envId, scope },
+    );
+    const config = py.files.find((f) => f.path === 'support/config.py')!.content!;
+    // The app file comes from {{env.apk}}: the environment variable, read at run time.
+    expect(config).toContain('"appium:app": env["apk"]');
+    expect(config).toContain('"appium:automationName": "UiAutomator2"');
+    const test = py.files.find((f) => f.path.endsWith('test_sign_in_export.py'))!.content!;
+    expect(test).toContain(
+      'app.fill([("id", "password"), ("accessibility id", "password")], secret("NURSE_PASSWORD"))',
+    );
+    expect(test).toContain('app.swipe("up", 0.75)');
+    const maestro = await ok<{ files: { path: string; content?: string }[] }>(
+      'POST',
+      `/api/applications/${appId}/codegen/preview`,
+      { target: 'maestro', environmentId: envId, scope },
+    );
+    expect(maestro.files.map((f) => f.path)).toContain('flows/patients-sign-in-export.yaml');
+    for (const f of [...py.files, ...maestro.files])
+      expect(f.content ?? '', f.path).not.toContain('N0t-In-Exports');
+  });
+
   it('reports what this computer has for Android testing', async () => {
     type Checks = { ready: boolean; checks: { name: string; ok: boolean; fix?: string }[] };
     const status = await ok<{ android: Checks; ios: Checks & { supported: boolean } }>(

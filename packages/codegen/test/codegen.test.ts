@@ -15,13 +15,14 @@ import {
   type TargetId,
 } from '../src/index.ts';
 import { camel, envName, parseString, snake, val } from '../src/values.ts';
-import { KITCHEN_SINK, PLANTED_SECRET } from './fixtures.ts';
+import { parseAllDocuments } from 'yaml';
+import { KITCHEN_SINK, NATIVE_APP, PLANTED_SECRET } from './fixtures.ts';
 
 const hasPython = spawnSync('python3', ['--version']).status === 0;
 const hasBash = spawnSync('bash', ['--version']).status === 0;
 
 const RUNTIME =
-  /(^|\/)support\/(helpers|api|db|mail|tabs|browser)\.(ts|py)$|find\.js$|support\/(Checks|J|Api|Fake|Db|Mail|Browser)\.java$|cypress\/support\/(helpers|mail)\.js$|cypress\/plugins\/.*\.cjs$/;
+  /(^|\/)support\/(helpers|api|db|mail|tabs|browser|app)\.(ts|py)$|find\.js$|support\/(Checks|J|Api|Fake|Db|Mail|Browser|App)\.java$|cypress\/support\/(helpers|mail)\.js$|cypress\/plugins\/.*\.cjs$|tools\/stepforge_atspi\.py$/;
 
 /** Snapshot of every generated text file (one file per output file, readable in review). */
 async function snapshot(target: TargetId, project: GeneratedProject, variant = '') {
@@ -163,7 +164,8 @@ describe('plan', () => {
   });
 });
 
-const ALL = TARGETS.map((t) => t.id);
+const ALL = TARGETS.filter((t) => !t.platforms).map((t) => t.id);
+const NATIVE = TARGETS.filter((t) => t.platforms);
 
 describe.each(ALL)('%s', (target) => {
   it('matches the snapshot, is valid code, and never contains a secret value', async () => {
@@ -181,6 +183,152 @@ describe.each(ALL)('%s', (target) => {
       if (path.endsWith('.json')) expect(() => JSON.parse(content), path).not.toThrow();
     }
     if (target !== 'docs-xlsx') await snapshot(target, project);
+  });
+});
+
+describe('phone and desktop apps (Appium, Maestro)', () => {
+  const ops = (platform: 'android' | 'ios' | 'macos' = 'android') =>
+    buildPlan({ ...NATIVE_APP, application: { ...NATIVE_APP.application, platform } }, { native: true });
+
+  it('turns phone and desktop steps into app actions, with the Appium selectors StepForge itself uses', () => {
+    const plan = ops();
+    const gestures = plan.tests[1]!.ops;
+    const methods = gestures.flatMap((o) => (o.op === 'app' ? [o.method] : []));
+    expect(methods).toEqual(
+      expect.arrayContaining([
+        'deepLink',
+        'scrollTo',
+        'swipe',
+        'swipeOn',
+        'drag',
+        'longPress',
+        'hideKeyboard',
+        'back',
+        'rotate',
+        'backgroundApp',
+        'closeApp',
+        'launchApp',
+        'resetApp',
+        'setLocation',
+        'permission',
+        'pushNotification',
+        'handleDialog',
+        'menu',
+        'select',
+      ]),
+    );
+    const fill = plan.tests[0]!.ops.find((o) => o.op === 'act' && o.action === 'fill');
+    expect(fill && 'el' in fill && fill.el?.queries).toEqual([
+      { using: 'xpath', value: "//*[@hint='Email']" },
+    ]);
+    // CSS has no Appium equivalent: dropped, and a step with only CSS (or only a picture) becomes a TODO.
+    const messages = plan.warnings.map((w) => w.message);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        'its locators (CSS) do not exist in phone and desktop apps; add an id, text, label or XPath locator',
+        'image locators (pictures) are not exported; add an id, text, label locator',
+        'this is a web-page step; phone and desktop apps have no equivalent',
+        'phone and desktop apps have no pages to open; use a deep link (myapp://…) instead',
+        'phone and desktop apps have no URL or page title to check',
+      ]),
+    );
+    const mixed = gestures.find(
+      (o) => o.op === 'act' && o.action === 'click' && o.el.loc.strategy === 'xpath',
+    ) as Extract<(typeof gestures)[number], { op: 'act' }>;
+    expect(mixed.el.queries).toEqual([{ using: 'xpath', value: '//*[@text="Save"]' }]);
+    // iOS: the same locator becomes its own selectors.
+    const ios = ops('ios').tests[0]!.ops.find((o) => o.op === 'act' && o.action === 'fill');
+    expect(ios && 'el' in ios && ios.el?.queries?.[0]?.using).toBe('-ios predicate string');
+  });
+
+  it('keeps the browser export for a phone app (with a warning), and refuses Appium for a web app', async () => {
+    const web = await generate(NATIVE_APP, { target: 'playwright-ts' });
+    expect(web.warnings.map((w) => w.message)).toContainEqual(
+      expect.stringContaining('Use the Appium or Maestro export'),
+    );
+    await expect(generate(KITCHEN_SINK, { target: 'appium-py' })).rejects.toThrow(
+      'is for phone and desktop apps; this application is a web app',
+    );
+    await expect(
+      generate(
+        { ...NATIVE_APP, application: { ...NATIVE_APP.application, platform: 'windows' } },
+        { target: 'maestro' },
+      ),
+    ).rejects.toThrow('is for Android and iOS apps');
+  });
+
+  const cases = NATIVE.flatMap((t) => t.platforms!.map((platform) => [t.id, platform] as const));
+  it.each(cases)('%s on %s: valid code, no secret value', async (target, platform) => {
+    const project = await generate(
+      { ...NATIVE_APP, application: { ...NATIVE_APP.application, platform } },
+      { target, ci: ['github', 'gitlab'] },
+    );
+    const dir = mkdtempSync(join(tmpdir(), `sf-${target}-${platform}-`));
+    const py: string[] = [];
+    for (const [path, content] of Object.entries(project.files)) {
+      const text = typeof content === 'string' ? content : content.toString('latin1');
+      expect(text, path).not.toContain(PLANTED_SECRET);
+      if (/\.(ts|js)$/.test(path))
+        expect(
+          () => transformSync(text, { loader: path.endsWith('.ts') ? 'ts' : 'js', format: 'esm' }),
+          path,
+        ).not.toThrow();
+      if (path.endsWith('.json')) expect(() => JSON.parse(text), path).not.toThrow();
+      if (/\.ya?ml$/.test(path))
+        for (const doc of parseAllDocuments(text)) expect(doc.errors, path).toEqual([]);
+      if (path.endsWith('.py')) {
+        mkdirSync(dirname(join(dir, path)), { recursive: true });
+        writeFileSync(join(dir, path), text);
+        py.push(join(dir, path));
+      }
+    }
+    if (py.length && hasPython)
+      expect(() => execFileSync('python3', ['-m', 'py_compile', ...py], { stdio: 'pipe' })).not.toThrow();
+    // Linux: StepForge's own helper ships with the project (Appium has no Linux driver).
+    expect('tools/stepforge_atspi.py' in project.files).toBe(platform === 'linux' && target !== 'maestro');
+    expect(project.warnings.map((w) => w.message)).toContainEqual(
+      expect.stringContaining('GitLab CI is not generated'),
+    );
+    if (platform === 'android') await snapshot(target, project);
+  });
+});
+
+describe('Electron apps (Playwright)', () => {
+  it('starts the app from the environment instead of opening a browser', async () => {
+    const input = {
+      ...KITCHEN_SINK,
+      application: { ...KITCHEN_SINK.application, platform: 'electron' as const },
+      environment: {
+        ...KITCHEN_SINK.environment,
+        launch: { appPath: '{{env.region}}/app', args: ['--debug'], env: { NODE_ENV: 'test' } },
+      },
+    };
+    const project = await generate(input, { target: 'playwright-ts', ci: ['github'] });
+    const electron = project.files['support/electron.ts'] as string;
+    expect(electron).toContain('_electron.launch(');
+    expect(electron).toContain('/\\.(c|m)?js$/.test(p)');
+    expect(electron).toContain("install it in the app's project");
+    expect(electron).toContain('appPath: `${env.region}/app`');
+    expect(electron).toContain("import { env } from './config';");
+    expect(() => transformSync(electron, { loader: 'ts', format: 'esm' })).not.toThrow();
+    const spec = Object.entries(project.files).find(([p]) => p.endsWith('.spec.ts'))![1] as string;
+    expect(spec).toContain("from '../../../support/electron';");
+    expect(project.files['playwright.config.ts']).toContain("projects: [{ name: 'electron' }]");
+    expect(project.files['.github/workflows/stepforge-tests.yml']).toContain(
+      'xvfb-run -a npx playwright test',
+    );
+    expect(project.warnings.map((w) => w.message)).not.toContainEqual(
+      expect.stringContaining('_electron.launch()'),
+    );
+    // Without launch settings, the browser export (with its warning) as before.
+    const plain = await generate(
+      { ...input, environment: KITCHEN_SINK.environment },
+      { target: 'playwright-ts' },
+    );
+    expect('support/electron.ts' in plain.files).toBe(false);
+    expect(plain.warnings.map((w) => w.message)).toContainEqual(
+      expect.stringContaining('_electron.launch()'),
+    );
   });
 });
 

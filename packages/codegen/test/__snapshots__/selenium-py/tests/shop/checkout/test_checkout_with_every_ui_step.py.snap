@@ -73,11 +73,11 @@ def test_checkout_with_every_ui_step(browser, data):
     browser.scroll(0, 800)
     # Scroll to the element "footer"
     browser.scroll_into_view(("testId", "footer"))
-    # Accept the next browser dialog
+    # Accept the next dialog
     browser.handle_next_dialog(accept=True, prompt_text="yes")
     # Click the element "//button[@id='remove']"
     browser.click(("xpath", "//button[@id='remove']"))
-    # Dismiss the next browser dialog
+    # Dismiss the next dialog
     browser.handle_next_dialog(accept=False)
     # Switch into the frame "iframe#payment"
     browser.frame("iframe#payment")

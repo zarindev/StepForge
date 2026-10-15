@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildMacDemo, MAC_DEMO_APP } from '../../../../scripts/build-macos-demo.ts';
+import { desktopSteps } from './desktop-steps.ts';
 import {
   AppiumServer,
   createNativeExecutor,
@@ -86,33 +87,6 @@ describe('macOS and Windows locators and launch settings', () => {
     await expect(pressShortcut(d, 'Hyper+X')).rejects.toThrow(/Unknown key "Hyper"/);
   });
 });
-
-/** The same scenario for both desktop demo apps (CareClinic): sign in, add patients, menus, a shortcut, a dialog. */
-function desktopSteps(platform: 'macos' | 'windows'): StepInput[] {
-  const id = (value: string) => [{ strategy: 'testId' as const, value }];
-  const count = (expected: string) => ({
-    type: 'ui.assert',
-    params: { check: 'text', expected },
-    locators: id('patient_count'),
-  });
-  return [
-    { type: 'ui.fill', params: { value: 'nurse@careclinic.test' }, locators: id('email') },
-    { type: 'ui.fill', params: { value: 'CareClinic1' }, locators: id('password') },
-    { type: 'ui.click', locators: [{ strategy: 'role', value: 'button', name: 'Sign in' }] },
-    count('No patients yet'),
-    // The menu's keyboard shortcut puts the cursor in the name field.
-    { type: 'ui.press', params: { key: platform === 'macos' ? 'Meta+N' : 'Control+N' } },
-    { type: 'ui.fill', params: { value: 'Ana Silva' }, locators: id('patient_name') },
-    { type: 'ui.click', locators: id('add_patient') },
-    count('1 patient'),
-    { type: 'ui.menu', params: { path: 'Patients > Clear List' } },
-    {
-      type: 'ui.handleDialog',
-      params: { action: 'accept', buttonLabel: platform === 'macos' ? 'Clear' : 'Yes' },
-    },
-    count('No patients yet'),
-  ];
-}
 
 const steps = (...s: StepInput[]) =>
   s.map((x) => ({

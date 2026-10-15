@@ -1,0 +1,27 @@
+.env.example (7 lines)
+.github/workflows/stepforge-tests.yml (35 lines)
+.gitignore (3 lines)
+config.yaml (5 lines)
+flows/gestures-and-device-steps.yaml (87 lines)
+flows/patients-sign-in-and-add-a-patient-tc-1.yaml (11 lines)
+flows/patients-sign-in-and-add-a-patient-tc-2.yaml (11 lines)
+flows/steps/patients-sign-in-and-add-a-patient.yaml (49 lines)
+README.md (67 lines)
+
+Warnings:
+- Gestures and device steps | ui.navigate | phone and desktop apps have no pages to open; use a deep link (myapp://…) instead
+- Gestures and device steps | ui.click | its locators (CSS) do not exist in phone and desktop apps; add an id, text, label or XPath locator
+- Gestures and device steps | ui.click | image locators (pictures) are not exported; add an id, text, label locator
+- Gestures and device steps | ui.hover | this is a web-page step; phone and desktop apps have no equivalent
+- Gestures and device steps | ui.switchTab | this is a web-page step; phone and desktop apps have no equivalent
+- Gestures and device steps | ui.assert | phone and desktop apps have no URL or page title to check
+-  |  | Maestro needs the app's package: set APP_ID when running the flows (the environment names only the app file)
+- Sign in and add a patient |  | api steps are not part of Maestro flows (they test the app's screens); export them to an Appium or API target
+- Gestures and device steps |  | drag and drop is not exported to Maestro; use swipe with start and end points
+- Gestures and device steps |  | Maestro cannot put the app in the background for a while; use stopApp and launchApp
+- Gestures and device steps |  | Maestro sets permissions when it launches the app: add `permissions:` to launchApp
+- Gestures and device steps |  | Maestro cannot send notifications
+- Gestures and device steps |  | menu bars are for desktop apps; Maestro tests phone apps
+- Gestures and device steps |  | no locator Maestro can use (an id, text, label or placeholder) for xpath=//*[@text="Save"]
+- Gestures and device steps |  | Maestro has no fixed wait (500 ms); wait for an element instead (extendedWaitUntil)
+-  |  | GitLab CI is not generated for phone and desktop apps (its shared runners have no emulator, simulator or desktop session); the GitHub Actions workflow is

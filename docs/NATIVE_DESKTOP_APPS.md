@@ -103,6 +103,13 @@ same planted bug: names longer than 12 characters are cut short.
 | Windows | `demo/windows-app` (C#, WinForms) | `dotnet build demo/windows-app -c Release -o demo/windows-app/build` → `CareClinic.exe` (needs the .NET 8 SDK) |
 | Linux | `demo/linux-app/careclinic.py` (Python, GTK 3) | No build: command `python3`, argument `demo/linux-app/careclinic.py` |
 
+## Code export
+
+**Exports** turns desktop-app tests into an Appium project (Python + pytest, TypeScript + WebdriverIO, or Java + JUnit
+5), with the environment's launch settings as capabilities and a GitHub Actions workflow for a macOS, Windows or Linux
+runner. Linux exports include StepForge's AT-SPI helper, since Appium has no Linux driver. See
+[CODEGEN.md](CODEGEN.md#phone-and-desktop-apps-appium-maestro).
+
 ## Running in CI
 
 GitHub's macOS and Windows runners can run desktop tests. StepForge's own CI does:

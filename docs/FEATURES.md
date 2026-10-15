@@ -140,9 +140,11 @@ traces and diagnosis work as on the web. [DESKTOP_APPS.md](DESKTOP_APPS.md)
 
 ## Take your tests elsewhere
 
-- **Code export** to 13 targets — Playwright (TypeScript, Python), Cypress, Selenium (Python, Java), pytest + requests,
-  REST Assured, k6, Postman, cURL, Markdown, Gherkin and Excel test cases — with optional page objects and CI files.
-  Anything a target cannot express is marked `TODO(StepForge)`, never dropped silently. [CODEGEN.md](CODEGEN.md)
+- **Code export** to 17 targets — Playwright (TypeScript, Python), Cypress, Selenium (Python, Java), Appium (Python,
+  TypeScript, Java) and Maestro for phone and desktop apps, pytest + requests, REST Assured, k6, Postman, cURL,
+  Markdown, Gherkin and Excel test cases — with optional page objects and CI files. Electron tests export to Playwright
+  and start the app. Anything a target cannot express is marked `TODO(StepForge)`, never dropped silently.
+  [CODEGEN.md](CODEGEN.md)
 
 ## Workspace
 
@@ -155,5 +157,3 @@ traces and diagnosis work as on the web. [DESKTOP_APPS.md](DESKTOP_APPS.md)
 
 The latest additions are in [WHATS_NEW.md](WHATS_NEW.md); planned work is in the README's
 [Coming next](../README.md#coming-next).
-
-- Appium / Maestro export of phone and desktop tests (every platform is done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).

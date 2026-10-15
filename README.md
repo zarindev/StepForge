@@ -61,13 +61,16 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 | Runs fully offline, data stays on your machine         |      Sometimes      |           —            |      ✅       |
 | Visual checkpoints with a difference image             |          —          |       Sometimes        |      ✅       |
 | Reusable blocks, shared elements, test data, campaigns |          —          |       Sometimes        |      ✅       |
-| Export to Playwright, Cypress, Selenium, k6, Postman   |    Usually one      |       Sometimes        |      ✅       |
+| Export to Playwright, Cypress, Selenium, Appium, k6…   |    Usually one      |       Sometimes        |      ✅       |
 | Free, no account or subscription                       |      Sometimes      |           —            |      ✅       |
 
 ## What's new
 
 **Just added — iOS, Android and desktop apps:**
 
+- **Export to Appium and Maestro**: phone and desktop tests become ready-to-run Appium projects (Python, TypeScript,
+  Java) or Maestro flows, with a CI workflow for an emulator, a simulator or a desktop runner; Electron tests export to
+  Playwright and start the app themselves ([guide](docs/CODEGEN.md#phone-and-desktop-apps-appium-maestro)).
 - **Linux desktop apps**: GTK and Qt apps through Linux's accessibility layer (AT-SPI), with StepForge's own helper
   ([guide](docs/NATIVE_DESKTOP_APPS.md#linux-apps)).
 - **Image locators**: find an element by a small picture of it, on any platform, for maps, canvases, games and
@@ -119,7 +122,7 @@ Planned work, in order — all of it free, open source and local:
 | ✅ | **Mobile gestures and a native recorder** | Done — see [recording phone apps](docs/ANDROID_APPS.md#recording) |
 | ✅ | **Windows and macOS desktop apps** | Done — see [macOS and Windows apps](docs/NATIVE_DESKTOP_APPS.md) |
 | ✅ | **Linux desktop apps and image locators** | Done — see [Linux apps](docs/NATIVE_DESKTOP_APPS.md#linux-apps) and [Image locators](docs/IMAGE_LOCATORS.md) |
-| 1 | **Native export and CI** | Appium (JS, Python, Java) and Maestro exports; CI templates for emulators and simulators |
+| ✅ | **Native export and CI** | Done — see [Code export](docs/CODEGEN.md#phone-and-desktop-apps-appium-maestro) |
 | — | **More code export** | The newest steps (page conditions, network, SOAP / Kafka / FTP) exported instead of marked TODO |
 | — | **Desktop installer** | Start StepForge with a double-click instead of a terminal |
 
@@ -499,7 +502,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | [Code export](docs/CODEGEN.md) | The 13 export targets |
 | [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) | How it is built |
 | [Known issues](docs/KNOWN_ISSUES.md) · [Changelog](CHANGELOG.md) | Limits and history |
-| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for native apps (all platforms done; Appium / Maestro export next) |
+| [Native apps plan](docs/NATIVE_APPS_PLAN.md) | The plan for native apps (every phase done, including the Appium and Maestro export) |
 
 ## Roadmap
 

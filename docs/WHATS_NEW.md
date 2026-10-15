@@ -2,6 +2,18 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — export to Appium and Maestro
+
+Phone and desktop tests now leave StepForge as ready-to-run projects. **Exports** offers **Appium** in Python
+(pytest), TypeScript (WebdriverIO) and Java (JUnit 5) for Android, iOS, macOS, Windows and Linux apps, and **Maestro**
+flows for Android and iOS. Each project starts the app with the environment's own settings, keeps the Appium
+selectors StepForge uses (best first, so its fallbacks work too) and comes with a small helper that does every
+gesture, device step, dialog and menu the way StepForge does. A GitHub Actions workflow starts an emulator, a simulator
+or a desktop runner. **Electron** tests now export to Playwright Test and start the app themselves. Every target was run
+against the demo apps on an Android emulator and an iOS simulator (3 of 3 tests passed each), and CI runs the exports
+on every platform.
+→ [Code export](CODEGEN.md#phone-and-desktop-apps-appium-maestro)
+
 ## Update — Linux desktop apps
 
 StepForge now tests **GTK and Qt apps on Linux** through the AT-SPI accessibility layer, with a small helper of its

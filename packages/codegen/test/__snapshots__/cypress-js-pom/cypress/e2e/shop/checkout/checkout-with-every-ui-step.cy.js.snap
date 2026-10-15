@@ -73,11 +73,11 @@ describe('Shop › Checkout › Checkout with every UI step', () => {
       cy.scrollTo(0, 800);
       // Scroll to the element "footer"
       productsPage.footer().scrollIntoView();
-      // Accept the next browser dialog
+      // Accept the next dialog
       cy.window().then((win) => cy.stub(win, 'prompt').returns('yes'));
       // Click the element "//button[@id='remove']"
       productsPage.element16().click();
-      // Dismiss the next browser dialog
+      // Dismiss the next dialog
       cy.on('window:confirm', () => false);
       // Switch into the frame "iframe#payment"
       // TODO(StepForge): switch into the iframe iframe#payment (needs cypress-iframe); the next steps run in the page
