@@ -288,3 +288,66 @@ export function windowsQueries(l: Locator): Query[] {
       throw new StepError('invalid_params', `The locator "${l.strategy}" is not available for Windows apps`);
   }
 }
+
+/** AT-SPI roles (as the Linux helper's tags) for the web's ARIA roles. */
+const LINUX_ROLES: Record<string, string[]> = {
+  button: ['push_button', 'toggle_button'],
+  textbox: ['text', 'entry', 'password_text', 'editbar'],
+  searchbox: ['text', 'entry'],
+  checkbox: ['check_box'],
+  switch: ['toggle_button', 'check_box'],
+  radio: ['radio_button'],
+  combobox: ['combo_box'],
+  menuitem: ['menu_item', 'menu'],
+  img: ['image', 'icon'],
+  image: ['image', 'icon'],
+  link: ['link'],
+  text: ['label', 'static'],
+  heading: ['heading', 'label'],
+  list: ['list', 'list_box', 'table', 'tree_table'],
+  slider: ['slider'],
+  progressbar: ['progress_bar'],
+  tab: ['page_tab'],
+};
+
+/**
+ * The Linux helper's queries for one StepForge locator, best first: test id → accessible id (GTK:
+ * atk_object_set_accessible_id; Qt: objectName); label and text → accessible name (exact, then contained);
+ * placeholder → accessible name; role → AT-SPI role with that name; XPath (ElementTree's subset) over role tags.
+ */
+export function linuxQueries(l: Locator): Query[] {
+  switch (l.strategy) {
+    case 'testId':
+      return [{ using: 'accessibility id', value: l.value }];
+    case 'label':
+    case 'placeholder':
+      return [
+        { using: 'name', value: l.value },
+        { using: 'accessibility id', value: l.value },
+      ];
+    case 'text':
+      return [
+        { using: 'name', value: l.value },
+        { using: 'partial name', value: l.value },
+      ];
+    case 'role': {
+      const roles = LINUX_ROLES[l.value.toLowerCase()];
+      if (!roles)
+        throw new StepError(
+          'invalid_params',
+          `The role "${l.value}" has no Linux equivalent; use a test id, text or XPath (roles: ${Object.keys(LINUX_ROLES).join(', ')})`,
+        );
+      const named = l.name ? `[@name=${xpathLiteral(l.name)}]` : '';
+      return roles.map((r) => ({ using: 'xpath', value: `//${r}${named}` }));
+    }
+    case 'xpath':
+      return [{ using: 'xpath', value: l.value }];
+    case 'css':
+      throw new StepError(
+        'invalid_params',
+        'CSS locators work on web pages; in a Linux app use a test id, text, a role or XPath',
+      );
+    default:
+      throw new StepError('invalid_params', `The locator "${l.strategy}" is not available for Linux apps`);
+  }
+}

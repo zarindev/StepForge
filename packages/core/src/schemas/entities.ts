@@ -31,7 +31,7 @@ export const ApplicationInput = z.object({
    * native desktop app (phone and native desktop apps run through Appium). Apps are started as configured in each
    * environment.
    */
-  platform: z.enum(['web', 'electron', 'android', 'ios', 'macos', 'windows']).default('web'),
+  platform: z.enum(['web', 'electron', 'android', 'ios', 'macos', 'windows', 'linux']).default('web'),
   tags: z.array(z.string().max(40)).default([]),
 });
 export type ApplicationInput = z.infer<typeof ApplicationInput>;
@@ -121,6 +121,17 @@ export const WindowsLaunchInput = z.object({
   capabilities: z.record(z.string(), z.unknown()).default({}),
 });
 
+/**
+ * How an environment starts a Linux desktop app (GTK, Qt): its command (a path or a name on the PATH), arguments,
+ * environment variables and working folder. Text values may use {{env.x}} / {{secret.x}}.
+ */
+export const LinuxLaunchInput = z.object({
+  app: z.string().min(1, "Set the app's command or path").max(1000),
+  arguments: z.array(z.string().max(1000)).max(50).default([]),
+  environment: z.record(z.string(), z.string()).default({}),
+  workingDir: z.string().max(1000).optional(),
+});
+
 /** An environment's browser settings (see BrowserSettings); text values may use {{secret.x}} / {{env.x}}. */
 export const BrowserSettingsInput = z.object({
   channel: z.enum(['chrome', 'msedge']).optional(),
@@ -179,6 +190,7 @@ export const EnvironmentInput = z.object({
       ios: IosLaunchInput.optional(),
       macos: MacLaunchInput.optional(),
       windows: WindowsLaunchInput.optional(),
+      linux: LinuxLaunchInput.optional(),
     })
     .default({ browser: 'chromium', headless: true }),
 });

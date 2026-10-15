@@ -119,7 +119,9 @@ export function AppFormDialog({
                     ? 'A native Mac app, by bundle id or .app; tested on a Mac with Xcode.'
                     : v.platform === 'windows'
                       ? 'A native Windows app (.exe or Store app); tested on Windows 10 or 11.'
-                      : 'Tests open the app in a browser at the environment’s address.'
+                      : v.platform === 'linux'
+                        ? 'A GTK or Qt app, started by its command; tested on Linux with a display.'
+                        : 'Tests open the app in a browser at the environment’s address.'
           }
         >
           <Select
@@ -133,6 +135,7 @@ export function AppFormDialog({
             <option value="ios">iOS app (iPhone, iPad)</option>
             <option value="macos">macOS app</option>
             <option value="windows">Windows app</option>
+            <option value="linux">Linux app (GTK, Qt)</option>
           </Select>
         </Field>
         <Field label="Description">

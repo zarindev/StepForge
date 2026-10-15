@@ -10,6 +10,11 @@ import {
   formToIos,
   formToMac,
   formToWindows,
+  formToLinux,
+  linuxLaunchSet,
+  linuxToForm,
+  LinuxLaunchFields,
+  type LinuxForm,
   macLaunchSet,
   macToForm,
   MacLaunchFields,
@@ -60,6 +65,7 @@ type EnvForm = {
   ios: IosForm;
   macos: MacForm;
   windows: WindowsForm;
+  linux: LinuxForm;
 };
 
 type ElectronLaunch = {
@@ -131,6 +137,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
           ...(app.platform === 'ios' && { ios: formToIos(f.ios) }),
           ...(app.platform === 'macos' && { macos: formToMac(f.macos) }),
           ...(app.platform === 'windows' && { windows: formToWindows(f.windows) }),
+          ...(app.platform === 'linux' && { linux: formToLinux(f.linux) }),
         },
       };
       return editing === 'new' || !editing
@@ -162,7 +169,8 @@ export function EnvironmentsTab({ app }: { app: Application }) {
       {(app.platform === 'android' ||
         app.platform === 'ios' ||
         app.platform === 'macos' ||
-        app.platform === 'windows') && <NativeStatusCard platform={app.platform} />}
+        app.platform === 'windows' ||
+        app.platform === 'linux') && <NativeStatusCard platform={app.platform} />}
       <div className="flex justify-between">
         <p className="text-sm text-muted">
           Where tests run. Use {'{{env.baseUrl}}'} and {'{{env.<variable>}}'} in steps.
@@ -205,7 +213,9 @@ export function EnvironmentsTab({ app }: { app: Application }) {
                             ? 'macOS app'
                             : app.platform === 'windows'
                               ? 'Windows app'
-                              : String(env.browserDefaultsJson.browser ?? 'chromium')}
+                              : app.platform === 'linux'
+                                ? 'Linux app'
+                                : String(env.browserDefaultsJson.browser ?? 'chromium')}
                   </p>
                 </div>
                 <Menu
@@ -236,7 +246,11 @@ export function EnvironmentsTab({ app }: { app: Application }) {
           desktop={app.platform === 'electron'}
           android={app.platform === 'android'}
           ios={app.platform === 'ios'}
-          nativeDesktop={app.platform === 'macos' || app.platform === 'windows' ? app.platform : undefined}
+          nativeDesktop={
+            app.platform === 'macos' || app.platform === 'windows' || app.platform === 'linux'
+              ? app.platform
+              : undefined
+          }
           onClose={() => setEditing(null)}
           onSubmit={(f) => save.mutate(f)}
           busy={save.isPending}
@@ -275,7 +289,7 @@ function EnvironmentDialog({
   /** The application is an iOS app: ask which app and simulator or iPhone. */
   ios?: boolean;
   /** A native desktop app (macOS or Windows): how to start it. */
-  nativeDesktop?: 'macos' | 'windows';
+  nativeDesktop?: 'macos' | 'windows' | 'linux';
   onClose: () => void;
   onSubmit: (f: EnvForm) => void;
   busy: boolean;
@@ -295,6 +309,7 @@ function EnvironmentDialog({
     ios: iosToForm(env?.browserDefaultsJson.ios),
     macos: macToForm(env?.browserDefaultsJson.macos),
     windows: windowsToForm(env?.browserDefaultsJson.windows),
+    linux: linuxToForm(env?.browserDefaultsJson.linux),
   });
   const launchSet = !!(f.desktop.executablePath.trim() || f.desktop.appPath.trim());
   const setDesktop = (p: Partial<EnvForm['desktop']>) => set({ desktop: { ...f.desktop, ...p } });
@@ -318,6 +333,7 @@ function EnvironmentDialog({
               (ios && !iosLaunchSet(f.ios)) ||
               (nativeDesktop === 'macos' && !macLaunchSet(f.macos)) ||
               (nativeDesktop === 'windows' && !windowsLaunchSet(f.windows)) ||
+              (nativeDesktop === 'linux' && !linuxLaunchSet(f.linux)) ||
               busy
             }
             onClick={() => onSubmit(f)}
@@ -362,6 +378,8 @@ function EnvironmentDialog({
         </Field>
         {nativeDesktop === 'macos' ? (
           <MacLaunchFields value={f.macos} onChange={(a) => set({ macos: a })} />
+        ) : nativeDesktop === 'linux' ? (
+          <LinuxLaunchFields value={f.linux} onChange={(a) => set({ linux: a })} />
         ) : nativeDesktop === 'windows' ? (
           <WindowsLaunchFields value={f.windows} onChange={(a) => set({ windows: a })} />
         ) : ios ? (

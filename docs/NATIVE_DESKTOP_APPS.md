@@ -1,4 +1,4 @@
-# macOS and Windows desktop apps
+# macOS, Windows and Linux desktop apps
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
@@ -9,7 +9,10 @@ Automation), both open source (Apache-2.0). StepForge installs and starts them i
 
 Electron apps have their own, simpler support: see [DESKTOP_APPS.md](DESKTOP_APPS.md).
 
-This is step N5 of the [native apps plan](NATIVE_APPS_PLAN.md).
+Linux apps (GTK, Qt) are covered too, through StepForge's own accessibility helper: see
+[Linux apps](#linux-apps) below.
+
+This is steps N5 and N6 of the [native apps plan](NATIVE_APPS_PLAN.md).
 
 **Desktop tests use this computer's mouse and keyboard while they run.** Leave the computer alone during a run, or run
 the tests in a separate user session, a virtual machine or CI.
@@ -98,6 +101,7 @@ same planted bug: names longer than 12 characters are cut short.
 | --- | --- | --- |
 | macOS | `demo/macos-app` (Swift, AppKit) | `npx tsx scripts/build-macos-demo.ts` → `demo/macos-app/build/CareClinic.app` (bundle id `com.stepforge.careclinic.mac`) |
 | Windows | `demo/windows-app` (C#, WinForms) | `dotnet build demo/windows-app -c Release -o demo/windows-app/build` → `CareClinic.exe` (needs the .NET 8 SDK) |
+| Linux | `demo/linux-app/careclinic.py` (Python, GTK 3) | No build: command `python3`, argument `demo/linux-app/careclinic.py` |
 
 ## Running in CI
 
@@ -117,6 +121,42 @@ steps:
   - run: npm ci && npm run appium:install
   - run: stepforge.bat run --app careclinic-windows --env CI --junit results.xml
 ```
+
+## Linux apps
+
+StepForge tests **GTK and Qt apps on Linux** through the **AT-SPI** accessibility layer, the one Linux screen readers
+use. Appium has no maintained Linux driver, so StepForge brings a small helper of its own
+(`packages/executors/native/linux/stepforge_atspi.py`, Python, part of StepForge). It speaks the same WebDriver
+protocol as Appium, so the steps, locators (including [image locators](IMAGE_LOCATORS.md)), checks, menus, dialogs
+and screenshots work the same way.
+
+**What you need:** Python 3 with PyGObject and the AT-SPI typelibs, and a display. On Ubuntu and Debian:
+
+```bash
+sudo apt install python3-gi gir1.2-atspi-2.0 gir1.2-gtk-3.0 at-spi2-core
+./stepforge.sh doctor native --platform linux
+```
+
+**Setting up:** set the application's **Platform** to _Linux app (GTK, Qt)_. In the environment, enter the app's
+**Command** (a path, or a name on the PATH such as `gnome-calculator`), its **Arguments** (one per line), app
+**environment variables** and a **working folder**. StepForge sets `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`, so Qt apps
+expose their controls too.
+
+| Locator | On Linux (AT-SPI) |
+| --- | --- |
+| **Test id** | The accessible id: GTK `atk_object_set_accessible_id` (GTK 3, ATK 2.34+), Qt `objectName` |
+| **Label**, **Placeholder** | The accessible name |
+| **Text** | The accessible name, exact, then contained |
+| **Role** `button "Save"` | The AT-SPI role with that name: `push_button`, `text`, `check_box`, `radio_button`, `combo_box`, `menu_item`, `label`, `link`, `list`, `page_tab`… |
+| **XPath** | Over the accessibility tree, with role names as tags: `//push_button[@name='Save']` (ElementTree's XPath subset: paths and `[@attribute='value']`) |
+
+Clicks use the element's own action (press, click, activate) when it has one, so they work without moving the real
+mouse; typing sets the field's text through AT-SPI. **Menu** opens `Patients > Clear List` from the menu bar, and
+**Handle dialog** presses a dialog's button.
+
+**Limits:** screenshots need X11 (or apps under Xwayland); no screen recording or device log yet; recording Linux apps
+from the dashboard is planned. On a server, run StepForge (or the CLI) inside a D-Bus session on a virtual display:
+`dbus-run-session -- xvfb-run -a ./stepforge.sh run --app myapp --env CI`.
 
 ## Not yet
 

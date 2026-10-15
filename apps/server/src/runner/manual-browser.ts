@@ -115,11 +115,17 @@ export class ManualBrowserService {
 
     // A desktop (Electron) app is opened itself, as its environment says; a web app in a browser.
     const platform = repo.getApplication(this.db, run.applicationId).platform;
-    if (platform === 'android' || platform === 'ios' || platform === 'macos' || platform === 'windows')
+    if (
+      platform === 'android' ||
+      platform === 'ios' ||
+      platform === 'macos' ||
+      platform === 'windows' ||
+      platform === 'linux'
+    )
       throw new repo.RepoError(
         400,
         'invalid',
-        `Opening ${{ ios: 'an iOS', android: 'an Android', macos: 'a macOS', windows: 'a Windows' }[platform]} app with the panel is planned; use the app on the device or computer and mark the steps here`,
+        `Opening ${{ ios: 'an iOS', android: 'an Android', macos: 'a macOS', windows: 'a Windows', linux: 'a Linux' }[platform]} app with the panel is planned; use the app on the device or computer and mark the steps here`,
       );
     const desktop = platform === 'electron';
     const launch = desktop

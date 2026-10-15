@@ -44,7 +44,7 @@ erDiagram
 
 ## Applications
 
-`applications.platform` is `web` (default), `electron` (migration 0014), `android`, `ios`, `macos` or `windows`. For an `electron` application,
+`applications.platform` is `web` (default), `electron` (migration 0014), `android`, `ios`, `macos`, `windows` or `linux`. For an `electron` application,
 each environment's `browser_defaults_json.electron` holds how to start the app: `executablePath` or `appPath`,
 `args`, `cwd` and `env` (see [DESKTOP_APPS.md](DESKTOP_APPS.md)). For an `android` application,
 `browser_defaults_json.android` holds `app` or `appPackage` (+ `appActivity`), `avd`, `udid`, `resetApp`,
@@ -52,7 +52,8 @@ each environment's `browser_defaults_json.electron` holds how to start the app: 
 `browser_defaults_json.ios` holds `app` or `bundleId`, `simulator`, `platformVersion`, `udid`, `resetApp`,
 `showSimulator` and `capabilities` (see [IOS_APPS.md](IOS_APPS.md)); `browser_defaults_json.macos` holds `bundleId` or
 `appPath`, `arguments`, `environment`, `capabilities`, and `browser_defaults_json.windows` holds `app`, `arguments`,
-`workingDir`, `capabilities` (see [NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md)).
+`workingDir`, `capabilities` (see [NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md)); `browser_defaults_json.linux` holds
+`app`, `arguments`, `environment`, `workingDir`.
 
 ## Deletion behaviour
 

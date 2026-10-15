@@ -67,7 +67,11 @@ function RunDialog({ req }: { req: Request }) {
   // Phone apps are not opened with the panel yet: the tester uses the phone, emulator or simulator and marks steps here.
   const platform = useApplications().data?.find((a) => a.id === req.applicationId)?.platform;
   const phone =
-    platform === 'android' || platform === 'ios' || platform === 'macos' || platform === 'windows';
+    platform === 'android' ||
+    platform === 'ios' ||
+    platform === 'macos' ||
+    platform === 'windows' ||
+    platform === 'linux';
   const tree = useTree(req.scope ? null : req.applicationId);
   const tags = useTags(req.scope ? null : req.applicationId);
   const [envId, setEnvId] = useState('');

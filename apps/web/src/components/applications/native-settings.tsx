@@ -14,6 +14,7 @@ export type NativeStatus = {
   ios: PlatformStatus & { supported: boolean };
   macos: PlatformStatus & { supported: boolean };
   windows: PlatformStatus & { supported: boolean };
+  linux: PlatformStatus & { supported: boolean };
   installing: boolean;
   avds: string[];
   devices: { serial: string; state: string; model?: string; emulator: boolean }[];
@@ -349,7 +350,11 @@ export function IosLaunchFields({ value: f, onChange }: { value: IosForm; onChan
 }
 
 /** What this computer has for testing Android or iOS apps, with how to fix what is missing, and installing Appium. */
-export function NativeStatusCard({ platform }: { platform: 'android' | 'ios' | 'macos' | 'windows' }) {
+export function NativeStatusCard({
+  platform,
+}: {
+  platform: 'android' | 'ios' | 'macos' | 'windows' | 'linux';
+}) {
   const status = useNativeStatus();
   const qc = useQueryClient();
   const install = useMutation({
@@ -362,7 +367,9 @@ export function NativeStatusCard({ platform }: { platform: 'android' | 'ios' | '
   });
   if (!status.data) return null;
   const p = status.data[platform];
-  const name = { ios: 'iOS', android: 'Android', macos: 'macOS', windows: 'Windows' }[platform];
+  const name = { ios: 'iOS', android: 'Android', macos: 'macOS', windows: 'Windows', linux: 'Linux' }[
+    platform
+  ];
   const appiumMissing = p.checks.some((c) => c.name.startsWith('Appium') && !c.ok);
   return (
     <section aria-label={`${name} on this computer`} className="rounded-lg border border-border p-4">
@@ -593,6 +600,93 @@ export function WindowsLaunchFields({
         />
       </Field>
       {!windowsLaunchSet(f) && <p className="text-xs text-fail">Set the app.</p>}
+    </div>
+  );
+}
+
+/** Linux desktop apps: a command (path or name), arguments, environment variables and a working folder. */
+type LinuxLaunch = {
+  app?: string;
+  arguments?: string[];
+  environment?: Record<string, string>;
+  workingDir?: string;
+};
+export type LinuxForm = { app: string; arguments: string; environment: string; workingDir: string };
+export function linuxToForm(v: unknown): LinuxForm {
+  const a = (v ?? {}) as LinuxLaunch;
+  return {
+    app: a.app ?? '',
+    arguments: (a.arguments ?? []).join('\n'),
+    environment: lines(a.environment ?? {}),
+    workingDir: a.workingDir ?? '',
+  };
+}
+export function formToLinux(f: LinuxForm): LinuxLaunch {
+  return {
+    app: f.app.trim() || undefined,
+    arguments: f.arguments
+      .split('\n')
+      .map((x) => x.trim())
+      .filter(Boolean),
+    environment: parseLines(f.environment),
+    workingDir: f.workingDir.trim() || undefined,
+  };
+}
+export const linuxLaunchSet = (f: LinuxForm) => !!f.app.trim();
+
+export function LinuxLaunchFields({
+  value: f,
+  onChange,
+}: {
+  value: LinuxForm;
+  onChange: (f: LinuxForm) => void;
+}) {
+  const set = (p: Partial<LinuxForm>) => onChange({ ...f, ...p });
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      <p className="text-sm font-medium">Start the Linux app</p>
+      <p className="text-xs text-muted">
+        A GTK or Qt app: its command (a path, or a name on the PATH such as gnome-calculator). Tests use this
+        computer’s display while they run.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Command">
+          <Input
+            aria-label="App file"
+            value={f.app}
+            className="font-mono text-xs"
+            placeholder="/usr/bin/myapp"
+            onChange={(e) => set({ app: e.target.value })}
+          />
+        </Field>
+        <Field label="Working folder">
+          <Input
+            aria-label="Working folder"
+            value={f.workingDir}
+            className="font-mono text-xs"
+            onChange={(e) => set({ workingDir: e.target.value })}
+          />
+        </Field>
+        <Field label="Arguments" hint="One per line.">
+          <Textarea
+            aria-label="Arguments"
+            value={f.arguments}
+            rows={2}
+            className="font-mono text-xs"
+            onChange={(e) => set({ arguments: e.target.value })}
+          />
+        </Field>
+        <Field label="App environment variables" hint="One per line: KEY=value.">
+          <Textarea
+            aria-label="App environment variables"
+            value={f.environment}
+            rows={2}
+            className="font-mono text-xs"
+            onChange={(e) => set({ environment: e.target.value })}
+          />
+        </Field>
+      </div>
+      {!linuxLaunchSet(f) && <p className="text-xs text-fail">Set the app’s command.</p>}
     </div>
   );
 }

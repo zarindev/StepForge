@@ -117,6 +117,14 @@ export type MacLaunch = {
   capabilities?: Record<string, unknown>;
 };
 
+/** How to start a Linux desktop app (see LinuxLaunchInput). */
+export type LinuxLaunch = {
+  app?: string;
+  arguments?: string[];
+  environment?: Record<string, string>;
+  workingDir?: string;
+};
+
 /** How to start a native Windows app (see WindowsLaunchInput). */
 export type WindowsLaunch = {
   app?: string;
@@ -274,6 +282,8 @@ export type RunOptions = {
   macos?: MacLaunch;
   /** Set for a native Windows app (Appium NovaWindows). */
   windows?: WindowsLaunch;
+  /** Set for a Linux desktop app (StepForge's AT-SPI helper). */
+  linux?: LinuxLaunch;
   baseUrl?: string;
 };
 

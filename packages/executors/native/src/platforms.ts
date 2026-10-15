@@ -3,6 +3,7 @@ import {
   type AndroidLaunch,
   type IosLaunch,
   type Locator,
+  type LinuxLaunch,
   type MacLaunch,
   type WindowsLaunch,
 } from '@stepforge/core';
@@ -14,6 +15,7 @@ import { listSimulators } from './ios.ts';
 import {
   androidQueries,
   iosQueries,
+  linuxQueries,
   macQueries,
   predicateLiteral,
   windowsQueries,
@@ -25,11 +27,11 @@ import type { ElementRef, WebDriverSession } from './webdriver.ts';
 
 /** What differs between Android and iOS for the same steps. */
 export type NativePlatform = {
-  name: 'Android' | 'iOS' | 'macOS' | 'Windows';
+  name: 'Android' | 'iOS' | 'macOS' | 'Windows' | 'Linux';
   /** Phone (touch, device) or desktop (mouse, keyboard, menus). */
   kind: 'phone' | 'desktop';
   /** The Appium driver this platform needs. */
-  driver: 'uiautomator2' | 'xcuitest' | 'mac2' | 'novawindows';
+  driver: 'uiautomator2' | 'xcuitest' | 'mac2' | 'novawindows' | 'atspi';
   capabilities(): Record<string, unknown>;
   queries(l: Locator): Query[];
   isChecked(d: WebDriverSession, el: ElementRef): Promise<boolean>;
@@ -783,4 +785,76 @@ async function pressUntilGone(d: WebDriverSession, find: () => Promise<ElementRe
     }
   }
   throw new StepError('timeout', 'The dialog did not close after pressing its button');
+}
+
+/** The capabilities StepForge's Linux helper takes (its own names: it is not an Appium driver). */
+export function linuxCapabilities(launch: LinuxLaunch): Record<string, unknown> {
+  if (!launch.app) throw new StepError('invalid_params', "Set the app's command or path in the environment");
+  return {
+    platformName: 'linux',
+    'stepforge:app': launch.app,
+    'stepforge:arguments': launch.arguments ?? [],
+    'stepforge:environment': launch.environment ?? {},
+    ...(launch.workingDir && { 'stepforge:workingDir': launch.workingDir }),
+  };
+}
+
+export function linuxPlatform(launch: LinuxLaunch): NativePlatform {
+  return {
+    name: 'Linux',
+    kind: 'desktop',
+    driver: 'atspi',
+    capabilities: () => linuxCapabilities(launch),
+    queries: linuxQueries,
+    isChecked: async (d, el) => (await d.attribute(el, 'checked')) === 'true',
+    async pressKey(d, key, el) {
+      if (el) await d.click(el);
+      await pressShortcut(d, key);
+    },
+    deepLink: notOnDesktop('Opening a deep link'),
+    doubleTap: async (d, el) => {
+      await d.click(el);
+      await d.click(el);
+    },
+    async scroll(d, direction) {
+      await pressShortcut(d, direction === 'down' ? 'PageDown' : 'PageUp');
+      return true;
+    },
+    log: { type: '', crash: /$^/ },
+    record: async () => null,
+    appId: async () => launch.app ?? '',
+    longPress: notOnDesktop('A long press'),
+    swipe: notOnDesktop('A swipe'),
+    drag: notOnDesktop('Drag and drop'),
+    setLocation: notOnDesktop('Setting the location'),
+    async appState() {
+      throw new StepError('unsupported', 'Each Linux test starts and closes the app itself');
+    },
+    permission: notOnDesktop('Granting permissions'),
+    pushNotification: notOnDesktop('Sending notifications'),
+    hideKeyboard: async () => {},
+    dialog: async (d, accept, buttonLabel) => {
+      const label = buttonLabel ?? (accept ? 'OK' : 'Cancel');
+      // A dialog's buttons (GTK message dialogs are "alert" or "dialog" roles).
+      const find = async () => [
+        ...(await d.findAll('xpath', `//alert//push_button[@name=${xpathLiteral(label)}]`).catch(() => [])),
+        ...(await d.findAll('xpath', `//dialog//push_button[@name=${xpathLiteral(label)}]`).catch(() => [])),
+      ];
+      if (!(await find()).length) throw new StepError('timeout', `no such alert: no "${label}" button`);
+      await pressUntilGone(d, find);
+    },
+    queryAppState: async () => undefined,
+    async menu(d, path) {
+      for (const [i, title] of path.entries()) {
+        let els = await d.findAll(
+          'xpath',
+          `//${i === 0 ? 'menu' : 'menu_item'}[@name=${xpathLiteral(title)}]`,
+        );
+        if (!els.length && i > 0) els = await d.findAll('xpath', `//menu[@name=${xpathLiteral(title)}]`);
+        if (!els.length)
+          throw new StepError('element_not_found', `No menu "${title}" (in ${path.join(' > ')})`);
+        await d.click(els[0]!);
+      }
+    },
+  };
 }

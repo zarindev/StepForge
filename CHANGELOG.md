@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Linux desktop apps**: a new platform _Linux app_ (GTK, Qt). An environment gives the app's command, arguments,
+  environment variables and working folder. StepForge's own helper (`packages/executors/native/linux/
+  stepforge_atspi.py`, Python + PyGObject) drives the app through AT-SPI and speaks the WebDriver subset the native
+  executor uses, so steps, locators (accessible id, name, AT-SPI roles, ElementTree XPath, pictures), menus, dialogs
+  and screenshots work as on other desktops. `doctor native --platform linux`; demo app `demo/linux-app`
+  (Python, GTK 3); CI job in a D-Bus session on a virtual display.
 - **Image locators**: a new locator strategy `image` (a PNG picture, stored in the step as a data URL, or a `.png`
   path; `threshold` 0.5–1, default 0.9) found in a screenshot by a built-in matcher (`@stepforge/image-match`:
   normalized cross-correlation on grayscale, coarse-to-fine; no native dependency). Web and Electron: click,

@@ -11,7 +11,7 @@ export type Application = {
   color: string;
   category: string;
   /** `electron` / `android` / `ios`: a desktop or phone app started from the environment's launch settings. */
-  platform: 'web' | 'electron' | 'android' | 'ios' | 'macos' | 'windows';
+  platform: 'web' | 'electron' | 'android' | 'ios' | 'macos' | 'windows' | 'linux';
   tagsJson: string[];
   archived: boolean;
   createdAt: string;

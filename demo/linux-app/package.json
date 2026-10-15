@@ -1,0 +1,6 @@
+{
+  "name": "@stepforge/demo-linux",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CareClinic for Linux: a small GTK 3 app (Python) for StepForge's Linux tests. Run: python3 careclinic.py"
+}

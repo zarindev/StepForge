@@ -2,6 +2,14 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — Linux desktop apps
+
+StepForge now tests **GTK and Qt apps on Linux** through the AT-SPI accessibility layer, with a small helper of its
+own (Appium has no maintained Linux driver). Set the platform to _Linux app_ and give each environment the app's
+command. Steps, locators (accessible ids, names, roles, XPath, pictures), menus and dialogs work as for macOS and
+Windows apps. `stepforge doctor native --platform linux` checks Python, PyGObject and the display.
+→ [Linux apps](NATIVE_DESKTOP_APPS.md#linux-apps)
+
 ## Update — image locators
 
 Some elements have nothing to find them by: a pin on a map, an icon in a canvas, a game, a remote desktop. An

@@ -5,15 +5,23 @@ export * from './android.ts';
 export * from './appium.ts';
 export * from './doctor.ts';
 export * from './ios.ts';
+export * from './linux.ts';
 export {
   androidQueries,
   iosQueries,
+  linuxQueries,
   macQueries,
   predicateLiteral,
   windowsQueries,
   xpathLiteral,
 } from './locators.ts';
-export { androidCapabilities, iosCapabilities, macCapabilities, windowsCapabilities } from './platforms.ts';
+export {
+  androidCapabilities,
+  iosCapabilities,
+  linuxCapabilities,
+  macCapabilities,
+  windowsCapabilities,
+} from './platforms.ts';
 export { WebDriverSession, WebDriverError } from './webdriver.ts';
 
 /** UI steps in a native app (Android, iOS, macOS, Windows), through a local Appium server. */
@@ -34,6 +42,7 @@ export function createNativeExecutor(opts: {
 export {
   androidPlatform,
   iosPlatform,
+  linuxPlatform,
   macPlatform,
   pressShortcut,
   windowsPlatform,

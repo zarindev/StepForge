@@ -10,6 +10,7 @@ import {
   type ElectronLaunch,
   type AndroidLaunch,
   type IosLaunch,
+  type LinuxLaunch,
   type MacLaunch,
   type WindowsLaunch,
   type RunOptions,
@@ -27,7 +28,7 @@ import { applicationGates, refreshDaily } from '@stepforge/analytics';
 import { createPerfExecutor } from '@stepforge/executor-perf';
 import type { LoadReport } from '@stepforge/perf';
 import { createUiExecutor, BrowserPool } from '@stepforge/executor-ui';
-import { createNativeExecutor, type AppiumServer } from '@stepforge/executor-native';
+import { createNativeExecutor, type AppiumServer, type LinuxHelper } from '@stepforge/executor-native';
 import { createUtilExecutor } from '@stepforge/executor-util';
 import { and, eq, inArray } from 'drizzle-orm';
 import { mkdirSync, rmSync, statSync } from 'node:fs';
@@ -67,6 +68,8 @@ export class RunManager {
 
   /** The local Appium server, for Android apps (set by the server). */
   appium?: AppiumServer;
+  /** StepForge's Linux desktop helper (set by the server). */
+  linux?: LinuxHelper;
 
   constructor(
     private readonly db: StepForgeDb,
@@ -384,8 +387,12 @@ export class RunManager {
     const platform = repo.getApplication(this.db, run.applicationId).platform;
     // Phone and native desktop apps answer through Appium, slower than a browser (the first steps of a fresh app
     // on a slow machine take many seconds): their steps wait up to 30 s unless the run sets its own time.
-    if (['android', 'ios', 'macos', 'windows'].includes(platform) && opts.timeoutMs === undefined)
+    if (['android', 'ios', 'macos', 'windows', 'linux'].includes(platform) && opts.timeoutMs === undefined)
       options.defaultTimeoutMs = Math.max(options.defaultTimeoutMs, 30_000);
+    if (platform === 'linux') {
+      const launch = (env.browserDefaultsJson as { linux?: LinuxLaunch }).linux ?? {};
+      options.linux = new VariableResolver({ env: envScope, secret: secrets }).resolve(launch) as LinuxLaunch;
+    }
     if (platform === 'macos') {
       const launch = (env.browserDefaultsJson as { macos?: MacLaunch }).macos ?? {};
       options.macos = new VariableResolver({ env: envScope, secret: secrets }).resolve(launch) as MacLaunch;
@@ -422,15 +429,21 @@ export class RunManager {
     const specs = this.specs;
     const appium = this.appium;
     const executors = [
-      options.android || options.ios || options.macos || options.windows
+      options.linux
         ? createNativeExecutor({
+            // Linux: StepForge's own AT-SPI helper instead of Appium.
             appiumUrl: () =>
-              appium
-                ? appium.url()
-                : Promise.reject(new Error('Phone and desktop apps are not available here')),
-            hasDriver: (d) => appium?.hasDriver(d) ?? false,
+              this.linux ? this.linux.url() : Promise.reject(new Error('Linux apps are not available here')),
           })
-        : createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines', run.applicationId) }),
+        : options.android || options.ios || options.macos || options.windows
+          ? createNativeExecutor({
+              appiumUrl: () =>
+                appium
+                  ? appium.url()
+                  : Promise.reject(new Error('Phone and desktop apps are not available here')),
+              hasDriver: (d) => appium?.hasDriver(d) ?? false,
+            })
+          : createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines', run.applicationId) }),
       createApiExecutor({
         contracts: specs
           ? async (ref, req, res) => {

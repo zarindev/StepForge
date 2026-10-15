@@ -980,7 +980,8 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean } = {}): Pl
     ios: 'an iOS',
     macos: 'a macOS desktop',
     windows: 'a Windows desktop',
-  }[input.application.platform as 'android' | 'ios' | 'macos' | 'windows'];
+    linux: 'a Linux desktop',
+  }[input.application.platform as 'android' | 'ios' | 'macos' | 'windows' | 'linux'];
   if (phone && tests.some((t) => t.usesUi))
     warnings.push({
       message:

@@ -43,6 +43,8 @@ first iPhone simulator:
 macOS and Windows desktop tests run with `STEPFORGE_TEST_MACOS=1` (a Mac with Xcode and Automation Mode on) or
 `STEPFORGE_TEST_WINDOWS=1` (Windows, after `dotnet build demo/windows-app -c Release -o demo/windows-app/build`):
 `npx vitest run packages/executors/native/test/desktop.test.ts`. They use the mouse and keyboard while they run.
+Linux desktop tests run with `STEPFORGE_TEST_LINUX=1` on Linux (PyGObject and AT-SPI installed), in a D-Bus session on
+a display: `dbus-run-session -- xvfb-run -a npx vitest run packages/executors/native/test/linux.test.ts`.
 
 ## Layout
 

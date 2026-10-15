@@ -24,8 +24,8 @@ async function sfApi<T>(page: Page, method: string, url: string, body?: unknown)
   ) as Promise<T>;
 }
 
-for (const platform of ['macos', 'windows'] as const) {
-  const name = platform === 'macos' ? 'macOS' : 'Windows';
+for (const platform of ['macos', 'windows', 'linux'] as const) {
+  const name = { macos: 'macOS', windows: 'Windows', linux: 'Linux' }[platform];
   test(`${name} apps: the platform, what this computer has, and how each environment starts the app`, async ({
     page,
   }) => {
@@ -48,9 +48,12 @@ for (const platform of ['macos', 'windows'] as const) {
     if (platform === 'macos') {
       await dialog.getByLabel('Bundle id').fill('com.stepforge.careclinic.mac');
       await dialog.getByLabel('Arguments').fill('-demo\n-fast');
-    } else {
+    } else if (platform === 'windows') {
       await dialog.getByLabel('App file').fill('C:\\Apps\\CareClinic.exe');
       await dialog.getByLabel('Arguments').fill('/demo');
+    } else {
+      await dialog.getByLabel('App file').fill('python3');
+      await dialog.getByLabel('Arguments').fill('demo/linux-app/careclinic.py');
     }
     await shot(page, `${platform}-environment`);
     await dialog.getByRole('button', { name: 'Save' }).click();
@@ -68,7 +71,9 @@ for (const platform of ['macos', 'windows'] as const) {
     expect(env!.browserDefaultsJson[platform]).toMatchObject(
       platform === 'macos'
         ? { bundleId: 'com.stepforge.careclinic.mac', arguments: ['-demo', '-fast'] }
-        : { app: 'C:\\Apps\\CareClinic.exe', arguments: '/demo' },
+        : platform === 'windows'
+          ? { app: 'C:\\Apps\\CareClinic.exe', arguments: '/demo' }
+          : { app: 'python3', arguments: ['demo/linux-app/careclinic.py'] },
     );
   });
 }

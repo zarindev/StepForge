@@ -24,7 +24,21 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 | N3 | Native apps, step 3: iOS apps | ✅ Done |
 | N4 | Native apps, step 4: gestures, phone recorder, phone diagnosis, device campaigns | ✅ Done |
 | N5 | Native apps, step 5: macOS and Windows desktop apps | ✅ Done |
-| N6 | Native apps, step 6: image locators (✅ done) and Linux desktop apps (planned) | Partly done |
+| N6 | Native apps, step 6: image locators and Linux desktop apps | ✅ Done |
+
+---
+
+## N6, part 2 — Linux desktop apps (2026-10-15)
+
+**Delivered**
+- Platform `linux` with launch settings; StepForge's AT-SPI helper (Python, a WebDriver subset: sessions, finding by
+  accessible id / name / partial name / ElementTree XPath, click through the element's action or a synthetic click,
+  text, attributes, states, extents, screenshots through Gdk, the tree as XML, W3C key and pointer actions).
+- `LinuxHelper` (started on first use), a Linux adapter (menus, dialogs, shortcuts), `doctor native --platform linux`,
+  dashboard forms and status. Demo app `demo/linux-app` (Python, GTK 3).
+
+**Tests**: mapping and capabilities (always); the desktop scenario and the planted bug on GTK in CI
+(`linux-desktop`: D-Bus session, virtual display); dashboard forms (E2E).
 
 ---
 

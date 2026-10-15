@@ -38,7 +38,7 @@ export type CodegenInput = {
   application: {
     name: string;
     slug: string;
-    platform?: 'web' | 'electron' | 'android' | 'ios' | 'macos' | 'windows';
+    platform?: 'web' | 'electron' | 'android' | 'ios' | 'macos' | 'windows' | 'linux';
   };
   environment: {
     name: string;

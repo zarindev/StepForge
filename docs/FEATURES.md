@@ -52,6 +52,11 @@ clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 Find an element by a small picture of it, in a screenshot, when it has no id, label or text (maps, canvas, games,
 remote desktops), on every platform. [IMAGE_LOCATORS.md](IMAGE_LOCATORS.md)
 
+## Test Linux apps
+
+GTK and Qt apps on Linux through the AT-SPI accessibility layer, with StepForge's own helper: steps, locators,
+menus and dialogs as for other desktop apps. [NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md#linux-apps)
+
 ## Test macOS and Windows apps
 
 Native Mac apps and Windows apps (Win32, WPF, WinForms, UWP) through Appium (Mac2, NovaWindows), installed and
@@ -151,5 +156,4 @@ traces and diagnosis work as on the web. [DESKTOP_APPS.md](DESKTOP_APPS.md)
 The latest additions are in [WHATS_NEW.md](WHATS_NEW.md); planned work is in the README's
 [Coming next](../README.md#coming-next).
 
-- Linux desktop apps and image matching, and Appium / Maestro export (Electron, Android, iOS, gestures, the phone
-  recorder, macOS and Windows are done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
+- Appium / Maestro export of phone and desktop tests (every platform is done): [NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).

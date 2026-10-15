@@ -18,7 +18,8 @@ explicitly authorised to test**.
 - **Email testing** reads the inboxes you configure. Use dedicated test mailboxes and app passwords.
 - **Third-party software.** StepForge downloads Playwright's browsers, Mailpit and optionally k6, Appium with its
   UiAutomator2, XCUITest, Mac2 and NovaWindows drivers (Apache-2.0) and, when needed for Appium, Node.js (MIT) from their official sources; their own
-  licences apply. The Android SDK and emulator (Google's licence) and Xcode (Apple's licence) are installed by you.
+  licences apply. The Android SDK and emulator (Google's licence) and Xcode (Apple's licence) are installed by you; Linux apps use your
+  system's PyGObject and AT-SPI libraries (LGPL).
 
 StepForge is provided under the [MIT License](LICENSE), "as is", without warranty of any kind. You are responsible for
 how you use it.

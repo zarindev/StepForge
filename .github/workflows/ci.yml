@@ -275,3 +275,25 @@ jobs:
       - run: npx vitest run packages/executors/native/test/desktop.test.ts
         env:
           STEPFORGE_TEST_WINDOWS: '1'
+
+  linux-desktop:
+    # Linux desktop apps: the demo GTK app (demo/linux-app) through StepForge's AT-SPI helper, in a D-Bus session
+    # (the accessibility bus) on a virtual display.
+    name: Linux desktop app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install GTK and the accessibility layer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-atspi-2.0 at-spi2-core xvfb dbus-x11
+      - run: dbus-run-session -- xvfb-run -a node apps/cli/bin/stepforge.mjs doctor native --platform linux
+        continue-on-error: true
+      - run: dbus-run-session -- xvfb-run -a npx vitest run packages/executors/native/test/linux.test.ts
+        env:
+          STEPFORGE_TEST_LINUX: '1'

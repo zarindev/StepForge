@@ -173,10 +173,10 @@ function StartPanel() {
                 ))}
               </Select>
             </Field>
-            {app?.platform === 'macos' || app?.platform === 'windows' ? (
+            {app?.platform === 'macos' || app?.platform === 'windows' || app?.platform === 'linux' ? (
               <p className="self-end pb-2 text-sm text-muted">
-                Recording {app.platform === 'macos' ? 'macOS' : 'Windows'} apps is planned. Add the steps in
-                the editor for now.
+                Recording {{ macos: 'macOS', windows: 'Windows', linux: 'Linux' }[app.platform]} apps is
+                planned. Add the steps in the editor for now.
               </p>
             ) : app?.platform === 'android' || app?.platform === 'ios' ? (
               <p className="self-end pb-2 text-sm text-muted">
@@ -210,7 +210,13 @@ function StartPanel() {
           )}
           <Button
             data-tour="recorder-button"
-            disabled={!envId || start.isPending || app?.platform === 'macos' || app?.platform === 'windows'}
+            disabled={
+              !envId ||
+              start.isPending ||
+              app?.platform === 'macos' ||
+              app?.platform === 'windows' ||
+              app?.platform === 'linux'
+            }
             onClick={() => start.mutate()}
           >
             <Circle className="h-3.5 w-3.5 fill-current text-fail" />{' '}

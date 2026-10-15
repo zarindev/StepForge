@@ -351,7 +351,7 @@ export function RunDetailPage() {
               runId={r.id}
               itemId={selectedId}
               canOpenBrowser={
-                !['android', 'ios', 'macos', 'windows'].includes(r.application.platform ?? 'web')
+                !['android', 'ios', 'macos', 'windows', 'linux'].includes(r.application.platform ?? 'web')
               }
               onDone={() => {
                 const next = items.find(

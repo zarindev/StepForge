@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import {
   androidPlatform,
   iosPlatform,
+  linuxPlatform,
   macPlatform,
   windowsPlatform,
   type Direction,
@@ -50,6 +51,7 @@ export class NativeSession implements ExecutorSession {
     else if (o.android) this.platform = androidPlatform(o.android);
     else if (o.macos) this.platform = macPlatform(o.macos);
     else if (o.windows) this.platform = windowsPlatform(o.windows);
+    else if (o.linux) this.platform = linuxPlatform(o.linux);
     else throw new StepError('invalid_params', 'No phone or desktop app is set for this test');
   }
 
@@ -502,7 +504,7 @@ export class NativeSession implements ExecutorSession {
         default:
           throw new StepError(
             'unsupported',
-            `"${step.type}" is not available in ${this.platform.name} apps yet (it is a web-page step); see docs/${({ iOS: 'IOS', Android: 'ANDROID', macOS: 'DESKTOP', Windows: 'DESKTOP' } as const)[this.platform.name]}_APPS.md`,
+            `"${step.type}" is not available in ${this.platform.name} apps yet (it is a web-page step); see docs/${({ iOS: 'IOS', Android: 'ANDROID', macOS: 'NATIVE_DESKTOP', Windows: 'NATIVE_DESKTOP', Linux: 'NATIVE_DESKTOP' } as const)[this.platform.name]}_APPS.md`,
           );
       }
     } catch (err) {

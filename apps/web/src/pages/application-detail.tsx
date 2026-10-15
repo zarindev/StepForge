@@ -104,6 +104,7 @@ export function ApplicationDetailPage() {
                     electron: 'Desktop app',
                     macos: 'macOS app',
                     windows: 'Windows app',
+                    linux: 'Linux app',
                   }[a.platform]
                 }
               </Badge>

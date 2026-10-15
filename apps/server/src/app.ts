@@ -38,7 +38,7 @@ import { registerScheduleRoutes } from './routes/schedules.ts';
 import { registerCodegenRoutes } from './routes/codegen.ts';
 import { CodegenService } from './codegen/service.ts';
 import { DemoService } from './demo/service.ts';
-import { AppiumServer } from '@stepforge/executor-native';
+import { AppiumServer, LinuxHelper } from '@stepforge/executor-native';
 import { registerNativeRoutes } from './routes/native.ts';
 import { MaintenanceService } from './maintenance/service.ts';
 import { registerMaintenanceRoutes } from './routes/maintenance.ts';
@@ -155,6 +155,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   };
   ctx.runs.appium = appium;
   ctx.recorder.appium = appium;
+  const linux = new LinuxHelper();
+  ctx.runs.linux = linux;
   ctx.manual = new ManualRunService(db, bus, ctx.runs, config.artifactsDir);
   ctx.manualBrowser = new ManualBrowserService(db, bus, ctx.runs, ctx.manual, config.artifactsDir);
   ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);
@@ -227,6 +229,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
     await ctx.runs.shutdown();
     await email.mailpit.stop();
     await appium.stop();
+    await linux.stop();
     await closePdfBrowser();
     ctx.recorder.discard();
     sqlite.close();

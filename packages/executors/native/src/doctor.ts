@@ -16,6 +16,7 @@ import {
   installedDrivers,
   nodeOkForAppium,
 } from './appium.ts';
+import { linuxChecks } from './linux.ts';
 import { automationMode, listSimulators, xcodeSelected, xcodeVersion, type Simulator } from './ios.ts';
 import { execFileSync } from 'node:child_process';
 
@@ -28,6 +29,7 @@ export type NativeStatus = {
   /** Native desktop apps: macOS (on a Mac) and Windows (on Windows). */
   macos: PlatformStatus & { supported: boolean };
   windows: PlatformStatus & { supported: boolean };
+  linux: PlatformStatus & { supported: boolean };
   avds: string[];
   devices: Device[];
   simulators: Simulator[];
@@ -204,6 +206,37 @@ export async function nativeDoctor(toolsDir: string): Promise<NativeStatus> {
           fix: 'Windows apps can only be tested on Windows (10 or 11)',
         },
       ];
+  const onLinux = process.platform === 'linux';
+  const lx = linuxChecks();
+  const linux: DoctorCheck[] = onLinux
+    ? [
+        {
+          name: 'Python 3',
+          ok: !!lx.python,
+          detail: lx.python ?? 'not found',
+          fix: 'sudo apt install python3 (or your distribution\u2019s package)',
+        },
+        {
+          name: 'Accessibility for Python (PyGObject, AT-SPI)',
+          ok: lx.atspi,
+          detail: lx.atspi ? 'available' : 'missing',
+          fix: 'sudo apt install python3-gi gir1.2-atspi-2.0 gir1.2-gtk-3.0 at-spi2-core',
+        },
+        {
+          name: 'A display',
+          ok: !!lx.display,
+          detail: lx.display ?? 'none (no DISPLAY or WAYLAND_DISPLAY)',
+          fix: 'Run StepForge in your desktop session, or on a server under a virtual display: xvfb-run -a',
+        },
+      ]
+    : [
+        {
+          name: 'Linux',
+          ok: false,
+          detail: `this computer runs ${process.platform}`,
+          fix: 'Linux desktop apps can only be tested on Linux',
+        },
+      ];
   // The emulator is optional when a phone is connected.
   const androidReady = android.filter((c) => c.name !== 'Android emulator').every((c) => c.ok);
   return {
@@ -211,6 +244,7 @@ export async function nativeDoctor(toolsDir: string): Promise<NativeStatus> {
     ios: { ready: ios.every((c) => c.ok), checks: ios, supported: mac },
     macos: { ready: macos.every((c) => c.ok), checks: macos, supported: mac },
     windows: { ready: windows.every((c) => c.ok), checks: windows, supported: win },
+    linux: { ready: linux.every((c) => c.ok), checks: linux, supported: onLinux },
     avds,
     devices,
     simulators,
