@@ -53,6 +53,8 @@ enum Ui {
         f.autocapitalizationType = .none
         f.autocorrectionType = .no
         f.isSecureTextEntry = secure
+        // Keeps iOS from treating the form as a saved-password login and covering the app with its password prompt.
+        if secure { f.textContentType = .oneTimeCode }
         // Return closes the keyboard, as in most apps.
         f.addAction(UIAction { _ in }, for: .editingDidEndOnExit)
         return f

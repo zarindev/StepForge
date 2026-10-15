@@ -111,6 +111,16 @@ describe.skipIf(!SIM)('iOS app on a simulator (CareClinic mobile)', () => {
       },
       { type: 'ui.fill', params: { value: password }, locators: [{ strategy: 'testId', value: 'password' }] },
       { type: 'ui.click', locators: [{ strategy: 'role', value: 'button', name: 'Sign in' }] },
+      // Signed in: the patients screen is there before the next step.
+      ...(password === 'CareClinic1'
+        ? [
+            {
+              type: 'ui.assert',
+              params: { check: 'visible' },
+              locators: [{ strategy: 'testId', value: 'patient_count' }],
+            } satisfies StepInput,
+          ]
+        : []),
     );
 
   it('signs in, adds a patient and checks the count; evidence: video, device log, screenshots', async () => {
