@@ -111,12 +111,18 @@ class CareClinic(Gtk.Window):
             return
         dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION, text="Clear the patient list?")
         dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Clear", Gtk.ResponseType.OK)
-        if dialog.run() == Gtk.ResponseType.OK:
-            for child in self.list.get_children():
-                self.list.remove(child)
-            self.count = 0
-            self.counter.set_text("No patients yet")
-        dialog.destroy()
+
+        # Not dialog.run(): its nested loop can stall accessibility calls; the answer is handled when it comes.
+        def answered(d, response):
+            if response == Gtk.ResponseType.OK:
+                for child in self.list.get_children():
+                    self.list.remove(child)
+                self.count = 0
+                self.counter.set_text("No patients yet")
+            d.destroy()
+
+        dialog.connect("response", answered)
+        dialog.show_all()
 
 
 if __name__ == "__main__":

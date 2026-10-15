@@ -400,6 +400,8 @@ def main():
     parser.add_argument("--port", type=int, default=4723)
     args = parser.parse_args()
     Atspi.init()
+    # An app that stops answering (busy, or stuck in a nested loop) fails a call after 5 s instead of 25.
+    Atspi.set_timeout(5000, 15000)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"StepForge Linux helper on port {args.port}", flush=True)
     try:
