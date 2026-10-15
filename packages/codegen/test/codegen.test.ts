@@ -258,39 +258,43 @@ describe('phone and desktop apps (Appium, Maestro)', () => {
   });
 
   const cases = NATIVE.flatMap((t) => t.platforms!.map((platform) => [t.id, platform] as const));
-  it.each(cases)('%s on %s: valid code, no secret value', async (target, platform) => {
-    const project = await generate(
-      { ...NATIVE_APP, application: { ...NATIVE_APP.application, platform } },
-      { target, ci: ['github', 'gitlab'] },
-    );
-    const dir = mkdtempSync(join(tmpdir(), `sf-${target}-${platform}-`));
-    const py: string[] = [];
-    for (const [path, content] of Object.entries(project.files)) {
-      const text = typeof content === 'string' ? content : content.toString('latin1');
-      expect(text, path).not.toContain(PLANTED_SECRET);
-      if (/\.(ts|js)$/.test(path))
-        expect(
-          () => transformSync(text, { loader: path.endsWith('.ts') ? 'ts' : 'js', format: 'esm' }),
-          path,
-        ).not.toThrow();
-      if (path.endsWith('.json')) expect(() => JSON.parse(text), path).not.toThrow();
-      if (/\.ya?ml$/.test(path))
-        for (const doc of parseAllDocuments(text)) expect(doc.errors, path).toEqual([]);
-      if (path.endsWith('.py')) {
-        mkdirSync(dirname(join(dir, path)), { recursive: true });
-        writeFileSync(join(dir, path), text);
-        py.push(join(dir, path));
+  it.each(cases)(
+    '%s on %s: valid code, no secret value',
+    async (target, platform) => {
+      const project = await generate(
+        { ...NATIVE_APP, application: { ...NATIVE_APP.application, platform } },
+        { target, ci: ['github', 'gitlab'] },
+      );
+      const dir = mkdtempSync(join(tmpdir(), `sf-${target}-${platform}-`));
+      const py: string[] = [];
+      for (const [path, content] of Object.entries(project.files)) {
+        const text = typeof content === 'string' ? content : content.toString('latin1');
+        expect(text, path).not.toContain(PLANTED_SECRET);
+        if (/\.(ts|js)$/.test(path))
+          expect(
+            () => transformSync(text, { loader: path.endsWith('.ts') ? 'ts' : 'js', format: 'esm' }),
+            path,
+          ).not.toThrow();
+        if (path.endsWith('.json')) expect(() => JSON.parse(text), path).not.toThrow();
+        if (/\.ya?ml$/.test(path))
+          for (const doc of parseAllDocuments(text)) expect(doc.errors, path).toEqual([]);
+        if (path.endsWith('.py')) {
+          mkdirSync(dirname(join(dir, path)), { recursive: true });
+          writeFileSync(join(dir, path), text);
+          py.push(join(dir, path));
+        }
       }
-    }
-    if (py.length && hasPython)
-      expect(() => execFileSync('python3', ['-m', 'py_compile', ...py], { stdio: 'pipe' })).not.toThrow();
-    // Linux: StepForge's own helper ships with the project (Appium has no Linux driver).
-    expect('tools/stepforge_atspi.py' in project.files).toBe(platform === 'linux' && target !== 'maestro');
-    expect(project.warnings.map((w) => w.message)).toContainEqual(
-      expect.stringContaining('GitLab CI is not generated'),
-    );
-    if (platform === 'android') await snapshot(target, project);
-  });
+      if (py.length && hasPython)
+        expect(() => execFileSync('python3', ['-m', 'py_compile', ...py], { stdio: 'pipe' })).not.toThrow();
+      // Linux: StepForge's own helper ships with the project (Appium has no Linux driver).
+      expect('tools/stepforge_atspi.py' in project.files).toBe(platform === 'linux' && target !== 'maestro');
+      expect(project.warnings.map((w) => w.message)).toContainEqual(
+        expect.stringContaining('GitLab CI is not generated'),
+      );
+      if (platform === 'android') await snapshot(target, project);
+    },
+    60_000,
+  ); // compiles a whole Python project: slow on Windows runners
 });
 
 describe('Electron apps (Playwright)', () => {
