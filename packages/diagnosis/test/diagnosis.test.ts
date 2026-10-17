@@ -490,6 +490,63 @@ describe('diagnoses (fixtures)', () => {
     expect(d.alternatives.map((a) => a.ruleId)).not.toContain('ui-value-mismatch');
   });
 
+  it('a JavaScript error thrown from an app bundle counts on the page it broke; "Expected hidden" is not "hidden"', () => {
+    const onCheckout = (console: DiagnosisInput['console']) =>
+      diagnose(
+        input(
+          step({
+            type: 'ui.assert',
+            errorKind: 'assertion',
+            message: 'Expected visible',
+            diagnostics: { pageUrl: 'http://x/checkout' },
+          }),
+          { console },
+        ),
+      );
+    // The script lives in /assets/, the page is /checkout: older results (no page) and new ones (with page).
+    expect(
+      onCheckout([
+        { type: 'pageerror', text: 'TypeError: x', location: 'http://x/assets/index-abc.js:1:200' },
+      ]).category,
+    ).toBe('js_exception');
+    expect(
+      onCheckout([
+        {
+          type: 'pageerror',
+          text: 'TypeError: x',
+          location: 'http://x/assets/index-abc.js:1:200',
+          page: 'http://x/checkout',
+        },
+      ]).category,
+    ).toBe('js_exception');
+    // Thrown on an earlier page: not this failure's cause.
+    expect(
+      onCheckout([
+        {
+          type: 'pageerror',
+          text: 'TypeError: x',
+          location: 'http://x/assets/index-abc.js:1:200',
+          page: 'http://x/dashboard',
+        },
+      ]).category,
+    ).not.toBe('js_exception');
+    const stillVisible = diagnose(
+      input(step({ type: 'ui.assert', errorKind: 'assertion', message: 'Expected hidden, but got false' })),
+    );
+    expect(stillVisible.category).not.toBe('element_hidden');
+  });
+
+  it('says where a JavaScript error happened once ("at http://…", not "at at")', () => {
+    const d = diagnose(
+      input(step({ type: 'ui.assert', errorKind: 'assertion', message: 'Expected visible' }), {
+        console: [{ type: 'pageerror', text: 'TypeError: x is undefined', location: 'at http://x/:12:5' }],
+      }),
+    );
+    expect(d.explanation).toContain('uncaught exception at http://x/:12:5;');
+    expect(d.fix).toBe('Fix the script error at http://x/:12:5.');
+    expect(d.evidence).toContainEqual({ label: 'Location', value: 'http://x/:12:5' });
+  });
+
   it('writes explanations with the real values', () => {
     const d = diagnose(input(api(200, 401)));
     expect(d.title).toBe('The API accepted a request it should have rejected (200 instead of 401)');

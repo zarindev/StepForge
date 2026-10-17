@@ -8,6 +8,7 @@ import {
   BUILTIN_RULES_DIR,
   type Diagnosis,
   type DiagnosisInput,
+  type NetworkEntry,
   type StepSnapshot,
 } from '@stepforge/diagnosis';
 import { and, desc, eq, lt, ne } from 'drizzle-orm';
@@ -98,6 +99,16 @@ export function deriveSeverity(
 const fmt = (v: unknown) => (v === undefined ? '' : typeof v === 'string' ? v : JSON.stringify(v));
 
 /** Rule-based diagnosis of failed run items, and the bug reports filed from them. */
+/**
+ * The requests that can explain a failure: those of the failed step and of the step just before it (a click that got
+ * a 500, then a check that fails), not a failed analytics call from much earlier. Logs without step numbers are kept.
+ */
+function nearFailure<T extends { step?: number }>(network: unknown, position: number): T[] {
+  const list = Array.isArray(network) ? (network as T[]) : [];
+  if (!list.some((n) => typeof n.step === 'number')) return list;
+  return list.filter((n) => n.step === position || n.step === position - 1);
+}
+
 export class DiagnosisService {
   constructor(
     private readonly db: StepForgeDb,
@@ -226,7 +237,10 @@ export class DiagnosisService {
         itemStatus: item.status,
         attempts: item.attempt,
         console: consoleLog ? this.readJson(consoleLog.path) : [],
-        network: networkLog ? this.readJson(networkLog.path) : [],
+        network: nearFailure<NetworkEntry & { step?: number }>(
+          networkLog ? this.readJson(networkLog.path) : [],
+          failedRow.position,
+        ),
         history: previous.map((p) => p.status),
         lastGreen,
         current: {

@@ -117,9 +117,12 @@ export async function inspectFailure(
     return { diagnostics: { matchCount, visible, candidates: [] }, target };
   }
 
+  // Words to look for: not pictures (an image locator's value is a whole data URL) or saved-element ids, and not
+  // long text — the fuzzy comparison runs against every element on the page.
   const wanted = locators
+    .filter((l) => l.strategy !== 'image' && l.strategy !== 'element')
     .flatMap((l) => [l.value, l.name ?? ''])
-    .filter(Boolean)
+    .filter((v) => v && v.length <= 200)
     .map((v) => v.replace(/[-_]/g, ' '));
   if (!wanted.length) return { diagnostics: { matchCount: 0, candidates: [] } };
   const inputsOnly = INPUT_STEPS.has(stepName);

@@ -55,7 +55,8 @@ export type StepSnapshot = {
   timeoutMs?: number;
 };
 
-export type ConsoleEntry = { type: string; text: string; location?: string; at?: number };
+/** `page`: for page errors, the page's URL when it happened (`location` is the script's). */
+export type ConsoleEntry = { type: string; text: string; location?: string; page?: string; at?: number };
 export type NetworkEntry = {
   method: string;
   url: string;

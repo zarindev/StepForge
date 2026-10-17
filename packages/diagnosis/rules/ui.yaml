@@ -41,7 +41,8 @@
     layer: ui
     any:
       - { visible: false, matchCount: { gte: 1 } }
-      - { message: { matches: 'is not visible|element is outside of the viewport|hidden' } }
+      # Playwright's own wording only: "Expected hidden" (an element that is still visible) is the opposite case.
+      - { message: { matches: 'is not visible|element is outside of the viewport|element is hidden|is hidden\b' } }
   title: 'The element is on the page but hidden: {{locator}}'
   explanation: '{{matchCount}} element(s) match {{locator}} but none is visible, so the user could not use it either.'
   fix: 'Check why the element is hidden (layout, screen size, a missing state); if hiding is intended, add the step that reveals it.'

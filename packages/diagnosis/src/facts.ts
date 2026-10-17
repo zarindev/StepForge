@@ -68,10 +68,18 @@ export function buildFacts(input: DiagnosisInput): Record<string, unknown> {
     }
   };
   const failedOn = f.diagnostics?.pageUrl ? pagePath(f.diagnostics.pageUrl) : undefined;
+  // Compare the page the error happened on; older results only have the script's location, and a script file
+  // (an app bundle such as /assets/index.js) says nothing about the page, so it does not rule the error out.
+  const errorPage = (c: { location?: string; page?: string }) =>
+    c.page !== undefined
+      ? pagePath(c.page)
+      : /\.(m?js|cjs|jsx|ts|tsx)$/i.test(pagePath(c.location) ?? '')
+        ? undefined
+        : pagePath(c.location);
   const pageError = (input.console ?? []).find(
     (c) =>
       c.type === 'pageerror' &&
-      (failedOn === undefined || pagePath(c.location) === undefined || pagePath(c.location) === failedOn),
+      (failedOn === undefined || errorPage(c) === undefined || errorPage(c) === failedOn),
   );
   const corsError = consoleErrors.find((c) => /CORS|Access-Control-Allow-Origin|cross-origin/i.test(c.text));
   const net = input.network ?? [];
@@ -165,7 +173,11 @@ export function buildFacts(input: DiagnosisInput): Record<string, unknown> {
     candidateText: best?.text ? ` showing "${best.text}"` : '',
     consoleErrorCount: consoleErrors.length,
     pageError: pageError
-      ? { text: pageError.text, location: pageError.location ?? 'unknown location' }
+      ? {
+          text: pageError.text,
+          // Stack frames read "at <where>"; the rules say "at {{pageError.location}}" themselves.
+          location: pageError.location?.replace(/^at\s+/, '') || 'unknown location',
+        }
       : undefined,
     corsError: corsError?.text,
     failedRequestCount: failedRequests.length,

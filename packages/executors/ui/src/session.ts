@@ -34,7 +34,7 @@ import { findImage, pngFromDataUrl } from '@stepforge/image-match';
 import { checkPageMetrics, collectPageMetrics, WEB_VITALS_INIT_SCRIPT } from '@stepforge/perf';
 
 type NetworkEntry = CoreNetworkEntry & { startedAt: number };
-type ConsoleEntry = { type: string; text: string; location?: string; at: number };
+type ConsoleEntry = { type: string; text: string; location?: string; page?: string; at: number };
 type SeenResponse = { response: Response; consumed: boolean };
 
 /** Browser identities for phone and tablet runs, so sites that detect mobile browsers serve their mobile version. */
@@ -191,14 +191,21 @@ export class UiSession implements ExecutorSession {
         });
       }
     });
-    p.on('pageerror', (e) =>
+    p.on('pageerror', (e) => {
+      // Kept like console messages: a page throwing in a loop must not grow the log without end.
+      if (this.consoleLog.length >= MAX_LOG_ENTRIES) return;
       this.consoleLog.push({
         type: 'pageerror',
+        page: p.url(),
         text: `${e.name}: ${e.message}`,
-        location: e.stack?.split('\n')[1]?.trim(),
+        // The stack's first frame, without its "at " (the diagnosis says "at <location>" itself).
+        location: e.stack
+          ?.split('\n')[1]
+          ?.trim()
+          .replace(/^at\s+/, ''),
         at: Date.now(),
-      }),
-    );
+      });
+    });
     p.on('requestfinished', async (r) => {
       const step = this.currentStep;
       if (this.keptRequests >= this.maxNetworkEntries) return this.dropRequest(step);
