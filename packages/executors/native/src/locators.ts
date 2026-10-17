@@ -98,6 +98,11 @@ export function predicateLiteral(s: string): string {
 
 const pred = (value: string): Query => ({ using: '-ios predicate string', value });
 
+/** A predicate literal inside a class chain's `…` brackets: a backtick there is written twice. */
+export function classChainLiteral(s: string): string {
+  return predicateLiteral(s).replace(/`/g, '``');
+}
+
 /** XCUITest element types for the web's ARIA roles, so `role=button "Sign in"` works on an iPhone too. */
 const IOS_ROLE_TYPES: Record<string, string[]> = {
   button: ['XCUIElementTypeButton'],
@@ -205,7 +210,7 @@ export function macQueries(l: Locator): Query[] {
           'invalid_params',
           `The role "${l.value}" has no macOS equivalent; use a test id, text or XPath (roles: ${Object.keys(MAC_ROLE_TYPES).join(', ')})`,
         );
-      const n = l.name ? predicateLiteral(l.name) : undefined;
+      const n = l.name ? classChainLiteral(l.name) : undefined;
       return types.map((t) => ({
         using: '-ios class chain',
         value: n ? `**/${t}[\`title == ${n} OR label == ${n} OR placeholderValue == ${n}\`]` : `**/${t}`,
@@ -311,6 +316,15 @@ const LINUX_ROLES: Record<string, string[]> = {
 };
 
 /**
+ * An element with this role tag and accessible name, for the Linux helper. Its XPath (ElementTree's subset) has no
+ * concat(), so a name with both kinds of quotes is looked up by its exact name instead (any role).
+ */
+export function linuxNamed(tag: string, name: string): Query {
+  if (name.includes("'") && name.includes('"')) return { using: 'name', value: name };
+  return { using: 'xpath', value: `//${tag}[@name=${xpathLiteral(name)}]` };
+}
+
+/**
  * The Linux helper's queries for one StepForge locator, best first: test id → accessible id (GTK:
  * atk_object_set_accessible_id; Qt: objectName); label and text → accessible name (exact, then contained);
  * placeholder → accessible name; role → AT-SPI role with that name; XPath (ElementTree's subset) over role tags.
@@ -337,8 +351,10 @@ export function linuxQueries(l: Locator): Query[] {
           'invalid_params',
           `The role "${l.value}" has no Linux equivalent; use a test id, text or XPath (roles: ${Object.keys(LINUX_ROLES).join(', ')})`,
         );
-      const named = l.name ? `[@name=${xpathLiteral(l.name)}]` : '';
-      return roles.map((r) => ({ using: 'xpath', value: `//${r}${named}` }));
+      if (!l.name) return roles.map((r) => ({ using: 'xpath', value: `//${r}` }));
+      const queries = roles.map((r) => linuxNamed(r, l.name!));
+      // The name-only fallback is the same for every role: ask once.
+      return queries[0]!.using === 'name' ? [queries[0]!] : queries;
     }
     case 'xpath':
       return [{ using: 'xpath', value: l.value }];

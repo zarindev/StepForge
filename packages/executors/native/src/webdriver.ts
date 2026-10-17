@@ -27,20 +27,45 @@ export class WebDriverSession {
     readonly capabilities: Record<string, unknown>,
   ) {}
 
+  /**
+   * Starts a session. A cancelled run stops waiting at once; Appium goes on starting the app, so a session that
+   * arrives after the cancel is quit (else the app would stay open until Appium's command timeout).
+   */
   static async create(
     serverUrl: string,
     capabilities: Record<string, unknown>,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<WebDriverSession> {
+    const aborted = () => new StepError('aborted', 'Run was cancelled');
+    if (signal?.aborted) throw aborted();
     const base = serverUrl.replace(/\/$/, '');
-    const value = (await call(
+    const pending = call(
       base,
       'POST',
       '/session',
       { capabilities: { alwaysMatch: capabilities, firstMatch: [{}] } },
       timeoutMs,
-    )) as { sessionId: string; capabilities: Record<string, unknown> };
-    return new WebDriverSession(base, value.sessionId, value.capabilities ?? {});
+    ).then((v) => {
+      const value = v as { sessionId: string; capabilities: Record<string, unknown> };
+      return new WebDriverSession(base, value.sessionId, value.capabilities ?? {});
+    });
+    if (!signal) return pending;
+    return new Promise((resolve, reject) => {
+      const onAbort = () => reject(aborted());
+      signal.addEventListener('abort', onAbort, { once: true });
+      pending.then(
+        (session) => {
+          signal.removeEventListener('abort', onAbort);
+          if (signal.aborted) void session.quit();
+          else resolve(session);
+        },
+        (err: unknown) => {
+          signal.removeEventListener('abort', onAbort);
+          reject(signal.aborted ? aborted() : err);
+        },
+      );
+    });
   }
 
   private cmd(method: string, path: string, body?: unknown, timeoutMs = 60_000): Promise<unknown> {

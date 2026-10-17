@@ -29,6 +29,21 @@ const describe = (l: Locator) =>
     ? `image (needs ${Math.round((l.threshold ?? 0.9) * 100)}%)`
     : `${l.strategy}=${l.value}${l.name ? ` "${l.name}"` : ''}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const isAborted = (err: unknown) => err instanceof StepError && err.kind === 'aborted';
+/** Waits, or stops at once when the run is cancelled. */
+const pause = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal.aborted) return reject(new StepError('aborted', 'Run was cancelled'));
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(new StepError('aborted', 'Run was cancelled'));
+    };
+    const t = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 
 type Found = { el: ElementRef; used: Locator; index: number; matches: number };
 
@@ -66,16 +81,18 @@ export class NativeSession implements ExecutorSession {
     const url = await this.appiumUrl().catch((err: Error) => {
       throw new StepError('navigation', err.message);
     });
+    const signal = this.ctx.signal;
     try {
       // The first test may boot the emulator or simulator and install (on iOS: build) Appium's helper app.
+      // Cancelling the run stops the wait (and the retry); a session Appium starts after that is quit.
       const timeout = pf.name === 'iOS' ? 900_000 : 420_000;
       try {
-        this.driver = await WebDriverSession.create(url, caps, timeout);
+        this.driver = await WebDriverSession.create(url, caps, timeout, signal);
       } catch (err) {
         // A connection dropped while the device or Appium's helper app was still starting: one more try.
         if (!(err instanceof StepError && err.kind === 'network')) throw err;
-        await sleep(5000);
-        this.driver = await WebDriverSession.create(url, caps, timeout);
+        await pause(5000, signal);
+        this.driver = await WebDriverSession.create(url, caps, timeout, signal);
       }
     } catch (err) {
       if (err instanceof StepError) throw err;
@@ -478,10 +495,12 @@ export class NativeSession implements ExecutorSession {
           const label = p.buttonLabel ? String(p.buttonLabel) : undefined;
           const deadline = Date.now() + timeout;
           for (;;) {
+            if (ctx.signal.aborted) throw new StepError('aborted', 'Run was cancelled');
             try {
               await this.platform.dialog(this.driver, accept, label);
               break;
             } catch (err) {
+              if (isAborted(err)) throw err;
               const e = err as Error;
               const none =
                 (err as WebDriverError).error === 'no such alert' ||
@@ -554,6 +573,7 @@ export class NativeSession implements ExecutorSession {
     let pass = false;
     let seen = false;
     for (;;) {
+      if (ctx.signal.aborted) throw new StepError('aborted', 'Run was cancelled');
       try {
         if (check === 'hidden') {
           const n = await this.count(step.locators[0]!);
@@ -574,6 +594,8 @@ export class NativeSession implements ExecutorSession {
         }
         pass = compare(check, actual, expected);
       } catch (err) {
+        // A cancelled run stops here (not "not ready, try again").
+        if (isAborted(err)) throw err;
         if ((err as StepError).kind === 'element_not_found' && check !== 'visible') throw err;
         actual =
           (err as StepError).kind === 'element_not_found'

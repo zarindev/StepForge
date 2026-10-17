@@ -63,6 +63,11 @@ type Active = {
 /** One recording at a time; the dashboard follows it live over the WebSocket. */
 export class RecorderManager {
   private active: Active | null = null;
+  /**
+   * A recording that is starting (the app or browser takes seconds to open): a second start is refused meanwhile,
+   * and a stop or discard sent meanwhile closes the session as soon as it is there.
+   */
+  private starting: { cancelled: boolean } | null = null;
   private last:
     | (RecorderSnapshot & {
         id: string;
@@ -117,9 +122,28 @@ export class RecorderManager {
 
   async start(input: z.input<typeof StartRecordingInput>) {
     const d = StartRecordingInput.parse(input);
+    if (this.starting)
+      throw new repo.RepoError(409, 'conflict', 'A recording is already starting. Wait for it, or stop it.');
     if (this.active && this.active.session.state !== 'stopped') {
       throw new repo.RepoError(409, 'conflict', 'A recording is already in progress. Stop it first.');
     }
+    // Marked before the first wait, so two quick clicks cannot start two sessions.
+    const starting = { cancelled: false };
+    this.starting = starting;
+    try {
+      return await this.begin(d, starting);
+    } finally {
+      if (this.starting === starting) this.starting = null;
+    }
+  }
+
+  /** A start that was stopped while the session opened: the session is closed and the start reports it. */
+  private async abandon(session: { stop(): Promise<unknown> }): Promise<never> {
+    await session.stop().catch(() => undefined);
+    throw new repo.RepoError(409, 'conflict', 'The recording was stopped while it was starting');
+  }
+
+  private async begin(d: z.output<typeof StartRecordingInput>, starting: { cancelled: boolean }) {
     const env = repo.getEnvironment(this.db, d.environmentId);
     if (env.applicationId !== d.applicationId)
       throw new repo.RepoError(400, 'invalid', 'Environment belongs to another application');
@@ -180,6 +204,7 @@ export class RecorderManager {
           err instanceof StepError ? err.message : (err as Error).message,
         );
       }
+      if (starting.cancelled) return this.abandon(session);
       this.active = {
         id,
         applicationId: d.applicationId,
@@ -229,6 +254,7 @@ export class RecorderManager {
         this.publish();
       },
     });
+    if (starting.cancelled) return this.abandon(session);
     this.active = {
       id,
       applicationId: d.applicationId,
@@ -280,6 +306,7 @@ export class RecorderManager {
   }
 
   async stop() {
+    if (this.starting) this.starting.cancelled = true;
     if (this.active) await this.active.session.stop();
     return this.status();
   }
@@ -290,6 +317,7 @@ export class RecorderManager {
   }
 
   discard(): void {
+    if (this.starting) this.starting.cancelled = true;
     void this.active?.session.stop();
     this.active = null;
     this.last = null;

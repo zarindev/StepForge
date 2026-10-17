@@ -14,10 +14,11 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { listSimulators } from './ios.ts';
 import {
   androidQueries,
+  classChainLiteral,
   iosQueries,
+  linuxNamed,
   linuxQueries,
   macQueries,
-  predicateLiteral,
   windowsQueries,
   xpathLiteral,
   type Query,
@@ -353,12 +354,18 @@ export function iosCapabilities(launch: IosLaunch): Record<string, unknown> {
   if (launch.udid) caps['appium:udid'] = launch.udid;
   if (launch.simulator) caps['appium:deviceName'] = launch.simulator;
   else if (!launch.udid) {
-    // No device named: the first iPhone simulator (a booted one if any).
-    const sim = listSimulators().find((s) => s.name.startsWith('iPhone'));
+    // No device named: the first iPhone simulator (a booted one if any), of the iOS version asked for.
+    const v = launch.platformVersion?.trim();
+    const sim = listSimulators().find(
+      (s) =>
+        s.name.startsWith('iPhone') && (!v || s.runtime === `iOS ${v}` || s.runtime.startsWith(`iOS ${v}.`)),
+    );
     if (!sim)
       throw new StepError(
         'invalid_params',
-        'No iPhone simulator found: add one in Xcode (Window → Devices and Simulators)',
+        v
+          ? `No iPhone simulator with iOS ${v} found: add one in Xcode (Window → Devices and Simulators), or clear the iOS version`
+          : 'No iPhone simulator found: add one in Xcode (Window → Devices and Simulators)',
       );
     caps['appium:udid'] = sim.udid;
     caps['appium:deviceName'] = sim.name;
@@ -592,8 +599,18 @@ export function macPlatform(launch: MacLaunch): NativePlatform {
       ])),
     doubleTap: async (d, el) => void (await d.execute('macos: doubleClick', [{ elementId: el }])),
     async scroll(d, direction) {
+      // At the centre of the app's (front) window: a fixed screen point may be another app, or the desktop.
+      const win = (await d.findAll('-ios class chain', '**/XCUIElementTypeWindow').catch(() => []))[0];
+      const r = win ? await d.rect(win).catch(() => undefined) : undefined;
+      if (!r || !r.width || !r.height)
+        throw new StepError('element_not_found', 'The app has no window to scroll in');
       await d.execute('macos: scroll', [
-        { x: 400, y: 300, deltaX: 0, deltaY: direction === 'down' ? -200 : 200 },
+        {
+          x: Math.round(r.x + r.width / 2),
+          y: Math.round(r.y + r.height / 2),
+          deltaX: 0,
+          deltaY: direction === 'down' ? -200 : 200,
+        },
       ]);
       return true;
     },
@@ -641,14 +658,26 @@ export function macPlatform(launch: MacLaunch): NativePlatform {
       // wrongly (several displays), so when a click leaves the dialog open, the keyboard answers it: Return presses
       // the default button, Escape the cancel button.
       const label = buttonLabel ?? (accept ? 'OK' : 'Cancel');
-      const dialogs = () => d.findAll('-ios class chain', '**/XCUIElementTypeSheet');
-      const byTitle = (t: string) =>
-        d.findAll('-ios class chain', `**/XCUIElementTypeButton[\`title == ${predicateLiteral(t)}\`]`);
-      let target = (await byTitle(label))[0];
+      // Only buttons of an open sheet or dialog window: the app's own OK and Cancel buttons are not a dialog.
+      const containers = ['XCUIElementTypeSheet', 'XCUIElementTypeDialog'];
+      const dialogs = async () =>
+        (await Promise.all(containers.map((c) => d.findAll('-ios class chain', `**/${c}`)))).flat();
+      const dialogButtons = async (predicate: string) =>
+        (
+          await Promise.all(
+            containers.map((c) =>
+              d.findAll('-ios class chain', `**/${c}/**/XCUIElementTypeButton[\`${predicate}\`]`),
+            ),
+          )
+        ).flat();
+      if (!(await dialogs()).length) throw new StepError('timeout', 'no such alert: no dialog is open');
+      let target = (await dialogButtons(`title == ${classChainLiteral(label)}`))[0];
       // No button named OK/Cancel: the dialog's default (first) button, or its cancel button.
-      if (!target && !buttonLabel && (await dialogs()).length)
-        target = (await d.findAll('accessibility id', accept ? 'action-button-1' : 'action-button-2'))[0];
-      if (!target) throw new StepError('timeout', `no such alert: no "${label}" button`);
+      if (!target && !buttonLabel)
+        target = (
+          await dialogButtons(`identifier == "${accept ? 'action-button-1' : 'action-button-2'}"`)
+        )[0];
+      if (!target) throw new StepError('timeout', `no such alert: the dialog has no "${label}" button`);
       const gone = async () => {
         for (let i = 0; i < 6; i++) {
           await new Promise((r) => setTimeout(r, 250));
@@ -656,9 +685,8 @@ export function macPlatform(launch: MacLaunch): NativePlatform {
         }
         return false;
       };
-      const open = (await dialogs()).length > 0;
       await d.click(target).catch(() => undefined);
-      if (!open || (await gone())) return;
+      if (await gone()) return;
       // Which button is the default one: the element tree says (the first button of an alert).
       const buttons = parseElements(await d.source()).filter((e) =>
         /^action-button-\d+$/.test(e.attrs.identifier ?? ''),
@@ -680,7 +708,7 @@ export function macPlatform(launch: MacLaunch): NativePlatform {
         const type = i === 0 ? 'XCUIElementTypeMenuBarItem' : 'XCUIElementTypeMenuItem';
         const els = await d.findAll(
           '-ios class chain',
-          `**/${type}[\`title == ${predicateLiteral(title)}\`]`,
+          `**/${type}[\`title == ${classChainLiteral(title)}\`]`,
         );
         if (!els.length)
           throw new StepError(
@@ -755,8 +783,20 @@ export function windowsPlatform(launch: WindowsLaunch): NativePlatform {
     hideKeyboard: async () => {},
     dialog: async (d, accept, buttonLabel) => {
       const label = buttonLabel ?? (accept ? 'OK' : 'Cancel');
-      const find = () => d.findAll('xpath', `//Window//Button[@Name=${xpathLiteral(label)}]`);
-      if (!(await find()).length) throw new StepError('timeout', `no such alert: no "${label}" button`);
+      // Only buttons of a dialog: a modal window, a classic dialog box (#32770), or a window owned by the app's
+      // window (UI Automation shows those inside it). The app's own OK and Cancel buttons are not a dialog.
+      const name = `[@Name=${xpathLiteral(label)}]`;
+      const find = () =>
+        d.findAll(
+          'xpath',
+          [
+            `//Window[@IsModal='True']//Button${name}`,
+            `//Window[@ClassName='#32770']//Button${name}`,
+            `//Window//Window//Button${name}`,
+          ].join(' | '),
+        );
+      if (!(await find()).length)
+        throw new StepError('timeout', `no such alert: no dialog with a "${label}" button`);
       await pressUntilGone(d, find);
     },
     queryAppState: async () => undefined,
@@ -836,21 +876,26 @@ export function linuxPlatform(launch: LinuxLaunch): NativePlatform {
     dialog: async (d, accept, buttonLabel) => {
       const label = buttonLabel ?? (accept ? 'OK' : 'Cancel');
       // A dialog's buttons (GTK message dialogs are "alert" or "dialog" roles).
-      const find = async () => [
-        ...(await d.findAll('xpath', `//alert//push_button[@name=${xpathLiteral(label)}]`).catch(() => [])),
-        ...(await d.findAll('xpath', `//dialog//push_button[@name=${xpathLiteral(label)}]`).catch(() => [])),
-      ];
+      const button = linuxNamed('push_button', label);
+      const find = async () =>
+        button.using === 'name'
+          ? await d.findAll(button.using, button.value).catch(() => [])
+          : [
+              ...(await d.findAll('xpath', `//alert${button.value}`).catch(() => [])),
+              ...(await d.findAll('xpath', `//dialog${button.value}`).catch(() => [])),
+            ];
       if (!(await find()).length) throw new StepError('timeout', `no such alert: no "${label}" button`);
       await pressUntilGone(d, find);
     },
     queryAppState: async () => undefined,
     async menu(d, path) {
       for (const [i, title] of path.entries()) {
-        let els = await d.findAll(
-          'xpath',
-          `//${i === 0 ? 'menu' : 'menu_item'}[@name=${xpathLiteral(title)}]`,
-        );
-        if (!els.length && i > 0) els = await d.findAll('xpath', `//menu[@name=${xpathLiteral(title)}]`);
+        const item = linuxNamed(i === 0 ? 'menu' : 'menu_item', title);
+        let els = await d.findAll(item.using, item.value);
+        if (!els.length && i > 0 && item.using === 'xpath') {
+          const sub = linuxNamed('menu', title);
+          els = await d.findAll(sub.using, sub.value);
+        }
         if (!els.length)
           throw new StepError('element_not_found', `No menu "${title}" (in ${path.join(' > ')})`);
         await d.click(els[0]!);

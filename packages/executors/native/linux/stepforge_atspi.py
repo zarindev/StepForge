@@ -12,6 +12,7 @@ import base64
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -256,6 +257,9 @@ for i in range(12):
     W3C_KEYS[chr(0xE031 + i)] = f"F{i + 1}"
 
 
+MODIFIERS = {"Shift_L", "Control_L", "Alt_L", "Super_L"}
+
+
 def keyval(value):
     name = W3C_KEYS.get(value)
     if name:
@@ -263,21 +267,58 @@ def keyval(value):
     return Gdk.unicode_to_keyval(ord(value))
 
 
+def keycode(keysym):
+    """The hardware keycode that types a keysym, and its shift level (0: no Shift), or (None, None)."""
+    keymap = Gdk.Keymap.get_for_display(Gdk.Display.get_default())
+    ok, keys = keymap.get_entries_for_keyval(keysym)
+    if not ok or not keys:
+        return None, None
+    k = min(keys, key=lambda k: (k.group, k.level))
+    return k.keycode, k.level
+
+
 def perform(session, actions):
-    for source in actions:
-        for a in source.get("actions", []):
-            t = a.get("type")
-            if t == "pause":
-                time.sleep((a.get("duration") or 0) / 1000)
-            elif t in ("keyDown", "keyUp"):
-                kind = Atspi.KeySynthType.PRESS if t == "keyDown" else Atspi.KeySynthType.RELEASE
-                Atspi.generate_keyboard_event(keyval(a["value"]), None, kind)
-            elif t == "pointerMove":
-                session.pointer = (int(a.get("x", 0)), int(a.get("y", 0)))
-                Atspi.generate_mouse_event(session.pointer[0], session.pointer[1], "abs")
-            elif t in ("pointerDown", "pointerUp"):
-                x, y = getattr(session, "pointer", (0, 0))
-                Atspi.generate_mouse_event(x, y, "b1p" if t == "pointerDown" else "b1r")
+    # PRESS and RELEASE take a hardware keycode, not a keysym: keys are held by their keycode (so Control+S is
+    # Control down, s, Control up). A character with no keycode of its own at that level ("!", a letter of another
+    # layout) is typed whole by its keysym (SYM: press and release).
+    held = {}  # key value -> keycode, while down
+    mods = set()  # modifier names held
+    try:
+        for source in actions:
+            for a in source.get("actions", []):
+                t = a.get("type")
+                if t == "pause":
+                    time.sleep((a.get("duration") or 0) / 1000)
+                elif t == "keyDown":
+                    value = a["value"]
+                    name = W3C_KEYS.get(value)
+                    # A shortcut names its letter in capitals ("Control+S"): that is the s key, not Shift+S.
+                    if not name and len(value) == 1 and value.isalpha() and mods & {"Control_L", "Alt_L", "Super_L"} and "Shift_L" not in mods:
+                        value = value.lower()
+                    sym = keyval(value)
+                    code, level = keycode(sym)
+                    if code is not None and (level == 0 or (level == 1 and "Shift_L" in mods) or name in MODIFIERS):
+                        Atspi.generate_keyboard_event(code, None, Atspi.KeySynthType.PRESS)
+                        held[a["value"]] = code
+                        if name in MODIFIERS:
+                            mods.add(name)
+                    else:
+                        Atspi.generate_keyboard_event(sym, None, Atspi.KeySynthType.SYM)
+                elif t == "keyUp":
+                    code = held.pop(a["value"], None)
+                    if code is not None:
+                        Atspi.generate_keyboard_event(code, None, Atspi.KeySynthType.RELEASE)
+                    mods.discard(W3C_KEYS.get(a["value"]))
+                elif t == "pointerMove":
+                    session.pointer = (int(a.get("x", 0)), int(a.get("y", 0)))
+                    Atspi.generate_mouse_event(session.pointer[0], session.pointer[1], "abs")
+                elif t in ("pointerDown", "pointerUp"):
+                    x, y = getattr(session, "pointer", (0, 0))
+                    Atspi.generate_mouse_event(x, y, "b1p" if t == "pointerDown" else "b1r")
+    finally:
+        # Never leave a key down (a failed action would keep Control held for the whole desktop).
+        for code in held.values():
+            safe(lambda: Atspi.generate_keyboard_event(code, None, Atspi.KeySynthType.RELEASE))
 
 
 def handle(method, parts, body):
@@ -415,12 +456,20 @@ def main():
     # An app that stops answering (busy, or stuck in a nested loop) fails a call after 5 s instead of 25.
     Atspi.set_timeout(5000, 15000)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+
+    # StepForge stops the helper with SIGTERM: leave through the finally below, so the apps it started are closed.
+    def stop(signum, frame):
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
     print(f"StepForge Linux helper on port {args.port}", flush=True)
     try:
         server.serve_forever()
     finally:
-        for s in SESSIONS.values():
-            s.quit()
+        for s in list(SESSIONS.values()):
+            safe(s.quit)
+        SESSIONS.clear()
 
 
 if __name__ == "__main__":

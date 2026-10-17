@@ -188,6 +188,21 @@ describe('recorder API', () => {
     expect(created.scenario).toMatchObject({ moduleId, name: 'Recorded into a module' });
   }, 90_000);
 
+  it('two quick starts open one recording; a stop sent while it starts closes it', async () => {
+    const payload = { applicationId: appId, environmentId: envId, headless: true };
+    const start = () => app.inject({ method: 'POST', url: '/api/recorder/start', headers: H, payload });
+    const [a, b] = await Promise.all([start(), start()]);
+    expect([a.statusCode, b.statusCode].sort()).toEqual([201, 409]);
+    await ok('POST', '/api/recorder/discard');
+    // Stopped while the browser opens: it is closed, and nothing is left recording.
+    const late = start();
+    await new Promise((r) => setTimeout(r, 20));
+    await ok('POST', '/api/recorder/stop');
+    expect((await late).statusCode).toBe(409);
+    expect(ctx.recorder.session()).toBeNull();
+    expect(ctx.recorder.status()).toBeNull();
+  }, 60_000);
+
   it('blocks: create, use from a scenario with util.useBlock, and validate nested steps', async () => {
     await ok('PUT', `/api/environments/${envId}/secrets`, { key: 'password', value: 'Admin123!' });
     const block = await ok<{ id: string }>('POST', `/api/applications/${appId}/blocks`, {

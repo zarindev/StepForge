@@ -3,7 +3,8 @@ import {
   adbPath,
   androidSdk,
   emulatorPath,
-  javaHome,
+  javaInfo,
+  JAVA_MIN,
   listAvds,
   listDevices,
   type Device,
@@ -13,8 +14,10 @@ import {
   APPIUM_VERSION,
   appiumInstalled,
   appiumPaths,
+  installedAppiumVersion,
   installedDrivers,
   nodeOkForAppium,
+  wantedDrivers,
 } from './appium.ts';
 import { linuxChecks } from './linux.ts';
 import { automationMode, listSimulators, xcodeSelected, xcodeVersion, type Simulator } from './ios.ts';
@@ -35,6 +38,10 @@ export type NativeStatus = {
   simulators: Simulator[];
 };
 
+/** The emulator system image for this computer's processor (an arm64 image does not run on an x64 machine). */
+export const emulatorImage = (arch: string = process.arch) =>
+  `system-images;android-35;google_apis;${arch === 'arm64' ? 'arm64-v8a' : 'x86_64'}`;
+
 const sdkCmd = (pkgs: string) => `sdkmanager ${pkgs} (in the Android SDK's cmdline-tools/latest/bin)`;
 const APPIUM_FIX = 'npm run appium:install, or Install Appium on the application’s Environments tab';
 
@@ -44,12 +51,23 @@ function appiumCheck(
   label: string,
 ): DoctorCheck {
   const ok = appiumInstalled(toolsDir, driver);
+  // The versions installed, and those StepForge pins (an older install still runs; the install updates it).
+  const appium = installedAppiumVersion(toolsDir) ?? 'unknown';
+  const installed = installedDrivers(toolsDir)[driver];
+  const pinned = wantedDrivers().find((d) => d.name === driver)?.version;
+  const outdated = [
+    appium !== APPIUM_VERSION && `Appium ${APPIUM_VERSION}`,
+    pinned && installed !== pinned && `the driver ${pinned}`,
+  ].filter(Boolean);
   return {
     name: `Appium and the ${label} driver`,
     ok,
     detail: ok
-      ? `Appium ${APPIUM_VERSION}, ${{ xcuitest: 'XCUITest', uiautomator2: 'UiAutomator2', mac2: 'Mac2', novawindows: 'NovaWindows' }[driver]} ${installedDrivers(toolsDir)[driver]} in ${appiumPaths(toolsDir).root}` +
-        (nodeOkForAppium() ? '' : ` (runs on its own Node.js ${APPIUM_NODE_VERSION})`)
+      ? `Appium ${appium}, ${{ xcuitest: 'XCUITest', uiautomator2: 'UiAutomator2', mac2: 'Mac2', novawindows: 'NovaWindows' }[driver]} ${installed} in ${appiumPaths(toolsDir).root}` +
+        (nodeOkForAppium() ? '' : ` (runs on its own Node.js ${APPIUM_NODE_VERSION})`) +
+        (outdated.length
+          ? ` (StepForge expects ${outdated.join(' and ')}: run npm run appium:install to update)`
+          : '')
       : 'not installed',
     fix: APPIUM_FIX,
   };
@@ -58,14 +76,18 @@ function appiumCheck(
 /** What testing Android and iOS apps needs on this computer, each with how to fix it. */
 export async function nativeDoctor(toolsDir: string): Promise<NativeStatus> {
   const sdk = androidSdk();
-  const java = javaHome();
+  const java = javaInfo();
   const [avds, devices] = await Promise.all([listAvds(), listDevices()]);
   const android: DoctorCheck[] = [
     {
-      name: 'Java 17 or newer',
-      ok: !!java,
-      detail: java ?? 'not found',
-      fix: 'Install a JDK (for example Eclipse Temurin 21) or Android Studio, or set JAVA_HOME',
+      name: `Java ${JAVA_MIN} or newer`,
+      ok: !!java.home,
+      detail: java.home
+        ? `Java ${java.version} at ${java.home}`
+        : java.tooOld
+          ? `Java ${java.tooOld.version ?? '(version unknown)'} at ${java.tooOld.home} is too old (needs ${JAVA_MIN}+)`
+          : 'not found',
+      fix: `Install a JDK ${JAVA_MIN}+ (for example Eclipse Temurin 21) or Android Studio, and set JAVA_HOME to it`,
     },
     {
       name: 'Android SDK',
@@ -87,7 +109,7 @@ export async function nativeDoctor(toolsDir: string): Promise<NativeStatus> {
           ? emulatorPath(sdk)
           : 'not installed (only needed without a phone)',
       fix:
-        sdkCmd('"emulator" "system-images;android-35;google_apis;arm64-v8a"') +
+        sdkCmd(`"emulator" "${emulatorImage()}"`) +
         ', then create a device with avdmanager or Android Studio',
     },
     {

@@ -1,4 +1,4 @@
-import { execFile, execFileSync } from 'node:child_process';
+import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -21,29 +21,70 @@ export function androidSdk(): string | undefined {
   return candidates.find((p) => existsSync(join(p, 'platform-tools')) || existsSync(join(p, 'emulator')));
 }
 
-/** A Java (17 or newer) for the Android tools: JAVA_HOME, Android Studio's own, or the system one. */
-export function javaHome(): string | undefined {
-  const ok = (home: string | undefined) => !!home && existsSync(join(home, 'bin', exe('java')));
-  if (ok(process.env.JAVA_HOME)) return process.env.JAVA_HOME;
-  const studio = [
+/** The major version in `java -version`'s output: 'version "17.0.2"' → 17, 'version "1.8.0_392"' → 8. */
+export function parseJavaMajor(output: string): number | undefined {
+  const m = /version "(\d+)(?:\.(\d+))?/.exec(output);
+  if (!m) return undefined;
+  const major = Number(m[1]);
+  return major === 1 && m[2] ? Number(m[2]) : major;
+}
+
+const javaVersions = new Map<string, number | undefined>();
+
+/** The major version of the Java in a JDK folder (asked once per folder), or undefined when it does not run. */
+export function javaVersion(home: string): number | undefined {
+  if (javaVersions.has(home)) return javaVersions.get(home);
+  let v: number | undefined;
+  try {
+    // java -version prints to stderr.
+    const r = spawnSync(join(home, 'bin', exe('java')), ['-version'], { encoding: 'utf8', timeout: 15_000 });
+    v = parseJavaMajor(`${r.stderr ?? ''}\n${r.stdout ?? ''}`);
+  } catch {
+    v = undefined;
+  }
+  javaVersions.set(home, v);
+  return v;
+}
+
+/** The Android tools (and Appium's Android driver) need Java 17 or newer. */
+export const JAVA_MIN = 17;
+
+/** Where to look for a Java, best first: JAVA_HOME, Android Studio's own, the system one (asked only if needed). */
+function* javaCandidates(): Generator<string> {
+  const has = (p: string | undefined | false): p is string => !!p && existsSync(join(p, 'bin', exe('java')));
+  for (const p of [
+    process.env.JAVA_HOME,
     '/Applications/Android Studio.app/Contents/jbr/Contents/Home',
     process.env.ProgramFiles && join(process.env.ProgramFiles, 'Android', 'Android Studio', 'jbr'),
     '/opt/android-studio/jbr',
     join(homedir(), 'android-studio', 'jbr'),
-  ].find((p) => ok(p || undefined));
-  if (studio) return studio;
+  ])
+    if (has(p)) yield p;
   if (process.platform === 'darwin') {
     try {
-      const home = execFileSync('/usr/libexec/java_home', ['-v', '17+'], {
+      const home = execFileSync('/usr/libexec/java_home', ['-v', `${JAVA_MIN}+`], {
         encoding: 'utf8',
         stdio: 'pipe',
       }).trim();
-      if (ok(home)) return home;
+      if (has(home)) yield home;
     } catch {
       // no Java installed
     }
   }
+}
+
+/** A Java (17 or newer) for the Android tools: JAVA_HOME, Android Studio's own, or the system one. */
+export function javaHome(): string | undefined {
+  for (const home of javaCandidates()) if ((javaVersion(home) ?? 0) >= JAVA_MIN) return home;
   return undefined;
+}
+
+/** The Java the Android tools use and its version; else the first one found, which is too old. */
+export function javaInfo(): { home?: string; version?: number; tooOld?: { home: string; version?: number } } {
+  const home = javaHome();
+  if (home) return { home, version: javaVersion(home) };
+  const old = javaCandidates().next().value as string | undefined;
+  return old ? { tooOld: { home: old, version: javaVersion(old) } } : {};
 }
 
 export const adbPath = (sdk: string) => join(sdk, 'platform-tools', exe('adb'));

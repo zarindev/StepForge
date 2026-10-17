@@ -97,8 +97,9 @@ async function installPortableNode(toolsDir: string, log: (m: string) => void): 
   const out = join(toolsDir, '.node-extract');
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
-  // bsdtar (macOS, Windows 10+) and GNU tar both read these archives.
-  execFileSync('tar', ['-xf', tmp, '-C', out]);
+  // bsdtar (macOS, Windows 10+) and GNU tar both read these archives. On Windows, Windows' own bsdtar: a GNU tar
+  // first on the PATH (Git for Windows) cannot open a .zip.
+  execFileSync(tarCommand(), ['-xf', tmp, '-C', out]);
   rmSync(portableNodeDir(toolsDir), { recursive: true, force: true });
   renameSync(
     join(
@@ -109,6 +110,16 @@ async function installPortableNode(toolsDir: string, log: (m: string) => void): 
   );
   rmSync(out, { recursive: true, force: true });
   rmSync(tmp, { force: true });
+}
+
+/** The tar that unpacks the Node.js archive: Windows' own (System32\tar.exe) on Windows, else the one on the PATH. */
+export function tarCommand(
+  platform: string = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  if (platform !== 'win32') return 'tar';
+  const system = join(env.SystemRoot ?? env.windir ?? 'C:\\Windows', 'System32', 'tar.exe');
+  return existsSync(system) ? system : 'tar';
 }
 
 /** Where Appium lives: `<data>/tools/appium` (the package) and `<data>/tools/appium/home` (its drivers). */
@@ -141,11 +152,29 @@ export function installedDrivers(toolsDir: string): Record<string, string> {
   return out;
 }
 
-/** Appium, a Node.js to run it, and the driver (default: every driver this computer can use). */
+/** The installed Appium's version (from its package.json), or undefined when it is not installed. */
+export function installedAppiumVersion(toolsDir: string): string | undefined {
+  const file = join(appiumPaths(toolsDir).root, 'node_modules', 'appium', 'package.json');
+  try {
+    return (JSON.parse(readFileSync(file, 'utf8')) as { version?: string }).version;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Appium, a Node.js to run it, and the driver. With a driver named: that driver, whatever its version (a test can
+ * run). Without: every driver this computer can use, all at StepForge's pinned versions (else the install updates
+ * them).
+ */
 export function appiumInstalled(toolsDir: string, driver?: string): boolean {
   if (!existsSync(appiumPaths(toolsDir).main) || !appiumNode(toolsDir)) return false;
   const drivers = installedDrivers(toolsDir);
-  return driver ? !!drivers[driver] : wantedDrivers().every((d) => !!drivers[d.name]);
+  if (driver) return !!drivers[driver];
+  return (
+    installedAppiumVersion(toolsDir) === APPIUM_VERSION &&
+    wantedDrivers().every((d) => drivers[d.name] === d.version)
+  );
 }
 
 function exec(
@@ -192,25 +221,32 @@ export async function installAppium(toolsDir: string, log: (m: string) => void =
       join(root, 'package.json'),
       JSON.stringify({ name: 'stepforge-appium', private: true }, null, 2),
     );
-  if (!existsSync(main)) {
-    log(`Installing Appium ${APPIUM_VERSION}…`);
+  const appium = existsSync(main) ? installedAppiumVersion(toolsDir) : undefined;
+  if (appium !== APPIUM_VERSION) {
+    log(appium ? `Updating Appium ${appium} to ${APPIUM_VERSION}…` : `Installing Appium ${APPIUM_VERSION}…`);
     await exec(
       npm,
-      ['install', '--no-audit', '--no-fund', '--loglevel=error', `appium@${APPIUM_VERSION}`],
+      ['install', '--no-audit', '--no-fund', '--loglevel=error', '--save-exact', `appium@${APPIUM_VERSION}`],
       { cwd: root },
       log,
     );
   }
+  const env = { ...process.env, APPIUM_HOME: home };
   for (const d of wantedDrivers()) {
-    if (installedDrivers(toolsDir)[d.name]) continue;
-    log(`Installing ${d.label} ${d.version}…`);
+    const installed = installedDrivers(toolsDir)[d.name];
+    if (installed === d.version) continue;
+    if (installed) {
+      // Another version: removed first, since Appium installs a driver only once (and updates only to the latest).
+      log(`Updating ${d.label} ${installed} to ${d.version}…`);
+      await exec(node, [main, 'driver', 'uninstall', d.name], { cwd: root, env }, log);
+    } else log(`Installing ${d.label} ${d.version}…`);
     await exec(
       node,
       // Appium's own list knows most drivers by name; others (NovaWindows) are installed as npm packages.
       d.npm
         ? [main, 'driver', 'install', '--source=npm', `${d.npm}@${d.version}`]
         : [main, 'driver', 'install', `${d.name}@${d.version}`],
-      { cwd: root, env: { ...process.env, APPIUM_HOME: home } },
+      { cwd: root, env },
       log,
     );
   }

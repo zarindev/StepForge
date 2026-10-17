@@ -42,7 +42,10 @@ export async function findPicture(
   const shot = await d.screenshot();
   const match = findImage(shot, pictureOf(l), { threshold: l.threshold ?? 0.9 });
   if (!match.found) return { match };
-  const win = await d.windowSize().catch(() => null);
+  // Android works in the screenshot's pixels (its window size leaves out the system bars); iOS and desktops in
+  // points, of which the screenshot has several per point.
+  const android = /^android$/i.test(String(d.capabilities?.platformName ?? ''));
+  const win = android ? null : await d.windowSize().catch(() => null);
   const shotWidth = shot.readUInt32BE(16);
   const k = win?.width ? win.width / shotWidth : 1;
   const r = [match.x * k, match.y * k, match.width * k, match.height * k].map((v) => Math.round(v));

@@ -178,6 +178,8 @@ export class NativeRecordingSession {
   private nextId = 1;
   private lastField?: { locators: Locator[]; secret: boolean; step?: NativeRecordedStep };
   private busy: Promise<unknown> = Promise.resolve();
+  /** The last screenshot's size in pixels (the screen the dashboard shows). */
+  private shotSize?: { width: number; height: number };
 
   private constructor(
     private readonly driver: WebDriverSession,
@@ -243,7 +245,18 @@ export class NativeRecordingSession {
   /** The screen as a PNG, and its size in pixels. */
   async screen(): Promise<{ png: Buffer; width: number; height: number }> {
     const png = await this.driver.screenshot();
-    return { png, width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+    this.shotSize = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+    return { png, ...this.shotSize };
+  }
+
+  /**
+   * What the screen fractions are fractions of, in the element tree's coordinates. Android's tree is in the
+   * screenshot's pixels (the window size leaves out the status and navigation bars); iOS's is in points, which the
+   * window size gives.
+   */
+  private async screenSize(): Promise<{ width: number; height: number }> {
+    if (this.platform.name === 'Android') return this.shotSize ?? (await this.screen());
+    return this.driver.windowSize();
   }
 
   /** The element at a point given as fractions of the screen (0–1), with its ranked, checked locators. */
@@ -251,23 +264,67 @@ export class NativeRecordingSession {
     fx: number,
     fy: number,
   ): Promise<{ element: ScreenElement; locators: Locator[]; describe: string } | null> {
-    const [source, win] = await Promise.all([this.driver.source(), this.driver.windowSize()]);
-    const element = elementAt(parseElements(source), fx * win.width, fy * win.height);
+    const hit = await this.at(fx, fy);
+    return hit && { element: hit.element, locators: hit.locators, describe: hit.describe };
+  }
+
+  /**
+   * The element at a point, its locators and a reference to it. A locator is kept only when it finds that one
+   * element and nothing else (a list repeats ids and texts: its first match is another row); failing all, the
+   * element's XPath with its position among the matches.
+   */
+  private async at(fx: number, fy: number) {
+    const [source, size] = await Promise.all([this.driver.source(), this.screenSize()]);
+    const element = elementAt(parseElements(source), fx * size.width, fy * size.height);
     if (!element) return null;
+    const same = (r: ScreenElement['rect']) =>
+      Math.abs(r.x - element.rect.x) <= 1 &&
+      Math.abs(r.y - element.rect.y) <= 1 &&
+      Math.abs(r.width - element.rect.width) <= 1 &&
+      Math.abs(r.height - element.rect.height) <= 1;
+    const rectOf = (el: ElementRef) => this.driver.rect(el).catch(() => undefined);
+    const candidates = locatorsFor(element);
     const locators: Locator[] = [];
-    for (const l of locatorsFor(element)) {
-      const found = await this.find([l]);
-      if (found) locators.push(l);
+    let el: ElementRef | undefined;
+    for (const l of candidates) {
+      // As a test finds it: the first query with matches, its first match.
+      const els = await this.matches(l);
+      if (els.length !== 1) continue;
+      const r = await rectOf(els[0]!);
+      if (!r || !same(r)) continue;
+      locators.push(l);
+      el ??= els[0];
     }
-    return { element, locators, describe: describeEl(element) };
+    const xpath = candidates.find((l) => l.strategy === 'xpath');
+    if (!locators.length && xpath) {
+      const els = await this.driver.findAll('xpath', xpath.value).catch(() => [] as ElementRef[]);
+      for (const [i, ref] of els.entries()) {
+        const r = await rectOf(ref);
+        if (r && same(r)) {
+          locators.push({ strategy: 'xpath', value: `(${xpath.value})[${i + 1}]`, score: 20 });
+          el = ref;
+          break;
+        }
+      }
+    }
+    return { element, locators, describe: describeEl(element), el };
   }
 
   /** Where an element is, as fractions of the screen (its centre), e.g. to tap it from a test. */
   async pointOf(locators: Locator[]): Promise<{ x: number; y: number } | null> {
     const el = await this.find(locators);
     if (!el) return null;
-    const [r, win] = await Promise.all([this.driver.rect(el), this.driver.windowSize()]);
-    return { x: (r.x + r.width / 2) / win.width, y: (r.y + r.height / 2) / win.height };
+    const [r, size] = await Promise.all([this.driver.rect(el), this.screenSize()]);
+    return { x: (r.x + r.width / 2) / size.width, y: (r.y + r.height / 2) / size.height };
+  }
+
+  /** What a locator's first query with any matches finds. */
+  private async matches(l: Locator): Promise<ElementRef[]> {
+    for (const q of this.platform.queries(l)) {
+      const els = await this.driver.findAll(q.using, q.value).catch(() => [] as ElementRef[]);
+      if (els.length) return els;
+    }
+    return [];
   }
 
   private async find(locators: Locator[]): Promise<ElementRef | undefined> {
@@ -280,16 +337,15 @@ export class NativeRecordingSession {
   }
 
   private async target(fx: number, fy: number) {
-    const hit = await this.inspect(fx, fy);
+    const hit = await this.at(fx, fy);
     if (!hit) throw new StepError('element_not_found', 'Nothing to tap there');
-    if (!hit.locators.length)
+    if (!hit.locators.length || !hit.el)
       throw new StepError(
         'element_not_found',
         `${hit.describe || 'This element'} has no id, text or label to find it by again; give it an accessibility id in the app`,
       );
-    const el = await this.find(hit.locators);
-    if (!el) throw new StepError('element_not_found', 'The element went away');
-    return { ...hit, el };
+    // The element under the point itself (the one its locators were checked against).
+    return { ...hit, el: hit.el };
   }
 
   /** A tap: done in the app; a text field only gets the focus (typing records the step). */
