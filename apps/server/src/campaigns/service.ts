@@ -224,6 +224,8 @@ export class CampaignService {
     if (cr.finishedAt) return;
     const summary = repo.summarizeCampaignRun(this.db, cr);
     if (summary.status === 'queued' || summary.status === 'running') return;
+    // A run stopped by a shutdown is resumed (or cancelled) later: the campaign finishes then, not now.
+    if (repo.campaignRunChildren(this.db, campaignRunId).some((r) => r.status === 'interrupted')) return;
     const done = this.finish(campaignRunId, cr);
     this.finishing.set(campaignRunId, done);
     return done;

@@ -209,11 +209,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   registerMaintenanceRoutes(app, ctx);
   await registerStaticRoutes(app, ctx);
 
-  // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal.
-  if (getSetting(db, 'mailpitAutostart', false))
-    email.mailpit.start().catch((err: Error) => app.log.warn(`Mailpit did not start: ${err.message}`));
-
   if (!opts.embedded) {
+    // Optional: start the local Mailpit with StepForge (Settings → Email). Failures are logged, not fatal. Not for
+    // the CLI (embedded): a quick command would end before Mailpit started, and leave it running.
+    if (getSetting(db, 'mailpitAutostart', false))
+      email.mailpit.start().catch((err: Error) => app.log.warn(`Mailpit did not start: ${err.message}`));
     ctx.scheduler.start();
     ctx.maintenance.startRetention((m) => app.log.info(m));
     // A loaded demo workspace brings its demo app back with StepForge.

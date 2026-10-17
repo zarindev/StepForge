@@ -1,6 +1,7 @@
 import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildApp } from './app.ts';
+import { loadConfig } from './config.ts';
 import { openBrowser } from './open-browser.ts';
 
 const MAX_PORT_ATTEMPTS = 10;
@@ -12,9 +13,12 @@ async function main(): Promise<void> {
     console.error('StepForge: unhandled error in background work:', err),
   );
 
+  // Read first: it loads .env, so settings there (the log level among them) apply.
+  const config = loadConfig();
   const { app, ctx } = await buildApp({
+    config,
     logger: {
-      level: process.env.STEPFORGE_LOG_LEVEL ?? 'info',
+      level: config.logLevel,
       transport: process.stdout.isTTY
         ? { target: 'pino-pretty', options: { ignore: 'pid,hostname' } }
         : undefined,
@@ -36,6 +40,9 @@ async function main(): Promise<void> {
       throw err;
     }
   }
+
+  // Links in notifications and campaign summaries use the port actually in use.
+  ctx.config.port = port;
 
   // The Vite dev server reads this file to inject the token during development.
   const sessionFile = join(ctx.config.dataDir, '.session.json');

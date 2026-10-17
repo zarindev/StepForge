@@ -68,7 +68,7 @@ finishes the session. See [Manual testing](MANUAL_RUNS.md).
 
 ## Running in CI
 
-Desktop-app tests run from the CLI and in CI like any other tests (`stepforge run --app notes`). Windows and macOS
+Desktop-app tests run from the CLI and in CI like any other tests (`stepforge run --app notes --env CI`). Windows and macOS
 runners show the windows on their desktop. Linux runners need a virtual display and Electron's sandbox helper:
 
 ```yaml
@@ -77,7 +77,7 @@ runners show the windows on their desktop. Linux runners need a virtual display 
   run: |
     sudo chown root:root node_modules/electron/dist/chrome-sandbox
     sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
-- run: xvfb-run -a npx stepforge run --app notes
+- run: xvfb-run -a npx stepforge run --app notes --env CI
 ```
 
 For a packaged app, the sandbox helper sits next to the app's executable. Another option is to add `--no-sandbox` to

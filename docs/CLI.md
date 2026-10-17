@@ -128,6 +128,10 @@ CLI.
 0 2 * * * cd /path/to/StepForge && ./stepforge.sh run --app careclinic --env Staging --notify "QA team" >> data/cli.log 2>&1
 ```
 
+cron starts with a short `PATH` (usually `/usr/bin:/bin`), so Node installed by Homebrew, nvm or fnm is not found.
+Put its folder first — `which node` prints it — for example `PATH=/opt/homebrew/bin:/usr/bin:/bin` on a line above the
+job (with nvm, the folder ends in the version, e.g. `~/.nvm/versions/node/v22.11.0/bin`, written out in full).
+
 **Windows (Task Scheduler)**, every night at 02:00 (Command Prompt):
 
 ```bat

@@ -3,12 +3,10 @@
  * Usage: npm run k6:install
  */
 import { findK6, installK6, K6_VERSION } from '@stepforge/perf';
-import { isAbsolute, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { loadConfig } from '../apps/server/src/config.js';
 
-const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const raw = process.env.STEPFORGE_DATA_DIR ?? './data';
-const binDir = join(isAbsolute(raw) ? raw : resolve(root, raw), 'bin');
+// Same folders as the server: .env, STEPFORGE_DATA_DIR and STEPFORGE_BIN_DIR all count.
+const { binDir } = loadConfig();
 
 const existing = findK6({ binDir });
 if (existing && !process.argv.includes('--force')) {

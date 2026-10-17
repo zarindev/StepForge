@@ -1,10 +1,22 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 
-const sessionFile = fileURLToPath(new URL('../../data/.session.json', import.meta.url));
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
+/** The server's data folder: STEPFORGE_DATA_DIR from the environment or the repository's .env, else ./data. */
+function dataDir(): string {
+  let dir = process.env.STEPFORGE_DATA_DIR;
+  const envFile = resolve(repoRoot, '.env');
+  if (!dir && existsSync(envFile))
+    dir = /^\s*STEPFORGE_DATA_DIR\s*=\s*["']?([^"'\r\n]+?)["']?\s*$/m.exec(
+      readFileSync(envFile, 'utf8'),
+    )?.[1];
+  return resolve(repoRoot, dir || 'data');
+}
+const sessionFile = resolve(dataDir(), '.session.json');
 const readSession = (): { port: number; token: string } | null =>
   existsSync(sessionFile) ? JSON.parse(readFileSync(sessionFile, 'utf8')) : null;
 

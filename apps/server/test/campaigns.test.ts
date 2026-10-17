@@ -1,4 +1,6 @@
+import { schema } from '@stepforge/db';
 import { createClinicApp } from '@stepforge/demo-clinic';
+import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -217,6 +219,30 @@ describe('campaigns', () => {
     const none = await call('POST', `/api/campaign-runs/${started.id}/rerun-failed`);
     expect(none.statusCode).toBe(400);
     expect(none.json().message).toMatch(/Nothing failed/);
+  }, 60_000);
+
+  it('a run interrupted by a shutdown does not finish the campaign; resuming it does', async () => {
+    const started = await ok<{ id: string }>('POST', `/api/campaigns/${campaignId}/run`);
+    await waitDone(started.id);
+    // As after a shutdown in the middle of the campaign: one run interrupted, the campaign not finished yet.
+    const d = await ok<Detail>('GET', `/api/campaign-runs/${started.id}`);
+    const stopped = d.cells[0]!.runId;
+    ctx.db.update(schema.runs).set({ status: 'interrupted' }).where(eq(schema.runs.id, stopped)).run();
+    ctx.db
+      .update(schema.campaignRuns)
+      .set({ finishedAt: null })
+      .where(eq(schema.campaignRuns.id, started.id))
+      .run();
+    received.length = 0;
+    await ctx.campaigns.checkFinished(started.id);
+    expect(
+      (await ok<{ finishedAt: string | null }>('GET', `/api/campaign-runs/${started.id}`)).finishedAt,
+    ).toBeNull();
+    expect(received).toHaveLength(0);
+    await ok('POST', `/api/runs/${stopped}/resume`);
+    const done = await waitDone(started.id);
+    expect(done.status).toBe('passed');
+    expect(received).toHaveLength(1);
   }, 60_000);
 
   it('a schedule can run the campaign; deleting the campaign removes its schedules', async () => {

@@ -107,8 +107,13 @@ export class MailpitServer {
     };
   }
 
+  /** Set by stop(): a start still checking the port must not spawn Mailpit afterwards. */
+  private stopped = false;
+
   async start(): Promise<MailpitStatus> {
+    this.stopped = false;
     if (await this.responding()) return this.status();
+    if (this.stopped) return this.status();
     const bin = mailpitBinary(this.opts.binDir);
     if (!existsSync(bin))
       throw new Error('Mailpit is not installed yet. Install it first (Settings → Email).');
@@ -147,6 +152,7 @@ export class MailpitServer {
   }
 
   async stop(): Promise<MailpitStatus> {
+    this.stopped = true;
     const child = this.child;
     this.child = null;
     if (child && child.exitCode === null) {

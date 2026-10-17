@@ -46,7 +46,7 @@ run
   --browser <name>      chromium | firefox | webkit
   --workers <n>         Parallel tests (1–8)
   --retries <n>         Retries for failed tests (0–3)
-  --priority <level>    high | normal | low (place in the run queue)
+  --priority <level>    high | normal | low (place in the queue when other runs wait)
   --headed              Show the browser
   --junit <file>        Write JUnit XML (for CI)
   --html <file>         Write the HTML report
@@ -303,10 +303,12 @@ const run: Handler = async (c, v, io) => {
     c.ctx.runs.cancel(runId);
   };
   process.once('SIGINT', cancel);
+  process.once('SIGTERM', cancel);
   try {
     await c.ctx.runs.idle();
   } finally {
     process.off('SIGINT', cancel);
+    process.off('SIGTERM', cancel);
     c.ctx.bus.off('event', onEvent);
   }
 
@@ -424,7 +426,19 @@ const campaign: Handler = async (c, v, io) => {
     );
   const started = c.ctx.campaigns.launch(camp.id, { trigger: 'cli' });
   if (!v.json) io.out(`Campaign "${camp.name}": ${started.runs} run(s)…`);
-  await c.ctx.runs.idle();
+  // Ctrl+C (or a CI job's SIGTERM) cancels the campaign's runs instead of leaving them "running".
+  const cancel = () => {
+    io.err('\nCancelling…');
+    c.ctx.campaigns.cancel(started.id);
+  };
+  process.once('SIGINT', cancel);
+  process.once('SIGTERM', cancel);
+  try {
+    await c.ctx.runs.idle();
+  } finally {
+    process.off('SIGINT', cancel);
+    process.off('SIGTERM', cancel);
+  }
   await c.ctx.campaigns.checkFinished(started.id); // the summary notification, if not sent already
   const d = c.ctx.campaigns.detail(started.id);
   const files: string[] = [];
@@ -582,18 +596,22 @@ const codegenCmd: Handler = async (c, v, io) => {
       }),
     };
   }
+  const ci =
+    typeof v.ci === 'string'
+      ? v.ci
+          .split(',')
+          .map((x) => lc(x.trim()))
+          .filter(Boolean)
+      : [];
+  const unknownCi = ci.filter((x) => x !== 'github' && x !== 'gitlab');
+  if (unknownCi.length)
+    throw new UsageError(`--ci must be github and/or gitlab (got ${unknownCi.join(', ')})`);
   const { project } = await c.ctx.codegen.build(application.id, {
     target,
     environmentId,
     scope,
     pom: !!v.pom,
-    ci:
-      typeof v.ci === 'string'
-        ? v.ci
-            .split(',')
-            .map((x) => x.trim())
-            .filter(Boolean)
-        : [],
+    ci,
   });
   for (const [path, content] of Object.entries(project.files)) write(join(out, path), content);
   io.out(`Wrote ${Object.keys(project.files).length} files to ${out}`);
@@ -628,7 +646,8 @@ async function doctor(c: Ctx, v: Values, io: Io): Promise<number> {
   const shown = PLATFORMS.filter((p) => !platform || p === platform);
   const ready = shown.some((p) => status[p].ready);
   if (v.json) {
-    io.out(JSON.stringify(status, null, 2));
+    // Only the platform asked for, as in the text output (the exit code is about it too).
+    io.out(JSON.stringify(Object.fromEntries(shown.map((p) => [p, status[p]])), null, 2));
     return ready ? EXIT.passed : EXIT.error;
   }
   for (const p of shown) {
