@@ -24,7 +24,13 @@ export function loadOrCreateKey(keyPath: string): Buffer {
   }
   mkdirSync(dirname(keyPath), { recursive: true });
   const key = generateKey();
-  writeFileSync(keyPath, key.toString('base64'), { mode: 0o600 });
+  try {
+    // "wx": created only if absent, so two StepForge processes starting together cannot each write their own key.
+    writeFileSync(keyPath, key.toString('base64'), { mode: 0o600, flag: 'wx' });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return loadOrCreateKey(keyPath);
+    throw err;
+  }
   try {
     chmodSync(keyPath, 0o600);
   } catch {
@@ -45,8 +51,11 @@ export function encrypt(plaintext: string, key: Buffer): EncryptedSecret {
 }
 
 export function decrypt(secret: EncryptedSecret, key: Buffer): string {
-  const decipher = createDecipheriv(ALGO, key, Buffer.from(secret.iv, 'base64'));
-  decipher.setAuthTag(Buffer.from(secret.tag, 'base64'));
+  // The full 16-byte tag only: a shortened tag would make forging a stored secret easier.
+  const decipher = createDecipheriv(ALGO, key, Buffer.from(secret.iv, 'base64'), { authTagLength: 16 });
+  const tag = Buffer.from(secret.tag, 'base64');
+  if (tag.length !== 16) throw new Error('Invalid secret: wrong authentication tag length');
+  decipher.setAuthTag(tag);
   return Buffer.concat([
     decipher.update(Buffer.from(secret.ciphertext, 'base64')),
     decipher.final(),

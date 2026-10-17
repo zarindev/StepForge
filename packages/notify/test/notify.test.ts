@@ -71,6 +71,21 @@ describe('message formatting', () => {
       failed: Array.from({ length: 14 }, (_, i) => ({ name: `T${i}` })),
     });
     expect(many.text).toContain('… and 4 more');
+    // Long names and messages: Telegram's text stays under its limit with every tag closed (a cut tag is refused).
+    const long = formatSummary({
+      ...summary,
+      failed: Array.from({ length: 10 }, (_, i) => ({
+        name: `Test & ${'x'.repeat(400)} ${i}`,
+        error: 'e'.repeat(400),
+      })),
+      gate: { status: 'red', failing: Array.from({ length: 40 }, (_, i) => `Rule ${i} & ${'y'.repeat(60)}`) },
+    });
+    expect(long.telegram.length).toBeLessThan(4096);
+    for (const tag of ['b', 'i', 'a']) {
+      const open = long.telegram.match(new RegExp(`<${tag}[ >]`, 'g'))?.length ?? 0;
+      expect(long.telegram.match(new RegExp(`</${tag}>`, 'g'))?.length ?? 0, tag).toBe(open);
+    }
+    expect(long.telegram).not.toMatch(/&[a-z]*$/m);
   });
 });
 

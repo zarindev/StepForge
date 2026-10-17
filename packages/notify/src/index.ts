@@ -52,6 +52,20 @@ const WebhookUrl = z
 export type WebhookSecret = { url: string; headers: Record<string, string> };
 export const writeWebhookSecret = (s: WebhookSecret): string => JSON.stringify(s);
 /** Reads a webhook secret; older channels stored the plain URL. */
+function fitLines(lines: string[], max: number): string {
+  const out: string[] = [];
+  let size = 0;
+  for (const [i, line] of lines.entries()) {
+    if (size + line.length + 1 > max) {
+      out.push(`… (${lines.length - i} more line${lines.length - i === 1 ? '' : 's'} not shown)`);
+      break;
+    }
+    out.push(line);
+    size += line.length + 1;
+  }
+  return out.join('\n');
+}
+
 export function readWebhookSecret(secret: string | undefined | null): WebhookSecret {
   if (!secret) return { url: '', headers: {} };
   if (secret.trimStart().startsWith('{')) {
@@ -173,18 +187,18 @@ export function formatSummary(s: RunSummary): Message {
     '',
     NOTIFY_CREDIT,
   ].join('\n');
-  const telegram = [
+  const telegramLines = [
     `<b>${esc(head)}</b>`,
     esc(counts),
     `<i>${esc(meta)}</i>`,
-    ...(gate ? [esc(gate)] : []),
+    ...(gate ? [esc(gate.slice(0, 600))] : []),
     ...(failed.length
       ? [
           '',
           '<b>Failed tests</b>',
           ...failed.map(
             (f) =>
-              `• ${esc(f.name)}${f.diagnosis || f.error ? ` — <i>${esc(String(f.diagnosis ?? f.error).slice(0, 200))}</i>` : ''}`,
+              `• ${esc(f.name.slice(0, 200))}${f.diagnosis || f.error ? ` — <i>${esc(String(f.diagnosis ?? f.error).slice(0, 200))}</i>` : ''}`,
           ),
         ]
       : []),
@@ -192,9 +206,10 @@ export function formatSummary(s: RunSummary): Message {
     ...(s.url ? ['', `<a href="${esc(s.url)}">Open the run</a>`] : []),
     '',
     `<i>${esc(NOTIFY_CREDIT)}</i>`,
-  ]
-    .join('\n')
-    .slice(0, 4000); // Telegram's limit is 4096 characters
+  ];
+  // Telegram's limit is 4096 characters, and a message cut inside a tag or an entity is refused as a whole: keep
+  // whole lines (each one is complete HTML) and say when the list was shortened.
+  const telegram = fitLines(telegramLines, 3900);
   const colour = ok ? '#16a34a' : '#dc2626';
   const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#0f172a;max-width:640px">
 <h2 style="margin:0 0 4px;color:${colour}">${esc(head)}</h2>

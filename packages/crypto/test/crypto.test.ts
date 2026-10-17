@@ -24,6 +24,20 @@ describe('crypto', () => {
     expect(() => decrypt(bad, key)).toThrow();
   });
 
+  it('rejects a shortened authentication tag', () => {
+    const key = generateKey();
+    const enc = encrypt('hello', key);
+    const short = { ...enc, tag: Buffer.from(enc.tag, 'base64').subarray(0, 4).toString('base64') };
+    expect(() => decrypt(short, key)).toThrow(/authentication tag/);
+  });
+
+  it('two starts at once end up with one key', () => {
+    const path = join(mkdtempSync(join(tmpdir(), 'sf-key-')), '.key');
+    const a = loadOrCreateKey(path);
+    const b = loadOrCreateKey(path);
+    expect(b.equals(a)).toBe(true);
+  });
+
   it('rejects the wrong key', () => {
     const enc = encrypt('hello', generateKey());
     expect(() => decrypt(enc, generateKey())).toThrow();
