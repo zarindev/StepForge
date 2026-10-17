@@ -102,3 +102,60 @@ describe('run queue priorities', () => {
     expect((await call('POST', `/api/runs/${low.id}/priority`, { priority: 'high' })).statusCode).toBe(409);
   }, 30_000);
 });
+
+describe('stopping StepForge during a run', () => {
+  it('the test that was running runs again when the run is resumed (it is not lost as skipped)', async () => {
+    type Item = { id: string; scenarioId: string; status: string };
+    const run = await ok<Run>('POST', '/api/runs', {
+      applicationId: appId,
+      environmentId: envId,
+      scope: { type: 'scenarios', ids: [quickId, slowId] },
+    });
+    // Wait until the slow test is the one running, then stop as StepForge does on shutdown.
+    for (let i = 0; i < 100; i++) {
+      const r = await ok<{ items: Item[] }>('GET', `/api/runs/${run.id}`);
+      if (r.items.find((x) => x.scenarioId === slowId)?.status === 'running') break;
+      await new Promise((res) => setTimeout(res, 50));
+    }
+    await ctx.runs.shutdown();
+    const stopped = await ok<Run & { items: Item[] }>('GET', `/api/runs/${run.id}`);
+    expect(stopped.status).toBe('interrupted');
+    expect(stopped.items.find((x) => x.scenarioId === slowId)?.status).toBe('queued');
+
+    await ok('POST', `/api/runs/${run.id}/resume`);
+    await ctx.runs.idle();
+    const done = await ok<Run & { items: Item[] }>('GET', `/api/runs/${run.id}`);
+    expect(done.status).toBe('passed');
+    expect(done.items.map((x) => x.status)).toEqual(['passed', 'passed']);
+  }, 30_000);
+});
+
+describe('deleting an application during its run', () => {
+  it('stops its run and the queue goes on with the other applications', async () => {
+    const other = (await ok('POST', '/api/applications', { name: 'Doomed', slug: 'doomed' })).id;
+    const otherEnv = (
+      await ok('POST', `/api/applications/${other}/environments`, {
+        name: 'Local',
+        baseUrl: 'http://127.0.0.1:9',
+      })
+    ).id;
+    const mod = (await ok('POST', `/api/applications/${other}/modules`, { name: 'D' })).id;
+    const slow = (
+      await ok('POST', `/api/modules/${mod}/scenarios`, {
+        name: 'Long',
+        steps: [{ type: 'util.wait', params: { ms: 3000 } }],
+      })
+    ).id;
+    await ok('POST', '/api/runs', {
+      applicationId: other,
+      environmentId: otherEnv,
+      scope: { type: 'scenarios', ids: [slow] },
+    });
+    const waiting = await start(quickId);
+    await new Promise((r) => setTimeout(r, 300));
+    const del = await call('DELETE', `/api/applications/${other}`, { confirm: 'Doomed' });
+    expect(del.statusCode).toBe(204);
+    await ctx.runs.idle();
+    expect((await ok<Run>('GET', `/api/runs/${waiting.id}`)).status).toBe('passed');
+  }, 30_000);
+});

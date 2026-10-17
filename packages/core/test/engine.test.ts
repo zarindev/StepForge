@@ -110,6 +110,70 @@ describe('runTestCase', () => {
     expect(r.status).toBe('failed');
   });
 
+  it('a soft failure inside if / loop does not stop the test; a hard one still does', async () => {
+    const soft = await run(
+      steps(
+        {
+          type: 'util.if',
+          params: {
+            condition: { value: 'a', operator: 'equals', expected: 'a' },
+            steps: [{ type: 'ui.click', params: { fail: 'x' }, continueOnFail: true }],
+          },
+        },
+        {
+          type: 'util.loop',
+          params: { count: 2, steps: [{ type: 'ui.click', params: { fail: 'y' }, continueOnFail: true }] },
+        },
+        { type: 'ui.click' },
+      ),
+    );
+    expect(soft.steps.at(-1)).toMatchObject({ type: 'ui.click', status: 'passed' });
+    expect(soft.steps.find((s) => s.type === 'util.if')!.status).toBe('failed');
+    expect(soft.status).toBe('failed');
+    const hard = await run(
+      steps(
+        {
+          type: 'util.if',
+          params: {
+            condition: { value: 'a', operator: 'equals', expected: 'a' },
+            steps: [{ type: 'ui.click', params: { fail: 'x' } }],
+          },
+        },
+        { type: 'ui.click' },
+      ),
+    );
+    expect(hard.steps.at(-1)).toMatchObject({ type: 'ui.click', status: 'skipped' });
+  });
+
+  it("an inner loop gives the outer loop's index and item back", async () => {
+    const r = await run(
+      steps({
+        type: 'util.loop',
+        params: {
+          count: 2,
+          as: 'o',
+          steps: [
+            { type: 'util.loop', params: { count: 3, steps: [{ type: 'ui.click' }] } },
+            { type: 'ui.click', params: { out: '{{vars.index}}/{{vars.o}}' }, captureAs: 'c' },
+          ],
+        },
+      }),
+    );
+    expect(r.vars.c).toBe('1/2');
+    expect(r.vars.index).toBeUndefined(); // no loop left: the loop variables are gone again
+  });
+
+  it('every after-hook runs, even when an earlier one failed', async () => {
+    const r = await run(steps({ type: 'ui.click' }), {
+      after: steps({ type: 'ui.click', params: { fail: 'cleanup 1' } }, { type: 'ui.click' }),
+    });
+    const after = r.steps.filter((s) => s.path.startsWith('after.'));
+    expect(after.map((s) => [s.path, s.status])).toEqual([
+      ['after.1', 'failed'],
+      ['after.2', 'passed'],
+    ]);
+  });
+
   it('retries a step and reports attempts', async () => {
     const r = await run(steps({ type: 'ui.click', params: { flakyTimes: 2 }, retries: 2 }));
     expect(r.status).toBe('passed');
@@ -213,6 +277,19 @@ describe('evaluateAssertion', () => {
     ['inRange', -4, '0..', false],
     ['inRange', '7', '..9', true],
     ['inRange', [null], '0..', false],
+    // QA: objects are searched as JSON, key order and booleans-as-text do not matter, missing values are not 0,
+    // and a range that cannot be read never passes.
+    ['contains', { status: 'success' }, 'success', true],
+    ['notContains', { status: 'success' }, 'failure', true],
+    ['equals', { a: 1, b: { c: 2, d: 3 } }, { b: { d: 3, c: 2 }, a: 1 }, true],
+    ['equals', true, 'true', true],
+    ['equals', [1, 2], [2, 1], false],
+    ['lt', null, 100, false],
+    ['lte', '', 0, false],
+    ['gt', undefined, -1, false],
+    ['inRange', 500, '10 - 20', false],
+    ['inRange', 150, '1e2..2e2', true],
+    ['inRange', 5, 5, false],
   ] as const)('%s(%j, %j) → %s', (operator, actual, expected, passed) => {
     expect(evaluateAssertion({ target: 't', operator, expected }, actual).passed).toBe(passed);
   });

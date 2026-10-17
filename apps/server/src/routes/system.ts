@@ -74,7 +74,8 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: AppContext): voi
 
   app.put<{ Params: { key: string }; Body: { value: unknown } }>('/api/settings/:key', async (req, reply) => {
     const key = req.params.key as SettingKey;
-    const schemaForKey = SETTINGS_SCHEMAS[key];
+    // Own keys only: "constructor" or "__proto__" must not find Object.prototype members.
+    const schemaForKey = Object.hasOwn(SETTINGS_SCHEMAS, key) ? SETTINGS_SCHEMAS[key] : undefined;
     if (!schemaForKey)
       return reply.code(404).send({ error: 'unknown_setting', message: `Unknown setting "${key}"` });
     const value = schemaForKey.parse(req.body?.value);

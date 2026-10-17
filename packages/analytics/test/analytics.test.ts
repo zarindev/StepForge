@@ -206,6 +206,8 @@ describe('quality gates', () => {
       rules: db.select().from(schema.qualityGates).get()!.rulesJson as never[],
     });
     expect(evaluateGate(db, gate()).status).toBe('unknown');
+    // Nothing can be judged yet (no run): the overall status is unknown, not green.
+    expect(applicationGates(db, appId).status).toBe('unknown');
 
     run(2, [
       [login, 'passed', 120],

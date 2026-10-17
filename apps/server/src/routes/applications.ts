@@ -1,7 +1,11 @@
 import { BulkScenarioAction, STEPFORGE_VERSION } from '@stepforge/core';
 import { STEPFORGE_AUTHOR } from '@stepforge/reports';
+import { schema } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
+import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 
@@ -47,7 +51,25 @@ export function registerApplicationRoutes(app: FastifyInstance, ctx: AppContext)
         .code(400)
         .send({ error: 'confirmation_required', message: `Type "${target.name}" to confirm deletion` });
     }
+    // Its runs stop first (a run whose rows vanish mid-way stalled the queue), then its files go with it.
+    await ctx.runs.cancelForApplication(target.id);
+    const runIds = db
+      .select({ id: schema.runs.id })
+      .from(schema.runs)
+      .where(eq(schema.runs.applicationId, target.id))
+      .all()
+      .map((r) => r.id);
+    const specFiles = db
+      .select({ path: schema.apiSpecs.rawPath })
+      .from(schema.apiSpecs)
+      .where(eq(schema.apiSpecs.applicationId, target.id))
+      .all()
+      .map((s) => s.path);
     repo.deleteApplication(db, target.id);
+    for (const id of runIds)
+      rmSync(join(ctx.config.artifactsDir, 'runs', id), { recursive: true, force: true });
+    rmSync(join(ctx.config.artifactsDir, 'baselines', target.id), { recursive: true, force: true });
+    for (const f of specFiles) rmSync(f, { force: true });
     return reply.code(204).send();
   });
 

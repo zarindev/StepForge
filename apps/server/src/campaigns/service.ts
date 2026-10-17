@@ -25,7 +25,8 @@ const TRIGGER = { manual: 'manual', schedule: 'schedule', cli: 'cli', rerun: 're
  * screen size, as one campaign run with a combined report, "rerun failed" and one summary notification at the end.
  */
 export class CampaignService {
-  private finishing = new Set<string>();
+  /** Campaign runs whose summary is being sent; a second caller waits for the same one. */
+  private finishing = new Map<string, Promise<void>>();
 
   constructor(
     private readonly db: StepForgeDb,
@@ -67,22 +68,24 @@ export class CampaignService {
     const c = repo.getCampaign(this.db, parent.campaignId);
     const cells = repo.campaignRunChildren(this.db, campaignRunId).flatMap((r) => {
       const failed = this.db
-        .select({ scenarioId: schema.runItems.scenarioId, status: schema.runItems.status })
+        .select({
+          scenarioId: schema.runItems.scenarioId,
+          testCaseId: schema.runItems.testCaseId,
+          status: schema.runItems.status,
+        })
         .from(schema.runItems)
         .where(eq(schema.runItems.runId, r.id))
         .all()
         .filter((i) => (i.status === 'failed' || i.status === 'broken') && i.scenarioId);
-      const ids = [...new Set(failed.map((i) => i.scenarioId!))];
-      return ids.length && r.environmentId
-        ? [
-            {
-              environmentId: r.environmentId,
-              browser: r.browser,
-              viewport: r.viewport,
-              scope: { type: 'scenarios' as const, ids },
-            },
-          ]
-        : [];
+      if (!r.environmentId) return [];
+      // Only the failed test cases of data-driven scenarios (not all of them); whole scenarios otherwise.
+      const testCases = [...new Set(failed.flatMap((i) => (i.testCaseId ? [i.testCaseId] : [])))];
+      const scenarios = [...new Set(failed.flatMap((i) => (i.testCaseId ? [] : [i.scenarioId!])))];
+      const cell = { environmentId: r.environmentId, browser: r.browser, viewport: r.viewport };
+      return [
+        ...(testCases.length ? [{ ...cell, scope: { type: 'testCases' as const, ids: testCases } }] : []),
+        ...(scenarios.length ? [{ ...cell, scope: { type: 'scenarios' as const, ids: scenarios } }] : []),
+      ];
     });
     if (!cells.length) throw new repo.RepoError(400, 'invalid', 'Nothing failed in this campaign run');
     return this.start(c, cells, { trigger: 'rerun', parentId: parent.id, scheduleId: undefined });
@@ -213,16 +216,34 @@ export class CampaignService {
 
   /** When every run of a campaign run has finished: mark it and send one summary to the channels. */
   async checkFinished(campaignRunId: string): Promise<void> {
-    if (this.finishing.has(campaignRunId)) return;
+    // Already being finished (the run.updated listener started it): wait for that, so the CLI does not close the
+    // database while the summary is still being sent.
+    const pending = this.finishing.get(campaignRunId);
+    if (pending) return pending;
     const cr = repo.getCampaignRunRow(this.db, campaignRunId);
     if (cr.finishedAt) return;
     const summary = repo.summarizeCampaignRun(this.db, cr);
     if (summary.status === 'queued' || summary.status === 'running') return;
-    this.finishing.add(campaignRunId);
+    const done = this.finish(campaignRunId, cr);
+    this.finishing.set(campaignRunId, done);
+    return done;
+  }
+
+  /** The schedule that launched a campaign run, if it still exists (it may have been deleted meanwhile). */
+  private scheduleOf(scheduleId: string | null | undefined) {
+    if (!scheduleId) return undefined;
+    try {
+      return repo.getSchedule(this.db, scheduleId);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async finish(campaignRunId: string, cr: ReturnType<typeof repo.getCampaignRunRow>): Promise<void> {
     try {
       // Send the summary first, so "finished" means the notification went out too.
       const c = repo.getCampaign(this.db, cr.campaignId);
-      const schedule = cr.scheduleId ? repo.getSchedule(this.db, cr.scheduleId) : undefined;
+      const schedule = this.scheduleOf(cr.scheduleId);
       const ids = [...new Set([...c.notifyChannelIdsJson, ...(schedule?.notifyChannelIdsJson ?? [])])];
       if (ids.length)
         await this.scheduler.deliver(this.summary(campaignRunId), ids, campaignRunId).catch(() => []);
@@ -237,7 +258,7 @@ export class CampaignService {
   summary(campaignRunId: string): RunSummary {
     const d = this.detail(campaignRunId);
     const app = repo.getApplication(this.db, d.applicationId);
-    const schedule = d.scheduleId ? repo.getSchedule(this.db, d.scheduleId) : undefined;
+    const schedule = this.scheduleOf(d.scheduleId);
     const label = (runId: string) => {
       const cell = d.cells.find((x) => x.runId === runId)!;
       return `${cell.environment} · ${cell.browser} · ${cell.viewport}`;

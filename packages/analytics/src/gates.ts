@@ -308,11 +308,11 @@ const RANK: Record<GateStatus, number> = { unknown: 0, green: 1, amber: 2, red: 
 /** All gates of an application and the overall (worst) status. */
 export function applicationGates(db: StepForgeDb, applicationId: string, runId?: string) {
   const gates = listGates(db, applicationId).map((g) => evaluateGate(db, g, runId));
-  const status = gates.reduce<GateStatus>(
-    (worst, g) => (RANK[g.status] > RANK[worst] ? g.status : worst),
-    gates.length ? 'green' : 'unknown',
-  );
-  return { status: gates.length ? status : ('unknown' as GateStatus), gates };
+  const worst = gates.reduce<GateStatus>((w, g) => (RANK[g.status] > RANK[w] ? g.status : w), 'green');
+  // Green only when every gate is green: a gate that cannot be judged yet (no run) keeps the overall unknown.
+  const status: GateStatus =
+    !gates.length || (worst === 'green' && gates.some((g) => g.status === 'unknown')) ? 'unknown' : worst;
+  return { status, gates };
 }
 
 /** A sensible starting gate for a new application. */

@@ -254,6 +254,10 @@ export function duplicateScenario(db: StepForgeDb, id: string): ScenarioDetail {
     status: 'draft',
     owner: src.owner,
     preconditions: src.preconditions,
+    // A manual test stays manual, and keeps its own set-up and clean-up blocks.
+    execution: src.execution,
+    setupBlockId: src.setupBlockId,
+    teardownBlockId: src.teardownBlockId,
     steps: src.steps.map(({ id: _id, ...s }) => s),
   });
   for (const tc of src.testCases) {

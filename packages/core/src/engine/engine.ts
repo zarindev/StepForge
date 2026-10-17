@@ -200,8 +200,7 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
   let stopped = false;
 
   /** Secrets must never be persisted: request/response payloads are masked before they leave the engine. */
-  const maskDeep = <T>(v: T): T =>
-    v === undefined ? v : (JSON.parse(resolver.mask(JSON.stringify(v))) as T);
+  const maskDeep = <T>(v: T): T => resolver.maskDeep(v);
 
   const record = (r: StepResult) => {
     results.push(r);
@@ -221,8 +220,11 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
     prefix: string,
     depth: number,
     callDepth: number,
+    /** Numbering starts after this many steps (after-hooks run one at a time). */
+    offset = 0,
   ): Promise<boolean> => {
-    for (const [i, raw] of list.entries()) {
+    for (const [index, raw] of list.entries()) {
+      const i = index + offset;
       const path = prefix ? `${prefix}.${i + 1}` : String(i + 1);
       const position = counter++;
       const step: RunnableStep = { ...raw, position };
@@ -258,12 +260,14 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         stepType: step.type,
         label: base.label,
       });
-      const result = CONTROL_STEP_TYPES.has(step.type)
-        ? await runControl(step, base, callDepth)
-        : await runLeaf(step, base);
+      const control = CONTROL_STEP_TYPES.has(step.type);
+      const result = control ? await runControl(step, base, callDepth) : await runLeaf(step, base);
       record(result);
       if (result.status === 'failed' || result.status === 'broken') {
-        if (!step.continueOnFail) stopped = true;
+        // A control step (if, loop, block) fails when a nested step failed. If those failures were all allowed to
+        // continue, the test continues too; a nested failure that stops the test has already set `stopped`.
+        const onlySoftChildren = control && !stopped && result.message?.endsWith('; a nested step failed');
+        if (!step.continueOnFail && !onlySoftChildren) stopped = true;
       }
     }
     return !stopped;
@@ -452,13 +456,19 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         const max = Math.min(Number(p.count ?? 100) || 100, MAX_LOOP_ITERATIONS);
         let ran = 0;
         let last = { passed: true, detail: '' };
-        while (ran < max && !stopped && !signal.aborted) {
-          // Set before the check, so the condition can use {{vars.index}} on the first pass too.
-          resolver.setVar('index', ran);
-          last = await evaluate((step.params as Record<string, unknown>).while);
-          if (!last.passed) break;
-          await runList(children, `${base.path}[${ran + 1}]`, base.depth + 1, callDepth);
-          ran++;
+        // An outer loop's index is back once this loop is done.
+        const restore = resolver.saveVars(['index']);
+        try {
+          while (ran < max && !stopped && !signal.aborted) {
+            // Set before the check, so the condition can use {{vars.index}} on the first pass too.
+            resolver.setVar('index', ran);
+            last = await evaluate((step.params as Record<string, unknown>).while);
+            if (!last.passed) break;
+            await runList(children, `${base.path}[${ran + 1}]`, base.depth + 1, callDepth);
+            ran++;
+          }
+        } finally {
+          restore();
         }
         const msg =
           ran >= max && last.passed
@@ -490,12 +500,18 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
         if (items.length > MAX_LOOP_ITERATIONS)
           throw new StepError('invalid_params', `loop is limited to ${MAX_LOOP_ITERATIONS} iterations`);
         let ran = 0;
-        for (const [i, item] of items.entries()) {
-          if (stopped || signal.aborted) break;
-          resolver.setVar(as, item);
-          resolver.setVar('index', i);
-          await runList(children, `${base.path}[${i + 1}]`, base.depth + 1, callDepth);
-          ran++;
+        // An outer loop's index and item are back once this loop is done.
+        const restore = resolver.saveVars([as, 'index']);
+        try {
+          for (const [i, item] of items.entries()) {
+            if (stopped || signal.aborted) break;
+            resolver.setVar(as, item);
+            resolver.setVar('index', i);
+            await runList(children, `${base.path}[${i + 1}]`, base.depth + 1, callDepth);
+            ran++;
+          }
+        } finally {
+          restore();
         }
         const msg = `Ran ${ran}/${items.length} iteration(s)`;
         return childFailed()
@@ -579,9 +595,11 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
   // so cleanup happens; a cancelled run skips them.
   if (input.before?.length) await runList(input.before, 'before', 0, 0);
   await runList(input.steps, '', 0, 0);
-  if (input.after?.length && !signal.aborted) {
+  // Each after-hook runs even when an earlier one failed: one broken cleanup must not skip the others.
+  for (const [i, hook] of (input.after ?? []).entries()) {
+    if (signal.aborted) break;
     stopped = false;
-    await runList(input.after, 'after', 0, 0);
+    await runList([hook], 'after', 0, 0, i);
   }
 
   const failed = !!firstFailure;

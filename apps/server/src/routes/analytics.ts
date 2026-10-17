@@ -28,7 +28,10 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: AppContext) {
     async (req) => {
       repo.getApplication(db, req.params.id);
       return appAnalytics(db, req.params.id, {
-        days: req.query.days ? Number(req.query.days) : undefined,
+        days:
+          req.query.days && Number.isFinite(Number(req.query.days)) && Number(req.query.days) > 0
+            ? Math.min(Number(req.query.days), 3650)
+            : undefined,
         environmentId: req.query.environmentId || undefined,
       });
     },

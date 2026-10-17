@@ -195,6 +195,29 @@ export class RunManager {
     await this.idle();
   }
 
+  /** Cancels one application's queued and running runs and waits until none of them runs (before deleting it). */
+  async cancelForApplication(applicationId: string): Promise<void> {
+    const open = this.db
+      .select({ id: schema.runs.id })
+      .from(schema.runs)
+      .where(
+        and(
+          eq(schema.runs.applicationId, applicationId),
+          inArray(schema.runs.status, ['queued', 'running', 'interrupted']),
+        ),
+      )
+      .all()
+      .map((r) => r.id);
+    for (const id of open) {
+      try {
+        this.cancel(id);
+      } catch {
+        // already finished
+      }
+    }
+    while (this.active && open.includes(this.active.runId)) await new Promise((r) => setTimeout(r, 50));
+  }
+
   cancel(runId: string): Run {
     const run = this.getRun(runId);
     if (this.active?.runId === runId) this.active.abort.abort();
@@ -337,7 +360,12 @@ export class RunManager {
           level: 'error',
           message: `Run crashed: ${(err as Error).message}`,
         });
-        this.finish(next, 'failed');
+        // The run may be gone (its application was deleted): the queue must go on either way.
+        try {
+          this.finish(next, 'failed');
+        } catch {
+          // nothing left to mark
+        }
       }
     }
   }
@@ -471,15 +499,32 @@ export class RunManager {
     let stop = false;
     const worker = async () => {
       for (let item = pending.shift(); item && !abort.signal.aborted && !stop; item = pending.shift()) {
-        const status = await this.executeItem(run, item, {
-          options,
-          envScope,
-          secrets,
-          executors,
-          signal: abort.signal,
-          retries: opts.retries,
-          browserVersion: () => pool.versionOf(options.browser),
-        });
+        let status: string;
+        try {
+          status = await this.executeItem(run, item, {
+            options,
+            envScope,
+            secrets,
+            executors,
+            signal: abort.signal,
+            retries: opts.retries,
+            browserVersion: () => pool.versionOf(options.browser),
+          });
+        } catch (err) {
+          // One test crashing must not stop the other workers (or leave this test "running"): it is broken.
+          status = 'broken';
+          this.saveItem(item, {
+            status: 'broken',
+            errorMessage: `StepForge error: ${(err as Error).message}`,
+          });
+          this.bus.publish({
+            type: 'run.log',
+            runId,
+            itemId: item.id,
+            level: 'error',
+            message: `Test crashed: ${(err as Error).message}`,
+          });
+        }
         if (opts.stopOnFirstFailure && (status === 'failed' || status === 'broken')) stop = true;
       }
     };
@@ -620,6 +665,11 @@ export class RunManager {
         });
     }
 
+    // StepForge is stopping: this test did not finish, so it runs again when the run is resumed.
+    if (ctx.signal.aborted && ctx.signal.reason === 'shutdown') {
+      this.saveItem(item, { status: 'queued', errorMessage: null });
+      return 'queued';
+    }
     const r = result!;
     const status = r.status === 'passed' && sawFailure ? 'flaky' : r.status;
     this.persistResult(item.id, r);

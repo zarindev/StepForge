@@ -4,10 +4,33 @@ import type { AssertionResult } from './types.ts';
 const fmt = (v: unknown) =>
   typeof v === 'string' ? JSON.stringify(v) : v === undefined ? 'undefined' : JSON.stringify(v);
 
+/** A number, or NaN for anything that is not one (a missing value must not count as 0). */
 function asNumber(v: unknown): number {
-  const n = typeof v === 'number' ? v : Number(v);
-  return n;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.trim() !== '') return Number(v);
+  return NaN;
 }
+
+/** JSON with object keys sorted, so `{a:1,b:2}` and `{b:2,a:1}` compare equal. */
+function stableJson(v: unknown): string {
+  return JSON.stringify(v, (_k, x: unknown) =>
+    x && typeof x === 'object' && !Array.isArray(x)
+      ? Object.fromEntries(
+          Object.entries(x as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+        )
+      : x,
+  );
+}
+
+/** Text to search in: strings as they are, objects and arrays as their JSON. */
+const textOf = (v: unknown) =>
+  typeof v === 'string'
+    ? v
+    : v === undefined || v === null
+      ? ''
+      : typeof v === 'object'
+        ? JSON.stringify(v)
+        : String(v);
 
 function lengthOf(v: unknown): number | undefined {
   if (typeof v === 'string' || Array.isArray(v)) return v.length;
@@ -17,23 +40,32 @@ function lengthOf(v: unknown): number | undefined {
 
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
-  // Loose numeric/string equality: "200" equals 200 — values from the DOM are always strings.
-  if ((typeof a === 'number' && typeof b === 'string') || (typeof a === 'string' && typeof b === 'number')) {
+  // Loose equality with text: "200" equals 200 and "true" equals true — values from the DOM are always strings.
+  const scalar = (x: unknown) => typeof x === 'number' || typeof x === 'boolean';
+  if ((scalar(a) && typeof b === 'string') || (typeof a === 'string' && scalar(b)))
     return String(a) === String(b);
-  }
-  return JSON.stringify(a) === JSON.stringify(b);
+  return stableJson(a) === stableJson(b);
 }
 
-/** Reads a range from `{min,max}`, `[min,max]` or `"min..max"` (either bound may be omitted). */
-export function parseRange(exp: unknown): { min?: number; max?: number } {
-  const num = (v: unknown) => (v === undefined || v === null || v === '' ? undefined : Number(v));
-  if (Array.isArray(exp)) return { min: num(exp[0]), max: num(exp[1]) };
-  if (exp && typeof exp === 'object') {
+/**
+ * Reads a range from `{min,max}`, `[min,max]` or `"min..max"` (either bound may be omitted, not both); null when it
+ * is not a range, so a check never passes on a range it could not read.
+ */
+export function parseRange(exp: unknown): { min?: number; max?: number } | null {
+  const num = (v: unknown) =>
+    v === undefined || v === null || (typeof v === 'string' && v.trim() === '') ? undefined : Number(v);
+  let r: { min?: number; max?: number } | null = null;
+  if (Array.isArray(exp)) r = { min: num(exp[0]), max: num(exp[1]) };
+  else if (exp && typeof exp === 'object') {
     const o = exp as { min?: unknown; max?: unknown };
-    return { min: num(o.min), max: num(o.max) };
+    r = { min: num(o.min), max: num(o.max) };
+  } else {
+    const parts = String(exp ?? '').split('..');
+    if (parts.length === 2) r = { min: num(parts[0]), max: num(parts[1]) };
   }
-  const m = /^\s*(-?[\d.]*)\s*\.\.\s*(-?[\d.]*)\s*$/.exec(String(exp ?? ''));
-  return m ? { min: num(m[1]), max: num(m[2]) } : {};
+  if (!r || (r.min === undefined && r.max === undefined)) return null;
+  if ([r.min, r.max].some((x) => x !== undefined && !Number.isFinite(x))) return null;
+  return r;
 }
 
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : [v]);
@@ -52,12 +84,12 @@ export function evaluateAssertion(a: Assertion, actual: unknown): AssertionResul
     case 'contains':
       passed = Array.isArray(actual)
         ? actual.some((x) => deepEqual(x, exp))
-        : String(actual ?? '').includes(String(exp));
+        : textOf(actual).includes(textOf(exp));
       break;
     case 'notContains':
       passed = Array.isArray(actual)
         ? !actual.some((x) => deepEqual(x, exp))
-        : !String(actual ?? '').includes(String(exp));
+        : !textOf(actual).includes(textOf(exp));
       break;
     case 'matches':
       try {
@@ -102,16 +134,19 @@ export function evaluateAssertion(a: Assertion, actual: unknown): AssertionResul
       break;
     }
     case 'inRange': {
-      const { min, max } = parseRange(exp);
-      passed = list(actual).every((x) => {
-        const n = asNumber(x);
-        return (
-          x !== null &&
-          Number.isFinite(n) &&
-          (min === undefined || n >= min) &&
-          (max === undefined || n <= max)
-        );
-      });
+      const range = parseRange(exp);
+      const { min, max } = range ?? {};
+      passed =
+        !!range &&
+        list(actual).every((x) => {
+          const n = asNumber(x);
+          return (
+            x !== null &&
+            Number.isFinite(n) &&
+            (min === undefined || n >= min) &&
+            (max === undefined || n <= max)
+          );
+        });
       break;
     }
     case 'matchesSchema':
