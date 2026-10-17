@@ -58,7 +58,8 @@ k6 is optional.
   engine selector offers it. StepForge runs k6 with the requests passed through an environment variable (nothing
   secret on disk) and converts k6's summary into the same report. k6 reports no per-second timeline.
 
-`npm run k6:install` downloads the pinned k6 release (AGPL-3.0, run as a separate program) into `data/bin/`.
+`npm run k6:install` downloads the pinned k6 release (AGPL-3.0, run as a separate program) into `data/bin/`, after
+checking its SHA-256. Another version (`STEPFORGE_K6_VERSION`) is checked against the digest GitHub publishes for it.
 
 ## Lighthouse
 

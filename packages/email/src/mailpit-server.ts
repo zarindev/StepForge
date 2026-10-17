@@ -1,9 +1,22 @@
+import { downloadRelease } from '@stepforge/core/download';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Pinned so the REST API StepForge relies on cannot change underneath it. Override with STEPFORGE_MAILPIT_VERSION. */
-export const MAILPIT_VERSION = process.env.STEPFORGE_MAILPIT_VERSION ?? 'v1.31.4';
+const PINNED_MAILPIT = 'v1.31.4';
+export const MAILPIT_VERSION = process.env.STEPFORGE_MAILPIT_VERSION ?? PINNED_MAILPIT;
+/** SHA-256 of the pinned release's assets (as published on GitHub); another version is checked against GitHub's. */
+const MAILPIT_SHA256: Record<string, string> = {
+  'mailpit-darwin-amd64.tar.gz': '9ff1d1b249ccb884ca48a6fca01f69f9db88b07692dd98e115294778a0b20f54',
+  'mailpit-darwin-arm64.tar.gz': '26afeae329874fa6154dd83bd2e0f307e5df858054145dc7e98ec1aa426a8381',
+  'mailpit-linux-386.tar.gz': '83638060c3caafd50829610e94a371cca77468cd7c149eead828c5c8297a13b5',
+  'mailpit-linux-amd64.tar.gz': '30942c4605c2ca8b9f759b1bb4e3ab6a12bdfdf66e5c94644ec2c75ac41e88e7',
+  'mailpit-linux-arm.tar.gz': 'f000853dcdb2747239bffd1343c2e85745751d15324d20d550fb612d5b48363e',
+  'mailpit-linux-arm64.tar.gz': '010a346a8b9d454f6fa22d4fd2dbd5bf5eb7104688412b9c130d0ba33a3579c4',
+  'mailpit-windows-amd64.zip': '0dd6ec909a6f5b2b66682b22d82abce97ab793e30766bf2f642b691e70a4a16b',
+  'mailpit-windows-arm64.zip': 'db337b96ace79e7a8d837b31023159062f87db35a12f8cb67304c32a09959056',
+};
 
 const exe = process.platform === 'win32' ? 'mailpit.exe' : 'mailpit';
 export const mailpitBinary = (binDir: string) => join(binDir, exe);
@@ -32,13 +45,17 @@ export function mailpitAsset(platform = process.platform, arch = process.arch): 
  */
 export async function installMailpit(binDir: string, log: (m: string) => void = () => {}): Promise<string> {
   const asset = mailpitAsset();
-  const url = `https://github.com/axllent/mailpit/releases/download/${MAILPIT_VERSION}/${asset}`;
+  log(`Downloading Mailpit ${MAILPIT_VERSION} (${asset}) from GitHub`);
+  const body = await downloadRelease({
+    repo: 'axllent/mailpit',
+    tag: MAILPIT_VERSION,
+    asset,
+    sha256: MAILPIT_VERSION === PINNED_MAILPIT ? MAILPIT_SHA256[asset] : undefined,
+    timeoutMs: 120_000,
+  });
   mkdirSync(binDir, { recursive: true });
-  log(`Downloading ${url}`);
-  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(120_000) });
-  if (!res.ok) throw new Error(`Download failed (${res.status}) from ${url}`);
   const archive = join(binDir, asset);
-  writeFileSync(archive, Buffer.from(await res.arrayBuffer()));
+  writeFileSync(archive, body);
   const r = spawnSync('tar', ['-xf', archive, '-C', binDir, exe], { encoding: 'utf8' });
   rmSync(archive, { force: true });
   if (r.status !== 0) throw new Error(`Could not extract ${asset}: ${r.stderr || r.error?.message}`);

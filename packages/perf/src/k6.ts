@@ -1,3 +1,4 @@
+import { downloadRelease } from '@stepforge/core/download';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -24,7 +25,16 @@ import {
 } from './load.ts';
 
 /** Pinned for reproducible installs; override with STEPFORGE_K6_VERSION. */
-export const K6_VERSION = process.env.STEPFORGE_K6_VERSION ?? 'v2.3.0';
+const PINNED_K6 = 'v2.3.0';
+export const K6_VERSION = process.env.STEPFORGE_K6_VERSION ?? PINNED_K6;
+/** SHA-256 of the pinned release's archives (as published on GitHub); another version is checked against GitHub's. */
+const K6_SHA256: Record<string, string> = {
+  'k6-v2.3.0-linux-amd64.tar.gz': '39c3117b6af817592dcd0ce4242105c0a7af10948c2a425306f0be8f7a8a8ab1',
+  'k6-v2.3.0-linux-arm64.tar.gz': '5ca3433e8201da72a284aaa241a1bb5fb47f4abb4e384d39410ddd8062f49b90',
+  'k6-v2.3.0-macos-amd64.zip': 'c83bb16f54f0676afa4ea235fd757f3892d307dbd1bd201450de83af31986654',
+  'k6-v2.3.0-macos-arm64.zip': 'b2417a3038edc5fe81dc178a889237724b595c5c9cfed875822008e46e862c7d',
+  'k6-v2.3.0-windows-amd64.zip': '112276d495e5741c968e2bc09ea6196099c1275bd6db9ee0875d173c7148ce43',
+};
 const exe = process.platform === 'win32' ? 'k6.exe' : 'k6';
 
 function k6Thresholds(t: LoadThresholds = {}): Record<string, string[]> {
@@ -169,14 +179,17 @@ export function k6Asset(platform = process.platform, arch = process.arch): strin
 /** Downloads k6 (free, AGPL-3.0, run as a separate program) from its GitHub releases into `binDir`. */
 export async function installK6(binDir: string): Promise<string> {
   const asset = k6Asset();
-  const url = `https://github.com/grafana/k6/releases/download/${K6_VERSION}/${asset}`;
-  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(180_000) });
-  if (!res.ok) throw new Error(`Download failed (${res.status}) from ${url}`);
+  const body = await downloadRelease({
+    repo: 'grafana/k6',
+    tag: K6_VERSION,
+    asset,
+    sha256: K6_VERSION === PINNED_K6 ? K6_SHA256[asset] : undefined,
+  });
   mkdirSync(binDir, { recursive: true });
   const tmp = mkdtempSync(join(tmpdir(), 'sf-k6-'));
   try {
     const archive = join(tmp, asset);
-    writeFileSync(archive, Buffer.from(await res.arrayBuffer()));
+    writeFileSync(archive, body);
     const r = spawnSync('tar', ['-xf', archive, '-C', tmp], { encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`Could not extract ${asset}: ${r.stderr || r.error?.message}`);
     const target = join(binDir, exe);

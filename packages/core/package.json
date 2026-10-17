@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./download": "./src/download.ts"
   },
   "dependencies": {
     "ulid": "^2.3.0",

@@ -15,9 +15,9 @@ by reading the email the application really sent, then extracting the code or li
 
 ### Local Mailpit
 
-`setup` downloads Mailpit (pinned version, ~10 MB, from its GitHub releases) into `data/bin/`. You can also install
-it from **Settings → Email** or with `npm run mailpit:install`. In Settings you can start and stop it, open the
-inbox, and choose *Start with StepForge*. It listens on `127.0.0.1` only:
+`setup` downloads Mailpit (pinned version, ~10 MB, from its GitHub releases) into `data/bin/` and checks its SHA-256
+before installing it. You can also install it from **Settings → Email** or with `npm run mailpit:install`. In Settings
+you can start and stop it, open the inbox, and choose *Start with StepForge*. It listens on `127.0.0.1` only:
 
 - SMTP: `127.0.0.1:1025` (`STEPFORGE_MAILPIT_SMTP_PORT`)
 - Web UI and API: `http://127.0.0.1:8025` (`STEPFORGE_MAILPIT_PORT`)
