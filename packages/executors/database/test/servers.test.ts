@@ -63,15 +63,20 @@ function setupSql(engine: SqlEngine): string[] {
     ...(engine === 'pg'
       ? [
           "CREATE OR REPLACE PROCEDURE sf_close_orders() LANGUAGE SQL AS $$ UPDATE orders SET status = 'closed' $$",
+          'CREATE OR REPLACE PROCEDURE sf_set_status(new_status VARCHAR) LANGUAGE SQL AS $$ UPDATE orders SET status = new_status $$',
         ]
       : engine === 'mysql'
         ? [
             'DROP PROCEDURE IF EXISTS sf_close_orders',
             "CREATE PROCEDURE sf_close_orders() UPDATE orders SET status = 'closed'",
+            'DROP PROCEDURE IF EXISTS sf_set_status',
+            'CREATE PROCEDURE sf_set_status(IN new_status VARCHAR(20)) UPDATE orders SET status = new_status',
           ]
         : [
             "IF OBJECT_ID('sf_close_orders', 'P') IS NOT NULL DROP PROCEDURE sf_close_orders",
             "CREATE PROCEDURE sf_close_orders AS UPDATE orders SET status = 'closed'",
+            "IF OBJECT_ID('sf_set_status', 'P') IS NOT NULL DROP PROCEDURE sf_set_status",
+            'CREATE PROCEDURE sf_set_status @NewStatus VARCHAR(20) AS UPDATE orders SET status = @NewStatus',
           ]),
   ];
 }
@@ -183,6 +188,60 @@ for (const [engine, url] of SQL) {
       });
       expect(r.status, r.error).toBe('passed');
       expect(await count("SELECT COUNT(*) AS n FROM orders WHERE status = 'closed'")).toBe(0);
+    }, 60_000);
+
+    it('rollback mode: a failed statement leaves later ones working; procedures take arguments; MySQL refuses schema changes', async () => {
+      const r = await runTestCase({
+        runId: 'R',
+        steps: steps(
+          {
+            type: 'db.query',
+            params: {
+              connection: 'x',
+              sql: "INSERT INTO orders (id, customer_id, total, status) VALUES (1, 1, 5, 'dup')",
+            },
+            continueOnFail: true,
+          },
+          {
+            type: 'db.query',
+            params: { connection: 'x', sql: 'SELECT COUNT(*) AS n FROM orders' },
+            assertions: [{ target: 'value', operator: 'equals', expected: 3 }],
+          },
+          {
+            type: 'db.callProcedure',
+            params: { connection: 'x', procedure: 'sf_set_status', args: ['archived'] },
+          },
+          {
+            type: 'db.query',
+            params: { connection: 'x', sql: "SELECT COUNT(*) AS n FROM orders WHERE status = 'archived'" },
+            assertions: [{ target: 'value', operator: 'equals', expected: 3 }],
+          },
+          ...(engine === 'mysql'
+            ? [
+                {
+                  type: 'db.runScript',
+                  params: { connection: 'x', script: 'TRUNCATE TABLE items' },
+                  continueOnFail: true,
+                },
+              ]
+            : []),
+        ),
+        executors: [createDbExecutor({ resolve: async () => cfg({ rollbackMode: true }) })],
+        options: { ...DEFAULT_RUN_OPTIONS, defaultTimeoutMs: 20_000 },
+        artifactsDir: '/tmp',
+      });
+      // Only the duplicate insert (and on MySQL the refused TRUNCATE) failed.
+      expect(r.steps.map((x) => x.status)).toEqual([
+        'failed',
+        'passed',
+        'passed',
+        'passed',
+        ...(engine === 'mysql' ? ['failed'] : []),
+      ]);
+      if (engine === 'mysql') expect(r.steps[4]!.message).toContain('MySQL commits TRUNCATE at once');
+      // Everything was rolled back: no order is archived, the items are still there.
+      expect(await count("SELECT COUNT(*) AS n FROM orders WHERE status = 'archived'")).toBe(0);
+      expect(await count('SELECT COUNT(*) AS n FROM items')).toBe(1);
     }, 60_000);
 
     it('audits data quality', async () => {

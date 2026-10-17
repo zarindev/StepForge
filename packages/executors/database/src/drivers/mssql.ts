@@ -86,9 +86,18 @@ export async function openMssql(cfg: ConnectionConfig): Promise<DbClient> {
     async callProcedure(name, args, opts) {
       const started = performance.now();
       try {
+        // Arguments are positional (execute() would pass them by name, and the procedure's own parameters are not
+        // named @p1, @p2…), so the call is written out: EXEC name @p1, @p2. The name is checked, since it is SQL.
+        if (!/^[\w$#@]+(\.[\w$#@]+){0,2}$|^(\[[^\]]+\]\.?){1,3}$/.test(name.trim()))
+          throw new DbError('query', `Not a procedure name: ${name}`);
         const r = request();
         args.forEach((p, i) => r.input(`p${i + 1}`, p));
-        return toResult(await r.execute(name), started, opts?.maxRows);
+        const list = args.map((_, i) => `@p${i + 1}`).join(', ');
+        return toResult(
+          await r.query(`EXEC ${name.trim()}${list ? ` ${list}` : ''}`),
+          started,
+          opts?.maxRows,
+        );
       } catch (err) {
         throw new DbError('query', (err as Error).message);
       }

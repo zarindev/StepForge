@@ -35,10 +35,21 @@ export async function openPg(cfg: ConnectionConfig): Promise<DbClient> {
   if (cfg.readOnly) await client.query('SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY');
   if (o.schema) await client.query(`SET search_path TO ${quote(String(o.schema))}`);
 
+  // In rollback mode a failed statement would abort the whole transaction ("current transaction is aborted") and
+  // fail every later database step: each statement gets its own savepoint, undone when it fails.
+  let inTransaction = false;
   const exec = async (text: string, params: unknown[] = [], maxRows?: number) => {
     const started = performance.now();
     try {
-      const res = await client.query({ text, values: params });
+      if (inTransaction) await client.query('SAVEPOINT stepforge_step');
+      let res;
+      try {
+        res = await client.query({ text, values: params });
+      } catch (err) {
+        if (inTransaction) await client.query('ROLLBACK TO SAVEPOINT stepforge_step').catch(() => {});
+        throw err;
+      }
+      if (inTransaction) await client.query('RELEASE SAVEPOINT stepforge_step');
       const last = Array.isArray(res) ? res[res.length - 1] : res;
       const raw = (last.rows ?? []) as Record<string, unknown>[];
       const { rows, truncated } = normalizeRows(raw, maxRows);
@@ -63,8 +74,10 @@ export async function openPg(cfg: ConnectionConfig): Promise<DbClient> {
       exec(`CALL ${name}(${args.map((_, i) => `$${i + 1}`).join(', ')})`, args, opts?.maxRows),
     async begin() {
       await client.query('BEGIN');
+      inTransaction = true;
     },
     async rollback() {
+      inTransaction = false;
       await client.query('ROLLBACK');
     },
     async schema(): Promise<SchemaInfo> {

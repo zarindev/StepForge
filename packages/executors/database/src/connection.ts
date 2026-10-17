@@ -30,7 +30,7 @@ export type StatementCheck = { write: boolean; keyword: string };
 export async function inspectStatement(
   cfg: ConnectionConfig,
   text: string,
-): Promise<StatementCheck & { transactionControl: boolean }> {
+): Promise<StatementCheck & { transactionControl: boolean; schemaChange?: string }> {
   if (cfg.engine === 'mongo') {
     const cmd = await parseMongoCommand(text);
     const op = Object.keys(cmd).find((k) => k !== 'collection' && typeof cmd[k] !== 'undefined') ?? '';
@@ -38,7 +38,12 @@ export async function inspectStatement(
   }
   const c = classifySql(text, cfg.engine);
   const first = c.statements.find((s) => s.kind !== 'read') ?? c.statements[0];
-  return { write: c.write, keyword: first?.keyword ?? '', transactionControl: c.transactionControl };
+  return {
+    write: c.write,
+    keyword: first?.keyword ?? '',
+    transactionControl: c.transactionControl,
+    schemaChange: c.statements.find((s) => s.kind === 'ddl')?.keyword,
+  };
 }
 
 /**
@@ -59,6 +64,15 @@ export async function checkPolicy(
       'blocked',
       `Blocked: connection "${cfg.name}" is read-only, and this ${check.keyword || 'statement'} would change data. ` +
         'Turn off read-only on the connection to allow writes.',
+    );
+  // MySQL commits a schema change (CREATE, ALTER, DROP, TRUNCATE…) at once, and everything written before it with
+  // it: rollback mode could not undo it, so it is refused instead of silently made permanent.
+  const schemaChange = 'schemaChange' in check ? check.schemaChange : undefined;
+  if (schemaChange && cfg.rollbackMode && cfg.engine === 'mysql')
+    throw new DbError(
+      'blocked',
+      `Blocked: MySQL commits ${schemaChange} at once, so rollback mode could not undo this step (or the writes before ` +
+        `it). Turn rollback mode off for "${cfg.name}" to change the schema.`,
     );
   if (check.transactionControl && cfg.rollbackMode)
     throw new DbError(

@@ -128,6 +128,21 @@ describe('connection policy', () => {
     await expect(checkPolicy(cfg({ rollbackMode: true }), 'COMMIT')).rejects.toThrow(/rollback mode/);
   });
 
+  it('refuses schema changes in rollback mode on MySQL only (MySQL commits them at once)', async () => {
+    const mysql = cfg({ engine: 'mysql', rollbackMode: true });
+    for (const sql of [
+      'TRUNCATE TABLE items',
+      'CREATE TABLE t (id INT)',
+      'INSERT INTO t VALUES (1); DROP TABLE t',
+    ])
+      await expect(checkPolicy(mysql, sql), sql).rejects.toThrow(/MySQL commits/);
+    await expect(checkPolicy(mysql, 'DELETE FROM items')).resolves.toMatchObject({ write: true });
+    await expect(
+      checkPolicy(cfg({ engine: 'pg', rollbackMode: true }), 'TRUNCATE TABLE items'),
+    ).resolves.toBeTruthy();
+    await expect(checkPolicy(cfg({ engine: 'mysql' }), 'TRUNCATE TABLE items')).resolves.toBeTruthy();
+  });
+
   it('requires the application name for writes on production', async () => {
     const prod = cfg({ production: { applicationName: 'CareClinic' } });
     await expect(checkPolicy(prod, 'UPDATE orders SET total = 0')).rejects.toThrow(
