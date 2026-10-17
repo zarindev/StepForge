@@ -1,8 +1,10 @@
 // StepForge recorder: injected into every page and frame of the recording browser.
 // Plain browser JavaScript (no build step). Talks to Node through the exposed binding __stepforgeEmit.
 (() => {
-  if (window.__sfRecorderInstalled) return;
-  window.__sfRecorderInstalled = true;
+  // Per document, not per window: a tab opened with window.open keeps its window object when its first (blank)
+  // document is replaced by the page, and a window-wide flag left that page without the recorder.
+  if (document.__sfRecorderInstalled) return;
+  document.__sfRecorderInstalled = true;
   const isTop = window === window.top;
   const emit = (payload) =>
     window.__stepforgeEmit ? window.__stepforgeEmit(payload) : Promise.resolve(null);
@@ -12,6 +14,29 @@
   const HASHED =
     /(^|[-_])([a-z]{1,4}[-_])?[a-z0-9]*\d[a-z0-9]{4,}$|^css-|^sc-|^jss\d|^Mui[A-Za-z]+-\w+-\d+|^_[a-zA-Z0-9]{5,}$|^ng-|^ember\d|^react-|:r\d/;
   const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
+
+  /**
+   * The text a locator replays against: the DOM's own letters (innerText applies CSS text-transform, so an uppercase
+   * "Save" button would be recorded as "SAVE" and never match), without hidden or aria-hidden parts (icon ligatures
+   * such as "delete" are not part of the name).
+   */
+  function domText(el) {
+    let out = '';
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3)
+        out += n.data; // Node.TEXT_NODE
+      else if (n.nodeType === 1) {
+        // Node.ELEMENT_NODE
+        if (n.getAttribute('aria-hidden') === 'true') continue;
+        const cs = window.getComputedStyle(n);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        // Block-level children are separate words; inline ones (Save<b>d</b>) are not.
+        const gap = cs.display.startsWith('inline') ? '' : ' ';
+        out += `${gap}${domText(n)}${gap}`;
+      }
+    }
+    return out;
+  }
 
   function interactiveAncestor(el) {
     let cur = el;
@@ -73,7 +98,7 @@
       if (['submit', 'button', 'reset'].includes(type)) return norm(el.value);
       return labelText(el) || norm(el.getAttribute('title')) || norm(el.getAttribute('placeholder'));
     }
-    const text = norm(el.innerText || el.textContent);
+    const text = norm(domText(el));
     if (text) return text;
     const img = el.querySelector('img[alt]');
     return norm(img?.getAttribute('alt')) || norm(el.getAttribute('title'));
@@ -147,7 +172,7 @@
     const ph = el.getAttribute('placeholder');
     if (ph) add('placeholder', ph, 75);
     if (!['input', 'select', 'textarea'].includes(el.tagName.toLowerCase())) {
-      const text = norm(el.innerText);
+      const text = norm(domText(el));
       if (text && text.length <= 60 && !/\d{3,}/.test(text)) add('text', text, 60);
     }
     if (el.id && !HASHED.test(el.id)) add('css', `#${CSS.escape(el.id)}`, 62);

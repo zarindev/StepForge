@@ -478,7 +478,9 @@ export class UiSession implements ExecutorSession {
               p.x !== undefined && p.x !== '' && p.y !== undefined && p.y !== ''
                 ? { x: Number(p.x), y: Number(p.y) }
                 : undefined;
-            const opts = { timeout, force: !!p.force, trial: false, ...(position && { position }) };
+            // "false" typed in a form is not true.
+            const force = p.force === true || p.force === 'true';
+            const opts = { timeout, force, trial: false, ...(position && { position }) };
             if (name === 'click')
               await resolved!.locator.click({ ...opts, button: (p.button as 'left') ?? 'left' });
             else if (name === 'dblclick') await resolved!.locator.dblclick(opts);
@@ -492,10 +494,21 @@ export class UiSession implements ExecutorSession {
             } else await resolved!.locator.hover(opts);
             break;
           }
-          case 'rightclick':
+          case 'rightclick': {
             await needs();
-            await resolved!.locator.click({ button: 'right', timeout });
+            // The same options as a click: force, and a point inside the element.
+            const at =
+              p.x !== undefined && p.x !== '' && p.y !== undefined && p.y !== ''
+                ? { x: Number(p.x), y: Number(p.y) }
+                : undefined;
+            await resolved!.locator.click({
+              button: 'right',
+              timeout,
+              force: p.force === true || p.force === 'true',
+              ...(at && { position: at }),
+            });
             break;
+          }
           case 'fill':
             await needs();
             await resolved!.locator.fill(String(p.value ?? ''), { timeout });
@@ -608,7 +621,10 @@ export class UiSession implements ExecutorSession {
               const state =
                 (p.state as 'visible' | 'hidden' | 'attached' | 'detached' | undefined) ?? 'visible';
               if (state === 'hidden' || state === 'detached') {
-                await buildLocator(this.scope, step.locators[0]!).first().waitFor({ state, timeout });
+                // Every locator: an outdated first one must not make a still-visible element count as gone.
+                await Promise.all(
+                  this.plainLocators(step.locators).map((l) => l.first().waitFor({ state, timeout })),
+                );
               } else {
                 await needs();
                 await resolved!.locator.waitFor({ state, timeout });
@@ -876,7 +892,8 @@ export class UiSession implements ExecutorSession {
     } else await this.page.screenshot({ ...shot, fullPage: !!p.fullPage });
     const key = baselineKey({
       name: p.name ? String(p.name) : undefined,
-      stepId: step.id,
+      // Inside a loop each iteration has its own baseline (the first keeps the plain one).
+      stepId: step.iterations?.some((n) => n > 1) ? `${step.id}~${step.iterations.join('.')}` : step.id,
       browser: o.browser,
       width: o.viewport.width,
       height: o.viewport.height,
@@ -1184,10 +1201,21 @@ export class UiSession implements ExecutorSession {
         if (pageLevel) {
           actual = check.startsWith('url') ? this.page.url() : await this.page.title();
         } else if (check === 'hidden') {
-          const l = buildLocator(this.scope, step.locators[0] ?? { strategy: 'css', value: 'body' });
-          actual = (await l.count()) === 0 || !(await l.first().isVisible());
+          // Hidden only when no locator finds a visible element (the first one may be outdated).
+          let visible = false;
+          for (const l of this.plainLocators(step.locators))
+            if ((await l.count()) > 0 && (await l.first().isVisible())) visible = true;
+          actual = !visible;
         } else if (check === 'count') {
-          actual = await buildLocator(this.scope, step.locators[0]!).count();
+          // The first locator that finds anything, as for every other step.
+          actual = 0;
+          for (const l of this.plainLocators(step.locators)) {
+            const n = await l.count();
+            if (n > 0) {
+              actual = n;
+              break;
+            }
+          }
         } else {
           const remaining = Math.max(0, deadline - Date.now());
           const r = await this.resolve(step, {
@@ -1244,6 +1272,14 @@ export class UiSession implements ExecutorSession {
     }
   }
 
+  /** The step's locators as Playwright locators (pictures cannot be counted or waited for this way). */
+  private plainLocators(locators: RunnableStep['locators']) {
+    const list = locators.filter((l) => l.strategy !== 'image');
+    return (list.length ? list : [{ strategy: 'css' as const, value: 'body' }]).map((l) =>
+      buildLocator(this.scope, l),
+    );
+  }
+
   private compare(check: string, actual: unknown, expected: unknown): boolean {
     const a = String(actual ?? '');
     const e = String(expected ?? '');
@@ -1256,9 +1292,11 @@ export class UiSession implements ExecutorSession {
       case 'disabled':
       case 'unchecked':
         return actual === false;
+      // A missing attribute (null) never passes, not even against "": "disabled is present" must fail without it.
+      case 'attribute':
+        return actual !== null && actual !== undefined && a === e;
       case 'text':
       case 'value':
-      case 'attribute':
       case 'url':
       case 'title':
         return a === e;
@@ -1268,7 +1306,8 @@ export class UiSession implements ExecutorSession {
         return a.includes(e);
       case 'textMatches':
       case 'urlMatches':
-        return new RegExp(e).test(a);
+        // An empty pattern would match anything.
+        return e !== '' && new RegExp(e).test(a);
       case 'count':
         return Number(actual) === Number(expected);
       default:
@@ -1332,16 +1371,27 @@ export class UiSession implements ExecutorSession {
     return out;
   }
 
+  /** Closes whatever was opened, without evidence (after a failed start). Never throws. */
+  async dispose(): Promise<void> {
+    if (this.electronApp) await this.electronApp.close().catch(() => {});
+    else await this.context?.close().catch(() => {});
+  }
+
   async close({ failed }: { failed: boolean }): Promise<ArtifactRef[]> {
     const o = this.ctx.options;
     const keep = (mode: string) => mode === 'always' || (mode === 'onFailure' && failed);
     const artifacts: ArtifactRef[] = [];
     if (o.trace !== 'off') {
       const path = join(this.ctx.artifactsDir, 'trace.zip');
-      if (keep(o.trace)) {
-        await this.context.tracing.stop({ path });
-        artifacts.push({ kind: 'trace', path });
-      } else await this.context.tracing.stop();
+      // A trace that cannot be written must not keep the browser context (or the app) open.
+      try {
+        if (keep(o.trace)) {
+          await this.context.tracing.stop({ path });
+          artifacts.push({ kind: 'trace', path });
+        } else await this.context.tracing.stop();
+      } catch {
+        // no trace, the rest of the evidence is still kept
+      }
     }
     if (o.captureLogs) {
       const consolePath = join(this.ctx.artifactsDir, 'console.json');

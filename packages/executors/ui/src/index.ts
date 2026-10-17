@@ -53,7 +53,14 @@ export function createUiExecutor(pool: BrowserPool, options: UiExecutorOptions =
       // An Electron app brings its own windows; everything else runs in a browser of the pool.
       const browser = ctx.options.electron ? null : await pool.get(ctx.options);
       const session = new UiSession(browser, ctx, options);
-      await session.open();
+      try {
+        await session.open();
+      } catch (err) {
+        // A start that failed half-way (Electron's window never came, tracing failed) must not leave the app or the
+        // browser context running: the engine never got a session to close.
+        await session.dispose();
+        throw err;
+      }
       return session;
     },
   };

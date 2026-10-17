@@ -227,7 +227,9 @@ export async function runTestCase(input: RunTestCaseInput): Promise<TestCaseResu
       const i = index + offset;
       const path = prefix ? `${prefix}.${i + 1}` : String(i + 1);
       const position = counter++;
-      const step: RunnableStep = { ...raw, position };
+      // The loop iterations it runs in, from its path ("5[2].1[3]" → [2, 3]): a step id repeats in every iteration.
+      const iterations = [...path.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]));
+      const step: RunnableStep = { ...raw, position, ...(iterations.length && { iterations }) };
       const base = { stepId: step.id, position, path, depth, type: step.type, label: step.label ?? '' };
       if (!step.enabled || stopped || signal.aborted) {
         const message = !step.enabled

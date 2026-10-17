@@ -24,7 +24,7 @@ function fakeUi(log: string[] = [], closed: { failed?: boolean } = {}): Executor
           if (p.flakyTimes && flaky++ < Number(p.flakyTimes)) throw new StepError('timeout', 'flaky');
           if (p.hang) await new Promise((r) => setTimeout(r, 10_000));
           return {
-            output: p.out,
+            output: p.iterations ? (step.iterations ?? []).join('.') : p.out,
             message: `did ${step.type}`,
             getTarget: (t) => (p.targets as Record<string, unknown>)?.[t],
           };
@@ -161,6 +161,27 @@ describe('runTestCase', () => {
     );
     expect(r.vars.c).toBe('1/2');
     expect(r.vars.index).toBeUndefined(); // no loop left: the loop variables are gone again
+  });
+
+  it('a step inside loops knows its iteration numbers (visual baselines per iteration)', async () => {
+    const r = await run(
+      steps({
+        type: 'util.loop',
+        params: {
+          count: 2,
+          steps: [
+            {
+              type: 'util.loop',
+              params: {
+                count: 3,
+                steps: [{ type: 'ui.click', params: { iterations: true }, captureAs: 'it' }],
+              },
+            },
+          ],
+        },
+      }),
+    );
+    expect(r.vars.it).toBe('2.3');
   });
 
   it('every after-hook runs, even when an earlier one failed', async () => {

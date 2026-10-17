@@ -230,6 +230,45 @@ describe('UI executor', () => {
     });
   });
 
+  it('hidden and count look at every locator; a missing attribute never passes; an empty pattern never matches', async () => {
+    const stale = { strategy: 'testId' as const, value: 'old-login-button' };
+    const button = { strategy: 'role' as const, value: 'button', name: 'Sign in' };
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/' } },
+        // The first locator is outdated, the second still finds the visible button: not hidden.
+        {
+          type: 'ui.assert',
+          params: { check: 'hidden' },
+          locators: [stale, button],
+          timeoutMs: 600,
+          continueOnFail: true,
+        },
+        {
+          type: 'ui.assert',
+          params: { check: 'count', expected: 1 },
+          locators: [stale, button],
+          continueOnFail: true,
+        },
+        {
+          type: 'ui.assert',
+          params: { check: 'attribute', attribute: 'data-nope', expected: '' },
+          locators: [button],
+          timeoutMs: 600,
+          continueOnFail: true,
+        },
+        {
+          type: 'ui.assert',
+          params: { check: 'textMatches', expected: '' },
+          locators: [button],
+          timeoutMs: 600,
+          continueOnFail: true,
+        },
+      ),
+    );
+    expect(r.steps.slice(1).map((s) => s.status)).toEqual(['failed', 'passed', 'failed', 'failed']);
+  });
+
   it('handles dialogs, new tabs and iframes', async () => {
     const r = await run(
       steps(

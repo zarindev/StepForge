@@ -6,7 +6,8 @@ export type TestCaseStatus = 'passed' | 'failed' | 'broken' | 'skipped';
 export type EvidenceMode = 'off' | 'onFailure' | 'always';
 
 /** A step with an id and position, after variable resolution. */
-export type RunnableStep = Step & { id: string; position: number };
+/** `iterations`: the loop iteration numbers the step runs in (outermost first), e.g. [2, 3]; absent outside loops. */
+export type RunnableStep = Step & { id: string; position: number; iterations?: number[] };
 
 export type AssertionResult = {
   target: string;

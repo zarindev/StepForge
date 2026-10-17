@@ -176,6 +176,101 @@ describe('recorder', () => {
     expect(session.snapshot().steps[1]!.params).toEqual({ url: '/login?from=typed' });
   }, 60_000);
 
+  it('records the DOM text of an uppercase-styled button, without its hidden icon text', async () => {
+    const session = await RecordingSession.start({
+      startUrl: `${base}/login`,
+      baseUrl: base,
+      headless: true,
+    });
+    const page = session.page;
+    try {
+      const locators = (await page.evaluate(`(() => {
+        const b = document.createElement('button');
+        b.style.textTransform = 'uppercase';
+        b.innerHTML = '<span aria-hidden="true">delete</span> Save<b>d</b> draft';
+        document.body.appendChild(b);
+        return window.__sfLocatorsFor(b);
+      })()`)) as { strategy: string; value: string; name?: string }[];
+      expect(locators).toContainEqual(
+        expect.objectContaining({ strategy: 'role', value: 'button', name: 'Saved draft' }),
+      );
+      expect(locators).toContainEqual(expect.objectContaining({ strategy: 'text', value: 'Saved draft' }));
+      // And it replays: Playwright finds the button by that name.
+      expect(await page.getByRole('button', { name: 'Saved draft', exact: true }).count()).toBe(1);
+    } finally {
+      await session.stop();
+    }
+  }, 60_000);
+
+  it('records actions in a tab opened by a link; a tab whose address is not unique is found by its position', async () => {
+    const session = await RecordingSession.start({
+      startUrl: `${base}/login`,
+      baseUrl: base,
+      headless: true,
+    });
+    const page = session.page;
+    try {
+      await page.evaluate(`(() => {
+        const a = document.createElement('a');
+        a.href = location.href;
+        a.target = '_blank';
+        a.textContent = 'Open the home page';
+        document.body.appendChild(a);
+      })()`);
+      const [popup] = await Promise.all([
+        page.context().waitForEvent('page'),
+        page.getByRole('link', { name: 'Open the home page' }).click(),
+      ]);
+      await popup.waitForLoadState();
+      await settle();
+      await popup.evaluate(`(() => {
+        const b = document.createElement('button');
+        b.textContent = 'In the new tab';
+        document.body.appendChild(b);
+      })()`);
+      await popup.getByRole('button', { name: 'In the new tab' }).click();
+      await new Promise((r) => setTimeout(r, 1500));
+    } finally {
+      await session.stop();
+    }
+    const steps = session.snapshot().steps;
+    const tab = steps.find((s) => s.type === 'ui.switchTab');
+    expect(steps.at(-1)).toMatchObject({ type: 'ui.click' });
+    // The same page in two tabs: no part of its address tells them apart, so the position is used.
+    expect(tab?.params).toEqual({ index: 1 });
+  }, 60_000);
+
+  it('records in a tab the page opens with window.open', async () => {
+    const session = await RecordingSession.start({
+      startUrl: `${base}/login`,
+      baseUrl: base,
+      headless: true,
+    });
+    const page = session.page;
+    try {
+      await page.evaluate(`(() => {
+        const b = document.createElement('button');
+        b.textContent = 'Open a window';
+        b.onclick = () => window.open(location.origin + '/login?from=popup');
+        document.body.appendChild(b);
+      })()`);
+      const [popup] = await Promise.all([
+        page.context().waitForEvent('page'),
+        page.getByRole('button', { name: 'Open a window' }).click(),
+      ]);
+      await popup.waitForLoadState();
+      await expect.poll(() => popup.locator('stepforge-recorder').count()).toBe(1);
+      await popup.getByLabel('Email').fill('popup@clinic.test');
+      await popup.getByLabel('Email').press('Tab');
+      await settle();
+    } finally {
+      await session.stop();
+    }
+    const steps = session.snapshot().steps;
+    expect(steps.map((s) => s.type)).toEqual(expect.arrayContaining(['ui.switchTab', 'ui.fill']));
+    expect(steps.find((s) => s.type === 'ui.fill')?.params).toMatchObject({ value: 'popup@clinic.test' });
+  }, 60_000);
+
   it('keeps the toolbar off the top navigation, and it can be dragged away', async () => {
     const session = await RecordingSession.start({
       startUrl: `${base}/login`,

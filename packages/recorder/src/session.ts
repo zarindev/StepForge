@@ -165,6 +165,14 @@ export class RecordingSession {
   private initialLoad = false;
 
   private attach(p: Page): void {
+    // A tab the page opens itself (window.open) can load its first page before the start-up script reaches it:
+    // install the recorder on each load too (it installs once per document).
+    const ensure = () => void p.evaluate(INJECTED).catch(() => {});
+    p.on('domcontentloaded', ensure);
+    void p
+      .waitForLoadState('domcontentloaded')
+      .then(ensure)
+      .catch(() => {});
     p.on('framenavigated', (frame) => {
       if (frame !== p.mainFrame() || this.state !== 'recording') return;
       const url = frame.url();
@@ -260,10 +268,28 @@ export class RecordingSession {
     return `iframe >> nth=${Math.max(0, index)}`;
   }
 
+  /**
+   * How replay finds this tab again: the shortest part of its address that no other open tab has (the path, then
+   * host and path, then the whole address), or its position. A bare "/" would also match the first tab.
+   */
+  private tabTarget(page: Page): { urlContains: string } | { index: number } {
+    const pages = page.context().pages();
+    const url = new URL(page.url());
+    for (const part of [
+      `${url.pathname}${url.search}`,
+      `${url.host}${url.pathname}${url.search}`,
+      url.href,
+    ]) {
+      if (part === '/' || !part) continue;
+      if (pages.filter((pg) => pg.url().includes(part)).length === 1) return { urlContains: part };
+    }
+    return { index: Math.max(0, pages.indexOf(page)) };
+  }
+
   /** Keeps tab and frame context in sync with where the action happened. */
   private async syncContext(page: Page, frame: Frame): Promise<void> {
     if (page !== this.currentPage) {
-      this.push({ type: 'ui.switchTab', params: { urlContains: new URL(page.url()).pathname } });
+      this.push({ type: 'ui.switchTab', params: this.tabTarget(page) });
       this.currentPage = page;
       this.currentFrame = 'main';
     }
