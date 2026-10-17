@@ -230,13 +230,13 @@ for (const [engine, url] of SQL) {
         options: { ...DEFAULT_RUN_OPTIONS, defaultTimeoutMs: 20_000 },
         artifactsDir: '/tmp',
       });
-      // Only the duplicate insert (and on MySQL the refused TRUNCATE) failed.
+      // Only the duplicate insert failed; on MySQL the refused TRUNCATE is broken, like other blocked statements.
       expect(r.steps.map((x) => x.status)).toEqual([
         'failed',
         'passed',
         'passed',
         'passed',
-        ...(engine === 'mysql' ? ['failed'] : []),
+        ...(engine === 'mysql' ? ['broken'] : []),
       ]);
       if (engine === 'mysql') expect(r.steps[4]!.message).toContain('MySQL commits TRUNCATE at once');
       // Everything was rolled back: no order is archived, the items are still there.
