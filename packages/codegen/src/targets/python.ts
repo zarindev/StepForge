@@ -1,3 +1,4 @@
+import { frameChain } from '@stepforge/core';
 import {
   CREDIT,
   ciFiles,
@@ -337,7 +338,8 @@ function uiOp(op: Op, s: State, out: (l: string) => void, warn: (m: string) => v
         if (op.selector === null) s.root = P;
         else {
           const f = next(s, 'frame');
-          out(`${f} = ${P}.frame_locator(${pyStr(op.selector)})`);
+          const chain = frameChain(op.selector).map((x) => `.frame_locator(${pyStr(x)})`);
+          out(`${f} = ${P}${chain.join('')}`);
           s.root = f;
         }
       } else out(`browser.frame(${op.selector === null ? '' : pyStr(op.selector)})`);

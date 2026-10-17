@@ -79,8 +79,8 @@ describe('Shop › Checkout › Checkout with every UI step', () => {
       productsPage.element16().click();
       // Dismiss the next dialog
       cy.on('window:confirm', () => false);
-      // Switch into the frame "iframe#payment"
-      // TODO(StepForge): switch into the iframe iframe#payment (needs cypress-iframe); the next steps run in the page
+      // Switch into the frame "iframe#checkout", then "iframe#payment"
+      // TODO(StepForge): switch into the iframe iframe#checkout >>> iframe#payment (needs cypress-iframe); the next steps run in the page
       // Type "4242 4242 4242 4242" into the field with placeholder "Card number"
       cy.findByPlaceholderText('Card number').fill('4242 4242 4242 4242');
       // Return to the main page

@@ -105,7 +105,7 @@ export const KITCHEN_SINK: CodegenInput = {
         s('ui.handleDialog', { params: { action: 'accept', promptText: 'yes' } }),
         s('ui.click', { locators: L('xpath', "//button[@id='remove']") }),
         s('ui.handleDialog', { params: { action: 'dismiss' } }),
-        s('ui.switchFrame', { params: { selector: 'iframe#payment' } }),
+        s('ui.switchFrame', { params: { selector: 'iframe#checkout >>> iframe#payment' } }),
         s('ui.fill', { params: { value: '4242 4242 4242 4242' }, locators: L('placeholder', 'Card number') }),
         s('ui.switchFrame', { params: { main: true } }),
         s('ui.click', { locators: L('role', 'link', 'Terms') }),

@@ -1,3 +1,4 @@
+import { frameChain } from '@stepforge/core';
 import {
   CREDIT,
   ciFiles,
@@ -267,7 +268,9 @@ export function printOps(ops: Op[], s: State, ind: string): void {
         if (op.selector === null) s.root = s.pageVar;
         else {
           const f = next(s, 'frame');
-          out(`const ${f} = ${s.pageVar}.frameLocator(${jsStr(op.selector)});`);
+          // `#outer >>> #inner`: a frame inside a frame.
+          const chain = frameChain(op.selector).map((x) => `.frameLocator(${jsStr(x)})`);
+          out(`const ${f} = ${s.pageVar}${chain.join('')};`);
           s.root = f;
         }
         break;

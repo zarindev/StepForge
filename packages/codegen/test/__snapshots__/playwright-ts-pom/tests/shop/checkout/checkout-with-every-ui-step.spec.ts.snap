@@ -82,8 +82,8 @@ test.describe('Shop › Checkout › Checkout with every UI step', () => {
       await productsPage.element16.click();
       // Dismiss the next dialog
       current.once('dialog', (dialog) => dialog.dismiss());
-      // Switch into the frame "iframe#payment"
-      const frame1 = current.frameLocator('iframe#payment');
+      // Switch into the frame "iframe#checkout", then "iframe#payment"
+      const frame1 = current.frameLocator('iframe#checkout').frameLocator('iframe#payment');
       // Type "4242 4242 4242 4242" into the field with placeholder "Card number"
       await frame1.getByPlaceholder('Card number', { exact: true }).fill('4242 4242 4242 4242');
       // Return to the main page

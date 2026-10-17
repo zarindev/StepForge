@@ -1,3 +1,4 @@
+import { frameChain } from './frames.ts';
 import type { Locator, Step } from './schemas/steps.ts';
 
 type AnyStep = Pick<Step, 'type' | 'params' | 'locators'> & { label?: string; captureAs?: string };
@@ -171,7 +172,7 @@ export function describeStep(step: AnyStep): string {
         : `${p.action === 'dismiss' ? 'Dismiss' : 'Accept'} the next dialog`;
       break;
     case 'ui.switchFrame':
-      s = p.main || !p.selector ? 'Return to the main page' : `Switch into the frame ${q(p.selector)}`;
+      s = p.main || !p.selector ? 'Return to the main page' : `Switch into the frame ${frameChain(String(p.selector)).map((f) => q(f)).join(', then ')}`;
       break;
     case 'ui.waitFor':
       s = step.locators.length

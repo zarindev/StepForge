@@ -57,7 +57,7 @@ How these cover single-page apps, PWAs, canvas apps, downloads, basic-auth stagi
 | `switchTab` | `index` or `urlContains` | without params: newest tab. In a desktop (Electron) app, each window is a tab ([DESKTOP_APPS.md](DESKTOP_APPS.md)) |
 | `closeTab` | — | switches to the remaining newest tab |
 | `handleDialog` | `action` (`accept`/`dismiss`), `promptText`, `buttonLabel` | browser: put it **before** the step that opens the dialog; other dialogs are dismissed. Phone apps: answers the dialog on screen (or the next one to appear), optionally by its button |
-| `switchFrame` | `selector` (iframe CSS) or `main: true` | |
+| `switchFrame` | `selector` (iframe CSS) or `main: true` | A frame inside a frame: `#outer >>> #inner` (outermost first; always from the main page) |
 | `waitFor` | with locator: `state` (`visible`/`hidden`/`attached`/`detached`); else `url` (glob) or `loadState` | prefer this over `util.wait` |
 | `screenshot` | `fullPage` | with a locator: element screenshot; kept as evidence |
 | `extract` | `from` (`text`/`value`/`attribute`/`count`/`url`/`title`), `attribute`, `regex` (group 1) | use `captureAs` to store it |

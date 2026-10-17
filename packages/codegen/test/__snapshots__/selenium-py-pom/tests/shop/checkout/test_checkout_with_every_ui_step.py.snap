@@ -81,8 +81,8 @@ def test_checkout_with_every_ui_step(browser, data):
     browser.click(ProductsPage.ELEMENT16)
     # Dismiss the next dialog
     browser.handle_next_dialog(accept=False)
-    # Switch into the frame "iframe#payment"
-    browser.frame("iframe#payment")
+    # Switch into the frame "iframe#checkout", then "iframe#payment"
+    browser.frame("iframe#checkout >>> iframe#payment")
     # Type "4242 4242 4242 4242" into the field with placeholder "Card number"
     browser.fill(("placeholder", "Card number"), "4242 4242 4242 4242")
     # Return to the main page

@@ -38,7 +38,7 @@ Feature: Shop › Checkout
     And accept the next dialog
     And click the element "//button[@id='remove']"
     And dismiss the next dialog
-    And switch into the frame "iframe#payment"
+    And switch into the frame "iframe#checkout", then "iframe#payment"
     And type "4242 4242 4242 4242" into the field with placeholder "Card number"
     And return to the main page
     And click the "Terms" link

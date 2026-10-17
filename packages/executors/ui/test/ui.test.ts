@@ -89,6 +89,21 @@ navigator.geolocation.getCurrentPosition(p => document.getElementById('geo').tex
         .writeHead(200, { 'content-type': 'text/html' })
         .end(`${send('get', '')}${send('post', ", { method: 'POST' }")}<p id="out"></p>`);
     }
+    // A frame inside a frame, next to a second top-level frame.
+    if (req.url === '/nested.html')
+      return res
+        .writeHead(200, { 'content-type': 'text/html' })
+        .end(
+          '<iframe id="outer" src="/outer.html"></iframe><iframe id="side" srcdoc="<p>Side frame</p>"></iframe>',
+        );
+    if (req.url === '/outer.html')
+      return res
+        .writeHead(200, { 'content-type': 'text/html' })
+        .end('<p>Outer</p><iframe id="inner" src="/inner.html"></iframe>');
+    if (req.url === '/inner.html')
+      return res
+        .writeHead(200, { 'content-type': 'text/html' })
+        .end('<button onclick="this.textContent = \'Clicked deep\'">Deep button</button>');
     if (req.url === '/other.html')
       return res.writeHead(200, { 'content-type': 'text/html' }).end('<title>Help</title><h1>Help page</h1>');
     res.writeHead(200, { 'content-type': 'text/html' }).end(html);
@@ -299,6 +314,35 @@ describe('UI executor', () => {
         { type: 'ui.assert', params: { check: 'title', expected: 'Help' } },
         { type: 'ui.closeTab' },
         { type: 'ui.assert', params: { check: 'title', expected: 'Fixture Login' } },
+      ),
+    );
+    expect(r.steps.filter((s) => s.status !== 'passed').map((s) => `${s.position}:${s.message}`)).toEqual([]);
+  });
+
+  it('switches into a frame inside a frame, then to another frame, then back', async () => {
+    const r = await run(
+      steps(
+        { type: 'ui.navigate', params: { url: '/nested.html' } },
+        { type: 'ui.switchFrame', params: { selector: '#outer >>> #inner' } },
+        { type: 'ui.click', locators: [{ strategy: 'role', value: 'button', name: 'Deep button' }] },
+        {
+          type: 'ui.assert',
+          params: { check: 'visible' },
+          locators: [{ strategy: 'text', value: 'Clicked deep' }],
+        },
+        // A frame selector always starts from the main page: the side frame is found from inside the inner one.
+        { type: 'ui.switchFrame', params: { selector: 'iframe >> nth=1' } },
+        {
+          type: 'ui.assert',
+          params: { check: 'visible' },
+          locators: [{ strategy: 'text', value: 'Side frame' }],
+        },
+        { type: 'ui.switchFrame', params: { main: true } },
+        {
+          type: 'ui.assert',
+          params: { check: 'count', expected: 2 },
+          locators: [{ strategy: 'css', value: 'iframe' }],
+        },
       ),
     );
     expect(r.steps.filter((s) => s.status !== 'passed').map((s) => `${s.position}:${s.message}`)).toEqual([]);

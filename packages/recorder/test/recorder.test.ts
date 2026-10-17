@@ -271,6 +271,41 @@ describe('recorder', () => {
     expect(steps.find((s) => s.type === 'ui.fill')?.params).toMatchObject({ value: 'popup@clinic.test' });
   }, 60_000);
 
+  it('records a frame inside a frame as one selector chain', async () => {
+    const session = await RecordingSession.start({
+      startUrl: `${base}/login`,
+      baseUrl: base,
+      headless: true,
+    });
+    const page = session.page;
+    const pages: Record<string, string> = {
+      '/nest': '<h1>Nest</h1><iframe id="outer" src="/nest-outer"></iframe>',
+      '/nest-outer': '<p>Outer</p><iframe name="deep" src="/nest-inner"></iframe>',
+      '/nest-inner': '<button onclick="this.textContent = \'Done\'">Deep button</button>',
+    };
+    await page
+      .context()
+      .route(`${base}/nest*`, (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body: pages[new URL(route.request().url()).pathname] ?? '',
+        }),
+      );
+    try {
+      await page.goto(`${base}/nest`);
+      const deep = page.frameLocator('#outer').frameLocator('iframe[name="deep"]');
+      await expect.poll(() => page.frames().length).toBe(3);
+      await deep.getByRole('button', { name: 'Deep button' }).click();
+      await settle();
+    } finally {
+      await session.stop();
+    }
+    const steps = session.snapshot().steps;
+    const frame = steps.find((s) => s.type === 'ui.switchFrame');
+    expect(frame?.params).toEqual({ selector: '#outer >>> iframe[name="deep"]' });
+    expect(steps.findIndex((s) => s.type === 'ui.click')).toBeGreaterThan(steps.indexOf(frame!));
+  }, 60_000);
+
   it('keeps the toolbar off the top navigation, and it can be dragged away', async () => {
     const session = await RecordingSession.start({
       startUrl: `${base}/login`,

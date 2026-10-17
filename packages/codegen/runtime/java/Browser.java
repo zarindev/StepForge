@@ -229,9 +229,23 @@ public final class Browser {
     }
   }
 
+  /** Into a frame from the main page: "#outer >>> #inner" is a frame inside a frame, "iframe >> nth=1" the second. */
   public void frame(String css) {
-    if (css == null) driver.switchTo().defaultContent();
-    else driver.switchTo().frame(el(Loc.of("css", css)));
+    driver.switchTo().defaultContent();
+    if (css == null) return;
+    for (String raw : css.split("\\s*>>>\\s*")) {
+      String part = raw.trim();
+      if (part.isEmpty()) continue;
+      java.util.regex.Matcher m = Pattern.compile("^(.*?)\\s*>>\\s*nth=(\\d+)$").matcher(part);
+      boolean indexed = m.matches();
+      String sel = indexed ? m.group(1) : part;
+      int nth = indexed ? Integer.parseInt(m.group(2)) : 0;
+      WebElement frame = waitFor(() -> {
+        List<WebElement> all = driver.findElements(By.cssSelector(sel));
+        return all.size() > nth ? all.get(nth) : null;
+      }, "No frame " + part);
+      driver.switchTo().frame(frame);
+    }
   }
 
   public void switchTab(Integer index, String urlContains) {

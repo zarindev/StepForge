@@ -42,9 +42,9 @@ your computer, is free and open source, and needs no account.
 
 ## Test any web app
 
-Single-page apps, PWAs, canvas and map apps, downloads, iframes, popups and OAuth windows, shadow DOM, mobile web with
-touch, sites behind basic auth or client certificates, localised and time-zone-dependent apps, dark mode, time-based
-features and visual regressions — with network waiting and mocking, offline mode, cookies and storage, a controllable
+Single-page apps, PWAs, canvas and map apps, downloads, iframes (also a frame inside a frame: `#outer >>> #inner`),
+popups and OAuth windows, shadow DOM, mobile web with touch, sites behind basic auth or client certificates, localised
+and time-zone-dependent apps, dark mode, time-based features and visual regressions — with network waiting and mocking, offline mode, cookies and storage, a controllable
 clock and visual checkpoints. [WEB_APPS.md](WEB_APPS.md)
 
 ## Image locators

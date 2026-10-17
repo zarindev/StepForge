@@ -8,6 +8,7 @@ import {
   type TestContext,
   type ProbeRequest,
   summarizeNetwork,
+  frameChain,
   formatBytes,
   type NetworkEntry as CoreNetworkEntry,
 } from '@stepforge/core';
@@ -612,7 +613,11 @@ export class UiSession implements ExecutorSession {
               this.scope = this.page;
               outcome = { message: 'Switched to main document' };
             } else {
-              this.scope = this.page.frameLocator(String(p.selector));
+              // `#outer >>> #inner`: a frame inside a frame, entered from the main page outward in.
+              this.scope = frameChain(String(p.selector)).reduce<Scope>(
+                (scope, part) => scope.frameLocator(part),
+                this.page,
+              );
               outcome = { message: `Switched to frame ${String(p.selector)}` };
             }
             break;

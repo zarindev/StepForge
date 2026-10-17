@@ -343,7 +343,13 @@ export const STEP_FIELDS: Record<string, FieldSpec[]> = {
     },
   ],
   'ui.switchFrame': [
-    { key: 'selector', label: 'Frame selector', kind: 'text', placeholder: '#payment-iframe' },
+    {
+      key: 'selector',
+      label: 'Frame selector',
+      kind: 'text',
+      placeholder: '#payment-iframe',
+      hint: 'A frame inside a frame: #outer >>> #inner (outermost first)',
+    },
     { key: 'main', label: 'Back to main page', kind: 'checkbox' },
   ],
   'ui.waitFor': [

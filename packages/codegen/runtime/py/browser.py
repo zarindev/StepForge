@@ -160,10 +160,18 @@ class Browser:
                 time.sleep(0.1)
 
     def frame(self, css=None):
+        """Into a frame from the main page: `#outer >>> #inner` is a frame inside a frame, `iframe >> nth=1` the second."""
+        self.driver.switch_to.default_content()
         if css is None:
-            self.driver.switch_to.default_content()
-        else:
-            self.driver.switch_to.frame(self.el(("css", css)))
+            return
+        for part in [p.strip() for p in re.split(r"\s*>>>\s*", css) if p.strip()]:
+            m = re.match(r"^(.*?)\s*>>\s*nth=(\d+)$", part)
+            sel, nth = (m.group(1), int(m.group(2))) if m else (part, 0)
+            found = self._wait(
+                lambda: (lambda all_: all_[nth] if len(all_) > nth else None)(self.driver.find_elements(By.CSS_SELECTOR, sel)),
+                f"No frame {part}",
+            )
+            self.driver.switch_to.frame(found)
 
     def switch_tab(self, index=None, url_contains=None):
         def find():

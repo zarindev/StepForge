@@ -83,8 +83,8 @@ def test_checkout_with_every_ui_step(page, data):
     current.locator("xpath=//button[@id='remove']").click()
     # Dismiss the next dialog
     current.once("dialog", lambda dialog: dialog.dismiss())
-    # Switch into the frame "iframe#payment"
-    frame1 = current.frame_locator("iframe#payment")
+    # Switch into the frame "iframe#checkout", then "iframe#payment"
+    frame1 = current.frame_locator("iframe#checkout").frame_locator("iframe#payment")
     # Type "4242 4242 4242 4242" into the field with placeholder "Card number"
     frame1.get_by_placeholder("Card number", exact=True).fill("4242 4242 4242 4242")
     # Return to the main page

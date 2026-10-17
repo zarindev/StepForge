@@ -1,7 +1,7 @@
 import { launchElectron } from '@stepforge/executor-ui';
 import { defaultParamsFor, type Locator, type StepInput } from './defaults.ts';
 import { readFileSync } from 'node:fs';
-import type { ElectronLaunch } from '@stepforge/core';
+import { FRAME_SEPARATOR, type ElectronLaunch } from '@stepforge/core';
 import {
   chromium,
   type Browser,
@@ -254,7 +254,15 @@ export class RecordingSession {
     });
   }
 
+  /** The frame's selector chain from the main page in: `#outer >>> #inner` for a frame inside a frame. */
   private async frameSelector(frame: Frame): Promise<string> {
+    const chain: string[] = [];
+    for (let f: Frame | null = frame; f?.parentFrame(); f = f.parentFrame()) chain.unshift(await this.frameStep(f));
+    return chain.join(FRAME_SEPARATOR) || 'iframe';
+  }
+
+  /** One frame's selector, relative to the frame that contains it. */
+  private async frameStep(frame: Frame): Promise<string> {
     const el = await frame.frameElement().catch(() => null);
     if (!el) return 'iframe';
     const attr = async (n: string) => (await el.getAttribute(n).catch(() => null)) ?? '';
