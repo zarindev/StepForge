@@ -161,27 +161,6 @@ describe('API › Orders API', () => {
       cy.request({
         method: 'POST',
         url: '/graphql',
-        qs: {
-          0: 'q',
-          1: 'u',
-          2: 'e',
-          3: 'r',
-          4: 'y',
-          5: ' ',
-          6: '{',
-          7: ' ',
-          8: 'm',
-          9: 'e',
-          10: ' ',
-          11: '{',
-          12: ' ',
-          13: 'i',
-          14: 'd',
-          15: ' ',
-          16: '}',
-          17: ' ',
-          18: '}',
-        },
         body: {
           query: 'query { me { id } }',
           variables: {
@@ -229,9 +208,9 @@ describe('API › Orders API', () => {
     });
     // Repeat for each line in {{vars.order.items}}
     cy.then(() => {
-      field(vars, 'order.items').forEach((line, index) => {
+      field(vars, 'order.items').forEach((item, index) => {
         cy.then(() => {
-          vars.line = line;
+          vars.line = item;
           vars.index = index;
         });
         // Note: {{vars.line.sku}}

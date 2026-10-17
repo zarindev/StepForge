@@ -1,8 +1,8 @@
-import { CREDIT, casesOf, ciFiles, day, envExample, headerLines, readme } from '../common.ts';
+import { CREDIT, casesOf, ciFiles, day, envExample, headerLines, oneLine, readme } from '../common.ts';
 import type { Op, Plan, TestPlan } from '../ir.ts';
-import { jsJson, jsKey, jsStr, jsVal } from '../lang/js.ts';
+import { jsJson, jsKey, jsStr, jsVal, jsVar } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject, Warning } from '../types.ts';
-import { envName, kebab, plain, snake, type Part, type Ref, type Val } from '../values.ts';
+import { envName, kebab, plain, snake, uniquer, type Part, type Ref, type Val } from '../values.ts';
 
 /** k6, Postman v2.1 and cURL: API steps only. Everything else is reported, never silently dropped. */
 
@@ -64,13 +64,17 @@ function body(res) {
     return res.body;
   }
 }
+function withQuery(u, query) {
+  return u + (u.indexOf('?') >= 0 ? '&' : '?') + query;
+}
 function pick(res, target) {
   if (target === 'status') return res.status;
-  if (target === 'time') return res.timings.duration;
+  if (target === 'time' || target === 'timeMs') return res.timings.duration;
   if (target === 'size') return (res.body || '').length;
   if (target === 'body') return body(res);
   if (target === 'text') return res.body;
-  if (target.indexOf('header:') === 0) return res.headers[target.slice(7).replace(/(^|-)([a-z])/g, (m, a, b) => a + b.toUpperCase())];
+  if (target.indexOf('header:') === 0 || target.indexOf('headers.') === 0)
+    return res.headers[target.replace(/^headers?[.:]/, '').toLowerCase().replace(/(^|-)([a-z])/g, (m, a, b) => a + b.toUpperCase())];
   if (target.indexOf('$') === 0) return jsonPath(body(res), target);
   return undefined;
 }
@@ -124,10 +128,10 @@ function secret(name) {
 
 function k6Ops(ops: Op[], lines: string[], ind: string): void {
   for (const op of ops) {
-    if (op.op === 'comment') lines.push(`${ind}// ${op.text}`);
-    else if (op.op === 'todo') lines.push(`${ind}// TODO(StepForge): ${op.text}`);
-    else if (op.op === 'setVar') lines.push(`${ind}vars.${op.name} = ${jsVal(op.value, ind)};`);
-    else if (op.op === 'gen') lines.push(`${ind}vars.${op.into} = fake(${jsStr(op.kind)});`);
+    if (op.op === 'comment') lines.push(`${ind}// ${oneLine(op.text)}`);
+    else if (op.op === 'todo') lines.push(`${ind}// TODO(StepForge): ${oneLine(op.text)}`);
+    else if (op.op === 'setVar') lines.push(`${ind}${jsVar(op.name)} = ${jsVal(op.value, ind)};`);
+    else if (op.op === 'gen') lines.push(`${ind}${jsVar(op.into)} = fake(${jsStr(op.kind)});`);
     else if (op.op === 'wait') lines.push(`${ind}sleep(${op.ms / 1000});`);
     else if (op.op === 'log') lines.push(`${ind}console.log(${jsVal(op.message)});`);
     else if (op.op === 'check')
@@ -141,7 +145,7 @@ function k6Ops(ops: Op[], lines: string[], ind: string): void {
           : op.from === 'header'
             ? `header:${op.name ?? ''}`
             : (op.path ?? 'body');
-      lines.push(`${ind}vars.${op.into} = pick(last, ${jsStr(target)});`);
+      lines.push(`${ind}${jsVar(op.into)} = pick(last, ${jsStr(target)});`);
     } else if (op.op === 'if') {
       lines.push(`${ind}if (compare(${jsVal(op.value)}, ${jsStr(op.operator)}, ${jsVal(op.expected)})) {`);
       k6Ops(op.then, lines, `${ind}  `);
@@ -153,7 +157,7 @@ function k6Ops(ops: Op[], lines: string[], ind: string): void {
     } else if (op.op === 'loop') {
       lines.push(
         op.over
-          ? `${ind}(${jsVal(op.over)}).forEach((item, index) => {\n${ind}  vars.${op.as} = item;\n${ind}  vars.index = index;`
+          ? `${ind}(${jsVal(op.over)}).forEach((item, index) => {\n${ind}  ${jsVar(op.as)} = item;\n${ind}  vars.index = index;`
           : `${ind}for (let index = 0; index < Number(${jsVal(op.count!)}); index++) {\n${ind}  vars.index = index;`,
       );
       k6Ops(op.body, lines, `${ind}  `);
@@ -179,7 +183,10 @@ function k6Ops(ops: Op[], lines: string[], ind: string): void {
           body = `JSON.stringify(${jsVal(op.body, ind)})`;
         } else body = jsVal(op.body, ind);
       }
-      const urlExpr = `url(${jsVal(op.url)})${query.length ? ` + \`?${query.join('&')}\`` : ''}`;
+      // The URL may already have a query string: withQuery() adds the parameters with ? or &.
+      const urlExpr = query.length
+        ? `withQuery(url(${jsVal(op.url)}), \`${query.join('&')}\`)`
+        : `url(${jsVal(op.url)})`;
       lines.push(
         `${ind}last = http.request(${jsStr(op.method)}, ${urlExpr}, ${body}, { headers: { ${headers.join(', ')} }, tags: { name: ${jsStr(op.label)} } });`,
       );
@@ -192,7 +199,7 @@ function k6Ops(ops: Op[], lines: string[], ind: string): void {
           ),
           `${ind}});`,
         );
-      if (op.into) lines.push(`${ind}vars.${op.into} = body(last);`);
+      if (op.into) lines.push(`${ind}${jsVar(op.into)} = body(last);`);
     }
   }
 }
@@ -216,7 +223,9 @@ export function generateK6(plan: Plan, o: CodegenOptions): GeneratedProject {
       'loop',
     ]);
     const cases = casesOf(t.scenario);
-    lines.push(`  // ${[...t.scenario.modulePath, t.scenario.name].join(' › ')} (${t.scenario.priority})`);
+    lines.push(
+      `  // ${oneLine([...t.scenario.modulePath, t.scenario.name].join(' › '))} (${t.scenario.priority})`,
+    );
     lines.push(`  for (const data of ${jsJson(cases.map((c) => c.data))}) {`);
     lines.push(`    group(${jsStr(t.scenario.name)}, () => {`);
     lines.push('      const vars = {};', '      let last;');
@@ -309,12 +318,27 @@ const pmText = (v: Val): string =>
     : v.t === 'ref'
       ? pmRef(v.ref)
       : String(plain(v) ?? '');
-function pmJson(v: Val): unknown {
-  if (v.t === 'obj') return Object.fromEntries(v.entries.map(([k, x]) => [k, pmJson(x)]));
-  if (v.t === 'arr') return v.items.map(pmJson);
+function pmJson(v: Val, bare: (r: Ref) => boolean = () => false): unknown {
+  if (v.t === 'obj') return Object.fromEntries(v.entries.map(([k, x]) => [k, pmJson(x, bare)]));
+  if (v.t === 'arr') return v.items.map((x) => pmJson(x, bare));
+  if (v.t === 'ref' && bare(v.ref)) return `${BARE}${pmRef(v.ref)}`;
   if (v.t === 'str' || v.t === 'ref') return pmText(v);
   return plain(v);
 }
+
+/**
+ * A raw JSON body. A placeholder holding a number or true/false is written without quotes ("qty": {{qty}}), so
+ * Postman sends 2, not "2", as StepForge does.
+ */
+const BARE = '__stepforge_bare__';
+const pmBody = (v: Val, bare: (r: Ref) => boolean) =>
+  JSON.stringify(pmJson(v, bare), null, 2).replace(new RegExp(`"${BARE}(\\{\\{[^"]*\\}\\})"`, 'g'), '$1');
+
+/** A query value: literal text URL-encoded, {{placeholders}} kept for Postman to fill in. */
+const pmQuery = (v: Val) =>
+  v.t === 'str'
+    ? v.parts.map((p) => (typeof p === 'string' ? encodeURIComponent(p) : pmRef(p))).join('')
+    : pmText(v);
 
 /** Generated data through Postman's dynamic variables. */
 const PM_FAKE: Record<string, string> = {
@@ -342,14 +366,14 @@ function pmAssert(target: string, operator: string, expected: Val): string {
   const actual =
     target === 'status'
       ? 'pm.response.code'
-      : target === 'time'
+      : target === 'time' || target === 'timeMs'
         ? 'pm.response.responseTime'
         : target === 'body'
           ? 'body'
           : target === 'text'
             ? 'pm.response.text()'
-            : target.startsWith('header:')
-              ? `pm.response.headers.get(${JSON.stringify(target.slice(7))})`
+            : target.startsWith('header:') || target.startsWith('headers.')
+              ? `pm.response.headers.get(${JSON.stringify(target.replace(/^headers?[.:]/, ''))})`
               : `jp(body, ${JSON.stringify(target)})`;
   const raw = pmJson(expected);
   // Inside scripts {{…}} is not replaced automatically.
@@ -381,6 +405,7 @@ export function generatePostman(plan: Plan): GeneratedProject {
   const { input } = plan;
   const folders = new Map<string, unknown[]>();
   const dataFiles: Record<string, string> = {};
+  const dataName = uniquer();
   for (const t of plan.tests) {
     if (!isApi(t)) {
       warnings.push({ scenario: t.scenario.name, message: SKIP_UI });
@@ -388,6 +413,11 @@ export function generatePostman(plan: Plan): GeneratedProject {
     }
     const warn = (message: string) => warnings.push({ scenario: t.scenario.name, message });
     const ops = flat(t.ops, warn, 'Postman', ['api', 'apiExtract', 'setVar', 'gen']);
+    // Test data that is a number or true/false in the test cases, and random numbers, keep their type in JSON bodies.
+    const bare = (r: Ref) =>
+      (r.scope === 'data' &&
+        t.scenario.testCases.some((c) => ['number', 'boolean'].includes(typeof c.data[r.name]))) ||
+      (r.scope === 'random' && ['number', 'timestamp'].includes(r.name));
     const items: unknown[] = [];
     let lastLabel = '';
     for (const op of ops) {
@@ -440,15 +470,15 @@ export function generatePostman(plan: Plan): GeneratedProject {
       if (op.auth?.type === 'cookie')
         headers.push({ key: 'Cookie', value: `${op.auth.name}=${pmText(op.auth.value)}` });
       const rawUrl = pmText(op.url);
-      const query = op.query.map(([k, v]) => ({ key: k, value: pmText(v) }));
+      const query = op.query.map(([k, v]) => `${encodeURIComponent(k)}=${pmQuery(v)}`);
       // A plain string URL (v2.1 allows it); Postman parses host, path and query itself.
-      const url = `${rawUrl.startsWith('/') ? '{{baseUrl}}' : ''}${rawUrl}${query.length ? `?${query.map((q) => `${q.key}=${q.value}`).join('&')}` : ''}`;
+      const url = `${rawUrl.startsWith('/') ? '{{baseUrl}}' : ''}${rawUrl}${query.length ? `${rawUrl.includes('?') ? '&' : '?'}${query.join('&')}` : ''}`;
       const body =
         op.body && op.bodyType !== 'none'
           ? op.bodyType === 'json'
             ? {
                 mode: 'raw',
-                raw: JSON.stringify(pmJson(op.body), null, 2),
+                raw: pmBody(op.body, bare),
                 options: { raw: { language: 'json' } },
               }
             : op.bodyType === 'form'
@@ -505,13 +535,14 @@ export function generatePostman(plan: Plan): GeneratedProject {
       },
     ]);
     if (t.scenario.testCases.length) {
-      dataFiles[`data/${kebab(t.scenario.name)}.json`] = `${JSON.stringify(
+      const file = `data/${dataName(kebab(t.scenario.name, 'scenario'))}.json`;
+      dataFiles[file] = `${JSON.stringify(
         t.scenario.testCases.map((c) => c.data),
         null,
         2,
       )}\n`;
       warn(
-        `its ${t.scenario.testCases.length} test case(s) are in data/${kebab(t.scenario.name)}.json; run the folder with that file as iteration data`,
+        `its ${t.scenario.testCases.length} test case(s) are in ${file}; run the folder with that file as iteration data`,
       );
     }
   }
@@ -559,8 +590,12 @@ export function generatePostman(plan: Plan): GeneratedProject {
 function shVar(name: string) {
   return envName(name);
 }
+/** A literal shell word in single quotes: nothing inside is expanded ($, backticks, "). */
+const shQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+/** Placeholders whose value is a number or true/false: sent as JSON numbers, as StepForge does. */
+type Typed = (r: Ref) => boolean;
 /** A value as a double-quoted shell word; captured values are read back with jq. */
-function shText(v: Val): string {
+function shText(v: Val, typed: Typed = () => false): string {
   const ref = (r: Ref): string => {
     switch (r.scope) {
       case 'baseUrl':
@@ -587,11 +622,11 @@ function shText(v: Val): string {
   const esc = (s: string) => s.replace(/(["\\$`])/g, '\\$1');
   if (v.t === 'str') return `"${v.parts.map((p) => (typeof p === 'string' ? esc(p) : ref(p))).join('')}"`;
   if (v.t === 'ref') return `"${ref(v.ref)}"`;
-  if (v.t === 'obj' || v.t === 'arr') return jqBuild(v);
+  if (v.t === 'obj' || v.t === 'arr') return jqBuild(v, typed);
   return `"${String(plain(v))}"`;
 }
 /** JSON bodies are built with jq so captured values and secrets are escaped correctly. */
-function jqBuild(v: Val): string {
+function jqBuild(v: Val, typed: Typed = () => false): string {
   const args: string[] = [];
   const expr = (x: Val): string => {
     if (x.t === 'obj') return `{${x.entries.map(([k, y]) => `${JSON.stringify(k)}: ${expr(y)}`).join(', ')}}`;
@@ -600,7 +635,12 @@ function jqBuild(v: Val): string {
       if (x.t === 'str' && x.parts.every((p) => typeof p === 'string'))
         return JSON.stringify(x.parts.join(''));
       const name = `a${args.length}`;
-      args.push(`--arg ${name} ${shText(x)}`);
+      if (x.t === 'ref' && x.ref.scope === 'vars') {
+        // Captured values are saved as JSON: they keep their type.
+        const [head, ...rest] = x.ref.name.split('.');
+        args.push(`--argjson ${name} "$(json ${snake(head!)}${rest.length ? ` '.${rest.join('.')}'` : ''})"`);
+      } else if (x.t === 'ref' && typed(x.ref)) args.push(`--argjson ${name} ${shText(x)}`);
+      else args.push(`--arg ${name} ${shText(x)}`);
       return `$${name}`;
     }
     return JSON.stringify(plain(x));
@@ -627,26 +667,41 @@ export function generateCurl(plan: Plan): GeneratedProject {
     const ops = flat(t.ops, warn, 'the cURL script', ['api', 'apiExtract', 'setVar', 'gen']);
     const first = t.scenario.testCases[0];
     if (t.scenario.testCases.length > 1) warn('only the first test case is used by the cURL script');
+    const typed: Typed = (r) =>
+      (r.scope === 'data' &&
+        first !== undefined &&
+        ['number', 'boolean'].includes(typeof first.data[r.name])) ||
+      (r.scope === 'random' && ['number', 'timestamp'].includes(r.name));
     lines.push(
       '',
-      `# ── ${[...t.scenario.modulePath, t.scenario.name].join(' › ')} (${t.scenario.priority})`,
-      `scenario ${JSON.stringify(t.scenario.name)}`,
+      `# ── ${oneLine([...t.scenario.modulePath, t.scenario.name].join(' › '))} (${t.scenario.priority})`,
+      `scenario ${shQuote(t.scenario.name)}`,
     );
     if (first)
       for (const [k, v] of Object.entries(first.data)) {
         dataKeys.add(k);
-        lines.push(`DATA_${shVar(k)}=${shText({ t: 'str', parts: [String(v)] })}`);
+        lines.push(
+          `DATA_${shVar(k)}=${shQuote(v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v))}`,
+        );
       }
     for (const op of ops) {
-      if (op.op === 'comment') lines.push(`# ${op.text}`);
-      else if (op.op === 'todo') lines.push(`# TODO(StepForge): ${op.text}`);
+      if (op.op === 'comment') lines.push(`# ${oneLine(op.text)}`);
+      else if (op.op === 'todo') lines.push(`# TODO(StepForge): ${oneLine(op.text)}`);
       else if (op.op === 'gen')
         lines.push(`save ${snake(op.into)} "$(jq -n --arg v "$(fake ${op.kind})" '$v')"`);
-      else if (op.op === 'setVar')
+      else if (op.op === 'setVar') {
+        // Saved as JSON with its type: 7 stays a number, {{data.qty}} keeps the test case's type.
+        const v = op.value;
         lines.push(
-          `save ${snake(op.name)} ${op.value.t === 'obj' || op.value.t === 'arr' ? shText(op.value) : `"$(jq -n --arg v ${shText(op.value)} '$v')"`}`,
+          `save ${snake(op.name)} ${
+            v.t === 'obj' || v.t === 'arr' || v.t === 'ref'
+              ? jqBuild(v, typed)
+              : v.t === 'str'
+                ? `"$(jq -n --arg v ${shText(v)} '$v')"`
+                : shQuote(JSON.stringify(plain(v)))
+          }`,
         );
-      else if (op.op === 'apiExtract') {
+      } else if (op.op === 'apiExtract') {
         const path = op.from === 'status' ? null : op.from === 'header' ? null : (op.path ?? '$');
         if (path === null) {
           warn(`extracting the ${op.from} is not supported by the cURL script`);
@@ -687,7 +742,7 @@ export function generateCurl(plan: Plan): GeneratedProject {
           );
         if (op.body && op.bodyType !== 'none') {
           if (op.bodyType === 'json')
-            args.push('-H "Content-Type: application/json"', `--data-binary ${shText(op.body)}`);
+            args.push('-H "Content-Type: application/json"', `--data-binary ${shText(op.body, typed)}`);
           else if (op.bodyType === 'form' && op.body.t === 'obj')
             for (const [k, v] of op.body.entries)
               args.push(
@@ -704,10 +759,13 @@ export function generateCurl(plan: Plan): GeneratedProject {
           op.url.t === 'str' && typeof op.url.parts[0] === 'string' && op.url.parts[0].startsWith('/')
             ? { ...op.url, parts: [{ scope: 'baseUrl', name: 'baseUrl' } as Ref, ...op.url.parts] }
             : op.url;
-        lines.push(`# ${op.label}`, `request ${args.join(' \\\n  ')} \\\n  ${shText(url)}`);
+        lines.push(`# ${oneLine(op.label)}`, `request ${args.join(' \\\n  ')} \\\n  ${shText(url)}`);
         for (const a of op.asserts) {
+          // shText: {{data.status}} is the test case's value, not the placeholder's text.
           if (a.target === 'status' && a.operator === 'equals')
-            lines.push(`expect_status ${String(plain(a.expected))}`);
+            lines.push(
+              `expect_status ${shText(a.expected.t === 'num' ? { t: 'str', parts: [String(a.expected.v)] } : a.expected)}`,
+            );
           else if (
             a.target.startsWith('$') &&
             ['equals', 'exists', 'notExists', 'matches', 'contains'].includes(a.operator)
@@ -735,9 +793,10 @@ export function generateCurl(plan: Plan): GeneratedProject {
     '# The API scenarios as cURL requests, with their checks. Needs bash, curl 7.87+ and jq.',
     'set -euo pipefail',
     '',
-    `BASE_URL="\${BASE_URL:-${input.environment.baseUrl}}"`,
+    // Defaults in single quotes: a $, backtick or quote in them is text, never run.
+    `[ -n "\${BASE_URL:-}" ] || BASE_URL=${shQuote(input.environment.baseUrl)}`,
     ...plan.variables.map(
-      (v) => `${shVar(v)}="\${${shVar(v)}:-${(input.environment.variables[v] ?? '').replace(/"/g, '\\"')}}"`,
+      (v) => `[ -n "\${${shVar(v)}:-}" ] || ${shVar(v)}=${shQuote(input.environment.variables[v] ?? '')}`,
     ),
     ...plan.secrets.map((s) => `${shVar(s)}="\${${shVar(s)}:?Set ${shVar(s)} (a secret; see .env.example)}"`),
     'RUN_ID="$(date +%s)"',
@@ -748,6 +807,7 @@ export function generateCurl(plan: Plan): GeneratedProject {
     '# Captured values are kept as JSON files and read back with jq.',
     'save() { printf \'%s\' "$2" > "$WORK/$1.json"; }',
     'value() { jq -r "${2:-.}" "$WORK/$1.json"; }',
+    'json() { jq -c "${2:-.}" "$WORK/$1.json" 2>/dev/null || echo null; }',
     'scenario() { echo; echo "▶ $1"; }',
     '# Simple generated data, like StepForge\'s "Generate data" step.',
     'fake() {',

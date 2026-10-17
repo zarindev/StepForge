@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { CREDIT, envEntries } from './common.ts';
+import { CREDIT, envEntries, ghVar, yamlStr } from './common.ts';
 import type { Plan } from './ir.ts';
 import type { AppPlatform, CiProvider } from './types.ts';
 import { envName, val, type Val } from './values.ts';
@@ -259,7 +259,7 @@ export function nativeCi(
   return {
     '.github/workflows/stepforge-tests.yml': [
       `# ${CREDIT}`,
-      `name: ${plan.input.application.name} tests (${PLATFORM_NAMES[platform]})`,
+      `name: ${yamlStr(`${plan.input.application.name} tests (${PLATFORM_NAMES[platform]})`)}`,
       'on:',
       '  push:',
       '  workflow_dispatch:',
@@ -270,7 +270,7 @@ export function nativeCi(
       ...env.map((e) =>
         isSecret(e.key)
           ? `      ${e.key}: \${{ secrets.${e.key} }}`
-          : `      ${e.key}: \${{ vars.${e.key} || '${e.value.replace(/'/g, "''")}' }}`,
+          : `      ${e.key}: ${ghVar(e.key, e.value)}`,
       ),
       '    steps:',
       '      - uses: actions/checkout@v4',

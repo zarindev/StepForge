@@ -8,7 +8,7 @@ import {
   type Query,
 } from '@stepforge/executor-native/locators';
 import type { AppPlatform, CodegenInput, CodegenScenario, CodegenStep, Warning } from './types.ts';
-import { camel, isStatic, pascal, plain, str, uniquer, val, type Ref, type Val } from './values.ts';
+import { camel, isStatic, kebab, pascal, plain, str, uniquer, val, type Ref, type Val } from './values.ts';
 
 /**
  * Steps → a small, language-neutral list of operations. Every generator prints these; anything a target cannot
@@ -164,6 +164,8 @@ export type TestPlan = {
   scenario: CodegenScenario;
   /** File-friendly unique base name of the scenario. */
   slug: string;
+  /** Kebab-case file name, unique among the scenarios of its module folder (names that read the same get 2, 3…). */
+  file: string;
   /** Operations in order; one generated test per test case (or one without data). */
   ops: Op[];
   /** Variables and secrets this test reads. */
@@ -480,7 +482,11 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
         method: gql ? 'POST' : String(q.method ?? 'GET').toUpperCase(),
         url: val(q.url ?? '/'),
         headers: Object.entries((q.headers as Record<string, unknown>) ?? {}).map(([k, v]) => [k, val(v)]),
-        query: Object.entries((q.query as Record<string, unknown>) ?? {}).map(([k, v]) => [k, val(v)]),
+        // A GraphQL step's `query` is the GraphQL text (sent in the body), not URL parameters.
+        query:
+          !gql && q.query && typeof q.query === 'object'
+            ? Object.entries(q.query as Record<string, unknown>).map(([k, v]) => [k, val(v)])
+            : [],
         body: gql
           ? val({
               query: q.query ?? '',
@@ -640,7 +646,8 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
       break;
     case 'util.generateData': {
       const { kind, name, ...opts } = q as { kind?: string; name?: string };
-      out.push({ op: 'gen', kind: String(kind ?? 'word'), opts, into: into ?? String(name ?? 'value') });
+      // Same default kind as StepForge's own "Generate data" step.
+      out.push({ op: 'gen', kind: String(kind ?? 'name'), opts, into: into ?? String(name ?? 'value') });
       break;
     }
     case 'util.useData':
@@ -1157,8 +1164,13 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean; native?: b
   const warnings: Warning[] = [];
   const sqlFiles: Record<string, string> = {};
   const slugs = uniquer();
+  const files = new Map<string, (name: string) => string>();
   const tests: TestPlan[] = input.scenarios.map((scenario) => {
     const slug = slugs(camel(scenario.name, 'scenario'));
+    // Scenarios whose names read the same (or have no Latin letters) must not overwrite each other's test file.
+    const folder = scenario.modulePath.map((m) => kebab(m, 'module')).join('/');
+    if (!files.has(folder)) files.set(folder, uniquer());
+    const file = files.get(folder)!(kebab(scenario.name, 'scenario'));
     let n = 0;
     const flags = { ui: false, api: false, db: false, email: false };
     const ctx: Ctx = {
@@ -1178,6 +1190,7 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean; native?: b
     return {
       scenario,
       slug,
+      file,
       ops,
       refs,
       usesUi: flags.ui,

@@ -3,9 +3,9 @@
 # The API scenarios as cURL requests, with their checks. Needs bash, curl 7.87+ and jq.
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-https://staging.shop.test}"
-API_VERSION="${API_VERSION:-v2}"
-REGION="${REGION:-eu}"
+[ -n "${BASE_URL:-}" ] || BASE_URL='https://staging.shop.test'
+[ -n "${API_VERSION:-}" ] || API_VERSION='v2'
+[ -n "${REGION:-}" ] || REGION='eu'
 ADMIN_PASSWORD="${ADMIN_PASSWORD:?Set ADMIN_PASSWORD (a secret; see .env.example)}"
 API_TOKEN="${API_TOKEN:?Set API_TOKEN (a secret; see .env.example)}"
 RUN_ID="$(date +%s)"
@@ -16,6 +16,7 @@ FAILED=0
 # Captured values are kept as JSON files and read back with jq.
 save() { printf '%s' "$2" > "$WORK/$1.json"; }
 value() { jq -r "${2:-.}" "$WORK/$1.json"; }
+json() { jq -c "${2:-.}" "$WORK/$1.json" 2>/dev/null || echo null; }
 scenario() { echo; echo "▶ $1"; }
 # Simple generated data, like StepForge's "Generate data" step.
 fake() {
@@ -47,14 +48,14 @@ expect_json() {
 }
 
 # ── API › Orders API (P2)
-scenario "Orders API"
+scenario 'Orders API'
 # Get a token
 # Get a token
 request -X POST \
   --data-urlencode "client=shop" \
   --data-urlencode "scope=orders" \
   "${BASE_URL}/oauth/token"
-expect_status 200
+expect_status "200"
 save token "$(cat "$RESPONSE")"
 # TODO(StepForge): api.request: the JSON Schema check on "$" is not exported
 # Create an order
@@ -64,9 +65,9 @@ request -X POST \
   -H "Authorization: Bearer ${API_TOKEN}" \
   --url-query "dryRun=false" \
   -H "Content-Type: application/json" \
-  --data-binary "$(jq -n --arg a0 "sf.$(date +%s)${RANDOM}@example.test" --arg a1 "${RANDOM}" '{"items": [{"sku": "A-1", "qty": 2}], "note": "it'\''s \"quoted\" & {braced}", "email": $a0, "at": $a1}')" \
+  --data-binary "$(jq -n --arg a0 "sf.$(date +%s)${RANDOM}@example.test" --argjson a1 "${RANDOM}" '{"items": [{"sku": "A-1", "qty": 2}], "note": "it'\''s \"quoted\" & {braced}", "email": $a0, "at": $a1}')" \
   "${BASE_URL}/api/${API_VERSION}/orders"
-expect_status 201
+expect_status "201"
 expect_json '.id' exists
 expect_json '.items[*].sku' contains "A-1"
 # TODO(StepForge): check header:content-type contains (not supported in the cURL script)
@@ -114,25 +115,6 @@ request -X PUT \
 # GraphQL
 # GraphQL
 request -X POST \
-  --url-query "0=q" \
-  --url-query "1=u" \
-  --url-query "2=e" \
-  --url-query "3=r" \
-  --url-query "4=y" \
-  --url-query "5= " \
-  --url-query "6={" \
-  --url-query "7= " \
-  --url-query "8=m" \
-  --url-query "9=e" \
-  --url-query "10= " \
-  --url-query "11={" \
-  --url-query "12= " \
-  --url-query "13=i" \
-  --url-query "14=d" \
-  --url-query "15= " \
-  --url-query "16=}" \
-  --url-query "17= " \
-  --url-query "18=}" \
   -H "Content-Type: application/json" \
   --data-binary "$(jq -n  '{"query": "query { me { id } }", "variables": {"first": 1}}')" \
   "${BASE_URL}/graphql"
@@ -144,19 +126,19 @@ expect_json '.errors' notExists
 # TODO(StepForge): log step not exported (the cURL script runs HTTP requests only)
 # Repeat 3 times
 # Loop, item 1 of 3
-save index "$(jq -n --arg v "0" '$v')"
+save index '0'
 # Send GET /ping?i={{vars.index}}
 # Send GET /ping?i={{vars.index}}
 request -X GET \
   "${BASE_URL}/ping?i=$(value index)"
 # Loop, item 2 of 3
-save index "$(jq -n --arg v "1" '$v')"
+save index '1'
 # Send GET /ping?i={{vars.index}}
 # Send GET /ping?i={{vars.index}}
 request -X GET \
   "${BASE_URL}/ping?i=$(value index)"
 # Loop, item 3 of 3
-save index "$(jq -n --arg v "2" '$v')"
+save index '2'
 # Send GET /ping?i={{vars.index}}
 # Send GET /ping?i={{vars.index}}
 request -X GET \

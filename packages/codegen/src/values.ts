@@ -134,12 +134,13 @@ export const kebab = (s: string, fallback = 'item') =>
 /** Environment variable name for a secret or variable key: apiToken → API_TOKEN. */
 export const envName = (s: string) => snake(s).toUpperCase().replace(/^_/, '');
 
-/** Makes names unique within a scope: name, name2, name3… */
+/** Makes names unique within a scope: name, name2, name3… (never a name it already gave, e.g. for save, save, save2). */
 export function uniquer() {
-  const used = new Map<string, number>();
+  const used = new Set<string>();
   return (name: string) => {
-    const n = (used.get(name) ?? 0) + 1;
-    used.set(name, n);
-    return n === 1 ? name : `${name}${n}`;
+    let out = name;
+    for (let n = 2; used.has(out); n++) out = `${name}${n}`;
+    used.add(out);
+    return out;
   };
 }

@@ -107,9 +107,15 @@ public final class Checks {
     }
   }
 
-  private static final Pattern TOKEN = Pattern.compile("\\.\\.([\\w$-]+)|\\.([\\w$-]+)|\\[\\s*'([^']*)'\\s*\\]|\\[\\s*\"([^\"]*)\"\\s*\\]|\\[(\\*|-?\\d+)\\]|\\.(\\*)");
+  private static final Pattern TOKEN = Pattern.compile(
+      "\\.\\.([\\w$-]+)|\\.([\\w$-]+)|\\[\\s*'([^']*)'\\s*\\]|\\[\\s*\"([^\"]*)\"\\s*\\]|\\[(\\*|-?\\d+)\\]|\\.(\\*)"
+          + "|\\[\\s*(-?\\d*)\\s*:\\s*(-?\\d*)\\s*\\]"
+          + "|\\[\\?\\(\\s*@((?:\\.[\\w$-]+)*)\\s*(?:(===?|!==?|<=|>=|<|>)\\s*('[^']*'|\"[^\"]*\"|[^)\\s]+)\\s*)?\\)\\]");
 
-  /** A small JSONPath: $, .key, ['key'], [n], [*] and ..key. Lists come back for wildcards. */
+  /**
+   * A small JSONPath: $, .key, ['key'], [n], [*], ..key, slices ([0:2], [-1:]) and filters on a field ([?(@.id==2)],
+   * [?(@.price<10)], [?(@.email)]). Lists come back for wildcards, slices and filters.
+   */
   public static Object jsonPath(Object data, String path) {
     List<Object> nodes = new ArrayList<>();
     nodes.add(data);
@@ -127,12 +133,70 @@ public final class Checks {
       } else if (idx != null) {
         int i = Integer.parseInt(idx);
         for (Object n : nodes) if (n instanceof List<?> l && i < l.size() && i >= -l.size()) next.add(l.get(i < 0 ? l.size() + i : i));
+      } else if (m.group(7) != null) {
+        multi = true;
+        for (Object n : nodes) {
+          if (!(n instanceof List<?> l)) continue;
+          int from = bound(m.group(7), 0, l.size()), to = bound(m.group(8), l.size(), l.size());
+          for (int i = from; i < to; i++) next.add(l.get(i));
+        }
+      } else if (m.group(9) != null) {
+        multi = true;
+        String field = m.group(9), op = m.group(10);
+        Object expected = op != null ? literal(m.group(11)) : null;
+        for (Object n : nodes) {
+          for (Object c : children(n)) {
+            Object v = field.isEmpty() ? c : fieldOf(c, field.substring(1));
+            if (op != null ? holds(v, op, expected) : v != null && !Boolean.FALSE.equals(v)) next.add(c);
+          }
+        }
       } else {
         for (Object n : nodes) if (n instanceof Map<?, ?> map && map.containsKey(key)) next.add(map.get(key));
       }
       nodes = next;
     }
     return multi ? nodes : nodes.isEmpty() ? null : nodes.get(0);
+  }
+
+  /** A slice bound: empty is the default; negative counts from the end. */
+  private static int bound(String s, int empty, int size) {
+    if (s.isEmpty()) return empty;
+    int i = Integer.parseInt(s);
+    return Math.max(0, Math.min(size, i < 0 ? size + i : i));
+  }
+
+  /** A JSONPath literal in a filter: 'text', "text", a number, true, false or null. */
+  private static Object literal(String raw) {
+    String t = raw.trim();
+    if (t.length() >= 2 && (t.startsWith("'") && t.endsWith("'") || t.startsWith("\"") && t.endsWith("\""))) return t.substring(1, t.length() - 1);
+    if (t.equals("true") || t.equals("false")) return Boolean.valueOf(t);
+    if (t.equals("null")) return null;
+    try {
+      return Double.parseDouble(t);
+    } catch (NumberFormatException e) {
+      return t;
+    }
+  }
+
+  /** A filter comparison, as StepForge's JSONPath evaluates it ("2" == 2; < and > on numbers when one side is one). */
+  private static boolean holds(Object a, String op, Object b) {
+    if (op.startsWith("==")) return same(a, b);
+    if (op.startsWith("!=")) return !same(a, b);
+    if (a == null || b == null) return false;
+    int order = a instanceof Number || b instanceof Number ? Double.compare(number(a), number(b)) : text(a).compareTo(text(b));
+    if ((a instanceof Number || b instanceof Number) && (Double.isNaN(number(a)) || Double.isNaN(number(b)))) return false;
+    return switch (op) {
+      case "<" -> order < 0;
+      case "<=" -> order <= 0;
+      case ">" -> order > 0;
+      default -> order >= 0;
+    };
+  }
+
+  private static Object fieldOf(Object obj, String path) {
+    Object cur = obj;
+    for (String k : path.split("\\.")) cur = cur instanceof Map<?, ?> m ? m.get(k) : null;
+    return cur;
   }
 
   private static List<Object> children(Object n) {
@@ -196,13 +260,13 @@ public final class Checks {
     Api.Result r = (Api.Result) result;
     switch (t) {
       case "status": return r.status();
-      case "time": return r.ms();
+      case "time": case "timeMs": return r.ms();
       case "size": return r.size();
       case "body": return r.body();
       case "text": return r.text();
       default:
     }
-    if (t.startsWith("header:")) return r.headers().get(t.substring(7).toLowerCase());
+    if (t.startsWith("header:") || t.startsWith("headers.")) return r.headers().get(t.replaceFirst("^headers?[.:]", "").toLowerCase());
     if (t.startsWith("$")) return jsonPath(r.body(), t);
     return null;
   }

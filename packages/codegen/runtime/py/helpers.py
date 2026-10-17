@@ -6,6 +6,7 @@ import string
 import time
 import uuid
 from datetime import date, timedelta
+from decimal import Decimal
 
 from faker import Faker
 
@@ -21,18 +22,32 @@ def _length(v):
     return None
 
 
+def _is_num(v):
+    return isinstance(v, (int, float, Decimal)) and not isinstance(v, bool)
+
+
+def _json_default(v):
+    # Database drivers return Decimal for NUMERIC columns: compared as the number it is.
+    if isinstance(v, Decimal):
+        return int(v) if v == v.to_integral_value() else float(v)
+    return str(v)
+
+
 def _same(a, b):
+    # 1 == 1.0 == Decimal("1"), but True is not 1.
+    if _is_num(a) and _is_num(b):
+        return a == b
     if a == b and type(a) is type(b):
         return True
     # "200" equals 200: values read from the page are always strings.
-    if isinstance(a, (int, float)) and not isinstance(a, bool) and isinstance(b, str) or (
-        isinstance(b, (int, float)) and not isinstance(b, bool) and isinstance(a, str)
-    ):
+    if (_is_num(a) and isinstance(b, str)) or (_is_num(b) and isinstance(a, str)):
         return _num_text(a) == _num_text(b)
-    return json.dumps(a, sort_keys=False, default=str) == json.dumps(b, sort_keys=False, default=str)
+    return json.dumps(a, default=_json_default) == json.dumps(b, default=_json_default)
 
 
 def _num_text(v):
+    if isinstance(v, Decimal):
+        v = int(v) if v == v.to_integral_value() else float(v)
     if isinstance(v, float) and v.is_integer():
         return str(int(v))
     return str(v)
@@ -115,18 +130,53 @@ def check(actual, operator, expected, what):
     )
 
 
-_TOKEN = re.compile(r"\.\.([\w$-]+)|\.([\w$-]+)|\[\s*'([^']*)'\s*\]|\[\s*\"([^\"]*)\"\s*\]|\[(\*|-?\d+)\]|\.(\*)")
+_TOKEN = re.compile(
+    r"\.\.([\w$-]+)|\.([\w$-]+)|\[\s*'([^']*)'\s*\]|\[\s*\"([^\"]*)\"\s*\]|\[(\*|-?\d+)\]|\.(\*)"
+    r"|\[\s*(-?\d*)\s*:\s*(-?\d*)\s*\]"
+    r"|\[\?\(\s*@((?:\.[\w$-]+)*)\s*(?:(===?|!==?|<=|>=|<|>)\s*('[^']*'|\"[^\"]*\"|[^)\s]+)\s*)?\)\]"
+)
+
+
+def _literal(raw):
+    """A JSONPath literal in a filter: 'text', "text", a number, true, false or null."""
+    t = raw.strip()
+    if len(t) >= 2 and t[0] == t[-1] and t[0] in "'\"":
+        return t[1:-1]
+    if t in ("true", "false"):
+        return t == "true"
+    if t == "null":
+        return None
+    try:
+        return float(t) if any(c in t for c in ".eE") else int(t)
+    except ValueError:
+        return t
+
+
+def _holds(a, op, b):
+    """A filter comparison, as StepForge's JSONPath evaluates it ("2" == 2; < and > on numbers when one side is one)."""
+    if op in ("==", "==="):
+        return _same(a, b)
+    if op in ("!=", "!=="):
+        return not _same(a, b)
+    if a is None or b is None:
+        return False
+    if _is_num(a) or _is_num(b):
+        x, y = _number(a), _number(b)
+    else:
+        x, y = str(a), str(b)
+    return {"<": x < y, "<=": x <= y, ">": x > y, ">=": x >= y}[op]
 
 
 def json_path(data, path):
-    """A small JSONPath: $, .key, ['key'], [n], [*] and ..key. Lists come back for wildcards."""
+    """A small JSONPath: $, .key, ['key'], [n], [*], ..key, slices ([0:2], [-1:]) and filters on a field
+    ([?(@.id==2)], [?(@.price<10)], [?(@.email)]). Lists come back for wildcards, slices and filters."""
     nodes, multi = [data], False
 
     def kids(n):
         return n if isinstance(n, list) else list(n.values()) if isinstance(n, dict) else []
 
     for m in _TOKEN.finditer(re.sub(r"^\$", "", path)):
-        deep, dot, sq, dq, idx, star = m.groups()
+        deep, dot, sq, dq, idx, star, start, stop, fpath, fop, fval = m.groups()
         if deep:
             multi, found = True, []
 
@@ -146,6 +196,19 @@ def json_path(data, path):
         elif idx is not None:
             i = int(idx)
             nodes = [n[i] for n in nodes if isinstance(n, list) and -len(n) <= i < len(n)]
+        elif start is not None:
+            multi = True
+            lo, hi = (int(start) if start else None), (int(stop) if stop else None)
+            nodes = [k for n in nodes if isinstance(n, list) for k in n[lo:hi]]
+        elif fpath is not None:
+            multi = True
+            expected = _literal(fval) if fop else None
+            kept = []
+            for k in (k for n in nodes for k in kids(n)):
+                v = field(k, fpath[1:]) if fpath else k
+                if (_holds(v, fop, expected) if fop else v is not None and v is not False):
+                    kept.append(k)
+            nodes = kept
         else:
             key = dot or sq or dq
             nodes = [n[key] for n in nodes if isinstance(n, dict) and key in n]
@@ -269,7 +332,7 @@ def pick(result, target):
         return rows[0].get(t) if rows else None
     if t == "status":
         return result["status"]
-    if t == "time":
+    if t in ("time", "timeMs"):
         return result["ms"]
     if t == "size":
         return result["size"]
@@ -277,8 +340,8 @@ def pick(result, target):
         return result["body"]
     if t == "text":
         return result["text"]
-    if t.startswith("header:"):
-        return result["headers"].get(t[7:].lower())
+    if t.startswith(("header:", "headers.")):
+        return result["headers"].get(re.sub(r"^headers?[.:]", "", t).lower())
     if t.startswith("$"):
         return json_path(result["body"], t)
     return None

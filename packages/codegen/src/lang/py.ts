@@ -34,13 +34,22 @@ const fpart = (s: string) =>
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
     .replace(/\{/g, '{{')
     .replace(/\}/g, '}}');
+
+/**
+ * Before Python 3.12 an f-string expression cannot hold a backslash, a #, or the f-string's own quote: a reference
+ * whose name needs one (data.get('it\'s')) is joined with + instead.
+ */
+const fsafe = (expr: string) => !/["\\#{}\r\n]/.test(expr);
 
 export function pyVal(v: Val, indent = ''): string {
   switch (v.t) {
     case 'str':
       if (v.parts.every((p) => typeof p === 'string')) return pyStr(v.parts.join(''));
+      if (v.parts.some((p) => typeof p !== 'string' && !fsafe(pyRef(p, "'"))))
+        return `(${v.parts.map((p) => (typeof p === 'string' ? pyStr(p) : `text(${pyRef(p)})`)).join(' + ')})`;
       return `f"${v.parts.map((p) => (typeof p === 'string' ? fpart(p) : `{text(${pyRef(p, "'")})}`)).join('')}"`;
     case 'ref':
       return pyRef(v.ref);
@@ -79,9 +88,11 @@ export function pyJson(x: unknown): string {
     .join(', ')}}`;
 }
 
-/** Multi-line text such as SQL. */
+/** Multi-line text such as SQL. Every " is escaped, so text ending in a quote cannot close the string early. */
 export const pyBlock = (s: string) =>
-  s.includes('\n') ? `"""${s.replace(/\\/g, '\\\\').replace(/"""/g, '\\"\\"\\"')}"""` : pyStr(s);
+  s.includes('\n')
+    ? `"""${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r/g, '\\r')}"""`
+    : pyStr(s);
 
 /** An integer: literal when it is one, int(…) around placeholder values. */
 export const pyInt = (v: Val) => (v.t === 'num' ? String(v.v) : `int(${pyVal(v)})`);

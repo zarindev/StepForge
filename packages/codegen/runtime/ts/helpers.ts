@@ -97,18 +97,48 @@ export function check(actual: unknown, operator: string, expected: unknown, what
     );
 }
 
-/** A small JSONPath: $, .key, ['key'], [n], [*] and ..key. Lists come back for wildcards. */
+/** A JSONPath literal in a filter: 'text', "text", a number, true, false or null. */
+function literal(raw: string): unknown {
+  const t = raw.trim();
+  if (/^'.*'$|^".*"$/.test(t)) return t.slice(1, -1);
+  if (t === 'true' || t === 'false') return t === 'true';
+  if (t === 'null') return null;
+  return t !== '' && Number.isFinite(Number(t)) ? Number(t) : t;
+}
+
+/** A filter comparison, as StepForge's JSONPath evaluates it ("2" == 2; < and > on numbers when one side is one). */
+function holds(a: unknown, op: string, b: unknown): boolean {
+  if (op === '==' || op === '===') return same(a, b);
+  if (op === '!=' || op === '!==') return !same(a, b);
+  if (a === undefined || a === null || b === null) return false;
+  const order =
+    typeof a === 'number' || typeof b === 'number'
+      ? Number(a) - Number(b)
+      : String(a) < String(b)
+        ? -1
+        : String(a) > String(b)
+          ? 1
+          : 0;
+  return op === '<' ? order < 0 : op === '<=' ? order <= 0 : op === '>' ? order > 0 : order >= 0;
+}
+
+/**
+ * A small JSONPath: $, .key, ['key'], [n], [*], ..key, slices ([0:2], [-1:]) and filters on a field
+ * ([?(@.id==2)], [?(@.price<10)], [?(@.email)]). Lists come back for wildcards, slices and filters.
+ */
 export function jsonPath(json: unknown, path: string): unknown {
   const tokens = [
     ...path
       .replace(/^\$/, '')
-      .matchAll(/\.\.([\w$-]+)|\.([\w$-]+)|\[\s*'([^']*)'\s*\]|\[\s*"([^"]*)"\s*\]|\[(\*|-?\d+)\]|\.(\*)/g),
+      .matchAll(
+        /\.\.([\w$-]+)|\.([\w$-]+)|\[\s*'([^']*)'\s*\]|\[\s*"([^"]*)"\s*\]|\[(\*|-?\d+)\]|\.(\*)|\[\s*(-?\d*)\s*:\s*(-?\d*)\s*\]|\[\?\(\s*@((?:\.[\w$-]+)*)\s*(?:(===?|!==?|<=|>=|<|>)\s*('[^']*'|"[^"]*"|[^)\s]+)\s*)?\)\]/g,
+      ),
   ];
   let nodes: unknown[] = [json];
   let multi = false;
   const kids = (n: unknown) => (Array.isArray(n) ? n : n && typeof n === 'object' ? Object.values(n) : []);
   for (const t of tokens) {
-    const [, deep, dot, sq, dq, idx, star] = t;
+    const [, deep, dot, sq, dq, idx, star, from, to, fpath, fop, fval] = t;
     if (deep) {
       multi = true;
       const found: unknown[] = [];
@@ -126,6 +156,18 @@ export function jsonPath(json: unknown, path: string): unknown {
     } else if (idx !== undefined) {
       const i = Number(idx);
       nodes = nodes.flatMap((n) => (Array.isArray(n) ? [n[i < 0 ? n.length + i : i]] : []));
+    } else if (from !== undefined) {
+      multi = true;
+      nodes = nodes.flatMap((n) =>
+        Array.isArray(n) ? n.slice(from === '' ? 0 : Number(from), to === '' ? n.length : Number(to)) : [],
+      );
+    } else if (fpath !== undefined) {
+      multi = true;
+      const expected = fop ? literal(fval!) : undefined;
+      nodes = nodes.flatMap(kids).filter((n) => {
+        const v = fpath ? field(n, fpath.slice(1)) : n;
+        return fop ? holds(v, fop, expected) : v !== undefined && v !== null && v !== false;
+      });
     } else {
       const key = dot ?? sq ?? dq!;
       nodes = nodes.flatMap((n) =>
@@ -242,11 +284,12 @@ export function pick(result: ApiLike | DbLike, target: string): unknown {
     return result.rows[0]?.[t];
   }
   if (t === 'status') return result.status;
-  if (t === 'time') return result.ms;
+  if (t === 'time' || t === 'timeMs') return result.ms;
   if (t === 'size') return result.size;
   if (t === 'body') return result.body;
   if (t === 'text') return result.text;
-  if (t.startsWith('header:')) return result.headers[t.slice(7).toLowerCase()];
+  if (t.startsWith('header:') || t.startsWith('headers.'))
+    return result.headers[t.replace(/^headers?[.:]/, '').toLowerCase()];
   if (t.startsWith('$')) return jsonPath(result.body, t);
   return undefined;
 }

@@ -13,10 +13,13 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Database access for tests exported by StepForge (by Md Zarin Tasnim). Each connection name reads DB_<NAME>_URL:
- * postgres://…, mysql://… or sqlite:/path/to/file.db. StepForge's $1 placeholders become JDBC's ?.
+ * postgres://…, mysql://… or sqlite:/path/to/file.db. StepForge's $1 placeholders become JDBC's ?, bound by their
+ * number.
  */
 public final class Db {
   private Db() {}
@@ -35,11 +38,44 @@ public final class Db {
     return DriverManager.getConnection(jdbc, URLDecoder.decode(auth[0], StandardCharsets.UTF_8), auth.length > 1 ? URLDecoder.decode(auth[1], StandardCharsets.UTF_8) : "");
   }
 
+  private static final Pattern TOKENS = Pattern.compile("'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|\\$(\\d+)|\\?");
+
+  private record Bound(String sql, List<Object> params) {}
+
+  /**
+   * $1, $2… become ? with the parameters in the order they appear, so $2 before $1 or $1 used twice bind the right
+   * values; a ? takes the next parameter. Quoted text is left as it is.
+   */
+  private static Bound bind(String sql, List<Object> params) {
+    StringBuilder out = new StringBuilder();
+    List<Object> bound = new ArrayList<>();
+    Matcher m = TOKENS.matcher(sql);
+    int last = 0;
+    int position = 0;
+    while (m.find()) {
+      String token = m.group();
+      if (token.startsWith("'") || token.startsWith("\"")) continue;
+      out.append(sql, last, m.start()).append('?');
+      last = m.end();
+      if (m.group(1) != null) {
+        int n = Integer.parseInt(m.group(1));
+        if (n < 1 || n > params.size()) throw new IllegalArgumentException("$" + n + " in the SQL, but " + params.size() + " parameter(s) were given");
+        bound.add(params.get(n - 1));
+      } else {
+        if (position >= params.size()) throw new IllegalArgumentException("More ? in the SQL than the " + params.size() + " parameter(s) given");
+        bound.add(params.get(position++));
+      }
+    }
+    out.append(sql.substring(last));
+    return new Bound(out.toString(), bound);
+  }
+
   /** Runs one statement with bound parameters. */
   public static Result query(String connection, String sql, List<Object> params) throws Exception {
     long started = System.currentTimeMillis();
-    try (Connection c = connect(connection); PreparedStatement st = c.prepareStatement(sql.replaceAll("\\$\\d+", "?"))) {
-      for (int i = 0; i < params.size(); i++) st.setObject(i + 1, params.get(i));
+    Bound b = params.isEmpty() ? new Bound(sql, params) : bind(sql, params);
+    try (Connection c = connect(connection); PreparedStatement st = c.prepareStatement(b.sql())) {
+      for (int i = 0; i < b.params().size(); i++) st.setObject(i + 1, b.params().get(i));
       if (st.execute()) {
         try (ResultSet rs = st.getResultSet()) {
           ResultSetMetaData md = rs.getMetaData();

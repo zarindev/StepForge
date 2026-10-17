@@ -1,4 +1,15 @@
-import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime, testPath } from '../common.ts';
+import {
+  CREDIT,
+  ciFiles,
+  day,
+  envExample,
+  headerLines,
+  oneLine,
+  readme,
+  runtime,
+  statusCode,
+  testPath,
+} from '../common.ts';
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
 import {
   APP_KEY,
@@ -361,17 +372,18 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
     if (uiOp(op, s, out, warn)) continue;
     switch (op.op) {
       case 'comment':
-        out(`# ${op.text}`);
+        out(`# ${oneLine(op.text)}`);
         break;
       case 'todo':
-        out(`# TODO(StepForge): ${op.text}`);
+        out(`# TODO(StepForge): ${oneLine(op.text)}`);
         break;
       case 'api': {
         const r = next(s, 'res');
         const headers: string[] = op.headers.map(([k, v]) => `${pyStr(k)}: ${pyText(v)}`);
         const params: string[] = op.query.map(([k, v]) => `${pyStr(k)}: ${pyVal(v)}`);
         let auth = '';
-        if (op.auth?.type === 'bearer') headers.push(`"Authorization": f"Bearer {${pyText(op.auth.token)}}"`);
+        // Joined with +, not an f-string: before Python 3.12 an f-string cannot hold secret("…")'s quotes.
+        if (op.auth?.type === 'bearer') headers.push(`"Authorization": "Bearer " + ${pyText(op.auth.token)}`);
         if (op.auth?.type === 'basic')
           auth = `auth=(${pyText(op.auth.username)}, ${pyText(op.auth.password)}), `;
         if (op.auth?.type === 'apiKey')
@@ -379,7 +391,7 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
             `${pyStr(op.auth.name)}: ${pyText(op.auth.value)}`,
           );
         if (op.auth?.type === 'cookie')
-          headers.push(`"Cookie": f"${op.auth.name}={${pyText(op.auth.value)}}"`);
+          headers.push(`"Cookie": ${pyStr(`${op.auth.name}=`)} + ${pyText(op.auth.value)}`);
         const i2 = `${ind}    `;
         const body =
           op.body === null || op.bodyType === 'none'
@@ -401,8 +413,9 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
         for (const b of body) out(`    ${b}`);
         out(')');
         for (const a of op.asserts) {
-          if (a.target === 'status' && a.operator === 'equals')
-            out(`assert ${r}["status"] == ${pyVal(a.expected)}, "status"`);
+          // A fixed code reads best as == 201; anything else goes through check(), which compares "201" == 201.
+          const code = a.target === 'status' && a.operator === 'equals' ? statusCode(a.expected) : null;
+          if (code !== null) out(`assert ${r}["status"] == ${code}, "status"`);
           else
             out(
               `check(pick(${r}, ${pyStr(a.target)}), ${pyStr(a.operator)}, ${pyVal(a.expected)}, ${pyStr(`${a.target} ${a.operator}`)})`,
@@ -449,7 +462,8 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
       case 'script':
         warn('JavaScript "Run script" steps are not translated to Python');
         out('# TODO(StepForge): this JavaScript step was not translated to Python:');
-        for (const l of op.code.split('\n')) out(`#   ${l}`);
+        // Python ends a comment at a lone CR too.
+        for (const l of op.code.split(/\r\n?|\n/)) out(`#   ${l}`);
         break;
       case 'if':
         out(`if compare(${pyVal(op.value)}, ${pyStr(op.operator)}, ${pyVal(op.expected)}):`);
@@ -647,7 +661,7 @@ function testFile(plan: Plan, t: TestPlan, flavor: Flavor, warn: (m: string) => 
     ...head,
     ...decorators,
     `def ${name}(${args.join(', ')}):`,
-    `    """${t.scenario.name.replace(/"/g, "'")}"""`,
+    `    """${oneLine(t.scenario.name).replace(/\\/g, '\\\\').replace(/"/g, "'")}"""`,
     ...(!cases.length && usesData ? ['    data = {}'] : []),
     ...(tabs ? ['    current = page'] : []),
     ...(flavor === 'playwright'

@@ -28,7 +28,7 @@ def test_orders_api(http):
     # TODO(StepForge): api.request: the JSON Schema check on "$" is not exported
     res2 = api.call(
         http, "POST", f"/api/{text(env['api-version'])}/orders",
-        headers={"X-Request-Id": text(random_value("uuid")), "X-Region": env["region"], "Authorization": f"Bearer {secret("API_TOKEN")}"},
+        headers={"X-Request-Id": text(random_value("uuid")), "X-Region": env["region"], "Authorization": "Bearer " + secret("API_TOKEN")},
         params={"dryRun": False},
         json={
             "items": [{
@@ -69,7 +69,7 @@ def test_orders_api(http):
     # Cookie
     res6 = api.call(
         http, "GET", "/me",
-        headers={"Cookie": f"sid={"abc"}"},
+        headers={"Cookie": "sid=" + "abc"},
     )
     # TODO(StepForge): api.request: auth type "oauth2" is not exported; set the header yourself
     res7 = api.call(
@@ -90,7 +90,6 @@ def test_orders_api(http):
     # GraphQL
     res10 = api.call(
         http, "POST", "/graphql",
-        params={"0": "q", "1": "u", "2": "e", "3": "r", "4": "y", "5": " ", "6": "{", "7": " ", "8": "m", "9": "e", "10": " ", "11": "{", "12": " ", "13": "i", "14": "d", "15": " ", "16": "}", "17": " ", "18": "}"},
         json={
             "query": "query { me { id } }",
             "variables": {

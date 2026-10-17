@@ -13,6 +13,8 @@ export const jsStr = (s: string) =>
 const IDENT = /^[A-Za-z_$][\w$]*$/;
 export const jsKey = (k: string) => (IDENT.test(k) ? k : jsStr(k));
 const member = (obj: string, k: string) => (IDENT.test(k) ? `${obj}.${k}` : `${obj}[${jsStr(k)}]`);
+/** A variable to assign: vars.orderId, or vars['order-id'] when the name is not an identifier. */
+export const jsVar = (name: string) => member('vars', name);
 
 const RANDOM = new Set(['email', 'uuid', 'number', 'digits6', 'string', 'timestamp']);
 
@@ -35,7 +37,9 @@ export function jsRef(r: Ref): string {
   }
 }
 
-const tmpl = (s: string) => s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+// A raw CR in a template literal is read as a newline: it is escaped like in jsStr.
+const tmpl = (s: string) =>
+  s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(/\r/g, '\\r');
 
 export function jsVal(v: Val, indent = ''): string {
   switch (v.t) {

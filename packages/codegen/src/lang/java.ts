@@ -1,3 +1,4 @@
+import { oneLine } from '../common.ts';
 import type { Ref, Val } from '../values.ts';
 import { envName } from '../values.ts';
 
@@ -72,9 +73,28 @@ export function javaJson(x: unknown): string {
     .join(', ')})`;
 }
 
-/** Multi-line text such as SQL, as a text block. */
+/** Multi-line text such as SQL, as a text block. Every " is escaped, so text ending in a quote cannot close it. */
 export const javaBlock = (s: string) =>
-  s.includes('\n') ? `"""\n${s.replace(/\\/g, '\\\\').replace(/"""/g, '\\"""')}"""` : javaStr(s);
+  s.includes('\n')
+    ? `"""\n${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r/g, '\\r')}"""`
+    : javaStr(s);
+
+/**
+ * Text for a // comment: on one line, and javac reads \u in comments too (C:\users is an error), so a backslash
+ * run before u is doubled; \\u is no escape.
+ */
+export const javaComment = (s: string) => oneLine(s).replace(/\\+(?=u)/g, (m) => m + m);
+
+const RESERVED = new Set(
+  (
+    'abstract assert boolean break byte case catch char class const continue default do double else enum extends ' +
+    'false final finally float for goto if implements import instanceof int interface long native new null package ' +
+    'private protected public return short static strictfp super switch synchronized this throw throws transient ' +
+    'true try void volatile while _'
+  ).split(' '),
+);
+/** A Java name that is not a reserved word (default → default_). */
+export const javaIdent = (s: string) => (RESERVED.has(s) ? `${s}_` : s);
 
 /** An int: literal when it is one, J.toInt(…) around placeholder values. */
 export const javaInt = (v: Val) => (v.t === 'num' ? String(v.v) : `J.toInt(${javaVal(v)})`);

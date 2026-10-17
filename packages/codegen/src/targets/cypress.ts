@@ -1,7 +1,18 @@
 import { transformSync } from 'esbuild';
-import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime, testPath } from '../common.ts';
+import {
+  CREDIT,
+  ciFiles,
+  day,
+  envExample,
+  headerLines,
+  oneLine,
+  readme,
+  runtime,
+  statusCode,
+  testPath,
+} from '../common.ts';
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
-import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal } from '../lang/js.ts';
+import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal, jsVar } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject } from '../types.ts';
 import { camel, envName, kebab, parseString } from '../values.ts';
 
@@ -85,10 +96,10 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
   for (const op of ops) {
     switch (op.op) {
       case 'comment':
-        emit([`// ${op.text}`]);
+        emit([`// ${oneLine(op.text)}`]);
         break;
       case 'todo':
-        emit([`// TODO(StepForge): ${op.text}`]);
+        emit([`// TODO(StepForge): ${oneLine(op.text)}`]);
         break;
       case 'goto': {
         const url = jsVal(op.url);
@@ -195,7 +206,7 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
         const value = op.source === 'text' ? 'String(value).trim()' : 'value';
         emit([
           `${get[op.source]}.then((value) => {`,
-          `  vars.${op.into} = ${op.regex ? `capture(${value}, ${jsStr(op.regex)})` : value};`,
+          `  ${jsVar(op.into)} = ${op.regex ? `capture(${value}, ${jsStr(op.regex)})` : value};`,
           '});',
         ]);
         break;
@@ -254,12 +265,13 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
           '  failOnStatusCode: false,',
           '}).then((response) => {',
           '  const res = toResult(response);',
+          // A fixed code reads best as to.eq(201); anything else goes through check(), which compares "201" == 201.
           ...op.asserts.map((a) =>
-            a.target === 'status' && a.operator === 'equals'
-              ? `  expect(res.status, 'status').to.eq(${jsVal(a.expected)});`
+            a.target === 'status' && a.operator === 'equals' && statusCode(a.expected) !== null
+              ? `  expect(res.status, 'status').to.eq(${statusCode(a.expected)});`
               : `  check(pick(res, ${jsStr(a.target)}), ${jsStr(a.operator)}, ${jsVal(a.expected)}, ${jsStr(`${a.target} ${a.operator}`)});`,
           ),
-          ...(op.into ? [`  vars.${op.into} = res.body;`] : []),
+          ...(op.into ? [`  ${jsVar(op.into)} = res.body;`] : []),
           '  last.api = res;',
           '});',
         ]);
@@ -272,15 +284,15 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
             : op.from === 'header'
               ? `header:${op.name ?? ''}`
               : (op.path ?? 'body');
-        emit([`vars.${op.into} = pick(last.api, ${jsStr(target)});`]);
+        emit([`${jsVar(op.into)} = pick(last.api, ${jsStr(target)});`]);
         break;
       }
       case 'setVar':
-        emit([`vars.${op.name} = ${jsVal(op.value)};`]);
+        emit([`${jsVar(op.name)} = ${jsVal(op.value)};`]);
         break;
       case 'gen':
         emit([
-          `vars.${op.into} = fake(${jsStr(op.kind)}${Object.keys(op.opts).length ? `, ${jsJson(op.opts)}` : ''});`,
+          `${jsVar(op.into)} = fake(${jsStr(op.kind)}${Object.keys(op.opts).length ? `, ${jsJson(op.opts)}` : ''});`,
         ]);
         break;
       case 'wait':
@@ -291,7 +303,7 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
         break;
       case 'script':
         emit([
-          `${op.into ? `vars.${op.into} = ` : ''}((vars, data) => {`,
+          `${op.into ? `${jsVar(op.into)} = ` : ''}((vars, data) => {`,
           ...op.code.split('\n').map((l) => `  ${l}`),
           '})(vars, data);',
         ]);
@@ -312,10 +324,11 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
       case 'loop': {
         s.lines.push(`${ind}cy.then(() => {`);
         if (op.over) {
-          s.lines.push(`${ind}  (${jsVal(op.over)}).forEach((${camel(op.as)}, index) => {`);
+          // Always `item`: the name as a variable could be a reserved word or shadow index/vars.
+          s.lines.push(`${ind}  (${jsVal(op.over)}).forEach((item, index) => {`);
           s.lines.push(
             `${ind}    cy.then(() => {`,
-            `${ind}      vars.${op.as} = ${camel(op.as)};`,
+            `${ind}      ${jsVar(op.as)} = item;`,
             `${ind}      vars.index = index;`,
             `${ind}    });`,
           );
@@ -340,13 +353,13 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
             (a) =>
               `  check(pick(result, ${jsStr(a.target)}), ${jsStr(a.operator)}, ${jsVal(a.expected)}, ${jsStr(`${a.target} ${a.operator}`)});`,
           ),
-          ...(op.into ? [`  vars.${op.into} = result.rows;`] : []),
+          ...(op.into ? [`  ${jsVar(op.into)} = result.rows;`] : []),
           '  last.db = result;',
           '});',
         ]);
         break;
       case 'dbExtract':
-        emit([`vars.${op.into} = pick(last.db, ${jsStr(op.path)});`]);
+        emit([`${jsVar(op.into)} = pick(last.db, ${jsStr(op.path)});`]);
         break;
       case 'emailWait': {
         const crit = [
@@ -358,7 +371,7 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
         ];
         emit([
           `cy.task('mail:wait', { ${crit.join(', ')} }, { timeout: ${op.timeoutMs + 5000} }).then((email) => {`,
-          ...(op.into ? [`  vars.${op.into} = email;`] : []),
+          ...(op.into ? [`  ${jsVar(op.into)} = email;`] : []),
           '  last.email = email;',
           '});',
         ]);
@@ -376,7 +389,7 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
             : op.kind === 'link'
               ? `mail.link(last.email, { ${[...(op.contains ? [`contains: ${jsText(op.contains)}`] : []), ...(op.index !== undefined ? [`index: ${op.index}`] : [])].join(', ')} })`
               : `mail.extract(last.email, ${jsStr(op.pattern ?? '(.+)')})`;
-        emit([`vars.${op.into} = ${call};`]);
+        emit([`${jsVar(op.into)} = ${call};`]);
         break;
       }
       case 'emailOpenLink': {

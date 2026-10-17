@@ -89,7 +89,7 @@
                 "url": "{{baseUrl}}/api/{{api-version}}/orders?dryRun=false",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"A-1\",\n      \"qty\": 2\n    }\n  ],\n  \"note\": \"it's \\\"quoted\\\" & {braced}\",\n  \"email\": \"{{$randomEmail}}\",\n  \"at\": \"{{$timestamp}}\"\n}",
+                  "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"A-1\",\n      \"qty\": 2\n    }\n  ],\n  \"note\": \"it's \\\"quoted\\\" & {braced}\",\n  \"email\": \"{{$randomEmail}}\",\n  \"at\": {{$timestamp}}\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -348,7 +348,7 @@
               "request": {
                 "method": "POST",
                 "header": [],
-                "url": "{{baseUrl}}/graphql?0=q&1=u&2=e&3=r&4=y&5= &6={&7= &8=m&9=e&10= &11={&12= &13=i&14=d&15= &16=}&17= &18=}",
+                "url": "{{baseUrl}}/graphql",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"query\": \"query { me { id } }\",\n  \"variables\": {\n    \"first\": 1\n  }\n}",

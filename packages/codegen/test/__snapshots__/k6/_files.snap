@@ -2,7 +2,7 @@
 .github/workflows/stepforge-tests.yml (23 lines)
 .gitlab-ci.yml (12 lines)
 README.md (67 lines)
-script.js (293 lines)
+script.js (302 lines)
 
 Warnings:
 - Checkout with every UI step | Receipt looks right | visual checkpoints are not exported; add a screenshot comparison in the target framework

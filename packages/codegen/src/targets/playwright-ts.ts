@@ -1,6 +1,17 @@
-import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime, testPath } from '../common.ts';
+import {
+  CREDIT,
+  ciFiles,
+  day,
+  envExample,
+  headerLines,
+  oneLine,
+  readme,
+  runtime,
+  statusCode,
+  testPath,
+} from '../common.ts';
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
-import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal } from '../lang/js.ts';
+import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal, jsVar } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject } from '../types.ts';
 import { camel, envName, kebab, parseString, val } from '../values.ts';
 
@@ -125,7 +136,7 @@ function appiumOp(op: Op, out: (line: string) => void): boolean {
     }
     case 'read': {
       const value = `await app.read(${jsStr(op.source)}, ${op.el ? q(op.el) : '[]'}${op.attribute ? `, ${jsStr(op.attribute)}` : ''})`;
-      out(`vars.${op.into} = ${op.regex ? `capture(String(${value}), ${jsStr(op.regex)})` : value};`);
+      out(`${jsVar(op.into)} = ${op.regex ? `capture(String(${value}), ${jsStr(op.regex)})` : value};`);
       return true;
     }
     case 'waitFor':
@@ -162,10 +173,10 @@ export function printOps(ops: Op[], s: State, ind: string): void {
     if (appium && appiumOp(op, out)) continue;
     switch (op.op) {
       case 'comment':
-        out(`// ${op.text}`);
+        out(`// ${oneLine(op.text)}`);
         break;
       case 'todo':
-        out(`// TODO(StepForge): ${op.text}`);
+        out(`// TODO(StepForge): ${oneLine(op.text)}`);
         break;
       case 'goto':
         out(`await ${s.pageVar}.goto(${jsVal(op.url)});`);
@@ -239,7 +250,7 @@ export function printOps(ops: Op[], s: State, ind: string): void {
           title: `await ${s.pageVar}.title()`,
         };
         const value = read[op.source]!;
-        out(`vars.${op.into} = ${op.regex ? `capture(${value}, ${jsStr(op.regex)})` : value};`);
+        out(`${jsVar(op.into)} = ${op.regex ? `capture(${value}, ${jsStr(op.regex)})` : value};`);
         break;
       }
       case 'screenshot':
@@ -305,14 +316,16 @@ export function printOps(ops: Op[], s: State, ind: string): void {
         for (const b of body) out(`  ${b}`);
         out('});');
         for (const a of op.asserts) {
-          if (a.target === 'status' && a.operator === 'equals' && !appium)
-            out(`expect(${r}.status, 'status').toBe(${jsVal(a.expected)});`);
+          // A fixed code reads best as toBe(201); anything else goes through check(), which compares "201" == 201.
+          const code =
+            a.target === 'status' && a.operator === 'equals' && !appium ? statusCode(a.expected) : null;
+          if (code !== null) out(`expect(${r}.status, 'status').toBe(${code});`);
           else
             out(
               `check(pick(${r}, ${jsStr(a.target)}), ${jsStr(a.operator)}, ${jsVal(a.expected)}, ${jsStr(`${a.target} ${a.operator}`)});`,
             );
         }
-        if (op.into) out(`vars.${op.into} = ${r}.body;`);
+        if (op.into) out(`${jsVar(op.into)} = ${r}.body;`);
         s.lastApi = r;
         break;
       }
@@ -325,17 +338,17 @@ export function printOps(ops: Op[], s: State, ind: string): void {
               : (op.path ?? 'body');
         out(
           s.lastApi
-            ? `vars.${op.into} = pick(${s.lastApi}, ${jsStr(target)});`
+            ? `${jsVar(op.into)} = pick(${s.lastApi}, ${jsStr(target)});`
             : '// TODO(StepForge): api.extract without an earlier request',
         );
         break;
       }
       case 'setVar':
-        out(`vars.${op.name} = ${jsVal(op.value, ind)};`);
+        out(`${jsVar(op.name)} = ${jsVal(op.value, ind)};`);
         break;
       case 'gen':
         out(
-          `vars.${op.into} = fake(${jsStr(op.kind)}${Object.keys(op.opts).length ? `, ${jsJson(op.opts)}` : ''});`,
+          `${jsVar(op.into)} = fake(${jsStr(op.kind)}${Object.keys(op.opts).length ? `, ${jsJson(op.opts)}` : ''});`,
         );
         break;
       case 'wait':
@@ -349,7 +362,7 @@ export function printOps(ops: Op[], s: State, ind: string): void {
         out(`console.log(${jsVal(op.message)});`);
         break;
       case 'script':
-        out(`${op.into ? `vars.${op.into} = ` : ''}await (async (vars: Vars, data: Vars) => {`);
+        out(`${op.into ? `${jsVar(op.into)} = ` : ''}await (async (vars: Vars, data: Vars) => {`);
         for (const l of op.code.split('\n')) out(`  ${l}`);
         out('})(vars, data);');
         break;
@@ -364,8 +377,9 @@ export function printOps(ops: Op[], s: State, ind: string): void {
         break;
       case 'loop':
         if (op.over) {
-          out(`for (const [index, ${camel(op.as)}] of (${jsVal(op.over)} as unknown[]).entries()) {`);
-          out(`  vars.${op.as} = ${camel(op.as)};`);
+          // Always `item`: the name as a variable could be a reserved word or shadow index/vars.
+          out(`for (const [index, item] of (${jsVal(op.over)} as unknown[]).entries()) {`);
+          out(`  ${jsVar(op.as)} = item;`);
           out('  vars.index = index;');
         } else {
           out(`for (let index = 0; index < ${jsNum(op.count!)}; index++) {`);
@@ -391,14 +405,14 @@ export function printOps(ops: Op[], s: State, ind: string): void {
           out(
             `check(pick(${r}, ${jsStr(a.target)}), ${jsStr(a.operator)}, ${jsVal(a.expected)}, ${jsStr(`${a.target} ${a.operator}`)});`,
           );
-        if (op.into) out(`vars.${op.into} = ${r}.rows;`);
+        if (op.into) out(`${jsVar(op.into)} = ${r}.rows;`);
         s.lastDb = r;
         break;
       }
       case 'dbExtract':
         out(
           s.lastDb
-            ? `vars.${op.into} = pick(${s.lastDb}, ${jsStr(op.path)});`
+            ? `${jsVar(op.into)} = pick(${s.lastDb}, ${jsStr(op.path)});`
             : '// TODO(StepForge): db.extract without an earlier query',
         );
         break;
@@ -412,7 +426,7 @@ export function printOps(ops: Op[], s: State, ind: string): void {
           `timeoutMs: ${op.timeoutMs}`,
         ];
         out(`const ${m} = await mail.waitForEmail({ ${crit.join(', ')} });`);
-        if (op.into) out(`vars.${op.into} = ${m};`);
+        if (op.into) out(`${jsVar(op.into)} = ${m};`);
         s.lastMail = m;
         break;
       }
@@ -434,7 +448,7 @@ export function printOps(ops: Op[], s: State, ind: string): void {
             : op.kind === 'link'
               ? `mail.link(${s.lastMail}, { ${[...(op.contains ? [`contains: ${jsText(op.contains)}`] : []), ...(op.index !== undefined ? [`index: ${op.index}`] : [])].join(', ')} })`
               : `mail.extract(${s.lastMail}, ${jsStr(op.pattern ?? '(.+)')})`;
-        out(`vars.${op.into} = ${call};`);
+        out(`${jsVar(op.into)} = ${call};`);
         break;
       }
       case 'emailOpenLink': {

@@ -1,6 +1,6 @@
 .env.example (21 lines)
 README.md (77 lines)
-requests.sh (183 lines)
+requests.sh (165 lines)
 
 Warnings:
 - Checkout with every UI step | Receipt looks right | visual checkpoints are not exported; add a screenshot comparison in the target framework

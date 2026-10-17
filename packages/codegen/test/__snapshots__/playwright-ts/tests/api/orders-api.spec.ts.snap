@@ -102,27 +102,6 @@ test.describe('API › Orders API', () => {
     const res10 = await api(request, {
       method: 'POST',
       url: '/graphql',
-      params: {
-        '0': 'q',
-        '1': 'u',
-        '2': 'e',
-        '3': 'r',
-        '4': 'y',
-        '5': ' ',
-        '6': '{',
-        '7': ' ',
-        '8': 'm',
-        '9': 'e',
-        '10': ' ',
-        '11': '{',
-        '12': ' ',
-        '13': 'i',
-        '14': 'd',
-        '15': ' ',
-        '16': '}',
-        '17': ' ',
-        '18': '}',
-      },
       json: {
         query: 'query { me { id } }',
         variables: {
@@ -150,8 +129,8 @@ test.describe('API › Orders API', () => {
       });
     }
     // Repeat for each line in {{vars.order.items}}
-    for (const [index, line] of (field(vars, 'order.items') as unknown[]).entries()) {
-      vars.line = line;
+    for (const [index, item] of (field(vars, 'order.items') as unknown[]).entries()) {
+      vars.line = item;
       vars.index = index;
       // Note: {{vars.line.sku}}
       console.log(field(vars, 'line.sku'));

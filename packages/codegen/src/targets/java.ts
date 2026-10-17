@@ -1,4 +1,4 @@
-import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime } from '../common.ts';
+import { CREDIT, ciFiles, day, envExample, headerLines, readme, runtime, statusCode } from '../common.ts';
 import {
   APP_KEY,
   capabilities,
@@ -10,7 +10,16 @@ import {
   PLATFORM_NAMES,
 } from '../native.ts';
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
-import { javaInt, javaBlock, javaJson, javaStr, javaText, javaVal } from '../lang/java.ts';
+import {
+  javaBlock,
+  javaComment,
+  javaIdent,
+  javaInt,
+  javaJson,
+  javaStr,
+  javaText,
+  javaVal,
+} from '../lang/java.ts';
 import type { CodegenOptions, GeneratedProject, TargetId } from '../types.ts';
 import { camel, envName, parseString, pascal, snake, uniquer, type Val } from '../values.ts';
 
@@ -222,10 +231,10 @@ function printOps(ops: Op[], s: State, ind: string): void {
     if (uiOp(op, s, out)) continue;
     switch (op.op) {
       case 'comment':
-        out(`// ${op.text}`);
+        out(`// ${javaComment(op.text)}`);
         break;
       case 'todo':
-        out(`// TODO(StepForge): ${op.text}`);
+        out(`// TODO(StepForge): ${javaComment(op.text)}`);
         break;
       case 'api': {
         const r = next(s, 'res');
@@ -263,8 +272,9 @@ function printOps(ops: Op[], s: State, ind: string): void {
         for (const c of chain.slice(1)) out(`        ${c}`);
         out(');');
         for (const a of op.asserts) {
-          if (a.target === 'status' && a.operator === 'equals')
-            out(`assertEquals(${javaVal(a.expected)}, ${r}.status(), "status");`);
+          // A fixed code reads best as assertEquals(201, …); anything else goes through check(), which compares "201" == 201.
+          const code = a.target === 'status' && a.operator === 'equals' ? statusCode(a.expected) : null;
+          if (code !== null) out(`assertEquals(${code}, ${r}.status(), "status");`);
           else
             out(
               `check(pick(${r}, ${javaStr(a.target)}), ${javaStr(a.operator)}, ${javaVal(a.expected)}, ${javaStr(`${a.target} ${a.operator}`)});`,
@@ -305,7 +315,7 @@ function printOps(ops: Op[], s: State, ind: string): void {
       case 'script':
         s.warn('JavaScript "Run script" steps are not translated to Java');
         out('// TODO(StepForge): this JavaScript step was not translated to Java:');
-        for (const l of op.code.split('\n')) out(`//   ${l}`);
+        for (const l of op.code.split(/\r\n?|\n/)) out(`//   ${javaComment(l)}`);
         break;
       case 'if':
         out(`if (compare(${javaVal(op.value)}, ${javaStr(op.operator)}, ${javaVal(op.expected)})) {`);
@@ -418,7 +428,7 @@ function printOps(ops: Op[], s: State, ind: string): void {
 }
 
 const javaPackage = (path: string[]) =>
-  ['tests', ...path.map((p) => snake(p).replace(/^_/, 'm') || 'module')].join('.');
+  ['tests', ...path.map((p) => javaIdent(snake(p, 'module').replace(/^_/, 'm')))].join('.');
 
 function testClass(
   plan: Plan,
@@ -433,7 +443,7 @@ function testClass(
   const browser = flavor === 'selenium' && t.usesUi;
   const appium = flavor === 'appium' && t.usesUi;
   const cases = t.scenario.testCases;
-  const method = camel(t.scenario.name, 'scenario');
+  const method = javaIdent(camel(t.scenario.name, 'scenario'));
   const tags = [...t.scenario.tags.map((x) => snake(x)), t.scenario.priority.toLowerCase()];
   const usesData = /\bdata\.get\(|\(data,/.test(code);
   const imports = [
@@ -481,7 +491,7 @@ function testClass(
     ...s.lines,
   ];
   return [
-    ...headerLines(plan.input, t.scenario).map((l) => `// ${l}`),
+    ...headerLines(plan.input, t.scenario).map((l) => `// ${javaComment(l)}`),
     `package ${javaPackage(t.scenario.modulePath)};`,
     '',
     ...imports,
@@ -626,7 +636,7 @@ function capabilitiesJava(plan: Plan): string {
     'import java.util.HashMap;',
     'import java.util.Map;',
     '',
-    `/** ${CREDIT}. ${PLATFORM_NAMES[platform]}: the capabilities StepForge starts the app with (from the ${plan.input.environment.name} environment). */`,
+    `/** ${CREDIT}. ${PLATFORM_NAMES[platform]}: the capabilities StepForge starts the app with (from the ${javaComment(plan.input.environment.name).replace(/\*\//g, '* /')} environment). */`,
     'public final class Capabilities {',
     `  public static final String PLATFORM = ${javaStr(platform)};`,
     '',

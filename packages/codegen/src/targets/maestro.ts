@@ -1,8 +1,8 @@
-import { CREDIT, day, headerLines, readme, testPath } from '../common.ts';
+import { CREDIT, day, headerLines, oneLine, readme, testPath } from '../common.ts';
 import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
 import { GITLAB_NATIVE, nativeCi, PLATFORM_NAMES } from '../native.ts';
 import type { CodegenOptions, GeneratedProject, Warning } from '../types.ts';
-import { envName, kebab, parseString, snake, type Ref, type Val } from '../values.ts';
+import { envName, kebab, parseString, snake, uniquer, type Ref, type Val } from '../values.ts';
 
 /**
  * Maestro flows (YAML) for Android and iOS apps. Maestro finds elements by id or text (no XPath, no fallbacks), waits
@@ -130,8 +130,14 @@ function jsCond(value: Val, operator: string, expected: Val, c: Ctx): string | n
     notEquals: `${a} != ${b}`,
     contains: `String(${a}).includes(${b})`,
     notContains: `!String(${a}).includes(${b})`,
+    // StepForge's operators (gt, lt…); the older names are kept for scenarios that still have them.
+    gt: `Number(${a}) > Number(${b})`,
+    lt: `Number(${a}) < Number(${b})`,
+    gte: `Number(${a}) >= Number(${b})`,
+    lte: `Number(${a}) <= Number(${b})`,
     greaterThan: `Number(${a}) > Number(${b})`,
     lessThan: `Number(${a}) < Number(${b})`,
+    matches: `new RegExp(${b}).test(String(${a}))`,
   };
   return op[operator] ?? null;
 }
@@ -140,7 +146,7 @@ function printOps(ops: Op[], c: Ctx, ind: string): void {
   const out = (l: string) => c.lines.push(`${ind}${l}`);
   const todo = (m: string) => {
     c.warn(m);
-    out(`# TODO(StepForge): ${m}`);
+    out(`# TODO(StepForge): ${oneLine(m)}`);
   };
   const need = (el: El): Record<string, string> | null => {
     const s = selector(el, c);
@@ -158,10 +164,10 @@ function printOps(ops: Op[], c: Ctx, ind: string): void {
   for (const op of ops) {
     switch (op.op) {
       case 'comment':
-        out(`# ${op.text}`);
+        out(`# ${oneLine(op.text)}`);
         break;
       case 'todo':
-        out(`# TODO(StepForge): ${op.text}`);
+        out(`# TODO(StepForge): ${oneLine(op.text)}`);
         break;
       case 'act': {
         const s = need(op.el);
@@ -473,6 +479,8 @@ export function generateMaestro(plan: Plan, o: CodegenOptions): GeneratedProject
     });
   const reset = launch.resetApp !== false;
   const allSecrets = new Set<string>();
+  // Flows sit in one folder (module path joined with -): their names must stay unique there too.
+  const flowName = uniquer();
   for (const t of plan.tests) {
     const { body, c } = flowFile(plan, t, warnings);
     for (const s of c.secrets) allSecrets.add(s);
@@ -491,16 +499,18 @@ export function generateMaestro(plan: Plan, o: CodegenOptions): GeneratedProject
       '---',
     ];
     const start = [`- launchApp:`, `    clearState: ${reset}`];
-    const base = testPath(t, (b) => b, 'flows')
-      .replace(/^flows\//, '')
-      .replace(/\//g, '-');
+    const base = flowName(
+      testPath(t, (b) => b, 'flows')
+        .replace(/^flows\//, '')
+        .replace(/\//g, '-'),
+    );
     if (!t.scenario.testCases.length) {
       files[`flows/${base}.yaml`] = [...header(t.scenario.name, []), ...start, ...body, ''].join('\n');
       continue;
     }
     // Test cases: one flow each, running the scenario's steps (flows/steps/) with that row's data.
     files[`flows/steps/${base}.yaml`] = [
-      `# ${CREDIT} · the steps of "${t.scenario.name}", run by each test case's flow`,
+      `# ${CREDIT} · the steps of "${oneLine(t.scenario.name)}", run by each test case's flow`,
       `appId: ${appId || '${APP_ID}'}`,
       '---',
       ...start,
@@ -511,7 +521,7 @@ export function generateMaestro(plan: Plan, o: CodegenOptions): GeneratedProject
       const data = Object.entries(tc.data).map(
         ([k, v]) => `  ${dataName(k)}: ${yq(typeof v === 'string' ? v : JSON.stringify(v))}`,
       );
-      files[`flows/${base}-${kebab(tc.code || tc.title)}.yaml`] = [
+      files[`flows/${flowName(`${base}-${kebab(tc.code || tc.title, 'case')}`)}.yaml`] = [
         ...header(`${t.scenario.name} — ${`${tc.code} ${tc.title}`.trim()}`, data),
         `- runFlow: steps/${base}.yaml`,
         '',

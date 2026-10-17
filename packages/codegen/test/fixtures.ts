@@ -480,3 +480,112 @@ export const NATIVE_APP: CodegenInput = {
   author: 'Md Zarin Tasnim',
   generatedAt: '2026-10-15T09:00:00.000Z',
 };
+
+/**
+ * Text and names that once broke exports: line breaks in step text, scenarios whose names read the same, names that
+ * are Java keywords or not identifiers, values with #, :, $, quotes and backslashes, SQL ending in a quote.
+ */
+export const HOSTILE: CodegenInput = {
+  application: { name: 'Odd: "Shop" #1', slug: 'odd' },
+  environment: {
+    name: 'Odd',
+    baseUrl: 'https://odd.test/$(touch pwned)`id`"',
+    variables: { note: 'a #b: c\\d\ne $HOME', tag: 'red #1' },
+    secretKeys: ['apiToken'],
+  },
+  connections: [{ name: 'main', engine: 'pg' }],
+  inboxes: [],
+  blocks: {},
+  library: {},
+  scenarios: [
+    {
+      id: 'H1',
+      name: 'Save order',
+      description: 'Line one\nline two\r\nline three\u2028four',
+      preconditions: 'C:\\users\\new\rdone',
+      modulePath: ['default'],
+      priority: 'P2',
+      tags: [],
+      testCases: [{ code: 'TC-1', title: 'one', data: { qty: 2, "it's": 'x', status: '201' } }],
+      steps: [
+        s('util.setVariable', { label: 'Set\nthe id\r\nnow', params: { name: 'order-id', value: 7 } }),
+        s('util.setVariable', { params: { name: 'my var', value: '{{data.qty}}' } }),
+        s('util.generateData', { params: { name: 'who' } }),
+        s('api.request', {
+          label: 'Create C:\\users\\new order',
+          params: {
+            method: 'POST',
+            url: '/orders?x=1',
+            headers: { 'x-note': "n={{data.it's}}!" },
+            query: { 'a b': 'c&d', n: '{{data.qty}}' },
+            auth: { type: 'bearer', token: '{{secret.apiToken}}' },
+            body: { qty: '{{data.qty}}', who: '{{vars.who}}' },
+          },
+          assertions: [
+            { target: 'status', operator: 'equals', expected: '{{data.status}}' },
+            { target: 'status', operator: 'equals', expected: '201' },
+          ],
+          captureAs: 'res-body',
+        }),
+        s('util.loop', {
+          params: { over: [1, 2], as: 'index', steps: [s('util.log', { params: { message: 'x' } })] },
+        }),
+        s('db.query', {
+          params: {
+            connection: 'main',
+            sql: "SELECT * FROM t\nWHERE a = $2 AND b = $1 AND c = 'it''s \"x\"'",
+            params: ['a', '{{vars.order-id}}'],
+          },
+        }),
+        s('util.runScript', { params: { code: 'vars.x = 1;\r// done' } }),
+      ],
+    },
+    {
+      id: 'H2',
+      name: 'Save order',
+      modulePath: ['default'],
+      priority: 'P2',
+      tags: [],
+      testCases: [],
+      steps: [s('util.log', { params: { message: 'two' } })],
+    },
+    {
+      id: 'H3',
+      name: 'Save-Order',
+      modulePath: ['default'],
+      priority: 'P2',
+      tags: [],
+      testCases: [],
+      steps: [s('util.log', { params: { message: 'three' } })],
+    },
+    {
+      id: 'H4',
+      name: 'Регистрация',
+      modulePath: ['Пациенты'],
+      priority: 'P2',
+      tags: [],
+      testCases: [],
+      steps: [s('util.log', { params: { message: 'four' } })],
+    },
+    {
+      id: 'H5',
+      name: 'Вход',
+      modulePath: ['Пациенты'],
+      priority: 'P2',
+      tags: [],
+      testCases: [],
+      steps: [s('util.log', { params: { message: 'five' } })],
+    },
+    {
+      id: 'H6',
+      name: 'new',
+      modulePath: ['class'],
+      priority: 'P2',
+      tags: [],
+      testCases: [],
+      steps: [s('util.log', { params: { message: 'six' } })],
+    },
+  ],
+  author: 'Md Zarin Tasnim',
+  generatedAt: '2026-05-01T09:30:00.000Z',
+};
