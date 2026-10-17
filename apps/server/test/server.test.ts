@@ -22,6 +22,20 @@ describe('server security', () => {
     expect(res.statusCode).toBe(401);
   });
 
+  it('needs the token however the /api path is written (percent-encoded, %2F)', async () => {
+    for (const url of ['/%61pi/system', '/%61%70%69/applications', '/api%2Fsystem', '/%61pi/demo'])
+      expect((await app.inject({ url, headers: { host: '127.0.0.1' } })).statusCode, url).not.toBe(200);
+    const post = await app.inject({
+      method: 'POST',
+      url: '/%61pi/maintenance/prune',
+      headers: { host: '127.0.0.1', 'content-type': 'text/plain' },
+      payload: 'x',
+    });
+    expect([401, 404]).toContain(post.statusCode);
+    expect((await app.inject({ url: '/%61pi/system', headers: H })).statusCode).toBe(200);
+    expect((await app.inject({ url: '/%E0%A4%A', headers: { host: '127.0.0.1' } })).statusCode).toBe(400);
+  });
+
   it('rejects foreign Host headers (DNS rebinding)', async () => {
     const res = await app.inject({ url: '/api/health', headers: { host: 'evil.example.com' } });
     expect(res.statusCode).toBe(403);
@@ -73,7 +87,55 @@ describe('system + settings', () => {
       payload: { value: 1 },
     });
     expect(unknown.statusCode).toBe(404);
+    // Object.prototype members are not settings (they used to answer 500).
+    for (const key of ['constructor', '__proto__', 'toString'])
+      expect(
+        (await app.inject({ method: 'PUT', url: `/api/settings/${key}`, headers: H, payload: { value: 1 } }))
+          .statusCode,
+        key,
+      ).toBe(404);
     expect((await app.inject({ url: '/api/settings', headers: H })).json().theme).toBe('light');
+  });
+
+  it('bad query values are ignored, not a server error; duplicating a manual test keeps it manual', async () => {
+    const appId = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/applications',
+        headers: H,
+        payload: { name: 'Q', slug: 'q-1' },
+      })
+    ).json().id;
+    for (const days of ['abc', '-5', '0'])
+      expect(
+        (await app.inject({ url: `/api/applications/${appId}/analytics?days=${days}`, headers: H }))
+          .statusCode,
+        days,
+      ).toBe(200);
+    const mod = (
+      await app.inject({
+        method: 'POST',
+        url: `/api/applications/${appId}/modules`,
+        headers: H,
+        payload: { name: 'M' },
+      })
+    ).json().id;
+    const manual = (
+      await app.inject({
+        method: 'POST',
+        url: `/api/modules/${mod}/scenarios`,
+        headers: H,
+        payload: {
+          name: 'Check by hand',
+          execution: 'manual',
+          steps: [{ type: 'util.manual', params: { instruction: 'Look' } }],
+        },
+      })
+    ).json();
+    const copy = (
+      await app.inject({ method: 'POST', url: `/api/scenarios/${manual.id}/duplicate`, headers: H })
+    ).json();
+    expect(copy.execution).toBe('manual');
   });
 
   it('serves a helpful page when the UI is not built', async () => {

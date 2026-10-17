@@ -200,6 +200,12 @@ describe('API executor', () => {
       ),
     );
     expect(fails(r)).toEqual([]);
+    // The credentials StepForge built (Basic = base64 of the password, a fetched OAuth2 token) are not stored.
+    const headersOf = (i: number) =>
+      (r.steps[i]!.request as { headers: Record<string, string> }).headers.authorization;
+    expect(headersOf(3)).toBe('Basic ••••••');
+    expect(headersOf(4)).toBe('Bearer ••••••');
+    expect(JSON.stringify(r.steps)).not.toContain(Buffer.from('ana:pw').toString('base64'));
   });
 
   it('GraphQL: data passes, errors fail by default; api.extract reads the last response', async () => {

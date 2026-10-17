@@ -38,7 +38,9 @@ export function nextRuns(cron: string, count = 5, from?: Date): Date[] {
   } catch (err) {
     throw new repo.RepoError(400, 'invalid_cron', `Invalid schedule "${cron}": ${(err as Error).message}`);
   }
-  const out = job.nextRuns(count, from);
+  // croner loops forever on a negative count: always ask for 1 to 100 runs.
+  const n = Math.min(Math.max(Math.trunc(Number(count)) || 1, 1), 100);
+  const out = job.nextRuns(n, from);
   job.stop();
   return out;
 }

@@ -20,7 +20,9 @@ export function registerScheduleRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get<{ Querystring: { cron?: string; count?: string } }>('/api/schedules/preview', async (req) => {
     const cron = z.string().min(1).parse(req.query.cron);
     return {
-      next: nextRuns(cron, Math.min(Number(req.query.count ?? 5) || 5, 20)).map((d) => d.toISOString()),
+      next: nextRuns(cron, Math.min(Math.max(Number(req.query.count ?? 5) || 5, 1), 20)).map((d) =>
+        d.toISOString(),
+      ),
     };
   });
   app.post<P<'id'>>('/api/applications/:id/schedules', async (req, reply) => {

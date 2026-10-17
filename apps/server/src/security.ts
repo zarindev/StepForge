@@ -41,8 +41,18 @@ export function registerSecurity(app: FastifyInstance, token: string): void {
         .code(403)
         .send({ error: 'forbidden_host', message: 'StepForge only accepts localhost requests' });
     }
-    const path = req.url.split('?')[0] ?? '';
-    if (!path.startsWith('/api/') || PUBLIC_ROUTES.has(path)) return;
+    // Decide by the route that matched, not by the URL as written: the router decodes the path, so "/%61pi/…"
+    // reaches an /api route although the raw URL does not start with "/api/".
+    const route = req.routeOptions?.url ?? '';
+    const raw = req.url.split('?')[0] ?? '';
+    let decoded = raw;
+    try {
+      decoded = decodeURIComponent(raw);
+    } catch {
+      return reply.code(400).send({ error: 'bad_request', message: 'Malformed URL' });
+    }
+    const isApi = route.startsWith('/api/') || decoded.startsWith('/api/') || raw.startsWith('/api/');
+    if (!isApi || PUBLIC_ROUTES.has(route || decoded)) return;
     if (!tokensMatch(token, tokenFrom(req))) {
       return reply.code(401).send({ error: 'unauthorized', message: 'Missing or invalid session token' });
     }

@@ -198,6 +198,33 @@ function portableSteps(list: AnyStep[], map?: RefMap) {
 
 const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/**
+ * Browser settings without passwords typed as plain text (HTTP sign-in, proxy, certificate passphrase): exports never
+ * carry secret values. A {{secret.x}} placeholder is kept, since it names the secret, not its value.
+ */
+function withoutPasswords(defaults: Record<string, unknown>): Record<string, unknown> {
+  const copy = structuredClone(defaults ?? {}) as Record<string, unknown> & {
+    settings?: {
+      httpCredentials?: { password?: string };
+      proxy?: { password?: string };
+      clientCertificates?: { passphrase?: string }[];
+    };
+  };
+  const scrub = (o: Record<string, unknown> | undefined, key: string) => {
+    if (
+      o &&
+      typeof o[key] === 'string' &&
+      o[key] &&
+      !/^\s*\{\{\s*secret\.[^}]+\}\}\s*$/.test(o[key] as string)
+    )
+      o[key] = '';
+  };
+  scrub(copy.settings?.httpCredentials, 'password');
+  scrub(copy.settings?.proxy, 'password');
+  for (const c of copy.settings?.clientCertificates ?? []) scrub(c, 'passphrase');
+  return copy;
+}
+
 export function exportApplication(
   db: StepForgeDb,
   applicationId: string,
@@ -242,7 +269,7 @@ export function exportApplication(
       baseUrl: e.baseUrl,
       isProduction: e.isProduction,
       variables: e.variablesJson,
-      browserDefaults: e.browserDefaultsJson,
+      browserDefaults: withoutPasswords(e.browserDefaultsJson),
       secretKeys: db
         .select({ key: secrets.key })
         .from(secrets)

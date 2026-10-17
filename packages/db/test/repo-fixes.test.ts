@@ -94,6 +94,27 @@ describe('environments and campaigns', () => {
     expect(r.listCampaigns(db, imported.applicationId).map((c) => c.name)).toEqual(['Both']);
   });
 
+  it('an export never carries passwords typed into browser settings (placeholders are kept)', () => {
+    r.createEnvironment(db, appId, {
+      name: 'Proxy',
+      baseUrl: 'http://localhost',
+      browserDefaults: {
+        browser: 'chromium',
+        headless: true,
+        settings: {
+          httpCredentials: { username: 'ana', password: 'Plain-Pass-1' },
+          proxy: { server: 'http://proxy:8080', password: '{{secret.proxyPw}}' },
+          clientCertificates: [{ origin: 'https://x', pfxPath: 'c.pfx', passphrase: 'Pfx-Pass-2' }],
+        },
+      },
+    });
+    const text = JSON.stringify(r.exportApplication(db, appId));
+    expect(text).not.toContain('Plain-Pass-1');
+    expect(text).not.toContain('Pfx-Pass-2');
+    expect(text).toContain('{{secret.proxyPw}}');
+    expect(text).toContain('"username":"ana"');
+  });
+
   it('a campaign run without runs is never reported as passed', () => {
     const local = r.createEnvironment(db, appId, { name: 'Local', baseUrl: 'http://localhost' });
     const c = r.saveCampaign(db, appId, { name: 'C', environmentIds: [local.id] });

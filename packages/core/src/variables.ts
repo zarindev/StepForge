@@ -99,18 +99,67 @@ export class VariableResolver {
     this.scopes.vars[name] = value;
   }
 
+  /** Saves variables, to put them back later (a loop's index and item inside another loop). */
+  saveVars(names: string[]): () => void {
+    const vars = (this.scopes.vars ??= {});
+    const saved = names.map((n) => [n, Object.hasOwn(vars, n), vars[n]] as const);
+    return () => {
+      for (const [n, had, v] of saved) {
+        if (had) vars[n] = v;
+        else delete vars[n];
+      }
+    };
+  }
+
   /** Copy of captured variables with secret values masked. */
   snapshotVars(): Record<string, unknown> {
-    return JSON.parse(this.mask(JSON.stringify(this.scopes.vars ?? {}))) as Record<string, unknown>;
+    return this.maskDeep(this.scopes.vars ?? {});
+  }
+
+  /**
+   * A copy of any value with every secret masked: in strings (and object keys), and numbers or booleans that are a
+   * secret themselves (a PIN 1234). Walks the value rather than its JSON text, so secrets with quotes or backslashes
+   * are found and the result is never broken JSON.
+   */
+  maskDeep<T>(value: T): T {
+    const secrets = this.secretList();
+    if (!secrets.length) return value;
+    const maskText = (t: string) => this.mask(t);
+    const seen = new WeakMap<object, unknown>();
+    const walk = (v: unknown): unknown => {
+      if (typeof v === 'string') return maskText(v);
+      if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint')
+        return secrets.includes(String(v)) ? MASK : v;
+      if (!v || typeof v !== 'object') return v;
+      if (seen.has(v)) return seen.get(v);
+      if (Array.isArray(v)) {
+        const out: unknown[] = [];
+        seen.set(v, out);
+        for (const x of v) out.push(walk(x));
+        return out;
+      }
+      // Plain data only (results are JSON): other objects (dates, buffers) as their JSON form.
+      if (Object.getPrototypeOf(v) !== Object.prototype && Object.getPrototypeOf(v) !== null)
+        return walk(JSON.parse(JSON.stringify(v) ?? 'null'));
+      const out: Record<string, unknown> = {};
+      seen.set(v, out);
+      for (const [k, x] of Object.entries(v)) out[maskText(k)] = walk(x);
+      return out;
+    };
+    return walk(value) as T;
+  }
+
+  private secretList(): string[] {
+    const secrets = new Set([...this.usedSecrets, ...Object.values(this.scopes.secret ?? {})]);
+    return [...secrets]
+      .filter((s) => typeof s === 'string' && s.length > 0)
+      .sort((a, b) => b.length - a.length);
   }
 
   /** Replaces every known secret value in `text` with the mask. */
   mask(text: string): string {
-    const secrets = new Set([...this.usedSecrets, ...Object.values(this.scopes.secret ?? {})]);
     let out = text;
-    for (const s of [...secrets].filter((s) => s.length > 0).sort((a, b) => b.length - a.length)) {
-      out = out.split(s).join(MASK);
-    }
+    for (const s of this.secretList()) out = out.split(s).join(MASK);
     return out;
   }
 }

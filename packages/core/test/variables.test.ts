@@ -50,6 +50,27 @@ describe('VariableResolver', () => {
     expect(r.mask(`sent ${body}`)).toBe(`sent {"password":"${MASK}"}`);
   });
 
+  it('masks secrets inside any value: numbers, quotes and backslashes, keys — never breaking it', () => {
+    const r = new VariableResolver({ secret: { pin: '1234', pw: 'pa"ss\\w', on: 'true' } });
+    const masked = r.maskDeep({
+      id: 1234,
+      flag: true,
+      text: 'pin is 1234; pw is pa"ss\\w',
+      list: [1234, 12345, 'x'],
+      'key-pa"ss\\w': null,
+      nested: { deep: [{ v: 'pa"ss\\w' }] },
+    });
+    expect(masked).toEqual({
+      id: MASK,
+      flag: MASK,
+      text: `pin is ${MASK}; pw is ${MASK}`,
+      list: [MASK, 12345, 'x'],
+      [`key-${MASK}`]: null,
+      nested: { deep: [{ v: MASK }] },
+    });
+    expect(r.maskDeep(undefined)).toBeUndefined();
+  });
+
   it('finds placeholders', () => {
     expect(findPlaceholders({ a: '{{env.baseUrl}}', b: ['{{vars.x}} {{data.y}}'] }).sort()).toEqual([
       'data.y',

@@ -113,6 +113,12 @@ describe('schedules', () => {
     const p = await ok<{ next: string[] }>('GET', '/api/schedules/preview?cron=0%202%20*%20*%20*&count=3');
     expect(p.next).toHaveLength(3);
     for (const d of p.next) expect(new Date(d).getHours()).toBe(2);
+    // A negative or silly count is clamped (croner never returns on a negative one: it crashed the server).
+    for (const count of ['-3', '0', 'abc', '999'])
+      expect(
+        (await ok<{ next: string[] }>('GET', `/api/schedules/preview?cron=*%20*%20*%20*%20*&count=${count}`))
+          .next.length,
+      ).toBeGreaterThan(0);
     const bad = await call('GET', '/api/schedules/preview?cron=not%20a%20cron');
     expect(bad.statusCode).toBe(400);
     expect(bad.json().error).toBe('invalid_cron');

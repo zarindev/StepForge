@@ -184,7 +184,20 @@ export function registerBugRoutes(app: FastifyInstance, ctx: AppContext) {
 
   // ─── Optional local AI (Ollama) ──────────────────────────────────────────
   const ollama = () => getSetting(db, 'ollama', SETTINGS_DEFAULTS.ollama);
-  const isLocal = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\/?/.test(url);
+  /** Diagnosis data never leaves this computer: the Ollama URL's host must be this machine (parsed, not a prefix). */
+  const isLocal = (url: string) => {
+    try {
+      const u = new URL(url);
+      return (
+        ['http:', 'https:'].includes(u.protocol) &&
+        !u.username &&
+        !u.password &&
+        ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)
+      );
+    } catch {
+      return false;
+    }
+  };
 
   app.get('/api/ai/status', async () => {
     const o = ollama();

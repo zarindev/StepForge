@@ -213,8 +213,14 @@ export async function send(
         : body
           ? '[multipart]'
           : undefined;
+  // Credentials StepForge built itself (Basic = base64 of the password, OAuth2 tokens fetched now) are not kept in
+  // the result: secret masking only knows the secret's own text.
+  const shownHeaders =
+    auth.type === 'basic' || auth.type === 'oauth2'
+      ? { ...headers, authorization: `${auth.type === 'basic' ? 'Basic' : 'Bearer'} ••••••` }
+      : headers;
   return {
-    request: { method, url, headers, ...(sentBody !== undefined && { body: sentBody }) },
+    request: { method, url, headers: shownHeaders, ...(sentBody !== undefined && { body: sentBody }) },
     response: {
       status: res.status,
       statusText: res.statusText,
