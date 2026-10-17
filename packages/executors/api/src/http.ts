@@ -119,6 +119,9 @@ function encodeBody(
     );
   }
   if (type === 'multipart') {
+    // fetch writes the multipart Content-Type with its boundary; a preset one (copied from cURL or Swagger UI) has
+    // no boundary, and the server could not read the body.
+    for (const k of Object.keys(headers)) if (k.toLowerCase() === 'content-type') delete headers[k];
     const fd = new FormData();
     for (const [k, v] of Object.entries(spec.body as Record<string, unknown>)) {
       if (v && typeof v === 'object' && 'file' in v) {
@@ -129,6 +132,46 @@ function encodeBody(
     return fd;
   }
   return String(spec.body);
+}
+
+/**
+ * fetch, following redirects itself: fetch hides the responses in between, so a session cookie set on a login's 302
+ * would be lost. Each hop's cookies go into the jar and are sent on the next hop; 301/302/303 after a POST continue
+ * as GET without the body (as browsers do), 307/308 repeat the request.
+ */
+async function fetchFollowing(
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: BodyInit; signal: AbortSignal },
+  follow: boolean,
+  jar: CookieJar | undefined,
+  cookieFor: (url: string) => string,
+): Promise<Response> {
+  let current = url;
+  let { method, body } = init;
+  const headers = { ...init.headers };
+  for (let hop = 0; ; hop++) {
+    const res = await fetch(current, { method, headers, body, redirect: 'manual', signal: init.signal });
+    const location = res.headers.get('location');
+    if (!follow || res.status < 300 || res.status >= 400 || !location || hop >= 20) return res;
+    const set = res.headers.getSetCookie?.() ?? [];
+    if (set.length) jar?.store(current, set);
+    await res.arrayBuffer().catch(() => undefined);
+    const nextUrl = new URL(location, current).toString();
+    if (
+      res.status === 303 ||
+      ((res.status === 301 || res.status === 302) && method !== 'GET' && method !== 'HEAD')
+    ) {
+      method = 'GET';
+      body = undefined;
+      for (const k of Object.keys(headers)) if (/^content-(type|length)$/i.test(k)) delete headers[k];
+    }
+    // Credentials stay with the site they were meant for.
+    if (new URL(nextUrl).origin !== new URL(current).origin) delete headers.authorization;
+    const cookie = cookieFor(nextUrl);
+    if (cookie) headers.cookie = cookie;
+    else delete headers.cookie;
+    current = nextUrl;
+  }
 }
 
 /** Sends one HTTP request with auth, cookies, timeout and cancellation; never throws on HTTP status. */
@@ -153,25 +196,26 @@ export async function send(
   }
   if (auth.type === 'oauth2') headers.authorization = `Bearer ${await oauthToken(auth, signal)}`;
   const url = resolveUrl(spec.url, opts.baseUrl, query);
-  const jarCookie = spec.cookies === false ? undefined : opts.jar?.header(url);
-  const cookieParts = [
-    headers.cookie,
-    jarCookie,
-    auth.type === 'cookie' ? `${auth.name}=${auth.value}` : undefined,
-  ].filter(Boolean);
-  if (cookieParts.length) headers.cookie = cookieParts.join('; ');
+  const jar = spec.cookies === false ? undefined : opts.jar;
+  // The step's own cookies (its Cookie header, cookie auth), sent on every hop together with the jar's.
+  const ownCookies = [headers.cookie, auth.type === 'cookie' ? `${auth.name}=${auth.value}` : undefined]
+    .filter(Boolean)
+    .join('; ');
+  const cookieFor = (u: string) => [ownCookies, jar?.header(u)].filter(Boolean).join('; ');
+  if (cookieFor(url)) headers.cookie = cookieFor(url);
+  else delete headers.cookie;
   const body = method === 'GET' || method === 'HEAD' ? undefined : encodeBody(spec, headers);
 
   const started = performance.now();
   let res: Response;
   try {
-    res = await fetch(url, {
-      method,
-      headers,
-      body,
-      redirect: spec.followRedirects === false ? 'manual' : 'follow',
-      signal,
-    });
+    res = await fetchFollowing(
+      url,
+      { method, headers, body, signal },
+      spec.followRedirects !== false,
+      opts.jar,
+      cookieFor,
+    );
   } catch (err) {
     const e = err as Error & { cause?: { code?: string; message?: string } };
     if (opts.signal?.aborted) throw new StepError('aborted', 'Run was cancelled');
@@ -189,7 +233,8 @@ export async function send(
   const resHeaders: Record<string, string> = {};
   res.headers.forEach((v, k) => (resHeaders[k] = v));
   const setCookies = res.headers.getSetCookie?.() ?? [];
-  if (setCookies.length) opts.jar?.store(url, setCookies);
+  // The last hop set these (after redirects that is not the URL first asked for).
+  if (setCookies.length) opts.jar?.store(res.url || url, setCookies);
   const text = buf.toString('utf8');
   let parsed: unknown = text;
   if (/json/i.test(resHeaders['content-type'] ?? '') || /^\s*[[{]/.test(text)) {

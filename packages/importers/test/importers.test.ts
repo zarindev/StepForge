@@ -94,12 +94,106 @@ describe('OpenAPI importer', () => {
     ).toEqual({ d: '2026-01-15', n: 5 });
   });
 
+  it('Swagger 2 bodies and schemas are used; a 2XX key checks any 2xx status', async () => {
+    const plan = await importOpenApi(
+      {
+        swagger: '2.0',
+        info: { title: 'Pets', version: '1' },
+        paths: {
+          '/pets': {
+            post: {
+              parameters: [
+                {
+                  name: 'pet',
+                  in: 'body',
+                  required: true,
+                  schema: {
+                    type: 'object',
+                    required: ['name'],
+                    properties: { name: { type: 'string', example: 'Rex' } },
+                  },
+                },
+              ],
+              responses: {
+                '201': {
+                  description: 'ok',
+                  schema: { type: 'object', properties: { id: { type: 'integer' } } },
+                },
+              },
+            },
+          },
+          '/health': { get: { responses: { '2XX': { description: 'ok' } } } },
+        },
+      },
+      { negative: false },
+    );
+    const all = plan.root.children!.flatMap((m) => m.scenarios.map((x) => x.steps.at(-1)!));
+    const create = all.find((x) => (x.params as { method?: string }).method === 'POST')!;
+    expect(create.params).toMatchObject({ body: { name: 'Rex' } });
+    expect(create.assertions).toContainEqual(
+      expect.objectContaining({ target: 'body', operator: 'matchesSchema' }),
+    );
+    const health = all.find((x) => String((x.params as { url?: string }).url).endsWith('/health'))!;
+    expect(health.assertions).toContainEqual({ target: 'status', operator: 'inRange', expected: [200, 299] });
+  });
+
   it('rejects invalid documents', async () => {
     await expect(importOpenApi({ openapi: '3.0.0' })).rejects.toThrow();
   });
 });
 
 describe('Postman importer', () => {
+  it('keeps folder auth, sends unparsable JSON bodies as JSON, and survives GraphQL placeholders', () => {
+    const plan = importPostman({
+      info: { name: 'Api', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+      item: [
+        {
+          name: 'Admin',
+          auth: {
+            type: 'apikey',
+            apikey: [
+              { key: 'key', value: 'x-admin' },
+              { key: 'value', value: '{{adminKey}}' },
+            ],
+          },
+          item: [
+            {
+              name: 'Update',
+              request: {
+                method: 'PUT',
+                url: '{{baseUrl}}/users/1',
+                body: { mode: 'raw', raw: '{"id": {{userId}}}', options: { raw: { language: 'json' } } },
+              },
+            },
+            {
+              name: 'Query',
+              request: {
+                method: 'POST',
+                url: '{{baseUrl}}/graphql',
+                body: {
+                  mode: 'graphql',
+                  graphql: {
+                    query: 'query($id: ID!) { user(id: $id) { name } }',
+                    variables: '{"id": {{id}}}',
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const [update, query] = plan.root.children![0]!.scenarios.map((s) => s.steps[0]!);
+    expect(update!.params).toMatchObject({
+      body: '{"id": {{env.userId}}}',
+      bodyType: 'raw',
+      headers: { 'content-type': 'application/json' },
+      auth: { type: 'apiKey', name: 'x-admin', value: '{{env.adminKey}}' },
+    });
+    expect(query!.params).toMatchObject({ variables: { id: '{{env.id}}' }, auth: { type: 'apiKey' } });
+    expect(plan.warnings.join(' ')).toContain('GraphQL variables with bare {{placeholders}}');
+  });
+
   it('maps folders, variables, auth, bodies and simple test scripts', () => {
     const plan = importPostman({
       info: { name: 'Shop', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
@@ -181,6 +275,11 @@ describe('cURL importer', () => {
     expect(importCurl('curl https://h.test/f -F name=a -F doc=@/tmp/a.pdf').params).toMatchObject({
       bodyType: 'multipart',
       body: { name: 'a', doc: { file: '/tmp/a.pdf' } },
+    });
+    expect(
+      importCurl("curl https://h.test/f -F 'img=@/tmp/x.png;type=image/png;filename=y.png'").params,
+    ).toMatchObject({
+      body: { img: { file: '/tmp/x.png' } },
     });
     expect(importCurl('curl https://h.test/l -d "a=1&b=two"').params).toMatchObject({
       method: 'POST',

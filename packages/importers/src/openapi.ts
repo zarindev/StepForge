@@ -83,9 +83,79 @@ export function parseSpecText(text: string): unknown {
 /** Validates and fully dereferences an OpenAPI 3 / Swagger 2 document (circular refs left as-is). */
 export async function loadOpenApi(input: unknown): Promise<OpenApiDoc> {
   const doc = typeof input === 'string' ? parseSpecText(input) : structuredClone(input);
-  return (await SwaggerParser.dereference(doc as never, {
+  const out = (await SwaggerParser.dereference(doc as never, {
     dereference: { circular: 'ignore' },
   })) as OpenApiDoc;
+  if (String(out.swagger ?? '').startsWith('2')) upgradeSwagger2(out);
+  return out;
+}
+
+/**
+ * Swagger 2 keeps the request body in `in: body` / `in: formData` parameters and the response schema in
+ * `responses[x].schema`: moved into OpenAPI 3's `requestBody` and `content`, so imports send a body and check the
+ * schema, and contract checks find it.
+ */
+function upgradeSwagger2(doc: OpenApiDoc): void {
+  const root = doc as OpenApiDoc & { consumes?: string[]; produces?: string[] };
+  for (const item of Object.values(doc.paths ?? {})) {
+    const shared = ((item as { parameters?: Parameter[] }).parameters ?? []) as (Parameter & {
+      type?: string;
+    })[];
+    for (const method of METHODS) {
+      const op = item[method] as (Operation & { consumes?: string[]; produces?: string[] }) | undefined;
+      if (!op) continue;
+      const params = [...shared, ...(op.parameters ?? [])] as (Parameter & {
+        type?: string;
+        format?: string;
+      })[];
+      const body = params.find((p) => p.in === 'body');
+      const form = params.filter((p) => p.in === 'formData');
+      if (body && !op.requestBody)
+        op.requestBody = {
+          required: body.required,
+          content: { 'application/json': { schema: body.schema } },
+        };
+      else if (form.length && !op.requestBody) {
+        const consumes = op.consumes ?? root.consumes ?? [];
+        const type =
+          form.some((p) => p.type === 'file') || consumes.includes('multipart/form-data')
+            ? 'multipart/form-data'
+            : 'application/x-www-form-urlencoded';
+        op.requestBody = {
+          content: {
+            [type]: {
+              schema: {
+                type: 'object',
+                properties: Object.fromEntries(
+                  form.map((p) => [
+                    p.name,
+                    p.schema ?? { type: p.type === 'file' ? 'string' : p.type, format: p.format },
+                  ]),
+                ),
+                required: form.filter((p) => p.required).map((p) => p.name),
+              } as Schema,
+            },
+          },
+        };
+      }
+      op.parameters = (op.parameters ?? []).filter((p) => p.in !== 'body' && p.in !== 'formData');
+      for (const res of Object.values(op.responses ?? {}) as {
+        schema?: Schema;
+        examples?: Record<string, unknown>;
+        content?: Record<string, MediaType>;
+      }[]) {
+        if (res.schema && !res.content) {
+          const example = res.examples?.['application/json'];
+          res.content = {
+            'application/json': {
+              schema: res.schema,
+              ...(example !== undefined && { example }),
+            } as MediaType,
+          };
+        }
+      }
+    }
+  }
 }
 
 export function listOperations(doc: OpenApiDoc): OpenApiOperation[] {
@@ -338,8 +408,11 @@ export async function importOpenApi(input: unknown, opts: OpenApiOptions = {}): 
       const bodySchema = merged(media?.schema);
       const exampleBody = op.requestBody ? secretize(mediaExample(media), needed) : undefined;
       const okEntry = Object.entries(op.responses ?? {}).find(([c]) => /^2/.test(c));
-      const okStatus = okEntry ? Number(okEntry[0]) : 200;
-      const okSchema = jsonMedia(okEntry?.[1].content)?.schema;
+      // "201" is checked exactly; a range key ("2XX") as any 2xx status.
+      const okStatus = okEntry && /^\d{3}$/.test(okEntry[0]) ? Number(okEntry[0]) : okEntry ? null : 200;
+      const okSchemaRaw = jsonMedia(okEntry?.[1].content)?.schema;
+      // A recursive schema keeps its $refs (they cannot be inlined): checking against it would always fail.
+      const okSchema = okSchemaRaw && selfContained(okSchemaRaw) ? okSchemaRaw : undefined;
 
       const steps = (
         request: Record<string, unknown>,
@@ -380,7 +453,9 @@ export async function importOpenApi(input: unknown, opts: OpenApiOptions = {}): 
           priority: M === 'GET' ? 'P2' : 'P1',
           tags: ['api', 'happy-path', ...(M === 'DELETE' ? ['destructive'] : [])],
           steps: steps(base, [
-            { target: 'status', operator: 'equals', expected: okStatus },
+            okStatus === null
+              ? { target: 'status', operator: 'inRange' as const, expected: [200, 299] }
+              : { target: 'status', operator: 'equals' as const, expected: okStatus },
             ...(okSchema ? [{ target: 'body', operator: 'matchesSchema' as const, expected: okSchema }] : []),
             { target: 'time', operator: 'lt', expected: timeMs },
           ]),
@@ -519,6 +594,15 @@ export function matchOperation(
 }
 
 /** Expected response definition for a status ("201", then "2XX", then "default"). */
+/** True when a schema has no $ref left (and no cycle): it can be checked on its own. */
+function selfContained(schema: Schema): boolean {
+  try {
+    return !JSON.stringify(schema).includes('"$ref"');
+  } catch {
+    return false;
+  }
+}
+
 export function responseFor(op: Operation, status: number) {
   const r = op.responses ?? {};
   return r[String(status)] ?? r[`${String(status)[0]}XX`] ?? r.default;

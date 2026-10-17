@@ -67,7 +67,8 @@ export function importCurl(cmd: string): PlannedStep {
       const f = next();
       const idx = f.indexOf('=');
       const v = f.slice(idx + 1);
-      form[f.slice(0, idx)] = v.startsWith('@') ? { file: v.slice(1) } : v;
+      // "file=@photo.png;type=image/png;filename=x.png": the path is what comes before the first ";".
+      form[f.slice(0, idx)] = v.startsWith('@') ? { file: v.slice(1).split(';')[0]!.trim() } : v;
     } else if (a === '-u' || a === '--user') {
       const [username, ...rest] = next().split(':');
       auth = { type: 'basic', username: username ?? '', password: rest.join(':') };

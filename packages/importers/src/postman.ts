@@ -21,6 +21,8 @@ type PmRequest = {
 type PmItem = {
   name: string;
   item?: PmItem[];
+  /** A folder's own auth, inherited by its requests ("inherit auth from parent"). */
+  auth?: PmAuth;
   request?: PmRequest | string;
   event?: { listen: string; script?: { exec?: string[] | string } }[];
 };
@@ -94,6 +96,27 @@ function authParams(auth: PmAuth | undefined): Record<string, unknown> | undefin
   return undefined;
 }
 
+/**
+ * GraphQL variables as an object. Bare placeholders ({"id": {{id}}}) are not JSON: they are quoted so the request
+ * imports (the value is then sent as text), with a warning; anything else unreadable is left out with a warning.
+ */
+function graphqlVariables(text: string, name: string, warnings: string[]): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    try {
+      const quoted = JSON.parse(text.replace(/(?<!["\w])(\{\{\s*[\w.-]+\s*\}\})(?!["\w])/g, '"$1"'));
+      warnings.push(
+        `"${name}": GraphQL variables with bare {{placeholders}} are sent as text; check their types`,
+      );
+      return quoted;
+    } catch {
+      warnings.push(`"${name}": its GraphQL variables are not valid JSON and were left out`);
+      return undefined;
+    }
+  }
+}
+
 /** Imports a Postman v2.0/v2.1 collection: folders → modules, requests → API scenarios. */
 export function importPostman(input: unknown): ImportPlan {
   const col = (typeof input === 'string' ? JSON.parse(input) : input) as Collection;
@@ -107,7 +130,7 @@ export function importPostman(input: unknown): ImportPlan {
     const mod: PlannedModule = { name, scenarios: [], children: [] };
     for (const it of items) {
       if (it.item) {
-        mod.children!.push(walk(it.item, it.name, inherited));
+        mod.children!.push(walk(it.item, it.name, it.auth ?? inherited));
         continue;
       }
       const req: PmRequest = typeof it.request === 'string' ? { url: it.request } : (it.request ?? {});
@@ -122,8 +145,12 @@ export function importPostman(input: unknown): ImportPlan {
           body = JSON.parse(b.raw);
           bodyType = 'json';
         } catch {
+          // Usually JSON with bare placeholders ({"id": {{userId}}}): sent as the text, filled in at run time —
+          // still as JSON when Postman marked it so (its exports leave out the automatic Content-Type header).
           body = b.raw;
           bodyType = 'raw';
+          if (b.options?.raw?.language === 'json' && !headers['content-type'])
+            headers['content-type'] = 'application/json';
         }
       } else if (b?.mode === 'urlencoded') {
         body = Object.fromEntries(
@@ -148,7 +175,9 @@ export function importPostman(input: unknown): ImportPlan {
               {
                 url: urlOf(req.url),
                 query: b?.graphql?.query ?? '',
-                ...(b?.graphql?.variables ? { variables: JSON.parse(b.graphql.variables) } : {}),
+                ...(b?.graphql?.variables
+                  ? { variables: graphqlVariables(b.graphql.variables, it.name, warnings) }
+                  : {}),
                 headers,
                 ...(authParams(req.auth ?? inherited) && { auth: authParams(req.auth ?? inherited) }),
               },

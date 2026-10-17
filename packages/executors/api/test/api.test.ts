@@ -38,6 +38,11 @@ beforeAll(async () => {
       });
     if (url.pathname === '/form')
       return json(200, { raw: await body(req), type: req.headers['content-type'] });
+    // A form login that answers 302 with the session cookie, then the page it redirects to.
+    if (url.pathname === '/login-redirect')
+      return res.writeHead(302, { location: '/home', 'set-cookie': 'sid=s3ss10n; Path=/; HttpOnly' }).end();
+    if (url.pathname === '/home')
+      return json(200, { method: req.method, cookie: req.headers.cookie ?? null });
     if (url.pathname === '/login')
       return json(200, { ok: true }, { 'set-cookie': 'sid=s3ss10n; Path=/; HttpOnly' });
     if (url.pathname === '/me')
@@ -206,6 +211,45 @@ describe('API executor', () => {
     expect(headersOf(3)).toBe('Basic ••••••');
     expect(headersOf(4)).toBe('Bearer ••••••');
     expect(JSON.stringify(r.steps)).not.toContain(Buffer.from('ana:pw').toString('base64'));
+  });
+
+  it('a session cookie set on a redirect is kept; a POST redirected with 302 continues as GET', async () => {
+    const r = await run(
+      steps(
+        {
+          type: 'api.request',
+          params: { method: 'POST', url: '/login-redirect', body: { u: 'ana' } },
+          assertions: [
+            { target: 'status', operator: 'equals', expected: 200 },
+            { target: '$.method', operator: 'equals', expected: 'GET' },
+            { target: '$.cookie', operator: 'contains', expected: 'sid=s3ss10n' },
+          ],
+        },
+        {
+          type: 'api.request',
+          params: { url: '/me' },
+          assertions: [{ target: '$.user', operator: 'equals', expected: 'ana' }],
+        },
+      ),
+    );
+    expect(fails(r)).toEqual([]);
+  });
+
+  it('a multipart body gets its boundary even when the step already names multipart/form-data', async () => {
+    const r = await run(
+      steps({
+        type: 'api.request',
+        params: {
+          method: 'POST',
+          url: '/form',
+          headers: { 'Content-Type': 'multipart/form-data' },
+          bodyType: 'multipart',
+          body: { name: 'Ana' },
+        },
+        assertions: [{ target: '$.type', operator: 'matches', expected: '^multipart/form-data; boundary=' }],
+      }),
+    );
+    expect(fails(r)).toEqual([]);
   });
 
   it('GraphQL: data passes, errors fail by default; api.extract reads the last response', async () => {
