@@ -58,6 +58,12 @@ function itemTitle(i: RunItem) {
 
 export function RunDetailPage() {
   const { runId } = useParams({ from: '/runs/$runId' });
+  // Keyed by run: "Run again" and links between runs stay on this route, and the selected item,
+  // filter, live steps and logs of the previous run must not carry over.
+  return <RunDetail key={runId} runId={runId} />;
+}
+
+function RunDetail({ runId }: { runId: string }) {
   const run = useRun(runId);
   const { item: linkedItem } = useSearch({ from: '/runs/$runId' });
   const [selected, setSelected] = useState<string | null>(linkedItem ?? null);

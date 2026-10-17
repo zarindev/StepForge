@@ -321,7 +321,7 @@ export function AnalyticsPage() {
         <h1 className="mr-auto text-xl font-semibold tracking-tight">Analytics — {app.data?.name}</h1>
         <Select
           aria-label="Period"
-          className="w-36"
+          className="w-44"
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
         >

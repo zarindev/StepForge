@@ -75,8 +75,12 @@ function ScheduleEditor({
   const qc = useQueryClient();
   const apps = useApplications();
   const [d, setD] = useState<Draft & { id?: string }>();
+  const [customMode, setCustomMode] = useState(false);
   useEffect(() => {
-    if (open && initial) setD(initial);
+    if (!open || !initial) return;
+    setD(initial);
+    // From the schedule being opened, not the previous draft (state updates land after this effect).
+    setCustomMode(!CRON_PRESETS.some((p) => p.cron === initial.cron));
   }, [open, initial]);
   const envs = useEnvironments(d?.applicationId);
   const tags = useTags(d?.applicationId);
@@ -87,9 +91,6 @@ function ScheduleEditor({
     enabled: !!d?.applicationId,
   });
   const channels = useChannels();
-  const custom = d ? !CRON_PRESETS.some((p) => p.cron === d.cron) : false;
-  const [customMode, setCustomMode] = useState(false);
-  useEffect(() => setCustomMode(custom), [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Default to the first environment once the application's environments load.
   useEffect(() => {

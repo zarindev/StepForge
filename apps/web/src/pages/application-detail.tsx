@@ -38,11 +38,14 @@ export function ApplicationDetailPage() {
   const { appId } = useParams({ from: '/applications/$appId' });
   const search = useSearch({ from: '/applications/$appId' });
   const app = useApplication(appId);
-  const [tab, setTab] = useState<Tab>(search.tab ?? 'environments');
+  const navigate = useNavigate();
+  // The tab lives in the URL: links such as "Edit element" or a block's usage change ?tab= on this page.
+  const tab: Tab = search.tab ?? 'environments';
+  const setTab = (t: Tab) =>
+    navigate({ to: '/applications/$appId', params: { appId }, search: (p) => ({ ...p, tab: t }) });
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const refresh = () => qc.invalidateQueries({ queryKey: qk.applications });
 
   const update = useMutation({
@@ -115,7 +118,13 @@ export function ApplicationDetailPage() {
           {a.description && <p className="mt-1.5 max-w-2xl text-sm text-muted">{a.description}</p>}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setEditing(true)}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              update.reset(); // the dialog opens without the error of an earlier attempt
+              setEditing(true);
+            }}
+          >
             <Pencil className="h-4 w-4" /> Edit
           </Button>
           <Link to="/applications/$appId/analytics" params={{ appId: a.id }}>
@@ -174,8 +183,8 @@ export function ApplicationDetailPage() {
       {tab === 'connections' && <ConnectionsTab app={a} />}
       {tab === 'inboxes' && <InboxesTab app={a} />}
       {tab === 'tags' && <TagsTab app={a} />}
-      {tab === 'blocks' && <BlocksTab app={a} initialBlock={search.block} />}
-      {tab === 'elements' && <ElementsTab app={a} initialElement={search.element} />}
+      {tab === 'blocks' && <BlocksTab key={search.block} app={a} initialBlock={search.block} />}
+      {tab === 'elements' && <ElementsTab key={search.element} app={a} initialElement={search.element} />}
       {tab === 'data' && <DataTab app={a} />}
       {tab === 'settings' && (
         <div className="max-w-2xl space-y-4">
@@ -208,7 +217,10 @@ export function ApplicationDetailPage() {
         <AppFormDialog
           open
           initial={a}
-          onClose={() => setEditing(false)}
+          onClose={() => {
+            setEditing(false);
+            update.reset();
+          }}
           onSubmit={(v) => update.mutate(v)}
           busy={update.isPending}
           error={(update.error as Error | null)?.message}

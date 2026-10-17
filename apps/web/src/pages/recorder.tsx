@@ -120,9 +120,12 @@ function StartPanel() {
   const [envId, setEnvId] = useState('');
   const [path, setPath] = useState('/');
   const qc = useQueryClient();
+  // After an app switch the old app's environment would be rejected by the server: pick one of this app's.
+  const envValid = !!envs.data?.some((e) => e.id === envId);
   useEffect(() => {
-    if (!envId && envs.data?.length) setEnvId((envs.data.find((e) => !e.isProduction) ?? envs.data[0]!).id);
-  }, [envs.data, envId]);
+    if (envs.data && !envValid)
+      setEnvId(envs.data.length ? (envs.data.find((e) => !e.isProduction) ?? envs.data[0]!).id : '');
+  }, [envs.data, envValid]);
   const start = useMutation({
     mutationFn: () =>
       api<Recording>('/api/recorder/start', {
@@ -211,7 +214,7 @@ function StartPanel() {
           <Button
             data-tour="recorder-button"
             disabled={
-              !envId ||
+              !envValid ||
               start.isPending ||
               app?.platform === 'macos' ||
               app?.platform === 'windows' ||

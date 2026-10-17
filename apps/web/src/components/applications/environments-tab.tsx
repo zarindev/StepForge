@@ -150,6 +150,11 @@ export function EnvironmentsTab({ app }: { app: Application }) {
       setEditing(null);
     },
   });
+  // Opening or closing the dialog drops the error of an earlier attempt.
+  const edit = (e: Environment | 'new' | null) => {
+    save.reset();
+    setEditing(e);
+  };
   const remove = useMutation({
     mutationFn: ({ env, confirm }: { env: Environment; confirm: string }) =>
       api(`/api/environments/${env.id}`, { method: 'DELETE', json: { confirm } }),
@@ -175,7 +180,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
         <p className="text-sm text-muted">
           Where tests run. Use {'{{env.baseUrl}}'} and {'{{env.<variable>}}'} in steps.
         </p>
-        <Button size="sm" onClick={() => setEditing('new')}>
+        <Button size="sm" onClick={() => edit('new')}>
           <Plus className="h-3.5 w-3.5" /> Add environment
         </Button>
       </div>
@@ -184,7 +189,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
           icon={Globe}
           title="No environments"
           description="Add at least one environment (for example Local at http://localhost:3000) so scenarios know where to run."
-          action={<Button onClick={() => setEditing('new')}>Add environment</Button>}
+          action={<Button onClick={() => edit('new')}>Add environment</Button>}
         />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
@@ -230,7 +235,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
                     </Button>
                   )}
                   items={[
-                    { label: 'Edit', icon: Pencil, onSelect: () => setEditing(env) },
+                    { label: 'Edit', icon: Pencil, onSelect: () => edit(env) },
                     { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setDeleting(env) },
                   ]}
                 />
@@ -251,7 +256,7 @@ export function EnvironmentsTab({ app }: { app: Application }) {
               ? app.platform
               : undefined
           }
-          onClose={() => setEditing(null)}
+          onClose={() => edit(null)}
           onSubmit={(f) => save.mutate(f)}
           busy={save.isPending}
           error={save.error?.message}

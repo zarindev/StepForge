@@ -11,7 +11,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ImportDialog } from '@/components/api/import-dialog';
 import { BulkBar, type BulkAction } from '@/components/explorer/bulk-bar';
 import { openRunDialog } from '@/components/runs/run-dialog';
@@ -70,9 +70,35 @@ export function ExplorerPage() {
   const selectedId = inTree ? search.scenario! : null;
   // Deep links (run results, search, bookmarks) may point into another application: switch to it.
   const linked = useScenario(search.scenario && tree.data && !inTree ? search.scenario : null);
+  // ?scenario only counts as a deep link until the user picks another application in the switcher,
+  // otherwise the old app's scenario would switch straight back to the old app.
+  const followLink = useRef(true);
+  const linkTarget = useRef<string | null>(null);
+  const lastApp = useRef(app?.id);
   useEffect(() => {
-    if (linked.data && app && linked.data.applicationId !== app.id)
+    if (search.scenario) followLink.current = true;
+  }, [search.scenario]);
+  useEffect(() => {
+    const prev = lastApp.current;
+    lastApp.current = app?.id;
+    if (!prev || !app || prev === app.id) return;
+    if (linkTarget.current === app.id) {
+      linkTarget.current = null;
+      return;
+    }
+    // A switch by the user: the old app's selection, checked ids and tag filter mean nothing here.
+    followLink.current = false;
+    setChecked(new Set());
+    setFilters((f) => (f.tagId ? { ...f, tagId: '' } : f));
+    if (search.scenario)
+      navigate({ search: (p) => ({ ...p, scenario: undefined, tab: undefined }), replace: true });
+  }, [app?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!followLink.current) return;
+    if (linked.data && app && linked.data.applicationId !== app.id) {
+      linkTarget.current = linked.data.applicationId;
       setCurrentAppId(linked.data.applicationId);
+    }
   }, [linked.data, app]);
   const select = (id: string | null, tab?: PanelTab) =>
     navigate({

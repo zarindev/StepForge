@@ -29,6 +29,11 @@ export function SecretsTab({ app }: { app: Application }) {
       toast('Secret saved (encrypted)');
     },
   });
+  // Opening or closing the dialog drops the error of an earlier attempt.
+  const add = (s: { key: string; value: string } | null) => {
+    save.reset();
+    setAdding(s);
+  };
   const remove = useMutation({
     mutationFn: (id: string) => api(`/api/secrets/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.secrets(activeEnv!.id) }),
@@ -66,7 +71,7 @@ export function SecretsTab({ app }: { app: Application }) {
               </option>
             ))}
           </Select>
-          <Button size="sm" onClick={() => setAdding({ key: '', value: '' })}>
+          <Button size="sm" onClick={() => add({ key: '', value: '' })}>
             <Plus className="h-3.5 w-3.5" /> Add secret
           </Button>
         </div>
@@ -88,7 +93,7 @@ export function SecretsTab({ app }: { app: Application }) {
                 <span className="font-mono text-sm">{s.key}</span>
                 <span className="font-mono text-sm tracking-widest text-muted">••••••••</span>
                 <code className="ml-auto text-xs text-muted">{`{{secret.${s.key}}}`}</code>
-                <Button variant="ghost" size="sm" onClick={() => setAdding({ key: s.key, value: '' })}>
+                <Button variant="ghost" size="sm" onClick={() => add({ key: s.key, value: '' })}>
                   Replace
                 </Button>
                 <Button
@@ -107,11 +112,11 @@ export function SecretsTab({ app }: { app: Application }) {
       {adding && (
         <Dialog
           open
-          onClose={() => setAdding(null)}
+          onClose={() => add(null)}
           title={`Secret for ${activeEnv.name}`}
           footer={
             <>
-              <Button variant="ghost" onClick={() => setAdding(null)}>
+              <Button variant="ghost" onClick={() => add(null)}>
                 Cancel
               </Button>
               <Button

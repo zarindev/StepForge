@@ -12,7 +12,7 @@ import { Menu } from '@/components/ui/menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/states';
 import { toast, toastError } from '@/components/ui/toast';
-import { api, artifactUrl, download, sessionToken } from '@/lib/api';
+import { api, artifactUrl, download } from '@/lib/api';
 import { setCurrentAppId } from '@/lib/current-app';
 import { useCurrentApp } from '@/lib/queries';
 import type { Bug, BugDetail, BugSeverity, BugStatus, Owner } from '@/lib/types';
@@ -49,11 +49,13 @@ function BugDetailView({ id, onDeleted }: { id: string; onDeleted: () => void })
     onError: toastError,
   });
   const copyMarkdown = async () => {
-    const res = await fetch(`/api/bugs/${id}/export?format=md`, {
-      headers: { 'x-stepforge-token': sessionToken() },
-    });
-    await navigator.clipboard.writeText(await res.text());
-    toast('Markdown copied — paste it into a GitHub issue');
+    // api() throws on an error status, so an error body never lands on the clipboard as a bug report.
+    try {
+      await navigator.clipboard.writeText(await api<string>(`/api/bugs/${id}/export?format=md`));
+      toast('Markdown copied — paste it into a GitHub issue');
+    } catch (err) {
+      toastError(err);
+    }
   };
 
   if (bug.isPending) return <Skeleton className="h-96" />;
@@ -262,8 +264,16 @@ export function BugsPage() {
         description="Bugs are filed automatically when tests fail."
       />
     );
+  // Exactly the bugs on screen: the export route filters by status only, so severity and owner
+  // filters travel as the visible ids.
   const exportList = (format: string) =>
-    download(`/api/applications/${app.id}/bugs/export?format=${format}${status ? `&status=${status}` : ''}`);
+    download(
+      `/api/applications/${app.id}/bugs/export?${new URLSearchParams({
+        format,
+        ...(status && { status }),
+        ids: (bugs.data ?? []).map((b) => b.id).join(','),
+      })}`,
+    );
 
   return (
     <div className="space-y-4">

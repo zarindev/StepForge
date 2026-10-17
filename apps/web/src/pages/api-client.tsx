@@ -132,9 +132,18 @@ export function ApiClientPage() {
   const [importing, setImporting] = useState<{ specId?: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const qc = useQueryClient();
+  // Only an environment of the current application counts: after an app switch the old id would send
+  // the request to the other app's environment and secrets.
+  const envValid = !!envs.data?.some((e) => e.id === envId);
   useEffect(() => {
-    if (!envId && envs.data?.length) setEnvId((envs.data.find((e) => !e.isProduction) ?? envs.data[0]!).id);
-  }, [envs.data, envId]);
+    if (envs.data && !envValid)
+      setEnvId(envs.data.length ? (envs.data.find((e) => !e.isProduction) ?? envs.data[0]!).id : '');
+  }, [envs.data, envValid]);
+  // A scenario loaded from the previous application must not be updated from this one.
+  useEffect(() => {
+    setLoaded(null);
+    setResult(null);
+  }, [app?.id]);
   const set = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }));
 
   const apiScenarios = useMemo(() => {
@@ -147,6 +156,7 @@ export function ApiClientPage() {
 
   const sendReq = useMutation({
     mutationFn: () => {
+      if (!envValid) throw new Error('Choose an environment of this application');
       let request;
       try {
         request = toRequest(draft);
@@ -314,7 +324,7 @@ export function ApiClientPage() {
                   </option>
                 ))}
               </Select>
-              <Button disabled={!envId || sendReq.isPending} onClick={() => sendReq.mutate()}>
+              <Button disabled={!envValid || sendReq.isPending} onClick={() => sendReq.mutate()}>
                 <Send className="h-4 w-4" /> {sendReq.isPending ? 'Sending…' : 'Send'}
               </Button>
             </div>

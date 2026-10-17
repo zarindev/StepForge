@@ -106,6 +106,8 @@ export function SqlWorkbenchPage() {
     if (!conn) return;
     setSql(readDrafts()[conn.id] ?? starter(conn));
     setResult(null);
+    setConfirming(null);
+    run.reset(); // the previous connection's error does not belong to this one
   }, [conn?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Schema-aware autocomplete for the active connection.

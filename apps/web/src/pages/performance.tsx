@@ -277,6 +277,11 @@ function LoadDesigner({ app, env, info }: { app: Application; env: Environment; 
             if (r.report) setReport(r.report);
             if (r.error) setError(r.error);
           },
+          (err: Error) => {
+            // The test is over either way: do not leave the designer showing it as running.
+            setLoadId(null);
+            toast(`Could not load the load test report: ${err.message}`, 'error');
+          },
         );
     },
     [loadId],
@@ -752,14 +757,12 @@ export function PerformancePage() {
           { value: 'lighthouse', label: 'Lighthouse' },
         ]}
       />
-      {tab === 'load' ? (
-        <>
-          <AuthorizationGate app={app} info={info.data} />
-          <LoadDesigner key={`${app.id}-${env.id}`} app={app} env={env} info={info.data} />
-        </>
-      ) : (
-        <LighthousePanel env={env} info={info.data} />
-      )}
+      {/* Hidden, not unmounted: a running load test and its live chart survive a look at Lighthouse. */}
+      <div hidden={tab !== 'load'}>
+        <AuthorizationGate app={app} info={info.data} />
+        <LoadDesigner key={`${app.id}-${env.id}`} app={app} env={env} info={info.data} />
+      </div>
+      {tab === 'lighthouse' && <LighthousePanel env={env} info={info.data} />}
     </div>
   );
 }
