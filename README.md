@@ -47,7 +47,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 - [Safety and responsible use](#safety-and-responsible-use)
 - [Troubleshooting](#troubleshooting)
 - [Documentation](#documentation)
-- [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
+- [Roadmap](#roadmap) · [Contributing](#contributing) · [Support StepForge](#support-stepforge) · [License](#license)
 
 **New to StepForge?** [Everything StepForge does](docs/FEATURES.md) lists every feature in one page.
 
@@ -534,6 +534,18 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md); the build history is in
 [docs/PROGRESS.md](docs/PROGRESS.md) and the design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Support StepForge
+
+StepForge is free and open source, and it will stay that way: no paid tier, no account, no cloud. If it saves you or
+your team time, you can support its development:
+
+<p>
+  <a href="https://github.com/sponsors/zarindev"><img alt="Sponsor on GitHub" src="https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" /></a>
+  <a href="https://buymeacoffee.com/zarindev"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" /></a>
+</p>
+
+Not able to give? A star on GitHub, a bug report or telling a colleague helps just as much.
+
 ## License
 
 [MIT](LICENSE) © Md Zarin Tasnim
@@ -546,5 +558,6 @@ Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.
   <p>
     <a href="https://www.upwork.com/freelancers/~01b847509724f9e1ff"><img alt="Hire me on Upwork" src="https://img.shields.io/badge/Hire%20me-Upwork-6FDA44?style=for-the-badge&logo=upwork&logoColor=white" /></a>
     <a href="https://github.com/zarindev"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-follow-181717?style=for-the-badge&logo=github&logoColor=white" /></a>
+    <a href="https://buymeacoffee.com/zarindev"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" /></a>
   </p>
 </div>
