@@ -158,7 +158,8 @@ Vitest, Playwright E2E, ESLint, Prettier and GitHub Actions for quality.
 
 ## 7. What I'd do next
 
-- A desktop installer (Electron) so non-developers can start StepForge with a double-click.
+- A desktop installer (Electron) so non-developers can start StepForge with a double-click — since done: installers for
+  macOS, Windows and Linux.
 - More diagnosis rules for pages with several simultaneous failures, like the CC-UI-01 miss above.
 - Running the exported Cypress and Selenium projects in CI too, as the Playwright export already is.
 

@@ -142,8 +142,8 @@ Planned work, in order — all of it free, open source and local:
 | ✅ | **Windows and macOS desktop apps** | Done — see [macOS and Windows apps](docs/NATIVE_DESKTOP_APPS.md) |
 | ✅ | **Linux desktop apps and image locators** | Done — see [Linux apps](docs/NATIVE_DESKTOP_APPS.md#linux-apps) and [Image locators](docs/IMAGE_LOCATORS.md) |
 | ✅ | **Native export and CI** | Done — see [Code export](docs/CODEGEN.md#phone-and-desktop-apps-appium-maestro) |
+| ✅ | **Desktop installer** | Done — StepForge as a desktop app for macOS, Windows and Linux: see [Desktop app](docs/STEPFORGE_DESKTOP.md) |
 | — | **More code export** | The newest steps (page conditions, network, SOAP / Kafka / FTP) exported instead of marked TODO |
-| — | **Desktop installer** | Start StepForge with a double-click instead of a terminal |
 
 The native-app work is planned in detail in [docs/NATIVE_APPS_PLAN.md](docs/NATIVE_APPS_PLAN.md).
 
@@ -563,6 +563,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] macOS and Windows desktop apps (menus, shortcuts, dialogs)
 - [x] Image locators (find elements by a picture, on every platform)
 - [x] Linux desktop apps (GTK, Qt)
+- [x] StepForge as a desktop app: installers for macOS, Windows and Linux
 - [ ] Next: see [Coming next](#coming-next)
 
 ## Contributing

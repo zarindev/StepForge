@@ -36,4 +36,4 @@ Status of every item, with the evidence. ✅ verified · 🟡 verified in part (
   `docs/assets/clips/`) and set the GitHub social preview to `docs/case-study/export/social/github-social-preview.png`.
 - Fill in the Upwork portfolio from `docs/case-study/UPWORK_LISTING.md` (the GitHub and Upwork links are already in
   the README, the case study and its last slide).
-- Optional: an Electron desktop installer (not built; KNOWN_ISSUES #64).
+- Optional: an Electron desktop installer — built since: installers for macOS, Windows and Linux (docs/STEPFORGE_DESKTOP.md).
