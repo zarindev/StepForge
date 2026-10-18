@@ -2,6 +2,8 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+![StepForge in its own window](assets/screenshots/new/desktop-app.png)
+
 StepForge can run in its own window instead of a browser tab. It is the same StepForge: the same local server, the
 same dashboard and the same data folder, so tests, runs and settings are shared with `npm start` and the CLI.
 
@@ -23,6 +25,8 @@ Nothing else to install: the app brings its own runtime. On Linux, UI tests also
 (`npx playwright install-deps chromium`, or the packages listed by Playwright for your distribution).
 
 ### First start
+
+![The start screen downloading Chromium on the first start](assets/screenshots/new/desktop-first-start.png)
 
 - **macOS:** the app is not signed with an Apple Developer certificate yet, so macOS says it cannot check it. Open it
   once with right-click → **Open** → **Open** (or System Settings → Privacy & Security → **Open Anyway**). After that it

@@ -2,6 +2,31 @@
 
 _By Md Zarin Tasnim · part of the StepForge documentation_
 
+## Update — StepForge as a desktop app
+
+![The StepForge dashboard in its own window](assets/screenshots/new/desktop-app.png)
+
+StepForge now installs like any app: **`.dmg`** for macOS (Apple silicon and Intel), **`.exe`** for Windows,
+**AppImage** and **`.deb`** for Linux. The installers bring their own runtime, so nobody needs Node.js or a terminal.
+The first start downloads Chromium for UI tests and Mailpit for email tests, with progress on the start screen; with no
+internet it opens anyway, says why, and tries again at the next start. Your data lives in the usual app-data folder
+and never leaves the computer. If StepForge already runs on the same data folder (with `npm start`), the window opens
+that one; quitting marks a running test *interrupted*, so it can be resumed. From a clone, `npm run desktop` opens the
+same app. CI builds every installer and runs the demo tests inside the installed app.
+→ [Desktop app](STEPFORGE_DESKTOP.md)
+
+Also new:
+
+- **Manual testing, step by step.** The panel now follows the order a tester works in: the step and its expected
+  result, then what you actually see, then a screenshot or clip, then pass, fail, blocked or skip.
+  → [Manual testing](MANUAL_RUNS.md)
+- **Frames inside frames.** A frame selector can name a chain, `#outer >>> #inner`, for a payment form inside an iframe
+  inside another. The recorder writes it, the runner follows it, and the Playwright and Selenium exports keep it.
+  → [Step reference](STEP_REFERENCE.md)
+- **Verified downloads.** Mailpit and k6 are checked against their SHA-256 before they are installed.
+- **A full QA pass.** 104 findings across security, the runner, diagnosis, the dashboard, phone and desktop apps, code
+  export, API, databases and the CLI, all resolved; 588 unit and integration tests and 42 end-to-end tests pass.
+
 ## Update — export to Appium and Maestro
 
 Phone and desktop tests now leave StepForge as ready-to-run projects. **Exports** offers **Appium** in Python

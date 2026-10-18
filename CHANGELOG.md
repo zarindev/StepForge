@@ -3,6 +3,19 @@
 ## [Unreleased]
 
 ### Added
+- **Desktop app** (`apps/desktop`, Electron): StepForge in its own window. Installed, the server runs on Electron's
+  own Node.js (better-sqlite3 rebuilt for it), data lives in the user's app-data folder, and the first start downloads
+  Playwright's Chromium and Mailpit (with a connection check first, so an offline start opens at once). From a clone,
+  `npm run desktop`. One window per data folder; an already running server is opened instead of starting a second;
+  quitting shuts the server down over IPC, and the server stops if the app dies. `npm run desktop:package` builds the
+  installers (`.dmg`, `.exe`, AppImage, `.deb`; not signed yet); `apps/desktop/scripts/smoke.mjs` starts the built app
+  and runs the demo tests in it; the `Desktop app` workflow builds and tests each system and attaches the installers to
+  a draft release on a version tag. Appium installs from the app use the portable Node.js (with npm).
+- **Frames inside frames**: `ui.switchFrame` takes a chain, `#outer >>> #inner` (`frameChain()` in core); the recorder
+  records the full chain, and Playwright (TS, Python) and the Selenium helpers (Python, Java) follow it. The Selenium
+  helpers also understand `>> nth=N`.
+- **Verified downloads**: `downloadRelease()` (`@stepforge/core/download`) checks Mailpit and k6 against pinned SHA-256
+  hashes, or GitHub's published digest for another version.
 - **Appium and Maestro export** (N7): four new targets for phone and desktop apps — `appium-py` (Appium-Python-Client
   + pytest), `appium-ts` (WebdriverIO + Mocha, TypeScript), `appium-java` (java-client + JUnit 5, Maven) for Android,
   iOS, macOS, Windows and Linux, and `maestro` (YAML flows) for Android and iOS. The plan gets a native mode: phone and

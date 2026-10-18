@@ -66,7 +66,26 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 ## What's new
 
-**Just added — iOS, Android and desktop apps:**
+**Just added — StepForge as a desktop app:**
+
+<p align="center"><img src="docs/assets/screenshots/new/desktop-app.png" width="820" alt="The StepForge dashboard in its own desktop window" /></p>
+
+- **Desktop app for macOS, Windows and Linux**: installers (`.dmg`, `.exe`, AppImage, `.deb`) that bring their own
+  runtime: no Node.js, no terminal. The first start downloads Chromium for UI tests and Mailpit for email tests, with
+  progress; without internet it opens anyway and tries again later. Data stays on your computer
+  ([guide](docs/STEPFORGE_DESKTOP.md)).
+- **Manual testing, step by step**: the panel follows how a tester works: do the step with the expected result in view,
+  write the actual result, take a screenshot or a clip, then pass, fail, blocked or skip
+  ([guide](docs/MANUAL_RUNS.md)).
+- **Frames inside frames**: `#outer >>> #inner` reaches an iframe inside an iframe (payment forms, embedded widgets),
+  in the recorder, the runner and every export ([steps](docs/STEP_REFERENCE.md)).
+- **Verified downloads**: Mailpit and k6 are checked against their SHA-256 before they are installed.
+- **A full QA pass on StepForge itself**: 104 findings across security, the runner, diagnosis, the dashboard, phone and
+  desktop apps, code export, API, databases and the CLI, all resolved. **588 unit and integration tests** and **42
+  end-to-end tests** pass; CI runs 11 jobs (including an Android emulator, an iOS simulator and macOS, Windows and Linux
+  desktops) and builds the installers, running the demo tests inside the app.
+
+**Earlier — iOS, Android and desktop apps:**
 
 - **Export to Appium and Maestro**: phone and desktop tests become ready-to-run Appium projects (Python, TypeScript,
   Java) or Maestro flows, with a CI workflow for an emulator, a simulator or a desktop runner; Electron tests export to
@@ -184,8 +203,9 @@ cd stepforge
 ./start.sh
 ```
 
-StepForge opens at <http://127.0.0.1:4400> (or the next free port). Prefer a window of its own? `npm run desktop` opens
-the same StepForge as a desktop app; installers that need no Node.js are on the way ([details](docs/STEPFORGE_DESKTOP.md)).
+StepForge opens at <http://127.0.0.1:4400> (or the next free port). Prefer a window of its own? Install the desktop
+app from the [releases](https://github.com/zarindev/StepForge/releases), or run `npm run desktop` from the clone
+([details](docs/STEPFORGE_DESKTOP.md)).
 
 ### Load the demo workspace in 60 seconds
 
