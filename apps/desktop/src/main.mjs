@@ -5,7 +5,7 @@
 // Two ways to run: from a clone (`npm run desktop`: the server runs on the installed Node.js and uses the repository's
 // data folder) and installed (the server runs on Electron's own Node.js, the data lives in the user's app-data folder,
 // and the first start downloads Playwright's Chromium and Mailpit).
-import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
+import { app, BrowserWindow, dialog, Menu, net, shell } from 'electron';
 import { fork } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
@@ -24,6 +24,8 @@ let server = null;
 let win = null;
 let dashboardUrl = '';
 let quitting = false;
+/** A first-start download in progress (stopped when the app quits). */
+let setupChild = null;
 const logTail = [];
 
 // One StepForge window: opening the app again focuses it.
@@ -139,7 +141,7 @@ function nodeRuntime() {
 }
 
 /** Runs a Node.js script of StepForge's (with the same runtime as the server), showing its last line while it runs. */
-function runScript(script, args, label) {
+function runScript(script, args, label, timeoutMs) {
   return new Promise((resolvePromise, reject) => {
     const child = fork(join(ROOT, script), args, {
       cwd: ROOT,
@@ -147,6 +149,12 @@ function runScript(script, args, label) {
       execArgv: script.endsWith('.ts') ? ['--import', 'tsx'] : [],
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
+    setupChild = child;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, timeoutMs);
     const show = (chunk) => {
       const text = chunk.toString();
       appendFileSync(logFile(), text);
@@ -160,9 +168,17 @@ function runScript(script, args, label) {
     child.stdout.on('data', show);
     child.stderr.on('data', show);
     child.on('error', reject);
-    child.on('exit', (code) =>
-      code === 0 ? resolvePromise() : reject(new Error(`${label} failed (exit code ${code})`)),
-    );
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      setupChild = null;
+      if (code === 0) resolvePromise();
+      else
+        reject(
+          new Error(
+            timedOut ? `no result after ${Math.round(timeoutMs / 60_000)} minutes` : `exit code ${code}`,
+          ),
+        );
+    });
   });
 }
 
@@ -181,20 +197,44 @@ async function firstStartSetup() {
   } catch {
     // first start
   }
+  // Offline (or the download site blocked): skip at once instead of waiting for Playwright's retries, and try again at
+  // the next start. Electron's own network stack is used, so the system's proxy settings count.
+  setStatus('Checking the internet connection…');
+  const online = await net
+    .fetch('https://cdn.playwright.dev/', { method: 'HEAD', signal: AbortSignal.timeout(10_000) })
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!online) {
+    void dialog.showMessageBox({
+      type: 'warning',
+      message: 'StepForge could not download its test browser',
+      detail:
+        'There seems to be no internet connection, so Chromium (for UI tests) and Mailpit (for email tests) were not ' +
+        'downloaded. Everything else works; StepForge tries again at the next start.',
+    });
+    return;
+  }
   const problems = [];
   try {
     await runScript(
       'node_modules/playwright/cli.js',
       ['install', 'chromium'],
       'Downloading Chromium for UI tests (first start only)…',
+      20 * 60_000,
     );
   } catch (err) {
-    problems.push(`Chromium: ${err.message}. UI tests need it; it is downloaded again at the next start.`);
+    problems.push(
+      `Chromium could not be downloaded (${err.message}). UI tests need it; StepForge tries again at the next start.`,
+    );
   }
   try {
-    await runScript('scripts/install-mailpit.ts', [], 'Downloading Mailpit for email tests…');
+    await runScript('scripts/install-mailpit.ts', [], 'Downloading Mailpit for email tests…', 3 * 60_000);
   } catch (err) {
-    problems.push(`Mailpit: ${err.message}. Install it later from Settings → Email.`);
+    problems.push(
+      `Mailpit could not be downloaded (${err.message}). Install it later from Settings → Email.`,
+    );
   }
   if (problems.length) {
     void dialog.showMessageBox({
@@ -282,6 +322,7 @@ function startServer() {
 // Quitting lets the server finish cleanly: a running test is marked interrupted (resumable), not lost.
 app.on('before-quit', (event) => {
   quitting = true;
+  setupChild?.kill();
   if (!server) return;
   event.preventDefault();
   const child = server;
