@@ -163,7 +163,11 @@ function runScript(script, args, label, timeoutMs) {
         .map((l) => l.trim())
         .filter(Boolean)
         .at(-1);
-      if (last) setStatus(label, last.slice(0, 120));
+      if (!last) return;
+      // Playwright draws a text progress bar ("|■■■   |  42% of 182.1 MiB"): shown as a real one.
+      const progress = last.match(/(\d+)% of ([\d.]+ \w+)/);
+      if (progress) setStatus(label, `${progress[1]}% of ${progress[2]}`, Number(progress[1]));
+      else setStatus(label, last.slice(0, 120));
     };
     child.stdout.on('data', show);
     child.stderr.on('data', show);
@@ -248,12 +252,14 @@ async function firstStartSetup() {
 }
 
 /** Updates the loading screen while the app gets ready. */
-function setStatus(title, detail = '') {
+function setStatus(title, detail = '', percent = null) {
   if (!win || dashboardUrl) return;
   void win.webContents
     .executeJavaScript(
       `document.querySelector('p').textContent = ${JSON.stringify(title)};` +
-        `document.querySelector('small').textContent = ${JSON.stringify(detail)};`,
+        `document.querySelector('small').textContent = ${JSON.stringify(detail)};` +
+        `document.querySelector('.bar').classList.toggle('known', ${percent !== null});` +
+        `document.querySelector('.bar').style.setProperty('--done', '${percent ?? 0}%');`,
     )
     .catch(() => {});
 }
@@ -383,8 +389,8 @@ function buildMenu() {
 function loadingPage() {
   const logo = readFileSync(join(ROOT, 'apps/desktop/assets/logo.svg'), 'utf8');
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>StepForge</title><style>
-    :root { color-scheme: light dark; --bg: #f8fafc; --fg: #0f172a; --muted: #64748b; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #0b0f17; --fg: #e2e8f0; --muted: #94a3b8; } }
+    /* Dark, like the dashboard's default theme and the window's background: no flash when the dashboard opens. */
+    :root { color-scheme: dark; --bg: #0b0f17; --fg: #e2e8f0; --muted: #94a3b8; }
     body { margin: 0; height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--fg);
       font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
     main { text-align: center; } svg { width: 72px; height: 72px; }
@@ -392,6 +398,7 @@ function loadingPage() {
     small { display: block; margin-top: 14px; min-height: 1.5em; color: var(--muted); font: 12px ui-monospace, Menlo, monospace; max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .bar { width: 160px; height: 3px; margin: 20px auto 0; border-radius: 3px; background: color-mix(in srgb, var(--muted) 25%, transparent); overflow: hidden; }
     .bar::after { content: ''; display: block; width: 40%; height: 100%; background: #f97316; animation: slide 1.1s ease-in-out infinite; }
+    .bar.known::after { width: var(--done); animation: none; transition: width .3s; }
     @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
   </style></head><body><main>${logo}<h1>StepForge</h1><p>Starting StepForge…</p><div class="bar"></div><small></small></main></body></html>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
