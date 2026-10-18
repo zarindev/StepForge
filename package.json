@@ -19,6 +19,7 @@
     "dev": "node scripts/dev.mjs",
     "start": "npm run start -w @stepforge/server --",
     "desktop": "npm run start -w @stepforge/desktop",
+    "desktop:package": "node apps/desktop/scripts/package.mjs",
     "stepforge": "node apps/cli/bin/stepforge.mjs",
     "build": "npm run build -w @stepforge/web",
     "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck -w @stepforge/web",
@@ -38,11 +39,13 @@
     "k6:install": "tsx scripts/install-k6.ts"
   },
   "devDependencies": {
+    "@electron/rebuild": "4.2.0",
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.5",
     "drizzle-kit": "^0.31.11",
     "electron": "^44.7.2",
+    "electron-builder": "26.17.0",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "prettier": "^3.9.9",

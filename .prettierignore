@@ -7,3 +7,5 @@ package-lock.json
 docs/samples
 docs/case-study/*.html
 docs/case-study/export
+apps/desktop/.stage
+apps/desktop/release

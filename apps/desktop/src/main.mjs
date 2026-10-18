@@ -1,9 +1,13 @@
 // StepForge desktop app (Electron main process). It starts the same local server `npm start` runs, as a child
-// process, and shows the dashboard in its own window. If a StepForge server from this folder is already running, the
-// window opens that one instead of starting a second server on the same database.
+// process, and shows the dashboard in its own window. If a StepForge server from the same data folder is already
+// running, the window opens that one instead of starting a second server on the same database.
+//
+// Two ways to run: from a clone (`npm run desktop`: the server runs on the installed Node.js and uses the repository's
+// data folder) and installed (the server runs on Electron's own Node.js, the data lives in the user's app-data folder,
+// and the first start downloads Playwright's Chromium and Mailpit).
 import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
 import { fork } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,7 +38,11 @@ async function start() {
   Menu.setApplicationMenu(buildMenu());
   showWindow();
   try {
-    dashboardUrl = (await runningServer()) ?? (await startServer());
+    dashboardUrl = await runningServer();
+    if (!dashboardUrl) {
+      if (app.isPackaged) await firstStartSetup();
+      dashboardUrl = await startServer();
+    }
     win?.loadURL(dashboardUrl);
   } catch (err) {
     dialog.showErrorBox(
@@ -86,9 +94,13 @@ function guardNavigation(contents) {
   contents.on('did-create-window', (child) => guardNavigation(child.webContents));
 }
 
-/** The data folder, as the server reads it: STEPFORGE_DATA_DIR from the environment or the repository's .env. */
+/**
+ * The data folder, as the server reads it: STEPFORGE_DATA_DIR from the environment, else (installed) the user's
+ * app-data folder or (from a clone) the repository's .env or ./data.
+ */
 function dataDir() {
   let raw = process.env.STEPFORGE_DATA_DIR;
+  if (!raw && app.isPackaged) return join(app.getPath('userData'), 'data');
   const envFile = join(ROOT, '.env');
   if (!raw && existsSync(envFile))
     raw = readFileSync(envFile, 'utf8').match(/^\s*STEPFORGE_DATA_DIR\s*=\s*"?([^"\n]+?)"?\s*$/m)?.[1];
@@ -115,18 +127,108 @@ async function runningServer() {
   }
 }
 
+/**
+ * The Node.js that runs the server and its helpers: Electron's own when installed (nothing else to install), else the
+ * Node.js on the PATH (or STEPFORGE_NODE), the one `setup` needs anyway.
+ */
+function nodeRuntime() {
+  const env = { ...process.env, STEPFORGE_DATA_DIR: dataDir(), STEPFORGE_OPEN_BROWSER: '0' };
+  return app.isPackaged
+    ? { execPath: process.execPath, env: { ...env, ELECTRON_RUN_AS_NODE: '1' } }
+    : { execPath: process.env.STEPFORGE_NODE || 'node', env: { ...env, ELECTRON_RUN_AS_NODE: undefined } };
+}
+
+/** Runs a Node.js script of StepForge's (with the same runtime as the server), showing its last line while it runs. */
+function runScript(script, args, label) {
+  return new Promise((resolvePromise, reject) => {
+    const child = fork(join(ROOT, script), args, {
+      cwd: ROOT,
+      ...nodeRuntime(),
+      execArgv: script.endsWith('.ts') ? ['--import', 'tsx'] : [],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    });
+    const show = (chunk) => {
+      const text = chunk.toString();
+      appendFileSync(logFile(), text);
+      const last = text
+        .split(/[\r\n]+/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .at(-1);
+      if (last) setStatus(label, last.slice(0, 120));
+    };
+    child.stdout.on('data', show);
+    child.stderr.on('data', show);
+    child.on('error', reject);
+    child.on('exit', (code) =>
+      code === 0 ? resolvePromise() : reject(new Error(`${label} failed (exit code ${code})`)),
+    );
+  });
+}
+
+/**
+ * Installed app, first start (and after an update that brings a new Playwright): Playwright's Chromium for UI tests
+ * and Mailpit for email tests, as `setup` does for a clone. A failure is reported, not fatal: everything else works.
+ */
+async function firstStartSetup() {
+  mkdirSync(dirname(logFile()), { recursive: true });
+  const playwright = JSON.parse(
+    readFileSync(join(ROOT, 'node_modules/playwright/package.json'), 'utf8'),
+  ).version;
+  const marker = join(dataDir(), '.desktop-setup.json');
+  try {
+    if (JSON.parse(readFileSync(marker, 'utf8')).playwright === playwright) return;
+  } catch {
+    // first start
+  }
+  const problems = [];
+  try {
+    await runScript(
+      'node_modules/playwright/cli.js',
+      ['install', 'chromium'],
+      'Downloading Chromium for UI tests (first start only)…',
+    );
+  } catch (err) {
+    problems.push(`Chromium: ${err.message}. UI tests need it; it is downloaded again at the next start.`);
+  }
+  try {
+    await runScript('scripts/install-mailpit.ts', [], 'Downloading Mailpit for email tests…');
+  } catch (err) {
+    problems.push(`Mailpit: ${err.message}. Install it later from Settings → Email.`);
+  }
+  if (problems.length) {
+    void dialog.showMessageBox({
+      type: 'warning',
+      message: 'Part of the first-start setup did not finish',
+      detail: `${problems.join('\n\n')}\n\nFull log: ${logFile()}`,
+    });
+    if (problems.some((p) => p.startsWith('Chromium'))) return; // try again next time
+  }
+  writeFileSync(marker, JSON.stringify({ playwright, at: new Date().toISOString() }));
+}
+
+/** Updates the loading screen while the app gets ready. */
+function setStatus(title, detail = '') {
+  if (!win || dashboardUrl) return;
+  void win.webContents
+    .executeJavaScript(
+      `document.querySelector('p').textContent = ${JSON.stringify(title)};` +
+        `document.querySelector('small').textContent = ${JSON.stringify(detail)};`,
+    )
+    .catch(() => {});
+}
+
 function startServer() {
+  setStatus('Starting the local server…');
   mkdirSync(dirname(logFile()), { recursive: true });
   appendFileSync(
     logFile(),
     `\n=== ${new Date().toISOString()} StepForge desktop app starting the server ===\n`,
   );
-  // Node.js runs the server (the prototype uses the Node.js that `setup` needs; the installers will bring their own).
   const child = fork(join(SERVER_DIR, 'src/index.ts'), [], {
     cwd: SERVER_DIR,
-    execPath: process.env.STEPFORGE_NODE || 'node',
+    ...nodeRuntime(),
     execArgv: ['--import', 'tsx'],
-    env: { ...process.env, STEPFORGE_OPEN_BROWSER: '0', ELECTRON_RUN_AS_NODE: undefined },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
   server = child;
@@ -238,7 +340,7 @@ function buildMenu() {
 }
 
 function loadingPage() {
-  const logo = readFileSync(join(ROOT, 'apps/web/public/logo.svg'), 'utf8');
+  const logo = readFileSync(join(ROOT, 'apps/desktop/assets/logo.svg'), 'utf8');
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>StepForge</title><style>
     :root { color-scheme: light dark; --bg: #f8fafc; --fg: #0f172a; --muted: #64748b; }
     @media (prefers-color-scheme: dark) { :root { --bg: #0b0f17; --fg: #e2e8f0; --muted: #94a3b8; } }
@@ -246,9 +348,10 @@ function loadingPage() {
       font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
     main { text-align: center; } svg { width: 72px; height: 72px; }
     h1 { font-size: 20px; margin: 16px 0 4px; } p { margin: 0; color: var(--muted); }
+    small { display: block; margin-top: 14px; min-height: 1.5em; color: var(--muted); font: 12px ui-monospace, Menlo, monospace; max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .bar { width: 160px; height: 3px; margin: 20px auto 0; border-radius: 3px; background: color-mix(in srgb, var(--muted) 25%, transparent); overflow: hidden; }
     .bar::after { content: ''; display: block; width: 40%; height: 100%; background: #f97316; animation: slide 1.1s ease-in-out infinite; }
     @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
-  </style></head><body><main>${logo}<h1>StepForge</h1><p>Starting the local server…</p><div class="bar"></div></main></body></html>`;
+  </style></head><body><main>${logo}<h1>StepForge</h1><p>Starting StepForge…</p><div class="bar"></div><small></small></main></body></html>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }

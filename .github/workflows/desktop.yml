@@ -1,0 +1,74 @@
+name: Desktop app
+
+# Builds the StepForge installers on each system, starts every built app and runs the demo tests in it.
+# A version tag (v*) also attaches the installers to a draft GitHub release.
+on:
+  push:
+    branches: [main, desktop-app]
+    tags: ['v*']
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/server/src/index.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+jobs:
+  installers:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, arch: arm64, label: 'macOS (Apple silicon)', smoke: true }
+          - { os: macos-latest, arch: x64, label: 'macOS (Intel)', smoke: false }
+          - { os: windows-latest, arch: x64, label: Windows, smoke: true }
+          - { os: ubuntu-latest, arch: x64, label: Linux, smoke: true }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The packaging script checks the rebuilt database module with Electron itself.
+      - run: node node_modules/electron/install.js
+      - run: npm run desktop:package -- --arch ${{ matrix.arch }}
+      # Linux: the system libraries Chromium needs (the app downloads Chromium itself on first start).
+      - if: matrix.smoke && runner.os == 'Linux'
+        run: npx playwright install-deps chromium
+      # An Intel app cannot be started on an Apple-silicon runner without Rosetta, so it is built but not started.
+      - if: matrix.smoke
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node apps/desktop/scripts/smoke.mjs --arch ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StepForge-${{ runner.os }}-${{ matrix.arch }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Draft release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: installers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - name: Attach the installers to a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --title "StepForge $GITHUB_REF_NAME" --notes "Desktop installers for macOS, Windows and Linux."
+          gh release upload "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --clobber

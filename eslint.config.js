@@ -11,6 +11,8 @@ export default tseslint.config(
       'packages/db/migrations/**',
       'demo/**/public/**',
       'docs/samples/**',
+      'apps/desktop/.stage/**',
+      'apps/desktop/release/**',
     ],
   },
   js.configs.recommended,
@@ -42,9 +44,12 @@ export default tseslint.config(
     },
   },
   {
-    // The demo desktop app: its main process and preload are CommonJS (Electron), its window script runs in the page.
-    files: ['demo/desktop-app/**/*.cjs'],
-    languageOptions: { sourceType: 'commonjs', globals: { require: 'readonly', __dirname: 'readonly' } },
+    // CommonJS: the demo desktop app's main process and preload, and the desktop app's electron-builder settings.
+    files: ['demo/desktop-app/**/*.cjs', 'apps/desktop/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { require: 'readonly', __dirname: 'readonly', module: 'writable' },
+    },
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   {
@@ -59,7 +64,7 @@ export default tseslint.config(
   },
   {
     // The desktop app's Electron main process (Node).
-    files: ['apps/desktop/src/**/*.mjs'],
+    files: ['apps/desktop/src/**/*.mjs', 'apps/desktop/scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         fetch: 'readonly',

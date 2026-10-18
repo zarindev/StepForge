@@ -2,7 +2,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { androidEnv } from './android.ts';
 
 /** Pinned versions, installed into StepForge's data folder (never globally). Both Apache-2.0. */
@@ -57,10 +57,25 @@ export function nodeOkForAppium(version = process.versions.node): boolean {
 const portableNodeDir = (toolsDir: string) => join(toolsDir, 'node');
 const portableNode = (toolsDir: string) =>
   join(portableNodeDir(toolsDir), process.platform === 'win32' ? 'node.exe' : join('bin', 'node'));
+const portableNpmCli = (toolsDir: string) =>
+  join(
+    portableNodeDir(toolsDir),
+    ...(process.platform === 'win32' ? [] : ['lib']),
+    'node_modules',
+    'npm',
+    'bin',
+    'npm-cli.js',
+  );
+
+/**
+ * Inside the desktop app StepForge runs on Electron's Node.js, which has no npm (Appium installs its drivers with npm):
+ * Appium then gets the portable Node.js, which comes with npm.
+ */
+const onElectron = () => !!process.versions.electron;
 
 /** The Node.js that runs Appium: StepForge's own when Appium accepts it, else the portable one (if installed). */
 export function appiumNode(toolsDir: string): string | undefined {
-  if (nodeOkForAppium()) return process.execPath;
+  if (nodeOkForAppium() && !onElectron()) return process.execPath;
   return existsSync(portableNode(toolsDir)) ? portableNode(toolsDir) : undefined;
 }
 
@@ -221,17 +236,31 @@ export async function installAppium(toolsDir: string, log: (m: string) => void =
       join(root, 'package.json'),
       JSON.stringify({ name: 'stepforge-appium', private: true }, null, 2),
     );
+  // npm: the one on the PATH, or (desktop app) the portable Node.js's own, which Appium's driver installs find first.
+  const portable = node === portableNode(toolsDir);
+  const pathEnv = portable
+    ? { PATH: `${dirname(node)}${delimiter}${process.env.PATH ?? ''}`, ELECTRON_RUN_AS_NODE: undefined }
+    : {};
+  const [npmCmd, npmArgs] = portable && onElectron() ? [node, [portableNpmCli(toolsDir)]] : [npm, []];
   const appium = existsSync(main) ? installedAppiumVersion(toolsDir) : undefined;
   if (appium !== APPIUM_VERSION) {
     log(appium ? `Updating Appium ${appium} to ${APPIUM_VERSION}…` : `Installing Appium ${APPIUM_VERSION}…`);
     await exec(
-      npm,
-      ['install', '--no-audit', '--no-fund', '--loglevel=error', '--save-exact', `appium@${APPIUM_VERSION}`],
-      { cwd: root },
+      npmCmd,
+      [
+        ...npmArgs,
+        'install',
+        '--no-audit',
+        '--no-fund',
+        '--loglevel=error',
+        '--save-exact',
+        `appium@${APPIUM_VERSION}`,
+      ],
+      { cwd: root, env: { ...process.env, ...pathEnv } },
       log,
     );
   }
-  const env = { ...process.env, APPIUM_HOME: home };
+  const env = { ...process.env, ...pathEnv, APPIUM_HOME: home };
   for (const d of wantedDrivers()) {
     const installed = installedDrivers(toolsDir)[d.name];
     if (installed === d.version) continue;

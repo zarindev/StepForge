@@ -6,7 +6,8 @@ const ROOT = resolve(import.meta.dirname, '../../..');
 
 function sources(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
-    if (['node_modules', 'dist', 'test', '__snapshots__'].includes(name)) continue;
+    // .stage and release: the desktop app's build output (copies of the demo apps, whose own comments may mention it).
+    if (['node_modules', 'dist', 'test', '__snapshots__', '.stage', 'release'].includes(name)) continue;
     const p = join(dir, name);
     if (statSync(p).isDirectory()) sources(p, out);
     else if (/\.(ts|tsx|js|mjs|cjs|yaml|json)$/.test(name)) out.push(p);

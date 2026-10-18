@@ -23,3 +23,5 @@ smoke-onboarding-failure.png
 # Python caches (from compiling the helpers and demos)
 __pycache__/
 *.pyc
+apps/desktop/.stage/
+apps/desktop/release/
