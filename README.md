@@ -541,7 +541,6 @@ your team time, you can support its development:
 
 <p>
   <a href="https://github.com/sponsors/zarindev"><img alt="Sponsor on GitHub" src="https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" /></a>
-  <a href="https://buymeacoffee.com/zarindev"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" /></a>
 </p>
 
 Not able to give? A star on GitHub, a bug report or telling a colleague helps just as much.
@@ -558,6 +557,5 @@ Not able to give? A star on GitHub, a bug report or telling a colleague helps ju
   <p>
     <a href="https://www.upwork.com/freelancers/~01b847509724f9e1ff"><img alt="Hire me on Upwork" src="https://img.shields.io/badge/Hire%20me-Upwork-6FDA44?style=for-the-badge&logo=upwork&logoColor=white" /></a>
     <a href="https://github.com/zarindev"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-follow-181717?style=for-the-badge&logo=github&logoColor=white" /></a>
-    <a href="https://buymeacoffee.com/zarindev"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" /></a>
   </p>
 </div>
