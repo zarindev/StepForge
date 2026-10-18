@@ -36,9 +36,13 @@ jobs:
       # The packaging script checks the rebuilt database module with Electron itself.
       - run: node node_modules/electron/install.js
       - run: npm run desktop:package -- --arch ${{ matrix.arch }}
-      # Linux: the system libraries Chromium needs (the app downloads Chromium itself on first start).
+      # Linux: install the .deb and let its own Playwright install Chromium's system libraries, exactly as the
+      # desktop guide tells users to (the app downloads Chromium itself on first start).
       - if: matrix.smoke && runner.os == 'Linux'
-        run: npx playwright install-deps chromium
+        run: |
+          sudo apt-get install -y ./apps/desktop/release/*.deb
+          sudo env ELECTRON_RUN_AS_NODE=1 /opt/StepForge/stepforge \
+            /opt/StepForge/resources/app/node_modules/playwright/cli.js install-deps chromium
       # An Intel app cannot be started on an Apple-silicon runner without Rosetta, so it is built but not started.
       - if: matrix.smoke
         run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node apps/desktop/scripts/smoke.mjs --arch ${{ matrix.arch }}
@@ -61,6 +65,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: installers
@@ -70,5 +75,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --title "StepForge $GITHUB_REF_NAME" --notes "Desktop installers for macOS, Windows and Linux."
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --title "StepForge $GITHUB_REF_NAME" --notes-file apps/desktop/RELEASE_NOTES.md
           gh release upload "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --clobber

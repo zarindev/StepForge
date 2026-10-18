@@ -180,6 +180,21 @@ Every feature, grouped by what you want to do: **[docs/FEATURES.md](docs/FEATURE
 
 ## Quick start
 
+### Option A — the desktop app (no Node.js, no terminal)
+
+1. Download the installer for your computer from the [latest release](https://github.com/zarindev/StepForge/releases)
+   (**Assets**): `…-mac-arm64.dmg` (Apple silicon), `…-mac-x64.dmg` (Intel Mac), `…-win-x64.exe` (Windows),
+   `…-linux-x86_64.AppImage` or `…-linux-amd64.deb` (Linux).
+2. Install it: **macOS** drag StepForge to Applications, then open it the first time with right-click → **Open**
+   (the app is not signed yet); **Windows** run the installer (SmartScreen: **More info** → **Run anyway**);
+   **Linux** make the AppImage executable and run it, or `sudo apt install ./StepForge-*.deb`.
+3. Open StepForge. The first start downloads Chromium for UI tests and Mailpit for email tests, then the dashboard
+   opens.
+
+Step-by-step guide, data location, updating and uninstalling: [docs/STEPFORGE_DESKTOP.md](docs/STEPFORGE_DESKTOP.md).
+
+### Option B — from the source code
+
 | You need | Version | Notes |
 | --- | --- | --- |
 | [Node.js](https://nodejs.org) | 22 or newer | Everything else (Playwright's Chromium, Mailpit) is installed by `setup` |
@@ -203,9 +218,8 @@ cd stepforge
 ./start.sh
 ```
 
-StepForge opens at <http://127.0.0.1:4400> (or the next free port). Prefer a window of its own? Install the desktop
-app from the [releases](https://github.com/zarindev/StepForge/releases), or run `npm run desktop` from the clone
-([details](docs/STEPFORGE_DESKTOP.md)).
+StepForge opens at <http://127.0.0.1:4400> (or the next free port). `npm run desktop` opens the same StepForge in a
+window of its own.
 
 ### Load the demo workspace in 60 seconds
 

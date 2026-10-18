@@ -12,29 +12,91 @@ This is a **preview**: the installers are not signed yet (see [First start](#fir
 ## Install
 
 Download the installer for your computer from the
-[GitHub releases](https://github.com/zarindev/StepForge/releases) (once a release includes them):
+[GitHub releases](https://github.com/zarindev/StepForge/releases) (open the newest release, then **Assets**). Nothing
+else is needed: no Node.js, no Git, no terminal. The installers are about 190–200 MB.
 
-| System | File | Install |
-| --- | --- | --- |
-| macOS, Apple silicon (M1 and later) | `StepForge-<version>-mac-arm64.dmg` | Open it and drag StepForge to Applications |
-| macOS, Intel | `StepForge-<version>-mac-x64.dmg` | Same |
-| Windows 10 and 11 | `StepForge-<version>-win-x64.exe` | Run it; choose the folder (no administrator rights needed) |
-| Linux | `StepForge-<version>-linux-x86_64.AppImage` or `…-linux-amd64.deb` | AppImage: make it executable and run it; .deb: `sudo apt install ./<file>` |
+| Your computer | Download |
+| --- | --- |
+| Mac with Apple silicon (M1, M2, M3, M4 …) | `StepForge-<version>-mac-arm64.dmg` |
+| Mac with an Intel processor | `StepForge-<version>-mac-x64.dmg` |
+| Windows 10 or 11 (64-bit) | `StepForge-<version>-win-x64.exe` |
+| Linux (64-bit) | `StepForge-<version>-linux-x86_64.AppImage` (any distribution) or `StepForge-<version>-linux-amd64.deb` (Debian, Ubuntu, Mint …) |
 
-Nothing else to install: the app brings its own runtime. On Linux, UI tests also need Chromium's system libraries
-(`npx playwright install-deps chromium`, or the packages listed by Playwright for your distribution).
+Not sure which Mac you have? Apple menu  → **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor:
+Intel …" means Intel.
+
+### macOS
+
+1. Open the downloaded `.dmg`.
+2. Drag **StepForge** onto **Applications**, then eject the disk image.
+3. Open **Applications** and **right-click StepForge → Open**, then **Open** in the dialog. This is needed once, because
+   the app is not signed with an Apple Developer certificate yet; a normal double-click on the first start shows
+   "StepForge can't be opened". If you already double-clicked: System Settings → **Privacy & Security** → scroll down →
+   **Open Anyway**.
+4. From then on, open it like any app (Launchpad, Spotlight, the Dock).
+
+### Windows
+
+1. Run the downloaded `.exe`.
+2. If SmartScreen says "Windows protected your PC" (the installer is not signed yet): **More info** → **Run anyway**.
+3. Choose who it is for and the folder (no administrator rights needed for "Only for me"), then **Install**.
+4. Open **StepForge** from the Start menu or the desktop shortcut.
+
+### Linux
+
+**AppImage** (any distribution):
+
+```bash
+chmod +x StepForge-*-linux-x86_64.AppImage
+./StepForge-*-linux-x86_64.AppImage
+```
+
+Some distributions need FUSE 2 for AppImages (Ubuntu 22.04 and later: `sudo apt install libfuse2`).
+
+**.deb** (Debian, Ubuntu, Mint …):
+
+```bash
+sudo apt install ./StepForge-*-linux-amd64.deb
+```
+
+Then open **StepForge** from the applications menu (or run `stepforge`).
+
+UI tests need Chromium's system libraries. On Debian or Ubuntu, after installing the `.deb`, StepForge's own copy of
+Playwright installs them (no Node.js needed):
+
+```bash
+sudo env ELECTRON_RUN_AS_NODE=1 /opt/StepForge/stepforge \
+  /opt/StepForge/resources/app/node_modules/playwright/cli.js install-deps chromium
+```
+
+With Node.js installed, `sudo npx playwright install-deps chromium` does the same. Other distributions: install the
+libraries [Playwright lists](https://playwright.dev/docs/intro#system-requirements) for yours.
 
 ### First start
 
 ![The start screen downloading Chromium on the first start](assets/screenshots/new/desktop-first-start.png)
 
-- **macOS:** the app is not signed with an Apple Developer certificate yet, so macOS says it cannot check it. Open it
-  once with right-click → **Open** → **Open** (or System Settings → Privacy & Security → **Open Anyway**). After that it
-  opens normally.
-- **Windows:** SmartScreen may say "Windows protected your PC": choose **More info** → **Run anyway**.
-- The first start downloads **Chromium** for UI tests (about 150 MB) and **Mailpit** for email tests (about 10 MB),
-  with progress on the start screen. Later starts take a few seconds. Without internet, StepForge still opens; UI
-  tests wait for Chromium, which is downloaded at the next start.
+The first start downloads **Chromium** for UI tests (about 180 MB) and **Mailpit** for email tests (about 10 MB), with
+progress on the start screen; then the dashboard opens. Later starts take a few seconds. Without internet, StepForge
+opens anyway, says what it could not download, and tries again at the next start (UI tests need Chromium; everything
+else works).
+
+Then choose **Load demo workspace** on the welcome screen to see StepForge at work, or create your first application.
+
+### Update
+
+Download the newer installer and install it over the old one (macOS: replace the app in Applications). Your tests,
+runs and settings are kept: they live in the data folder below, not in the app.
+
+### Uninstall
+
+- **macOS:** move StepForge from Applications to the Bin.
+- **Windows:** Settings → Apps → **StepForge** → Uninstall.
+- **Linux:** delete the AppImage, or `sudo apt remove stepforge`.
+
+Your data stays in the data folder below; delete that folder too to remove everything. Chromium (shared with other
+Playwright tools) is in `~/Library/Caches/ms-playwright` (macOS), `%LOCALAPPDATA%\ms-playwright` (Windows) or
+`~/.cache/ms-playwright` (Linux).
 
 ### Where your data is
 
