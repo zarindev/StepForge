@@ -47,7 +47,7 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 - [Safety and responsible use](#safety-and-responsible-use)
 - [Troubleshooting](#troubleshooting)
 - [Documentation](#documentation)
-- [Roadmap](#roadmap) · [Contributing](#contributing) · [Support StepForge](#support-stepforge) · [License](#license)
+- [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
 
 **New to StepForge?** [Everything StepForge does](docs/FEATURES.md) lists every feature in one page.
 
@@ -533,17 +533,6 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 
 Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md); the build history is in
 [docs/PROGRESS.md](docs/PROGRESS.md) and the design in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Support StepForge
-
-StepForge is free and open source, and it will stay that way: no paid tier, no account, no cloud. If it saves you or
-your team time, you can support its development:
-
-<p>
-  <a href="https://github.com/sponsors/zarindev"><img alt="Sponsor on GitHub" src="https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" /></a>
-</p>
-
-Not able to give? A star on GitHub, a bug report or telling a colleague helps just as much.
 
 ## License
 
