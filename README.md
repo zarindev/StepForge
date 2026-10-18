@@ -184,7 +184,8 @@ cd stepforge
 ./start.sh
 ```
 
-StepForge opens at <http://127.0.0.1:4400> (or the next free port).
+StepForge opens at <http://127.0.0.1:4400> (or the next free port). Prefer a window of its own? `npm run desktop` opens
+the same StepForge as a desktop app (preview, [details](docs/STEPFORGE_DESKTOP.md)).
 
 ### Load the demo workspace in 60 seconds
 
@@ -491,6 +492,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 | --- | --- |
 | [What's new](docs/WHATS_NEW.md) | The latest release: 13 new features |
 | [Features](docs/FEATURES.md) | Every feature in one page |
+| [Desktop app](docs/STEPFORGE_DESKTOP.md) | StepForge in its own window (preview) |
 | [Step reference](docs/STEP_REFERENCE.md) | Every step type, its parameters and checks |
 | [Testing every kind of web app](docs/WEB_APPS.md) | SPAs, PWAs, canvas, downloads, network mocking, visual checkpoints, browser settings |
 | [Image locators](docs/IMAGE_LOCATORS.md) | Find elements by a picture of them, on every platform |

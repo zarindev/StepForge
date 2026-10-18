@@ -1,0 +1,11 @@
+{
+  "name": "@stepforge/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StepForge as a desktop app: the local server and dashboard in their own window",
+  "type": "module",
+  "main": "src/main.mjs",
+  "scripts": {
+    "start": "node start.mjs"
+  }
+}

@@ -50,6 +50,8 @@ async function main(): Promise<void> {
 
   const url = `http://127.0.0.1:${port}`;
   app.log.info(`StepForge is running at ${url}`);
+  // Started by the desktop app: tell it where the dashboard is.
+  process.send?.({ type: 'ready', url });
   // `npm start -- --demo` (or STEPFORGE_DEMO=1): load the demo workspace — sample data only when asked for.
   if (process.argv.includes('--demo') || process.env.STEPFORGE_DEMO === '1') {
     ctx.demo
@@ -74,6 +76,12 @@ async function main(): Promise<void> {
   };
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  // The desktop app asks over IPC (works on Windows too) and, if it dies, its server must not stay behind.
+  process.on(
+    'message',
+    (m: { type?: string }) => m?.type === 'shutdown' && void shutdown('Desktop app quit'),
+  );
+  process.on('disconnect', () => void shutdown('Desktop app closed'));
 }
 
 main().catch((err) => {

@@ -57,4 +57,16 @@ export default tseslint.config(
       globals: { process: 'readonly', console: 'readonly', URL: 'readonly', setTimeout: 'readonly' },
     },
   },
+  {
+    // The desktop app's Electron main process (Node).
+    files: ['apps/desktop/src/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        fetch: 'readonly',
+        AbortSignal: 'readonly',
+        clearTimeout: 'readonly',
+        encodeURIComponent: 'readonly',
+      },
+    },
+  },
 );
