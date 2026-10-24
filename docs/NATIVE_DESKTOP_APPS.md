@@ -77,6 +77,8 @@ Steps for desktop apps:
 | **Press** a shortcut | `Meta+S` (⌘S on a Mac), `Control+S`, `Control+Shift+N`, `Alt+F4`, `F5`, `Enter`… (modifiers `Shift`, `Control`, `Alt` / `Option`, `Meta` / `Command`) |
 | **Handle dialog** | Presses a dialog's button: OK or Cancel by default (on macOS, the alert's default or cancel button), or name it (`Clear`, `Yes`, `Don't Save`). If a click leaves a macOS sheet open, it answers with Return or Escape |
 | **App** | `launch` or `close` the app |
+| **Right-click** | Opens an element's context menu |
+| **Visual checkpoint** | Compares the app's windows (or an element) with the approved baseline: see below |
 | Click, double-click, fill, type, clear, check, select, assert, extract, wait for, screenshot, scroll | As for other apps |
 
 Phone-only steps (swipe, long press on Windows, rotate, location, permissions, notifications) explain that they are
@@ -88,8 +90,54 @@ Each step waits up to **30 seconds** by default, as for phone apps; a run's or a
 
 Screenshots (every step or at failures) and, at a failure, the element tree of the app (XML) with each element's
 identifier, title, type and position. On macOS, a screen recording (MP4) is made with XCTest's own recorder (macOS 15
-or newer). On Windows, a recording needs `ffmpeg` on the PATH. There is no device log for desktop apps: the console
-evidence is empty.
+or newer). On Windows and Linux, a recording needs `ffmpeg` on the PATH; without it the run log says so and the test
+goes on without a video. A Linux app's own output (stdout and stderr) is its console log, as logcat is for Android;
+macOS and Windows apps have no device log, so their console evidence is empty.
+
+## What the dashboard shows of a desktop app
+
+Recording and manual tests show the app in the dashboard as a picture of **its windows**, refreshed about once a
+second: the screenshot cropped to the app's windows (on macOS and Linux every window of the app, dialogs included;
+on Windows the app window NovaWindows works with). A click on the picture is mapped to the app's own coordinates:
+macOS points on the main display (a Retina screenshot has two or more pixels per point; the crop and the mapping take
+that into account), the Windows app window's pixels, the Linux screen's pixels. Menus that open outside the windows
+(the macOS menu bar) are not in the picture: use **Choose from the menu bar** (`File > Save`) instead. On macOS only
+the main display is captured: keep the app's window there.
+
+## Recording
+
+**Record** on a macOS, Windows or Linux app starts the app as the environment says and shows its windows in the
+dashboard. **It uses this computer's mouse and keyboard while it records**, as tests do.
+
+- Choose what a click on the picture does: **Click** (a text field gets the focus; type in **Text to type** to record
+  a **Fill** step, a password field becomes a secret), **Double-click**, **Right-click** (also the picture's own
+  right-click), **Check text** or **Check visible**.
+- **Press a key or a shortcut** (`Enter`, `Control+S`, `Meta+N`) records a **Press** step; **Choose from the menu bar**
+  records a **Menu** step; **Scroll** records a scroll of the window.
+
+Locators come from the app's element tree and are each checked against the app before they are kept, best first:
+macOS: the accessibility identifier, the placeholder, the role with its title, the title (a static text's value),
+then XPath; Windows: the AutomationId, a field's Name as its label, the control type with its Name, the Name, then
+XPath; Linux: the accessible id, a field's name as its label, the role with its name, the name, then XPath. An element
+with none of these is not recorded: the recorder says so (give it an accessibility identifier in the app).
+
+## Manual tests
+
+**Run manually** starts the app as automated tests start it and shows its windows on the run page beside the
+checklist. The tester uses the app from the picture (click, double-click, right-click, typing into the focused field,
+keys, menus, scrolling) or on this computer directly. **Screenshot** keeps the app's windows with the current step;
+**Record clip** / **Stop clip** mark a part of the session's screen recording (macOS: XCTest's recorder; Windows and
+Linux: ffmpeg; without one, clips are not offered and the panel says why). Results, notes, screenshots and bug
+reports are saved as for web manual tests ([MANUAL_RUNS.md](MANUAL_RUNS.md)); finishing the test closes the app and
+keeps its recording as the test's video.
+
+## Visual checkpoints
+
+A **Visual checkpoint** compares the app's windows (as the dashboard shows them), or the step's element, with the
+approved baseline, using the same comparison and **Accept as new baseline** as web pages
+([visual checkpoints](WEB_APPS.md#visual-checkpoints)). Baselines are kept per step (or *Baseline name*), platform
+and size: `<step>-macos-800x600.png`. Fonts, themes (light or dark), display scale and window size differ between
+computers: keep baselines per machine, or raise the allowed difference. *Hide (CSS)* is ignored in an app.
 
 ## The demo apps
 
@@ -161,14 +209,17 @@ Clicks use the element's own action (press, click, activate) when it has one, so
 mouse; typing sets the field's text through AT-SPI. **Menu** opens `Patients > Clear List` from the menu bar, and
 **Handle dialog** presses a dialog's button.
 
-**Limits:** screenshots need X11 (or apps under Xwayland); no screen recording or device log yet; recording Linux apps
-from the dashboard is planned. On a server, run StepForge (or the CLI) inside a D-Bus session on a virtual display:
+**Recording and log:** with `ffmpeg` on the PATH (`sudo apt-get install ffmpeg`), each test (and each manual session)
+is recorded from the X display (`x11grab`, 10 frames a second). The app's stdout and stderr, kept by the helper, are
+the test's console log; a Python traceback, a core dump or the app exiting with an error code is marked as an error.
+
+**Limits:** screenshots and recordings need X11 (or apps under Xwayland). On a server, run StepForge (or the CLI) inside a D-Bus session on a virtual display:
 `dbus-run-session -- xvfb-run -a ./stepforge.sh run --app myapp --env CI`.
 
 ## Not yet
 
-Recording desktop apps from the dashboard, and the manual-test panel inside a desktop app, are planned. For now, add
-steps in the editor; the element tree from a failed run shows the identifiers and names to use.
+The recorder does not record what is done on the app itself (outside the dashboard's picture), drags, or menus opened
+by clicking in the picture (use **Choose from the menu bar**). macOS shows only the main display.
 
 ## Troubleshooting
 

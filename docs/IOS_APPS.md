@@ -114,11 +114,18 @@ Simulators need nothing more than Xcode. A real iPhone also needs:
    trust the developer on the iPhone (Settings → General → VPN & Device Management).
 3. The app built for iPhones (`.ipa`), signed with the same team, or already installed (bundle id).
 
-## Manual tests and recording
+## Manual tests, recording and visual checkpoints
 
-As for Android: manual tests of an iOS app are marked on the run page while the tester uses the simulator or iPhone.
-**Record** shows the app's screen in the dashboard, and taps, typing, swipes and checks there become steps
-([how](ANDROID_APPS.md#recording)).
+As for Android:
+
+- **Run manually** starts the app on the simulator or iPhone and shows its screen on the run page beside the
+  checklist; the tester taps and types there (or on the simulator itself), keeps screenshots from the device and clips
+  of the session's screen recording, and finishing closes the app ([how](ANDROID_APPS.md#manual-tests)). On a
+  simulator the recording is made with Xcode's own tool; on a real iPhone it needs ffmpeg.
+- **Record** shows the app's screen in the dashboard, and taps, typing, swipes and checks there become steps
+  ([how](ANDROID_APPS.md#recording)).
+- A **Visual checkpoint** compares the screen without the status bar (or an element) with its approved baseline,
+  per simulator or device name and size: `<step>-ios-iPhone_18_Pro-1206x2460.png` ([how](ANDROID_APPS.md#visual-checkpoints)).
 
 ## Code export
 

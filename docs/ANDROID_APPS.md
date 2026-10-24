@@ -131,7 +131,7 @@ button.
 
 Steps that only make sense in a browser are reported as not available, and the test stops with a clear message.
 These are hover, right-click, uploads, drag and drop (use **Swipe** with a target), tabs, frames, network faking,
-storage, clock control, downloads, visual checkpoints and page performance. API, database, email and utility steps work in the same
+storage, clock control, downloads and page performance. API, database, email and utility steps work in the same
 test as usual. For example, one test can create a patient through the API, then check that it appears in the app.
 
 Each step of a phone app waits up to **30 seconds** by default (browser steps: the setting in Settings), because
@@ -147,11 +147,34 @@ Every test keeps:
 - At a failure, the **element tree** of the screen (XML): every element with its resource id, text, content
   description and bounds. It shows what the app displayed instead, and what to put in a locator.
 
+## Visual checkpoints
+
+A **Visual checkpoint** step works in an Android app as on a web page ([visual checkpoints](WEB_APPS.md#visual-checkpoints)): the first
+run keeps the screenshot as the approved baseline, later runs compare with it pixel by pixel, and a change fails the
+step with a difference image (changed pixels in red) that can be accepted as the new baseline from the run page.
+
+- Without an element, the whole screen is compared **without the status bar**: its clock and icons change from run to
+  run. With an element, only that element.
+- Baselines are kept per step (or per *Baseline name*), device model and screenshot size, with the application's
+  other baselines: `baselines/<application>/<step>-android-<device model>-<width>x<height>.png`. A different emulator
+  image or phone starts its own baselines.
+- *Hide (CSS)* is for web pages and is ignored in an app (the run log says so).
+
 ## Manual tests
 
-Manual tests of an Android app work from the run page: the tester uses the app on the phone or emulator and marks each
-step there (pass, fail, notes, screenshots from the computer, bug reports). The panel that the browser and desktop
-apps get, which opens the app beside the steps, is planned for native apps.
+**Run manually** on an Android app starts the app on the phone or emulator, with the environment's launch settings
+(as automated tests start it), and the run page shows its screen beside the checklist. The tester uses the app from
+there (a click on the screen taps that point; **Long press**, **Text to type**, the swipe buttons, **Back** and
+**Hide keyboard** work as in the recorder) or on the device itself; the picture follows about once a second.
+
+- **Screenshot** keeps the device's screen with the current step (the camera button on a step keeps it with that step).
+  **Record clip** and **Stop clip** mark a part of the session's screen recording for the current step; **Current**
+  chooses which step that is.
+- Results, notes, marked-up screenshots and bug reports are saved as for web manual tests (see MANUAL_RUNS.md).
+- **Finish test** (or **Close the app**) closes the app. The session's screen recording becomes the test's video, and
+  the clips play from it.
+
+Nothing is recorded as steps: a manual session only drives the app. Use **Record** for that.
 
 ## Recording
 

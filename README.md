@@ -146,6 +146,12 @@ your data lives: [desktop app guide](docs/STEPFORGE_DESKTOP.md).
   runtime: no Node.js, no terminal. The first start downloads Chromium for UI tests and Mailpit for email tests, with
   progress; without internet it opens anyway and tries again later. Data stays on your computer
   ([guide](docs/STEPFORGE_DESKTOP.md)).
+- **Phone and desktop apps get the same tools as web apps**: **Run manually** starts an Android, iOS, macOS, Windows
+  or Linux app and shows its screen on the run page beside the steps, where the tester uses it, takes screenshots from
+  the device and clips of its recording; the recorder records macOS, Windows and Linux apps from their picture;
+  **visual checkpoints** work in every app; Linux apps get a screen recording (ffmpeg) and their output as a log
+  ([manual tests](docs/MANUAL_RUNS.md#web-desktop-and-phone-applications),
+  [desktop apps](docs/NATIVE_DESKTOP_APPS.md#recording)).
 - **Manual testing, step by step**: the panel follows how a tester works: do the step with the expected result in view,
   write the actual result, take a screenshot or a clip, then pass, fail, blocked or skip
   ([guide](docs/MANUAL_RUNS.md)).
@@ -228,10 +234,10 @@ Every feature, grouped by what you want to do: **[docs/FEATURES.md](docs/FEATURE
 | **UI** | ✅ Recorder with ranked, self-healing locators · assert/extract/mask from the toolbar · tabs, dialogs, iframes · conditions on the page (“if the cookie banner is visible”, “repeat while Load more shows”) · screenshots, video, Playwright traces |
 | **Any web app** | ✅ SPAs, PWAs, canvas and map apps, mobile web with touch · wait for and fake API responses, go offline · file downloads · cookies and storage · control the clock · per-environment language, time zone, location, dark mode, basic auth, headers, proxy, client certificates, installed Chrome/Edge — see [docs/WEB_APPS.md](docs/WEB_APPS.md) |
 | **iOS apps** | ✅ iPhone and iPad apps on the iOS Simulator or a real iPhone, from a Mac with Xcode · Appium + XCUITest installed and started by StepForge · a .app / .ipa or an installed bundle id per environment · accessibility ids, labels, placeholders, roles and XPath · screen recording, system log, element tree at failures — see [docs/IOS_APPS.md](docs/IOS_APPS.md) |
-| **Phone apps: gestures and recording** | ✅ Swipe, long press, scroll to, back, rotate, open / close / background / reset the app, deep links, location, permissions, dialogs, push notifications (iOS simulators) · record by clicking the phone's screen in the dashboard · diagnosis of crashes, dialogs, keyboard and off-screen elements · campaigns across devices — see [docs/ANDROID_APPS.md](docs/ANDROID_APPS.md#gestures-and-device-steps) |
+| **Phone apps: gestures and recording** | ✅ Swipe, long press, scroll to, back, rotate, open / close / background / reset the app, deep links, location, permissions, dialogs, push notifications (iOS simulators) · record by clicking the phone's screen in the dashboard · manual tests with the phone's screen beside the steps · visual checkpoints of the screen · diagnosis of crashes, dialogs, keyboard and off-screen elements · campaigns across devices — see [docs/ANDROID_APPS.md](docs/ANDROID_APPS.md#gestures-and-device-steps) |
 | **Image locators** | ✅ Find elements by a picture of them (map pins, canvas, games, remote desktops) on web, Electron, Android, iOS, macOS and Windows · click, hover, tap, visible / hidden · says how close the best match came — see [docs/IMAGE_LOCATORS.md](docs/IMAGE_LOCATORS.md) |
-| **Linux apps** | ✅ GTK and Qt apps through the AT-SPI accessibility layer (StepForge's own helper) · a command per environment · accessible ids, names, roles and XPath · menus and dialogs — see [docs/NATIVE_DESKTOP_APPS.md](docs/NATIVE_DESKTOP_APPS.md#linux-apps) |
-| **macOS and Windows apps** | ✅ Native Mac apps (AppKit, SwiftUI) and Windows apps (Win32, WPF, WinForms, UWP) through Appium (Mac2, NovaWindows), installed and started by StepForge · a bundle id / .app or an .exe / Store app per environment · menus (`File > Save`), keyboard shortcuts, dialogs · accessibility ids, names, roles and XPath — see [docs/NATIVE_DESKTOP_APPS.md](docs/NATIVE_DESKTOP_APPS.md) |
+| **Linux apps** | ✅ GTK and Qt apps through the AT-SPI accessibility layer (StepForge's own helper) · a command per environment · accessible ids, names, roles and XPath · menus and dialogs · recorder, manual tests, visual checkpoints · screen recording with ffmpeg, the app's output as its log — see [docs/NATIVE_DESKTOP_APPS.md](docs/NATIVE_DESKTOP_APPS.md#linux-apps) |
+| **macOS and Windows apps** | ✅ Native Mac apps (AppKit, SwiftUI) and Windows apps (Win32, WPF, WinForms, UWP) through Appium (Mac2, NovaWindows), installed and started by StepForge · a bundle id / .app or an .exe / Store app per environment · menus (`File > Save`), keyboard shortcuts, dialogs · accessibility ids, names, roles and XPath · recorder, manual tests and visual checkpoints from the app's picture in the dashboard — see [docs/NATIVE_DESKTOP_APPS.md](docs/NATIVE_DESKTOP_APPS.md) |
 | **Android apps** | ✅ Native Android apps on an emulator or a USB phone, from Windows, macOS or Linux · Appium + UiAutomator2 installed and started by StepForge · an .apk or an installed app per environment · ids, text, hints, roles and XPath · screen recording, device log, element tree at failures · `stepforge doctor native` — see [docs/ANDROID_APPS.md](docs/ANDROID_APPS.md) |
 | **Desktop apps** | ✅ Electron apps on Windows, macOS and Linux · start the packaged app or its project folder per environment · every window is a tab · recorder, manual testing, video, traces and diagnosis — see [docs/DESKTOP_APPS.md](docs/DESKTOP_APPS.md) |
 | **Visual checks** | ✅ Screenshot comparison with an approved baseline · difference image · one-click "Accept as new baseline" · masks for changing parts |
@@ -627,6 +633,7 @@ More: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 - [x] Image locators (find elements by a picture, on every platform)
 - [x] Linux desktop apps (GTK, Qt)
 - [x] StepForge as a desktop app: installers for macOS, Windows and Linux
+- [x] Manual tests, visual checkpoints and (desktop) recording for phone and native desktop apps
 - [ ] Next: see [Coming next](#coming-next)
 
 ## Contributing

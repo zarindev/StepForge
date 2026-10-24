@@ -3,6 +3,28 @@
 ## [Unreleased]
 
 ### Added
+- **Manual tests in phone and desktop apps**: **Run manually** on an Android, iOS, macOS, Windows or Linux app starts
+  the app through the native executor with the environment's launch settings, and the run page shows its screen (a
+  desktop app's windows) beside the checklist, refreshed about once a second. The tester uses the app from there
+  (taps and clicks at the point, long press, double and right click, typing into the focused field, keys, swipes,
+  menus, scrolling) or on the device. **Screenshot** keeps the device's screen with the current step; **Record clip**
+  marks a part of the session's screen recording; results, bug reports and the session video are saved as for web
+  manual tests. Finishing closes the app. New routes: `GET /api/run-items/:id/manual/screen`,
+  `POST …/manual/act`, `POST …/manual/panel`; `GET …/manual` reports the open app. The run dialog offers _Start the
+  app now_.
+- **Recording macOS, Windows and Linux apps** from their picture in the dashboard: click, double-click, right-click,
+  typing (passwords become secrets), key presses and shortcuts, menu paths, scrolling and checks become steps, with
+  locators from the Mac2, NovaWindows and AT-SPI element trees (identifier / AutomationId / accessible id, placeholder
+  or a field's name, role with its name, text, XPath), each checked against the app. The picture is the screenshot
+  cropped to the app's windows; clicks are mapped to the app's coordinates (macOS points on a Retina display, the
+  Windows app window, the Linux screen).
+- **Visual checkpoints in phone and desktop apps**: the screen without the status bar (phones), the app's windows
+  (desktops) or an element, compared with the same pixel comparison as web pages (now in `@stepforge/image-match`),
+  with baselines per step, platform, device and size and the same **Accept as new baseline**.
+- **Linux apps: screen recording and log**: tests and manual sessions are recorded with ffmpeg (`x11grab`) when it is
+  on the PATH (otherwise the run log says how to install it); the app's stdout and stderr, kept by the AT-SPI helper,
+  are the test's console log, with tracebacks, core dumps and an error exit marked as errors.
+- `ui.rightclick` works in macOS, Windows and Linux apps.
 - **Desktop app** (`apps/desktop`, Electron): StepForge in its own window. Installed, the server runs on Electron's
   own Node.js (better-sqlite3 rebuilt for it), data lives in the user's app-data folder, and the first start downloads
   Playwright's Chromium and Mailpit (with a connection check first, so an offline start opens at once). From a clone,

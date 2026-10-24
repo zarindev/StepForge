@@ -55,13 +55,23 @@ remote desktops), on every platform. [IMAGE_LOCATORS.md](IMAGE_LOCATORS.md)
 ## Test Linux apps
 
 GTK and Qt apps on Linux through the AT-SPI accessibility layer, with StepForge's own helper: steps, locators,
-menus and dialogs as for other desktop apps. [NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md#linux-apps)
+menus and dialogs as for other desktop apps. Tests are recorded with ffmpeg and keep the app's output as their log.
+[NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md#linux-apps)
 
 ## Test macOS and Windows apps
 
 Native Mac apps and Windows apps (Win32, WPF, WinForms, UWP) through Appium (Mac2, NovaWindows), installed and
 started by StepForge. Each environment names the app; tests add menus, keyboard shortcuts and dialog buttons to the
 usual steps. [NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md)
+
+## Record, test by hand and compare pictures in phone and desktop apps
+
+The dashboard shows a phone app's screen, or a desktop app's windows, and works with it: **Record** turns taps,
+clicks, typing, keys and menus into steps (Android, iOS, macOS, Windows, Linux); **Run manually** starts the app
+beside the manual checklist, with screenshots from the device and clips of its screen recording; **Visual
+checkpoints** compare the screen (without the status bar), the app's windows or an element with an approved baseline.
+[MANUAL_RUNS.md](MANUAL_RUNS.md#web-desktop-and-phone-applications) ·
+[NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md#recording) · [ANDROID_APPS.md](ANDROID_APPS.md#visual-checkpoints)
 
 ## Phone gestures, recording and diagnosis
 

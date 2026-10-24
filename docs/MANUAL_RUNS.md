@@ -4,7 +4,7 @@ _By Md Zarin Tasnim · part of the StepForge documentation_
 
 Some checks need a person: a printout, a judgement about how something looks, a flow nobody has automated yet, or an
 exploratory pass before a release. StepForge runs those tests with you: it opens the application in a browser with
-the steps beside it, records the session, takes screenshots you can mark up, and turns a failure into a bug report.
+the steps beside it (a phone or desktop app's screen beside the steps on the run page), records the session, takes screenshots you can mark up, and turns a failure into a bug report.
 The results are ordinary run results, so run history, analytics, quality gates and the HTML / PDF / Excel reports
 include them.
 
@@ -77,23 +77,43 @@ scenarios** are expanded, **test data and environment variables are filled in** 
 `{{env.baseUrl}}`), secrets stay as `{{secret.name}}` placeholders, and **saved elements** are described by their
 locators.
 
-## Web and desktop applications
+## Web, desktop and phone applications
 
 For a web application, manual testing opens a web browser (Chromium) at the run's screen size. For an Electron desktop
 app it starts the app as the environment says, with the same panel in its window; closing the app finishes the
-session ([DESKTOP_APPS.md](DESKTOP_APPS.md)). For an Android or iOS app, the tester uses
-the app on the phone, emulator or simulator and marks the steps on the run page ([ANDROID_APPS.md](ANDROID_APPS.md),
-[IOS_APPS.md](IOS_APPS.md)). The panel for phone apps and other desktop apps come with the native-app work — see
-[NATIVE_APPS_PLAN.md](NATIVE_APPS_PLAN.md).
+session ([DESKTOP_APPS.md](DESKTOP_APPS.md)).
+
+A **phone app** (Android, iOS) or a **native desktop app** (macOS, Windows, Linux) cannot take a panel inside it. **Run
+manually** (_Start the app now_, on by default) starts the app as automated tests start it, with the environment's
+launch settings, and the **run page shows its screen** beside the checklist (a desktop app's windows), refreshed
+about once a second:
+
+- **Use the app from the picture**: a click taps (phones) or clicks (desktops) that point; long press, double-click,
+  right-click, **Text to type** (into the focused field), swipes, Back and Hide keyboard (phones), keys, shortcuts,
+  menu paths and scrolling (desktops). The device, simulator or app window itself works too.
+- **Screenshot** keeps the device's screen (or the app's windows) with the current step; the camera button on a step
+  keeps one with that step, and **Current** makes a step the one screenshots and clips go to (by default the first
+  step without a result, as in the browser panel).
+- **Record clip** / **Stop clip** mark a part of the session's screen recording, as in the browser panel. The
+  recording is the platform's own: on the device (Android), Xcode's simulator recorder (iOS), XCTest (macOS) or ffmpeg
+  (Windows, Linux, real iPhones). Without one, the panel says why and clips are not offered.
+- Pass / fail / blocked / skip, notes, marked-up screenshots and bug reports work as for web applications.
+- **Finish test** or **Close the app** closes the app; the recording becomes the test's video.
+
+Details per platform: [ANDROID_APPS.md](ANDROID_APPS.md#manual-tests), [IOS_APPS.md](IOS_APPS.md),
+[NATIVE_DESKTOP_APPS.md](NATIVE_DESKTOP_APPS.md#manual-tests).
 
 ## API
 
 | Request                                                | What it does                                                                                                                     |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /api/runs` with `"mode": "manual"`               | Starts a manual run (status `running`, tests `queued`); manual tests are only included in manual runs                            |
-| `GET /api/run-items/:id/manual`                        | The test's checklist, results (notes, screenshots, clips, linked bug), session video, and whether its browser is open            |
+| `GET /api/run-items/:id/manual`                        | The test's checklist, results (notes, screenshots, clips, linked bug), session video, whether its browser is open, and `app` (a phone or desktop app open for it: platform, whether it is recorded, the current step) |
 | `PUT /api/run-items/:id/manual`                        | `{ result: {…} }` (one step) or `{ results: [{ number, status, note?, screenshots?, clips? }] }`, plus `done` / `reopen` — merged per step, so steps not sent keep what is stored; `status` is `passed`, `failed`, `blocked`, `skipped` or `pending`. A finished test stays finished unless `reopen` is sent |
-| `POST /api/run-items/:id/manual/browser` · `DELETE …`  | Opens (or brings forward) / closes the tester's browser                                                                          |
+| `POST /api/run-items/:id/manual/browser` · `DELETE …`  | Opens (or brings forward) / closes the tester's browser, or starts / closes a phone or desktop app                                |
+| `GET /api/run-items/:id/manual/screen`                 | A phone or desktop app's screen (PNG; a desktop app's windows), with its size in `x-screen-size`                                  |
+| `POST /api/run-items/:id/manual/act`                   | Drives the app: `{ action: "tap", x, y, button?, count?, holdMs? }` (x, y: fractions of the picture), `type`, `key`, `swipe`, `scroll`, `menu`, `back`, `hideKeyboard` |
+| `POST /api/run-items/:id/manual/panel`                 | The panel's actions for an app: `{ type: "screenshot" \| "clipStart" \| "clipStop" \| "go" \| "mark", number, status?, note? }` |
 | `POST /api/run-items/:id/manual/attachments`           | `{ number, dataUrl }` (PNG/JPEG) → `{ path }` to add to a step's `screenshots`                                                   |
 | `POST /api/run-items/:id/manual/bug`                   | `{ number, title, expected, actual, severity }` → the bug                                                                        |
 | `POST /api/runs/:id/manual/finish`                     | Ends the run; unfinished tests become skipped                                                                                    |
