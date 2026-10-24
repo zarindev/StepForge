@@ -9,3 +9,4 @@ docs/case-study/*.html
 docs/case-study/export
 apps/desktop/.stage
 apps/desktop/release
+.claude

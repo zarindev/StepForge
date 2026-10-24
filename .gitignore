@@ -25,3 +25,4 @@ __pycache__/
 *.pyc
 apps/desktop/.stage/
 apps/desktop/release/
+.claude/worktrees/

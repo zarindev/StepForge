@@ -11,6 +11,7 @@ export default tseslint.config(
       'packages/db/migrations/**',
       'demo/**/public/**',
       'docs/samples/**',
+      '.claude/**',
       'apps/desktop/.stage/**',
       'apps/desktop/release/**',
     ],
