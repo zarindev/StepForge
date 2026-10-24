@@ -161,7 +161,12 @@ export function desktopScreenTests(o: {
     const second = await run(steps(wait, checkpoint), {}, baselines);
     expect(second.steps.at(-1)!.visual?.status, second.steps.at(-1)!.message).toBe('match');
     expect(second.status).toBe('passed');
-    const changed = await run(steps(...signIn, checkpoint), {}, baselines);
+    const signedIn: StepInput = {
+      type: 'ui.waitFor',
+      params: { state: 'visible' },
+      locators: id('patient_count'),
+    };
+    const changed = await run(steps(...signIn, signedIn, checkpoint), {}, baselines);
     expect(changed.status).toBe('failed');
     expect(['changed', 'sizeChanged']).toContain(changed.steps.at(-1)!.visual?.status);
   }, 600_000);

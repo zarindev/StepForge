@@ -9,7 +9,7 @@ import {
   type StepOutcome,
   type TestContext,
 } from '@stepforge/core';
-import { baselineKey, compareWithBaseline, cropPng } from '@stepforge/image-match/visual';
+import { baselineKey, compareWithBaseline, cropPng, pngDiffPercent } from '@stepforge/image-match/visual';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -604,15 +604,26 @@ export class NativeSession implements ExecutorSession {
         'warn',
         'Hiding parts with CSS is for web pages: the mask of this checkpoint is ignored in an app',
       );
-    let png: Buffer;
-    if (el) png = await this.driver.screenshot(el);
-    else if (this.platform.kind === 'phone') {
-      png = await this.driver.screenshot();
+    const capture = async (): Promise<Buffer> => {
+      if (el) return this.driver.screenshot(el);
+      if (this.platform.kind !== 'phone') return (await this.platform.view(this.driver)).png;
+      const shot = await this.driver.screenshot();
       const top = await this.platform.statusBar(this.driver).catch(() => 0);
-      const size = pngSize(png);
-      if (top > 0 && top < size.height)
-        png = cropPng(png, { x: 0, y: top, width: size.width, height: size.height - top });
-    } else png = (await this.platform.view(this.driver)).png;
+      const size = pngSize(shot);
+      return top > 0 && top < size.height
+        ? cropPng(shot, { x: 0, y: top, width: size.width, height: size.height - top })
+        : shot;
+    };
+    // A screen that is still changing (a window opening, a screen redrawing after a click) is not compared: wait,
+    // up to about 3 s, until two screenshots in a row are the same.
+    let png = await capture();
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 300));
+      const next = await capture();
+      const moved = pngDiffPercent(png, next, threshold);
+      png = next;
+      if (moved !== null && moved <= maxDiffPercent / 10) break;
+    }
     const actual = join(this.ctx.artifactsDir, `visual-${pad(step.position)}.png`);
     writeFileSync(actual, png);
     const size = pngSize(png);

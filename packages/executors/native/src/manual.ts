@@ -1,7 +1,8 @@
-import { StepError } from '@stepforge/core';
+import { StepError, type Locator } from '@stepforge/core';
 import { pressShortcut, type Direction, type NativePlatform, type PointerOptions } from './platforms.ts';
+import { elementAt, isField, locatorsFor, parseElements } from './recorder.ts';
 import { pngSize, type Area } from './view.ts';
-import { WebDriverSession } from './webdriver.ts';
+import { WebDriverSession, type ElementRef } from './webdriver.ts';
 
 /** What the tester does on the dashboard's picture of the app (points are fractions of the picture, 0–1). */
 export type ManualAction =
@@ -27,6 +28,8 @@ export class NativeManualSession {
   private stopRecording: (() => Promise<Buffer | null>) | null = null;
   private area?: Area;
   private busy: Promise<unknown> = Promise.resolve();
+  /** A desktop text field clicked last: typing goes into it (key actions do not reach every desktop driver). */
+  private field?: Locator[];
   private stopped = false;
 
   private constructor(
@@ -109,12 +112,18 @@ export class NativeManualSession {
           if (pf.kind === 'phone' && a.button === 'right')
             throw new StepError('unsupported', 'Phones have no right-click: long-press instead');
           await pf.pointer(d, x, y, opts);
+          this.field = undefined;
+          if (pf.kind === 'desktop' && a.button !== 'right' && (a.count ?? 1) === 1) {
+            const hit = elementAt(parseElements(await d.source().catch(() => '')), x, y);
+            if (hit && isField(hit)) this.field = locatorsFor(hit);
+          }
           break;
         }
         case 'type': {
           if (!a.text) return;
           // A phone types into the focused field; a desktop app gets the keys.
-          const el = pf.kind === 'phone' ? await d.activeElement() : undefined;
+          const el =
+            pf.kind === 'phone' ? await d.activeElement() : this.field && (await this.find(this.field));
           if (el) await d.sendKeys(el, a.text);
           else
             await d.actions([
@@ -156,6 +165,15 @@ export class NativeManualSession {
           break;
       }
     });
+  }
+
+  private async find(locators: Locator[]): Promise<ElementRef | undefined> {
+    for (const l of locators)
+      for (const q of this.platform.queries(l)) {
+        const els = await this.driver.findAll(q.using, q.value).catch(() => []);
+        if (els.length) return els[0];
+      }
+    return undefined;
   }
 
   /** Closes the app; gives the session's screen recording (null without one). */

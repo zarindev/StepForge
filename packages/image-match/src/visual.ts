@@ -65,6 +65,15 @@ export function compareWithBaseline(input: {
   };
 }
 
+/** The percentage of pixels that differ between two PNGs (null when their sizes differ). */
+export function pngDiffPercent(a: Buffer, b: Buffer, threshold = 0.1): number | null {
+  const x = PNG.sync.read(a);
+  const y = PNG.sync.read(b);
+  if (x.width !== y.width || x.height !== y.height) return null;
+  const differing = pixelmatch(x.data, y.data, undefined, x.width, x.height, { threshold });
+  return (differing / (x.width * x.height)) * 100;
+}
+
 /** A part of a PNG (in its pixels, clipped to the image), as a new PNG. */
 export function cropPng(png: Buffer, r: { x: number; y: number; width: number; height: number }): Buffer {
   const img = PNG.sync.read(png);
