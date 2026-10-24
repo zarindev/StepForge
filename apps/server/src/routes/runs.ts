@@ -140,6 +140,7 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
   app.get<P<'id'>>('/api/run-items/:id/manual', async (req) => ({
     ...ctx.manual.checklist(req.params.id),
     browserOpen: ctx.manualBrowser.isOpen(req.params.id),
+    app: ctx.manualBrowser.appOf(req.params.id),
   }));
   // The tester's browser for a manual test (StepForge panel on top, session recorded), and bug reports from a step.
   app.post<P<'id'>>('/api/run-items/:id/manual/browser', async (req) =>
@@ -148,6 +149,48 @@ export async function registerRunRoutes(app: FastifyInstance, ctx: AppContext): 
   app.delete<P<'id'>>('/api/run-items/:id/manual/browser', async (req, reply) => {
     await ctx.manualBrowser.close(req.params.id);
     return reply.code(204).send();
+  });
+  // A phone or desktop app open for a manual test: its screen, what the tester does on it, and the panel's actions
+  // (a screenshot from the app, a clip of its screen recording, a result) as in the browser's panel.
+  app.get<P<'id'>>('/api/run-items/:id/manual/screen', async (req, reply) => {
+    const { png, width, height } = await ctx.manualBrowser.screen(req.params.id);
+    return reply
+      .header('cache-control', 'no-store')
+      .header('x-screen-size', `${width}x${height}`)
+      .type('image/png')
+      .send(png);
+  });
+  const ManualPoint = { x: z.number().min(0).max(1), y: z.number().min(0).max(1) };
+  const ManualAct = z.discriminatedUnion('action', [
+    z.object({
+      action: z.literal('tap'),
+      ...ManualPoint,
+      button: z.enum(['left', 'right']).optional(),
+      count: z.number().int().min(1).max(2).optional(),
+      holdMs: z.number().int().min(0).max(10_000).optional(),
+    }),
+    z.object({ action: z.literal('type'), text: z.string().max(5000) }),
+    z.object({ action: z.literal('key'), key: z.string().min(1).max(100) }),
+    z.object({ action: z.literal('swipe'), direction: z.enum(['up', 'down', 'left', 'right']) }),
+    z.object({ action: z.literal('scroll'), direction: z.enum(['up', 'down']) }),
+    z.object({ action: z.literal('menu'), path: z.string().min(1).max(500) }),
+    z.object({ action: z.literal('back') }),
+    z.object({ action: z.literal('hideKeyboard') }),
+  ]);
+  app.post<P<'id'>>('/api/run-items/:id/manual/act', async (req) => {
+    await ctx.manualBrowser.act(req.params.id, ManualAct.parse(req.body));
+    return { ok: true };
+  });
+  app.post<P<'id'>>('/api/run-items/:id/manual/panel', async (req) => {
+    const body = z
+      .object({
+        type: z.enum(['mark', 'screenshot', 'clipStart', 'clipStop', 'go']),
+        number: z.string().max(100).default(''),
+        status: z.enum(['passed', 'failed', 'blocked', 'skipped']).optional(),
+        note: z.string().max(5000).optional(),
+      })
+      .parse(req.body);
+    return ctx.manualBrowser.panel(req.params.id, body);
   });
   app.post<P<'id'>>('/api/run-items/:id/manual/bug', async (req, reply) =>
     reply.code(201).send(ctx.manual.reportBug(req.params.id, req.body)),

@@ -64,9 +64,9 @@ export function RunDialogHost() {
 
 function RunDialog({ req }: { req: Request }) {
   const envs = useEnvironments(req.applicationId);
-  // Phone apps are not opened with the panel yet: the tester uses the phone, emulator or simulator and marks steps here.
+  // Phone and desktop apps take no panel: StepForge starts the app and the run page shows its screen beside the steps.
   const platform = useApplications().data?.find((a) => a.id === req.applicationId)?.platform;
-  const phone =
+  const native =
     platform === 'android' ||
     platform === 'ios' ||
     platform === 'macos' ||
@@ -120,8 +120,8 @@ function RunDialog({ req }: { req: Request }) {
       qc.invalidateQueries({ queryKey: ['runs'] });
       close();
       navigate({ to: '/runs/$runId', params: { runId: run.id } });
-      // A manual run opens the tester's browser on the first test right away.
-      if (mode === 'manual' && openBrowser && !phone) {
+      // A manual run opens the tester's browser (or starts the app) on the first test right away.
+      if (mode === 'manual' && openBrowser) {
         try {
           const detail = await api<{ items: { id: string }[] }>(`/api/runs/${run.id}`);
           const first = detail.items[0];
@@ -168,12 +168,13 @@ function RunDialog({ req }: { req: Request }) {
             <option value="manual">Manual — a person follows the steps and records results</option>
           </Select>
         </Field>
-        {mode === 'manual' && phone && (
-          <p className="text-xs text-muted">
-            Use the app on the device or this computer and mark each step on the run page.
-          </p>
+        {mode === 'manual' && native && (
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={openBrowser} onChange={setOpenBrowser} label="Start the app now" /> Start the app
+            now; its screen shows on the run page beside the steps
+          </label>
         )}
-        {mode === 'manual' && !phone && (
+        {mode === 'manual' && !native && (
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={openBrowser} onChange={setOpenBrowser} label="Open the browser now" /> Open the
             browser now, with the steps beside the app

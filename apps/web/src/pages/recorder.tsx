@@ -54,7 +54,7 @@ type Recording = {
   network: Captured[];
   secretKeys: string[];
   target?: Target;
-  /** Set when a phone app is recorded: the dashboard shows its screen. */
+  /** Set when a phone or desktop app is recorded: the dashboard shows its screen (a desktop app's windows). */
   native?: { platform: string };
 } | null;
 
@@ -178,8 +178,8 @@ function StartPanel() {
             </Field>
             {app?.platform === 'macos' || app?.platform === 'windows' || app?.platform === 'linux' ? (
               <p className="self-end pb-2 text-sm text-muted">
-                Recording {{ macos: 'macOS', windows: 'Windows', linux: 'Linux' }[app.platform]} apps is
-                planned. Add the steps in the editor for now.
+                Starts the app on this computer as the environment says; you use its windows from their
+                picture here (it takes over the mouse and keyboard while it records).
               </p>
             ) : app?.platform === 'android' || app?.platform === 'ios' ? (
               <p className="self-end pb-2 text-sm text-muted">
@@ -213,18 +213,12 @@ function StartPanel() {
           )}
           <Button
             data-tour="recorder-button"
-            disabled={
-              !envValid ||
-              start.isPending ||
-              app?.platform === 'macos' ||
-              app?.platform === 'windows' ||
-              app?.platform === 'linux'
-            }
+            disabled={!envValid || start.isPending}
             onClick={() => start.mutate()}
           >
             <Circle className="h-3.5 w-3.5 fill-current text-fail" />{' '}
             {start.isPending
-              ? app?.platform === 'electron' || app?.platform === 'android' || app?.platform === 'ios'
+              ? app?.platform && app.platform !== 'web'
                 ? 'Starting the app…'
                 : 'Opening browser…'
               : 'Start recording'}
@@ -340,7 +334,10 @@ function LivePanel({ rec }: { rec: NonNullable<Recording> }) {
           </div>
         </div>
         {rec.native ? (
-          <NativeScreen platform={rec.native.platform} recordKey={RECORDER_KEY} />
+          <NativeScreen
+            platform={rec.native.platform}
+            onActed={(res) => res.recording && qc.setQueryData(RECORDER_KEY, res.recording)}
+          />
         ) : (
           <ol className="max-h-[60vh] overflow-y-auto p-3" aria-label="Recorded steps" aria-live="polite">
             {rec.steps.map((s, i) => (
@@ -357,7 +354,9 @@ function LivePanel({ rec }: { rec: NonNullable<Recording> }) {
           </div>
           <p className="mt-1 text-muted">
             {rec.native
-              ? 'Use the app from its screen here: taps, typing, swipes and checks become steps.'
+              ? ['macOS', 'Windows', 'Linux'].includes(rec.native.platform)
+                ? 'Use the app from its picture here: clicks, typing, keys, menus and checks become steps.'
+                : 'Use the app from its screen here: taps, typing, swipes and checks become steps.'
               : 'Use the toolbar inside it to pause, add checks, save values, mask fields or stop.'}
           </p>
         </Card>

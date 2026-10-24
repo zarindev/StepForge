@@ -3,13 +3,17 @@ import { Link } from '@tanstack/react-router';
 import {
   Ban,
   Bug,
+  Camera,
   Check,
+  Circle,
   Clapperboard,
   ExternalLink,
   ImagePlus,
   Minus,
   MonitorPlay,
   PenLine,
+  Smartphone,
+  Square,
   X,
 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
@@ -25,6 +29,7 @@ import { api, artifactUrl } from '@/lib/api';
 import { useLiveEvent } from '@/lib/live';
 import { qk } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { NativeScreen } from '@/components/recorder/native-screen';
 import { Annotator } from './annotator';
 
 type Status = 'passed' | 'failed' | 'blocked' | 'skipped';
@@ -44,6 +49,17 @@ type Checklist = {
   item: { status: string };
   video: string | null;
   browserOpen: boolean;
+  /** A phone or desktop app open for this test (its screen is shown here). */
+  app: {
+    platform: string;
+    kind: 'phone' | 'desktop';
+    /** Whether the session's screen is recorded (clips need it). */
+    recording: boolean;
+    noRecording: string | null;
+    /** A clip is being recorded. */
+    clip: boolean;
+    current: string | null;
+  } | null;
 };
 
 const CHOICES: { status: Status; label: string; icon: typeof Check; on: string }[] = [
@@ -173,20 +189,22 @@ function BugDialog({
 /**
  * A manual run's checklist for one test. The tester works in the browser StepForge opens (with the steps in a panel
  * on top) or right here: each step in plain English, marked passed / failed / blocked / skipped, with notes,
- * screenshots (marked up with boxes, arrows, pen and text), screen-recording clips and bug reports.
+ * screenshots (marked up with boxes, arrows, pen and text), screen-recording clips and bug reports. A phone or desktop
+ * app is opened as tests open it, and its screen is shown here next to the steps (screenshots and clips come from it).
  */
 export function ManualChecklist({
   runId,
   itemId,
   onDone,
-  canOpenBrowser = true,
+  platform = 'web',
 }: {
   runId: string;
   itemId: string;
   onDone: () => void;
-  /** False for apps StepForge cannot open with the panel yet (Android): the tester marks steps here. */
-  canOpenBrowser?: boolean;
+  /** The application's platform: web and Electron apps get a browser window with the panel, the others their screen here. */
+  platform?: string;
 }) {
+  const native = ['android', 'ios', 'macos', 'windows', 'linux'].includes(platform);
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ['manual', itemId],
@@ -291,11 +309,26 @@ export function ManualChecklist({
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['manual', itemId] }),
     onError: toastError,
   });
+  // The app's panel actions (as in the browser's panel): a screenshot from the app, a clip, the current step.
+  const panel = useMutation({
+    mutationFn: (body: { type: 'screenshot' | 'clipStart' | 'clipStop' | 'go'; number?: string }) =>
+      api(`/api/run-items/${itemId}/manual/panel`, { method: 'POST', json: body }),
+    onSuccess: (_d, body) => {
+      void qc.invalidateQueries({ queryKey: ['manual', itemId] });
+      if (body.type === 'screenshot') toast(`Screenshot added to step ${body.number}`);
+      if (body.type === 'clipStop') toast(`Clip added to step ${body.number}`);
+    },
+    onError: toastError,
+  });
 
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   if (q.isPending) return <Skeleton className="h-64" />;
   const checkable = q.data.lines.filter((l) => !l.group);
   const checked = checkable.filter((l) => (results[l.number]?.status ?? 'pending') !== 'pending').length;
+  const app = q.data.app;
+  // The step screenshots and clips go to: the one chosen, else the first without a result.
+  const current = app?.current ?? checkable[0]?.number ?? '';
+  const where = native ? 'app' : 'browser';
 
   return (
     <Card className="space-y-3 p-5" aria-label="Manual checklist">
@@ -309,7 +342,8 @@ export function ManualChecklist({
         {q.data.browserOpen ? (
           <>
             <Badge tone="indigo">
-              <MonitorPlay className="mr-1 inline h-3 w-3" /> Browser open · recording
+              <MonitorPlay className="mr-1 inline h-3 w-3" />{' '}
+              {native ? `App open${app?.recording ? ' · recording' : ''}` : 'Browser open · recording'}
             </Badge>
             <Button
               variant="ghost"
@@ -317,19 +351,20 @@ export function ManualChecklist({
               disabled={browser.isPending}
               onClick={() => browser.mutate(false)}
             >
-              Close browser
+              {native ? 'Close the app' : 'Close browser'}
             </Button>
           </>
-        ) : canOpenBrowser ? (
+        ) : (
           <Button
             variant="outline"
             size="sm"
             disabled={browser.isPending}
             onClick={() => browser.mutate(true)}
           >
-            <MonitorPlay className="h-3.5 w-3.5" /> Open browser
+            {native ? <Smartphone className="h-3.5 w-3.5" /> : <MonitorPlay className="h-3.5 w-3.5" />}{' '}
+            {native ? (browser.isPending ? 'Starting the app…' : 'Open the app') : 'Open browser'}
           </Button>
-        ) : null}
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -342,11 +377,57 @@ export function ManualChecklist({
           Finish test
         </Button>
       </div>
-      {q.data.browserOpen && (
+      {q.data.browserOpen && !app && (
         <p className="rounded-lg border border-indigo/30 bg-indigo/5 px-3 py-2 text-xs">
           The browser shows the steps in a StepForge panel: mark them there (or here), take screenshots and
           record clips. The whole session is recorded; it is kept when the browser closes.
         </p>
+      )}
+      {app && (
+        <section aria-label="The app" className="rounded-lg border border-border">
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs">
+            <span className="text-muted">
+              Step <b className="font-mono text-fg">{current || '—'}</b>
+              {current && `: ${split(q.data.lines.find((l) => l.number === current)?.text ?? '')[0]}`}
+            </span>
+            <span className="flex-1" />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!current || panel.isPending}
+              onClick={() => panel.mutate({ type: 'screenshot', number: current })}
+            >
+              <Camera className="h-3.5 w-3.5" /> Screenshot
+            </Button>
+            {app.clip ? (
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={panel.isPending}
+                onClick={() => panel.mutate({ type: 'clipStop', number: current })}
+              >
+                <Square className="h-3.5 w-3.5 fill-current" /> Stop clip
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!current || !app.recording || panel.isPending}
+                title={app.noRecording ?? 'Records a clip of the app’s screen for this step'}
+                onClick={() => panel.mutate({ type: 'clipStart', number: current })}
+              >
+                <Circle className="h-3.5 w-3.5 fill-current text-fail" /> Record clip
+              </Button>
+            )}
+          </div>
+          {app.noRecording && <p className="px-3 pt-2 text-xs text-muted">{app.noRecording}</p>}
+          <NativeScreen
+            platform={app.platform}
+            recording={false}
+            screenUrl={`/api/run-items/${itemId}/manual/screen`}
+            actUrl={`/api/run-items/${itemId}/manual/act`}
+          />
+        </section>
       )}
       <input
         ref={fileInput}
@@ -405,6 +486,33 @@ export function ManualChecklist({
                         <span className="hidden xl:inline">{c.label}</span>
                       </button>
                     ))}
+                    {app && (
+                      <button
+                        type="button"
+                        aria-label={`Step ${l.number}: screenshot from the app`}
+                        title="Take a screenshot of the app for this step"
+                        disabled={panel.isPending}
+                        onClick={() => panel.mutate({ type: 'screenshot', number: l.number })}
+                        className="inline-flex h-7 items-center rounded-md px-2 text-muted hover:bg-fg/5"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {app && (
+                      <button
+                        type="button"
+                        aria-label={`Step ${l.number}: make it the current step`}
+                        aria-pressed={current === l.number}
+                        title="Screenshots and clips from the app go to this step"
+                        onClick={() => panel.mutate({ type: 'go', number: l.number })}
+                        className={cn(
+                          'inline-flex h-7 items-center rounded-md px-2 text-xs',
+                          current === l.number ? 'bg-brand/15 text-brand' : 'text-muted hover:bg-fg/5',
+                        )}
+                      >
+                        Current
+                      </button>
+                    )}
                     <button
                       type="button"
                       aria-label={`Step ${l.number}: attach a screenshot`}
@@ -479,7 +587,7 @@ export function ManualChecklist({
                             className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-muted"
                           >
                             <Clapperboard className="h-3 w-3" /> Clip {i + 1} · {time(c.startMs)}–
-                            {time(c.endMs)} (playable when the browser closes)
+                            {time(c.endMs)} (playable when the {where} closes)
                           </span>
                         ),
                       )}

@@ -456,12 +456,15 @@ export class RunManager {
     const pool = new BrowserPool();
     const specs = this.specs;
     const appium = this.appium;
+    // Visual checkpoints keep their approved baselines per application (web, desktop and phone apps alike).
+    const baselineDir = join(this.artifactsRoot, 'baselines', run.applicationId);
     const executors = [
       options.linux
         ? createNativeExecutor({
             // Linux: StepForge's own AT-SPI helper instead of Appium.
             appiumUrl: () =>
               this.linux ? this.linux.url() : Promise.reject(new Error('Linux apps are not available here')),
+            baselineDir,
           })
         : options.android || options.ios || options.macos || options.windows
           ? createNativeExecutor({
@@ -470,8 +473,9 @@ export class RunManager {
                   ? appium.url()
                   : Promise.reject(new Error('Phone and desktop apps are not available here')),
               hasDriver: (d) => appium?.hasDriver(d) ?? false,
+              baselineDir,
             })
-          : createUiExecutor(pool, { baselineDir: join(this.artifactsRoot, 'baselines', run.applicationId) }),
+          : createUiExecutor(pool, { baselineDir }),
       createApiExecutor({
         contracts: specs
           ? async (ref, req, res) => {

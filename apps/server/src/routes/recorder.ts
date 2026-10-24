@@ -23,7 +23,8 @@ export function registerRecorderRoutes(app: FastifyInstance, ctx: AppContext): v
     reply.code(201).send(recorder.save(req.body as never)),
   );
 
-  // Phone apps: the screen as a picture, and what the tester does on it (points are fractions of the screen, 0–1).
+  // Phone and desktop apps: the screen (a desktop app's windows) as a picture, and what the tester does on it (points
+  // are fractions of the picture, 0–1).
   app.get('/api/recorder/screen', async (_req, reply) => {
     const { png, width, height } = await recorder.native().screen();
     return reply
@@ -35,12 +36,21 @@ export function registerRecorderRoutes(app: FastifyInstance, ctx: AppContext): v
   const Point = { x: z.number().min(0).max(1), y: z.number().min(0).max(1) };
   const Act = z.discriminatedUnion('action', [
     z.object({ action: z.literal('tap'), ...Point }),
+    z.object({
+      action: z.literal('click'),
+      ...Point,
+      button: z.enum(['left', 'right']).default('left'),
+      count: z.number().int().min(1).max(2).default(1),
+    }),
     z.object({ action: z.literal('longPress'), ...Point }),
     z.object({ action: z.literal('check'), ...Point, check: z.enum(['visible', 'text']) }),
     z.object({ action: z.literal('type'), text: z.string().max(5000) }),
     z.object({ action: z.literal('swipe'), direction: z.enum(['up', 'down', 'left', 'right']) }),
     z.object({ action: z.literal('back') }),
     z.object({ action: z.literal('hideKeyboard') }),
+    z.object({ action: z.literal('key'), key: z.string().min(1).max(100) }),
+    z.object({ action: z.literal('menu'), path: z.string().min(1).max(500) }),
+    z.object({ action: z.literal('scroll'), direction: z.enum(['up', 'down']) }),
   ]);
   app.post('/api/recorder/act', async (req, reply) => {
     const a = Act.parse(req.body);
@@ -48,7 +58,11 @@ export function registerRecorderRoutes(app: FastifyInstance, ctx: AppContext): v
     let result: unknown;
     try {
       if (a.action === 'tap') result = await s.tap(a.x, a.y);
+      else if (a.action === 'click') result = await s.click(a.x, a.y, { button: a.button, count: a.count });
       else if (a.action === 'longPress') await s.longPress(a.x, a.y);
+      else if (a.action === 'key') await s.key(a.key);
+      else if (a.action === 'menu') await s.menu(a.path);
+      else if (a.action === 'scroll') await s.scroll(a.direction);
       else if (a.action === 'check') await s.check(a.x, a.y, a.check);
       else if (a.action === 'type') await s.type(a.text);
       else if (a.action === 'swipe') await s.swipe(a.direction);

@@ -307,11 +307,14 @@ export class AppiumServer {
   }
 
   hasDriver(name: string): boolean {
+    if (process.env.STEPFORGE_APPIUM_URL) return true;
     return appiumInstalled(this.toolsDir, name);
   }
 
   /** The server's URL, starting it if needed. */
   url(): Promise<string> {
+    // Test switch: an Appium server that is already running (StepForge's own E2E tests use a fake one).
+    if (process.env.STEPFORGE_APPIUM_URL) return Promise.resolve(process.env.STEPFORGE_APPIUM_URL);
     if (this.starting) return this.starting;
     this.starting = this.start().catch((err) => {
       this.starting = undefined;

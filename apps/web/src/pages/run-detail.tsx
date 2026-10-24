@@ -356,9 +356,7 @@ function RunDetail({ runId }: { runId: string }) {
               key={selectedId}
               runId={r.id}
               itemId={selectedId}
-              canOpenBrowser={
-                !['android', 'ios', 'macos', 'windows', 'linux'].includes(r.application.platform ?? 'web')
-              }
+              platform={r.application.platform ?? 'web'}
               onDone={() => {
                 const next = items.find(
                   (i) => i.id !== selectedId && (i.status === 'queued' || i.status === 'running'),

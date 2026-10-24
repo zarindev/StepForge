@@ -157,8 +157,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<{ app: FastifyI
   ctx.recorder.appium = appium;
   const linux = new LinuxHelper();
   ctx.runs.linux = linux;
+  ctx.recorder.linux = linux;
   ctx.manual = new ManualRunService(db, bus, ctx.runs, config.artifactsDir);
   ctx.manualBrowser = new ManualBrowserService(db, bus, ctx.runs, ctx.manual, config.artifactsDir);
+  ctx.manualBrowser.appium = appium;
+  ctx.manualBrowser.linux = linux;
   ctx.scheduler = new SchedulerService(db, masterKey, bus, ctx.runs, () => `http://127.0.0.1:${config.port}`);
   ctx.campaigns = new CampaignService(
     db,

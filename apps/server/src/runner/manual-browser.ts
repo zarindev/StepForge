@@ -1,14 +1,21 @@
 import { launchElectron } from '@stepforge/executor-ui';
-import { VariableResolver, VIEWPORT_PRESETS, type ElectronLaunch } from '@stepforge/core';
+import { StepError, VariableResolver, VIEWPORT_PRESETS, type ElectronLaunch } from '@stepforge/core';
+import {
+  NativeManualSession,
+  type AppiumServer,
+  type LinuxHelper,
+  type ManualAction,
+} from '@stepforge/executor-native';
 import type { StepForgeDb } from '@stepforge/db';
 import { schema } from '@stepforge/db';
 import * as repo from '@stepforge/db/repos';
 import { newId } from '@stepforge/core';
 import { eq } from 'drizzle-orm';
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import type { EventBus } from '../context.ts';
+import { isNative, nativePlatformFor, nativeServerUrl } from '../native-apps.ts';
 import type { RunManager } from './manager.ts';
 import type { ManualRunService } from './manual.ts';
 
@@ -26,9 +33,12 @@ type Session = {
   runId: string;
   /** Closes the browser (or the desktop app) the tester used. */
   shut: () => Promise<void>;
-  context: BrowserContext;
-  page: Page;
-  /** The recording starts with the browser context; clips are offsets into it. */
+  /** A web or Electron app: the browser context and page the tester uses (with the StepForge panel on top). */
+  context?: BrowserContext;
+  page?: Page;
+  /** A phone or desktop app: started as tests start it; the dashboard shows its screen next to the checklist. */
+  native?: NativeManualSession;
+  /** The recording starts with the browser context (or the app's screen recording); clips are offsets into it. */
   startedAt: number;
   video?: string;
   /** The step the tester chose with "go" (and its status then); cleared once that step gets a (new) result. */
@@ -41,11 +51,18 @@ type Session = {
  * The browser a tester uses for a manual test: it opens the application with a StepForge panel on top (current step,
  * what to expect, the next step; pass / fail / blocked / skip; screenshots; screen-recording clips). The whole session
  * is recorded as a video, and every action is saved to the test's results at once, so the dashboard follows along.
+ *
+ * A phone or desktop app cannot take a panel: it is started as tests start it, and the dashboard shows its screen
+ * (operable there as on the device) next to the same checklist; screenshots come from the app, clips from its
+ * screen recording.
  */
 export class ManualBrowserService {
   private sessions = new Map<string, Session>();
   /** Browsers being launched: a second "open" while one starts gets the same one. */
   private opening = new Map<string, Promise<{ open: true; url: string }>>();
+  /** The local Appium server and the Linux helper, for phone and desktop apps (set by the server). */
+  appium?: AppiumServer;
+  linux?: LinuxHelper;
 
   constructor(
     private readonly db: StepForgeDb,
@@ -82,14 +99,58 @@ export class ManualBrowserService {
     return this.sessions.get(itemId)?.page;
   }
 
+  /** A phone or desktop app open for this test: its platform, and whether a clip is being recorded. */
+  appOf(itemId: string) {
+    const s = this.sessions.get(itemId);
+    if (!s?.native) return null;
+    return {
+      platform: s.native.platform.name,
+      kind: s.native.kind,
+      recording: s.video !== undefined,
+      noRecording: s.native.noRecording ?? null,
+      clip: s.clipStart !== null,
+      current: this.state(itemId).current,
+    };
+  }
+
+  private nativeOf(itemId: string): NativeManualSession {
+    const n = this.sessions.get(itemId)?.native;
+    if (!n) throw new repo.RepoError(409, 'conflict', 'The app is not open for this test');
+    return n;
+  }
+
+  /** The app's screen (a desktop app's windows), for the dashboard. */
+  screen(itemId: string) {
+    return this.nativeOf(itemId).screen();
+  }
+
+  /** What the tester does on the dashboard's picture of the app; a step that cannot be done is explained. */
+  async act(itemId: string, action: ManualAction) {
+    try {
+      await this.nativeOf(itemId).act(action);
+    } catch (err) {
+      if (err instanceof StepError || (err as Error).name === 'WebDriverError')
+        throw new repo.RepoError(422, 'not_done', (err as Error).message);
+      throw err;
+    }
+  }
+
+  /** The dashboard's panel for a phone or desktop app: the same actions as the browser's panel. */
+  async panel(itemId: string, action: Record<string, unknown>) {
+    if (!this.sessions.get(itemId))
+      throw new repo.RepoError(409, 'conflict', 'The app is not open for this test');
+    return this.handle(itemId, action);
+  }
+
   /** Opens (or brings forward) the browser for one test of a manual run. */
   open(itemId: string): Promise<{ open: true; url: string }> {
     const existing = this.sessions.get(itemId);
-    if (existing)
+    if (existing?.native) return Promise.resolve({ open: true as const, url: '' });
+    if (existing?.page)
       return existing.page
         .bringToFront()
         .catch(() => {})
-        .then(() => ({ open: true as const, url: existing.page.url() }));
+        .then(() => ({ open: true as const, url: existing.page!.url() }));
     let opening = this.opening.get(itemId);
     if (!opening) {
       // Stored before anything is awaited, so concurrent calls share one browser.
@@ -115,18 +176,7 @@ export class ManualBrowserService {
 
     // A desktop (Electron) app is opened itself, as its environment says; a web app in a browser.
     const platform = repo.getApplication(this.db, run.applicationId).platform;
-    if (
-      platform === 'android' ||
-      platform === 'ios' ||
-      platform === 'macos' ||
-      platform === 'windows' ||
-      platform === 'linux'
-    )
-      throw new repo.RepoError(
-        400,
-        'invalid',
-        `Opening ${{ ios: 'an iOS', android: 'an Android', macos: 'a macOS', windows: 'a Windows', linux: 'a Linux' }[platform]} app with the panel is planned; use the app on the device or computer and mark the steps here`,
-      );
+    if (isNative(platform)) return this.launchNative(itemId, run.id, platform, env, videoDir);
     const desktop = platform === 'electron';
     const launch = desktop
       ? ((env?.browserDefaultsJson as { electron?: ElectronLaunch } | undefined)?.electron ?? {})
@@ -182,11 +232,12 @@ export class ManualBrowserService {
       throw e;
     }
     const s = session;
+    const page = s.page!;
     this.sessions.set(itemId, s);
     // The tester closing the window ends the session (the video is kept).
     if (electronApp) electronApp.on('close', () => void this.end(itemId, s));
     else browser!.on('disconnected', () => void this.end(itemId, s));
-    s.page.on('close', () => void this.end(itemId, s));
+    page.on('close', () => void this.end(itemId, s));
     // The run may have finished (or the test been finished) while the browser started.
     const item = this.db.select().from(schema.runItems).where(eq(schema.runItems.id, itemId)).get();
     const runStatus = this.runs.getRun(run.id).status;
@@ -199,12 +250,74 @@ export class ManualBrowserService {
       );
     }
 
-    const url = desktop ? s.page.url() : this.startUrl(itemId, env?.baseUrl);
-    if (!desktop) await s.page.goto(url).catch(() => {});
+    const url = desktop ? page.url() : this.startUrl(itemId, env?.baseUrl);
+    if (!desktop) await page.goto(url).catch(() => {});
     // The app's first window loaded before the panel was added: load it once more, now the session answers it.
-    else await s.page.reload().catch(() => {});
+    else await page.reload().catch(() => {});
     this.bus.publish({ type: 'manual.browser', runId: run.id, itemId, open: true });
     return { open: true, url };
+  }
+
+  /** A phone or desktop app, started as its environment's launch settings say (as tests start it). */
+  private async launchNative(
+    itemId: string,
+    runId: string,
+    platform: string,
+    env:
+      | {
+          browserDefaultsJson: unknown;
+          variablesJson: Record<string, unknown>;
+          baseUrl: string;
+          name: string;
+        }
+      | undefined,
+    videoDir: string,
+  ): Promise<{ open: true; url: string }> {
+    let native;
+    try {
+      native = nativePlatformFor(
+        platform,
+        env ?? { browserDefaultsJson: {} },
+        new VariableResolver({
+          env: env ? { ...env.variablesJson, baseUrl: env.baseUrl, name: env.name } : {},
+          secret: {},
+        }),
+      )!;
+    } catch (err) {
+      throw new repo.RepoError(400, 'invalid', (err as Error).message);
+    }
+    const url = await nativeServerUrl(native, { appium: this.appium, linux: this.linux });
+    const app = await NativeManualSession.start({ url, platform: native }).catch((err: Error) => {
+      throw new repo.RepoError(400, 'invalid', err.message);
+    });
+    const video = app.recordingStartedAt ? join(videoDir, `app-${Date.now()}.mp4`) : undefined;
+    const s: Session = {
+      runId,
+      native: app,
+      // Closing the app gives its screen recording: kept as the test's video.
+      shut: async () => {
+        const mp4 = await app.stop().catch(() => null);
+        if (mp4 && video) writeFileSync(video, mp4);
+      },
+      startedAt: app.recordingStartedAt ?? Date.now(),
+      ...(video && { video: this.rel(video) }),
+      current: null,
+      clipStart: null,
+    };
+    this.sessions.set(itemId, s);
+    // The run may have finished (or the test been finished) while the app started.
+    const item = this.db.select().from(schema.runItems).where(eq(schema.runItems.id, itemId)).get();
+    const runStatus = this.runs.getRun(runId).status;
+    if (runStatus !== 'running' || (item && !['queued', 'running'].includes(item.status))) {
+      await this.end(itemId, s);
+      throw new repo.RepoError(
+        409,
+        'conflict',
+        runStatus !== 'running' ? `This run is ${runStatus}` : 'This test is finished',
+      );
+    }
+    this.bus.publish({ type: 'manual.browser', runId, itemId, open: true });
+    return { open: true, url: '' };
   }
 
   /** The scenario's first "open page" step, else the environment's base URL. */
@@ -272,13 +385,14 @@ export class ManualBrowserService {
   /** The panel cannot change a finished test (finishing it closes this browser). */
   private assertOpen(itemId: string) {
     const item = this.db.select().from(schema.runItems).where(eq(schema.runItems.id, itemId)).get();
-    if (item && !['queued', 'running'].includes(item.status)) throw new Error('This test is finished');
+    if (item && !['queued', 'running'].includes(item.status))
+      throw new repo.RepoError(409, 'conflict', 'This test is finished');
   }
 
   /** Pushes the latest state to the panel (after a change made in the dashboard, too). */
   async refresh(itemId: string) {
     const s = this.sessions.get(itemId);
-    if (!s) return;
+    if (!s?.page) return;
     await s.page
       .evaluate(
         (st) => (window as unknown as { __sfManualRender?: (x: unknown) => void }).__sfManualRender?.(st),
@@ -326,6 +440,13 @@ export class ManualBrowserService {
         break;
       }
       case 'clipStart':
+        // An app without a screen recording (e.g. Linux without ffmpeg) cannot keep clips.
+        if (s.native && !s.video)
+          throw new repo.RepoError(
+            400,
+            'invalid',
+            s.native.noRecording ?? 'This app has no screen recording',
+          );
         s.clipStart = Date.now() - s.startedAt;
         break;
       case 'clipStop':
@@ -353,19 +474,25 @@ export class ManualBrowserService {
     return this.state(itemId);
   }
 
-  /** A screenshot of the page without the StepForge panel, kept with the test. */
+  /** A screenshot of the page without the StepForge panel (or of the app), kept with the test. */
   private async screenshot(itemId: string, number: string): Promise<string> {
     const s = this.sessions.get(itemId)!;
     const rel = `runs/${s.runId}/${itemId}/manual-${number.replace(/[^\w.-]+/g, '_')}-${Date.now()}.png`;
     mkdirSync(join(this.artifactsRoot, 'runs', s.runId, itemId), { recursive: true });
+    if (s.native) {
+      // The device's screen, or the desktop app's windows.
+      writeFileSync(join(this.artifactsRoot, rel), await s.native.screenshot());
+      return rel;
+    }
+    const page = s.page!;
     const hide = (h: boolean) =>
-      s.page.evaluate(
+      page.evaluate(
         (x) => (window as unknown as { __sfManualHide?: (v: boolean) => void }).__sfManualHide?.(x),
         h,
       );
     await hide(true).catch(() => {});
     try {
-      await s.page.screenshot({ path: join(this.artifactsRoot, rel) });
+      await page.screenshot({ path: join(this.artifactsRoot, rel) });
     } finally {
       await hide(false).catch(() => {});
     }
@@ -384,7 +511,7 @@ export class ManualBrowserService {
     s.closing ??= (async () => {
       this.sessions.delete(itemId);
       // Closing the context saves a browser's video; a desktop app's video is saved when the app closes.
-      await s.context.close().catch(() => {});
+      await s.context?.close().catch(() => {});
       await s.shut();
       try {
         if (s.video && existsSync(join(this.artifactsRoot, s.video))) {

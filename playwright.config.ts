@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const PORT = 4410;
+/** The fake Appium server native-manual.spec.ts starts. */
+const FAKE_APPIUM_PORT = 4736;
 const dataDir = process.env.STEPFORGE_E2E_DATA ?? mkdtempSync(join(tmpdir(), 'stepforge-e2e-'));
 process.env.STEPFORGE_E2E_DATA = dataDir;
 /** A file (not :memory:) so the SQL Workbench E2E can connect to the demo's database. */
@@ -51,6 +53,11 @@ export default defineConfig({
         STEPFORGE_BIN_DIR: 'data/bin',
         // Appium installed by `npm run appium:install` (phone-app specs run on a device only when asked).
         STEPFORGE_TOOLS_DIR: 'data/tools',
+        // Without a device, phone and desktop apps answer through a fake Appium server (native-manual.spec.ts).
+        ...(!process.env.STEPFORGE_TEST_ANDROID &&
+          !process.env.STEPFORGE_TEST_IOS && {
+            STEPFORGE_APPIUM_URL: `http://127.0.0.1:${FAKE_APPIUM_PORT}`,
+          }),
         STEPFORGE_MAILPIT_PORT: '8196',
         STEPFORGE_MAILPIT_SMTP_PORT: '1196',
       },

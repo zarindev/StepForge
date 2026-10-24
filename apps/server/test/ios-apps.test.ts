@@ -1,5 +1,7 @@
+import { parseElements, type NativeManualSession } from '@stepforge/executor-native';
 import type { FastifyInstance } from 'fastify';
-import { existsSync } from 'node:fs';
+import { copyFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildIosDemo, IOS_DEMO_APP } from '../../../scripts/build-ios-demo.ts';
@@ -72,7 +74,7 @@ describe('iOS apps', () => {
     ).toBe('ios');
   });
 
-  it('the manual-test panel explains it is not available for iOS apps yet', async () => {
+  it('a manual test can be marked on the run page without opening the app', async () => {
     const s = await ok('POST', `/api/modules/${moduleId}/scenarios`, {
       name: 'Check the list by hand',
       execution: 'manual',
@@ -85,9 +87,6 @@ describe('iOS apps', () => {
       scope: { type: 'scenarios', ids: [s.id] },
     });
     const itemId = (await ok<{ items: { id: string }[] }>('GET', `/api/runs/${run.id}`)).items[0]!.id;
-    const open = await call('POST', `/api/run-items/${itemId}/manual/browser`);
-    expect(open.statusCode).toBe(400);
-    expect(open.json().message).toContain('an iOS app');
     await ok('PUT', `/api/run-items/${itemId}/manual`, {
       results: [{ number: '1', status: 'passed' }],
       done: true,
@@ -230,4 +229,94 @@ describe('iOS apps', () => {
     },
     1_200_000,
   );
+  it.skipIf(!SIM)(
+    'a manual test opens the app: its screen in the dashboard, a tap and typing, a screenshot and a clip from it',
+    async () => {
+      const s = await ok('POST', `/api/modules/${moduleId}/scenarios`, {
+        name: 'Sign in by hand',
+        execution: 'manual',
+        steps: [
+          {
+            type: 'util.manual',
+            params: { instruction: 'Type your email', expected: 'It shows in the field' },
+          },
+          { type: 'util.manual', params: { instruction: 'Sign in', expected: 'The patient list opens' } },
+        ],
+      });
+      const run = await ok<{ id: string }>('POST', '/api/runs', {
+        applicationId: appId,
+        environmentId: envId,
+        mode: 'manual',
+        scope: { type: 'scenarios', ids: [s.id] },
+      });
+      const itemId = (await ok<{ items: { id: string }[] }>('GET', `/api/runs/${run.id}`)).items[0]!.id;
+      await ok('POST', `/api/run-items/${itemId}/manual/browser`);
+      const check = () =>
+        ok<{
+          app: { platform: string; recording: boolean } | null;
+          results: { number: string; status: string; screenshots: string[]; clips: unknown[] }[];
+          videos: string[];
+          item: { status: string };
+        }>('GET', `/api/run-items/${itemId}/manual`);
+      expect((await check()).app).toMatchObject({ platform: 'iOS', recording: true });
+      const screen = await call('GET', `/api/run-items/${itemId}/manual/screen`);
+      expect(screen.headers['content-type']).toBe('image/png');
+      // Tap the email field where the element tree says it is (as a tester clicks its picture), then type.
+      const field = await waitForField(ctx, itemId);
+      await ok('POST', `/api/run-items/${itemId}/manual/act`, { action: 'tap', ...field });
+      await ok('POST', `/api/run-items/${itemId}/manual/panel`, { type: 'clipStart', number: '1' });
+      await ok('POST', `/api/run-items/${itemId}/manual/act`, {
+        action: 'type',
+        text: 'nurse@careclinic.test',
+      });
+      await new Promise((r) => setTimeout(r, 1500));
+      await ok('POST', `/api/run-items/${itemId}/manual/panel`, { type: 'clipStop', number: '1' });
+      await ok('POST', `/api/run-items/${itemId}/manual/panel`, { type: 'screenshot', number: '1' });
+      await ok('POST', `/api/run-items/${itemId}/manual/panel`, {
+        type: 'mark',
+        number: '1',
+        status: 'passed',
+      });
+      await ok('POST', `/api/run-items/${itemId}/manual/panel`, {
+        type: 'mark',
+        number: '2',
+        status: 'passed',
+      });
+      const one = (await check()).results.find((r) => r.number === '1')!;
+      expect(one.screenshots).toHaveLength(1);
+      expect(one.clips).toHaveLength(1);
+      if (process.env.STEPFORGE_SHOTS)
+        copyFileSync(
+          join(ctx.config.artifactsDir, one.screenshots[0]!),
+          `${process.env.STEPFORGE_SHOTS}/ios-manual-screenshot.png`,
+        );
+      await ok('PUT', `/api/run-items/${itemId}/manual`, { done: true });
+      // Finishing closes the app; its screen recording is kept as the test's video.
+      await expect.poll(async () => (await check()).videos.length, { timeout: 120_000 }).toBe(1);
+      expect((await check()).item.status).toBe('passed');
+    },
+    900_000,
+  );
 });
+
+/** Where the email field is on the app's screen, as fractions of its picture (waiting for the app to show it). */
+async function waitForField(c: AppContext, itemId: string): Promise<{ x: number; y: number }> {
+  const session = (
+    c.manualBrowser as unknown as { sessions: Map<string, { native: NativeManualSession }> }
+  ).sessions.get(itemId)!.native;
+  for (let i = 0; i < 120; i++) {
+    const { area } = await session.platform.view(session.driver);
+    const field = parseElements(await session.driver.source()).find((e) =>
+      /email/i.test(
+        `${e.attrs['resource-id'] ?? ''} ${e.attrs.name ?? ''} ${e.attrs.hint ?? ''} ${e.attrs.placeholderValue ?? ''}`,
+      ),
+    );
+    if (field)
+      return {
+        x: (field.rect.x + field.rect.width / 2 - area.x) / area.width,
+        y: (field.rect.y + field.rect.height / 2 - area.y) / area.height,
+      };
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error('The email field did not show');
+}
