@@ -537,7 +537,13 @@ async function main() {
   console.log(`Work folder: ${work}`);
   const lab = await startLab();
   const results: { target: string; result: string; ok: boolean | null }[] = [];
-  const env = { ...process.env, CI: process.env.CI ?? '1', BASE_URL: lab.url, CLIENT_SECRET };
+  const env = {
+    ...process.env,
+    CI: process.env.CI ?? '1',
+    BASE_URL: lab.url,
+    CLIENT_SECRET,
+    ELECTRON_RUN_AS_NODE: undefined, // set by some editors; Cypress (Electron) must not inherit it
+  };
   try {
     for (const target of targets) {
       const runner = RUNNERS[target]!;

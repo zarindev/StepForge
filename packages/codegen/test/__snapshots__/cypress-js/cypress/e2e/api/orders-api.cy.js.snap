@@ -2,7 +2,9 @@
 // Scenario: API › Orders API (P2, #api)
 import { check, compare, pick, fake, field, random, runId } from '../../support/helpers.js';
 import { env, secret } from '../../support/config.js';
-import { toResult, basicAuth } from '../../support/api.js';
+import { toResult, basicAuth, oauth2Token } from '../../support/api.js';
+import { pageCondition, byRole, byText } from '../../support/web.js';
+import { expectSchema } from '../../support/schema.js';
 
 // Tags: @api @p2
 describe('API › Orders API', () => {
@@ -28,7 +30,7 @@ describe('API › Orders API', () => {
         last.api = res;
       });
     });
-    // TODO(StepForge): api.request: the JSON Schema check on "$" is not exported to Cypress
+    // Create an order
     cy.then(() => {
       cy.request({
         method: 'POST',
@@ -59,6 +61,13 @@ describe('API › Orders API', () => {
         check(pick(res, 'header:content-type'), 'contains', 'json', 'header:content-type contains');
         check(pick(res, 'time'), 'lte', 800, 'time lte');
         check(pick(res, '$.total'), 'inRange', [0, 1000], '$.total inRange');
+        expectSchema(
+          res.body,
+          {
+            type: 'object',
+          },
+          '$ matches the JSON schema',
+        );
         vars.order = res.body;
         last.api = res;
       });
@@ -119,16 +128,24 @@ describe('API › Orders API', () => {
         last.api = res;
       });
     });
-    // TODO(StepForge): api.request: auth type "oauth2" is not exported to Cypress; set the header yourself
+    // OAuth2 client credentials
     cy.then(() => {
-      cy.request({
-        method: 'GET',
-        url: '/x',
-        failOnStatusCode: false,
-      }).then((response) => {
-        const res = toResult(response);
-        expect(res.status, 'status').to.eq(200);
-        last.api = res;
+      oauth2Token({
+        tokenUrl: 'https://id.test/token',
+        clientId: 'shop-tests',
+        clientSecret: secret('API_TOKEN'),
+        scope: 'orders:read',
+      }).then((token) => {
+        cy.request({
+          method: 'GET',
+          url: '/x',
+          headers: { Authorization: `Bearer ${token}` },
+          failOnStatusCode: false,
+        }).then((response) => {
+          const res = toResult(response);
+          expect(res.status, 'status').to.eq(200);
+          last.api = res;
+        });
       });
     });
     // Upload
@@ -220,9 +237,48 @@ describe('API › Orders API', () => {
         });
       });
     });
-    // TODO(StepForge): util.loop: “repeat while” loops are not exported to Cypress; write the loop by hand
-    // TODO(StepForge): util.if: page conditions (if the element is …) are not exported to Cypress; write the check by hand
-    // TODO(StepForge): util.loop: “repeat while” loops are not exported to Cypress; write the loop by hand
+    // Repeat while the "Load more" button is visible
+    cy.then(() => {
+      const pass1 = (pass) => {
+        if (pass >= 100) throw new Error('Stopped after the limit of 100 pass(es); the condition still held');
+        vars.index = pass;
+        pageCondition(byRole('button', 'Load more'), 'visible').then((holds) => {
+          if (!holds) return;
+          // Note: more
+          cy.log('more');
+          cy.then(() => pass1(pass + 1));
+        });
+      };
+      pass1(0);
+    });
+    // If "Out of stock" is on the page
+    cy.then(() => pageCondition(byText('Out of stock'), 'present')).then((holds) => {
+      if (holds) {
+        // Note: oos
+        cy.log('oos');
+      }
+    });
+    // Poll until three
+    cy.then(() => {
+      const pass2 = (pass) => {
+        if (pass >= 5) throw new Error('Stopped after the limit of 5 pass(es); the condition still held');
+        vars.index = pass;
+        if (!compare(vars.index, 'lt', 3)) return;
+        // Send GET /poll
+        cy.then(() => {
+          cy.request({
+            method: 'GET',
+            url: '/poll',
+            failOnStatusCode: false,
+          }).then((response) => {
+            const res = toResult(response);
+            last.api = res;
+          });
+        });
+        cy.then(() => pass2(pass + 1));
+      };
+      pass2(0);
+    });
     // Remember "[object Object]" as payload
     cy.then(() => {
       vars.payload = {

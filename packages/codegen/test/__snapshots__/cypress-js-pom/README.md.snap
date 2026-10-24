@@ -29,6 +29,7 @@ npx cypress open   # interactive
 | `API_TOKEN` | secret {{secret.apiToken}} — never commit its value |
 | `DB_MAIN_URL` | "main" database (pg), e.g. postgres://user:password@localhost:5432/db |
 | `DB_LOCAL_URL` | "local" database (sqlite), e.g. sqlite:./app.db |
+| `DB_DOCS_URL` | "docs" database (mongo), e.g. mongodb://user:password@localhost:27017/db |
 | `DB_UNKNOWN_URL` | "unknown" database, e.g. postgres://…, mysql://… or sqlite:./app.db |
 | `MAILPIT_URL` | Mailpit web/API address (default `http://127.0.0.1:8025`) |
 
@@ -39,7 +40,7 @@ Secret values are not part of the export: set them in `.env` locally and as CI s
 - `cypress/e2e/` — one spec per scenario, grouped by module; one test per test case
 - `cypress/pages/` — page objects (one function per element)
 - `cypress/support/` — configuration, helpers, the `fill` command and Testing Library queries
-- `cypress/plugins/` — Node tasks for the database and Mailpit
+- `cypress/plugins/` — Node tasks (database, Mailpit, downloads, Kafka, FTP, MongoDB as the tests need)
 - `sql/` — the SQL of each database step
 
 ## Notes
@@ -54,14 +55,7 @@ Secret values are not part of the export: set them in `.env` locally and as CI s
 These steps could not be translated exactly; the code has a `TODO(StepForge)` comment where each one was:
 
 - **Checkout with every UI step** — Receipt looks right: visual checkpoints are not exported; add a screenshot comparison in the target framework
-- **Orders API** — Create an order: the JSON Schema check on "$" is not exported to Cypress
-- **Orders API** — OAuth2 client credentials: auth type "oauth2" is not exported to Cypress; set the header yourself
-- **Orders API** — util.loop: “repeat while” loops are not exported to Cypress; write the loop by hand
-- **Orders API** — util.if: page conditions (if the element is …) are not exported to Cypress; write the check by hand
-- **Orders API** — Poll until three: “repeat while” loops are not exported to Cypress; write the loop by hand
 - **Data and email** — db.query: SQL Server helpers are not generated; the SQL file is exported for reference
-- **Data and email** — db.mongoFind: MongoDB steps are not exported to Cypress; use the MongoDB driver of the target language
-- **Data and email** — Count orders in Mongo: MongoDB steps are not exported to Cypress; use the MongoDB driver of the target language
 - **Data and email** — db.dataQualityCheck: the data-quality audit runs only in StepForge
 - **Data and email** — db.query: the "unknown" connection is not set up in this environment; all database drivers are included and DB_UNKNOWN_URL decides
 - **Data and email** — email.waitForEmail: IMAP inboxes are not exported; the helper reads a Mailpit server (MAILPIT_URL)
@@ -69,41 +63,14 @@ These steps could not be translated exactly; the code has a `TODO(StepForge)` co
 - **Data and email** — perf.lighthouse: performance measurements run only in StepForge
 - **Data and email** — perf.loadTest: load tests are not part of functional tests; export the scenario to k6 instead
 - **Data and email** — perf.queryPlan: performance measurements run only in StepForge
-- **Network, storage and clock** — ui.setClock: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.mockRoute: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.mockRoute: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.mockRoute: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.mockRoute: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.waitForResponse: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.mockRoute: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.tap: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.download: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.storage: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.storage: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.storage: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.storage: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.storage: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.storage: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.storage: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.setOffline: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.setOffline: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.setClock: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — ui.setClock: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Network, storage and clock** — util.if: page conditions (if the element is …) are not exported to Cypress; write the check by hand
-- **Network, storage and clock** — Load every page: “repeat while” loops are not exported to Cypress; write the loop by hand
-- **Network, storage and clock** — util.if: page conditions (if the element is …) are not exported to Cypress; write the check by hand
-- **Network, storage and clock** — util.if: page conditions (if the element is …) are not exported to Cypress; write the check by hand
-- **Network, storage and clock** — ui.networkSummary: this browser step is not exported to Cypress; write it with the framework’s own API
-- **Integrations** — Get the price: SOAP steps are not exported to Cypress; send the envelope with an HTTP client
-- **Integrations** — SOAP 1.2 envelope: SOAP steps are not exported to Cypress; send the envelope with an HTTP client
-- **Integrations** — Publish an order event: Kafka steps are not exported to Cypress; use a Kafka client of the target language
-- **Integrations** — Wait for the invoice event: Kafka steps are not exported to Cypress; use a Kafka client of the target language
-- **Integrations** — Upload the price list: FTP steps are not exported to Cypress; use an FTP client of the target language
-- **Integrations** — Read the report: FTP steps are not exported to Cypress; use an FTP client of the target language
-- **Integrations** — List the inbox: FTP steps are not exported to Cypress; use an FTP client of the target language
+- **Network, storage and clock** — ui.setOffline: going offline is not exported to Cypress: it has no offline mode of its own (only through the Chrome DevTools protocol, which its own runner uses too); test the offline page by hand
+- **Network, storage and clock** — ui.setOffline: going offline is not exported to Cypress: it has no offline mode of its own (only through the Chrome DevTools protocol, which its own runner uses too); test the offline page by hand
+- **Network, storage and clock** — ui.networkSummary: the network summary is not exported to Cypress: it does not see the size of each response or the requests the page lost; check the traffic in StepForge
 - **Checkout with every UI step**: drag and drop needs a plugin in Cypress (e.g. @4tw/cypress-drag-drop)
 - **Checkout with every UI step**: iframes need a plugin in Cypress (e.g. cypress-iframe)
 - **Checkout with every UI step**: Cypress cannot control several tabs; remove the target="_blank" or visit the URL directly
 - **Checkout with every UI step**: Cypress cannot control several tabs; remove the target="_blank" or visit the URL directly
 - **Checkout with every UI step**: Cypress cannot control several tabs; remove the target="_blank" or visit the URL directly
 - **Orders API**: multipart bodies are sent as JSON by cy.request; check the request
+- **Network, storage and clock** — ui.setClock: a page clock that runs on from a set time is not exported to Cypress (cy.clock stops time); fix the time instead
+- **Network, storage and clock** — ui.setClock: moving the page clock forward is not exported to Cypress (cy.tick needs a stopped clock)

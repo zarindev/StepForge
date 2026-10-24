@@ -3,6 +3,10 @@ require('dotenv').config();
 const { defineConfig } = require('cypress');
 const db = require('./cypress/plugins/db.cjs');
 const mail = require('./cypress/plugins/mail.cjs');
+const { downloadTasks } = require('./cypress/plugins/downloads.cjs');
+const kafka = require('./cypress/plugins/kafka.cjs');
+const { ftp } = require('./cypress/plugins/ftp.cjs');
+const mongo = require('./cypress/plugins/mongo.cjs');
 
 module.exports = defineConfig({
   e2e: {
@@ -18,11 +22,17 @@ module.exports = defineConfig({
       API_VERSION: process.env.API_VERSION,
       REGION: process.env.REGION,
     },
-    setupNodeEvents(on) {
+    setupNodeEvents(on, config) {
       on('task', {
         'db:query': ({ connection, sql, params }) => db.query(connection, sql, params ?? []),
         'db:script': ({ connection, sql }) => db.script(connection, sql),
         'mail:wait': (criteria) => mail.waitForEmail({ ...criteria, since: new Date(criteria.since) }),
+        ...downloadTasks(config.downloadsFolder),
+        'kafka:produce': ({ options, timeoutMs }) => kafka.produce(options, timeoutMs),
+        'kafka:consume': ({ options, since, timeoutMs }) =>
+          kafka.consume(options, new Date(since), timeoutMs),
+        ftp: (options) => ftp(options),
+        'mongo:run': ({ connection, command }) => mongo.run(connection, command),
       });
     },
   },
