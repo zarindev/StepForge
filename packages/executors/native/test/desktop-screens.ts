@@ -1,6 +1,6 @@
 import { DEFAULT_RUN_OPTIONS, newId, runTestCase, type RunOptions, type StepInput } from '@stepforge/core';
 import { utilExecutor } from '@stepforge/executor-util';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
@@ -140,12 +140,27 @@ export function desktopScreenTests(o: {
       };
       const byId = (id: string) => (a: Record<string, string>) =>
         (a.identifier ?? a.AutomationId ?? a.id) === id;
+      // Each action's picture, the field the session remembered and the element tree, kept in test-results/ (CI
+      // uploads it when the job fails).
+      const kept = join('test-results', 'desktop-manual', o.name.replace(/\W+/g, '_'));
+      rmSync(kept, { recursive: true, force: true });
+      mkdirSync(kept, { recursive: true });
+      let n = 0;
+      const act = async (a: Parameters<typeof m.act>[0]) => {
+        await m.act(a);
+        const label = `${++n}-${a.action}`;
+        writeFileSync(join(kept, `${label}.png`), await m.screenshot());
+        writeFileSync(
+          join(kept, `${label}.txt`),
+          `${JSON.stringify(a)}\nfield: ${JSON.stringify((m as unknown as { field?: unknown }).field)}\n\n${await m.driver.source()}`,
+        );
+      };
       // Signing in by hand: the typed text has to reach the fields for the next screen to show.
-      await m.act({ action: 'tap', ...(await where(byId('email'))) });
-      await m.act({ action: 'type', text: 'nurse@careclinic.test' });
-      await m.act({ action: 'tap', ...(await where(byId('password'))) });
-      await m.act({ action: 'type', text: 'CareClinic1' });
-      await m.act({
+      await act({ action: 'tap', ...(await where(byId('email'))) });
+      await act({ action: 'type', text: 'nurse@careclinic.test' });
+      await act({ action: 'tap', ...(await where(byId('password'))) });
+      await act({ action: 'type', text: 'CareClinic1' });
+      await act({
         action: 'tap',
         ...(await where(
           (a) =>

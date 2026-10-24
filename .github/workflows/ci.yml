@@ -274,7 +274,9 @@ jobs:
         if: failure()
         with:
           name: desktop-visual-macos
-          path: test-results/desktop-visual/
+          path: |
+            test-results/desktop-visual/
+            test-results/desktop-manual/
           retention-days: 7
       # The exported Appium projects against the same app (N7).
       - run: npx tsx scripts/verify-native-export.ts --platform macos --targets appium-py,appium-ts,appium-java
@@ -302,7 +304,9 @@ jobs:
         if: failure()
         with:
           name: desktop-visual-windows
-          path: test-results/desktop-visual/
+          path: |
+            test-results/desktop-visual/
+            test-results/desktop-manual/
           retention-days: 7
       # The exported Appium projects against the same app (N7).
       - run: npx tsx scripts/verify-native-export.ts --platform windows --targets appium-py,appium-ts,appium-java
@@ -333,7 +337,9 @@ jobs:
         if: failure()
         with:
           name: desktop-visual-linux
-          path: test-results/desktop-visual/
+          path: |
+            test-results/desktop-visual/
+            test-results/desktop-manual/
           retention-days: 7
       # The exported projects against the same app, through StepForge's helper (N7).
       - run: dbus-run-session -- xvfb-run -a npx tsx scripts/verify-native-export.ts --platform linux --targets appium-py,appium-ts,appium-java
