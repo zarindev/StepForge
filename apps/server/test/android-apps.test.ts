@@ -389,10 +389,13 @@ describe('Android apps', () => {
         const item = await ok<{
           steps: {
             status: string;
+            message?: string | null;
             responseJson?: { visual?: { status: string; diff?: string; key: string } };
           }[];
         }>('GET', `/api/run-items/${run.items[0]!.id}`);
-        return { status: run.status, visual: item.steps.at(-1)!.responseJson?.visual };
+        // Every step's result, for a failure message that says which step did what.
+        const steps = item.steps.map((s) => `${s.status}: ${s.message ?? ''}`).join(' | ');
+        return { status: run.status, visual: item.steps.at(-1)!.responseJson?.visual, steps };
       };
       // The app waits on its sign-in screen: the same screen twice matches (the status bar's clock is left out).
       const same = await make([
@@ -407,7 +410,7 @@ describe('Android apps', () => {
       expect(first.visual?.status).toBe('new');
       const second = await runOf(same.id);
       expect(second.status).toBe('passed');
-      expect(second.visual?.status).toBe('match');
+      expect(second.visual?.status, second.steps).toBe('match');
       // Typing into the email field changes the screen: the checkpoint fails and marks the difference.
       const changed = await make([
         {
@@ -420,7 +423,7 @@ describe('Android apps', () => {
       ]);
       const third = await runOf(changed.id);
       expect(third.status).toBe('failed');
-      expect(third.visual?.status).toBe('changed');
+      expect(third.visual?.status, third.steps).toBe('changed');
       expect(third.visual?.diff).toMatch(/visual-\d+-diff\.png$/);
       if (process.env.STEPFORGE_SHOTS)
         copyFileSync(
