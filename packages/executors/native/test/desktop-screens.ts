@@ -155,11 +155,20 @@ export function desktopScreenTests(o: {
           `${JSON.stringify(a)}\nfield: ${JSON.stringify((m as unknown as { field?: unknown }).field)}\n\n${await m.driver.source()}`,
         );
       };
-      // Signing in by hand: the typed text has to reach the fields for the next screen to show.
-      await act({ action: 'tap', ...(await where(byId('email'))) });
-      await act({ action: 'type', text: 'nurse@careclinic.test' });
-      await act({ action: 'tap', ...(await where(byId('password'))) });
-      await act({ action: 'type', text: 'CareClinic1' });
+      // Signing in by hand: the typed text has to reach the fields for the next screen to show. GitHub's macOS
+      // runners show a system pop-up ("… find devices on local networks") as the app starts, which can take the
+      // keys meant for the app: a field still empty after typing is typed into again, as a tester would.
+      const fill = async (field: string, text: string, secret: boolean) => {
+        for (let i = 0; i < 3; i++) {
+          await act({ action: 'tap', ...(await where(byId(field))) });
+          await act({ action: 'type', text });
+          const [el] = await m.driver.findAll('accessibility id', field);
+          const value = el ? await m.driver.text(el).catch(() => '') : '';
+          if (secret ? value.length > 0 : value.includes(text)) return;
+        }
+      };
+      await fill('email', 'nurse@careclinic.test', false);
+      await fill('password', 'CareClinic1', true);
       await act({
         action: 'tap',
         ...(await where(

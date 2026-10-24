@@ -236,6 +236,18 @@ class Session:
             return [nodes[id(n)] for n in found if id(n) in nodes]
         raise WdError("invalid selector", f'The locator strategy "{using}" is not available for Linux apps')
 
+    def at_point(self, x, y):
+        """The smallest showing element of the app that contains a screen point."""
+        best = None
+        for acc, depth in walk(self.app):
+            e = extents(acc) if depth else None
+            if not e or e[2] <= 0 or e[3] <= 0 or "showing" not in states(acc):
+                continue
+            if e[0] <= x <= e[0] + e[2] and e[1] <= y <= e[1] + e[3]:
+                if best is None or e[2] * e[3] <= best[1]:
+                    best = (acc, e[2] * e[3])
+        return best[0] if best else None
+
     def click(self, acc):
         act = safe(acc.get_action_iface)
         if act:
@@ -313,6 +325,11 @@ def keycode(keysym):
     return k.keycode, k.level
 
 
+# Clicked through their accessible action (role tags as in the page source); text roles get the focus.
+PRESSABLE = {"push_button", "toggle_button", "check_box", "radio_button", "menu_item", "check_menu_item", "radio_menu_item", "link"}
+TEXT_ROLES = {"text", "entry", "password_text"}
+
+
 def perform(session, actions):
     # PRESS and RELEASE take a hardware keycode, not a keysym: keys are held by their keycode (so Control+S is
     # Control down, s, Control up). A character with no keycode of its own at that level ("!", a letter of another
@@ -352,6 +369,29 @@ def perform(session, actions):
                     x, y = getattr(session, "pointer", (0, 0))
                     # W3C buttons: 0 left, 1 middle, 2 right; X buttons: 1 left, 2 middle, 3 right.
                     button = {0: 1, 1: 2, 2: 3}.get(int(a.get("button") or 0), 1)
+                    if button == 1:
+                        # A left click at a point: a button, check box, menu item or link under it is pressed through
+                        # its accessible action, and a text field gets the focus (synthetic mouse events do not
+                        # reach every toolkit, e.g. GTK on a virtual display); anything else gets the mouse events.
+                        if t == "pointerDown":
+                            session.down_at = (x, y)
+                            continue
+                        if getattr(session, "down_at", None) == (x, y):
+                            session.down_at = None
+                            target = session.at_point(x, y)
+                            role = role_tag(target) if target is not None else ""
+                            if role in PRESSABLE:
+                                session.click(target)
+                                continue
+                            if role in TEXT_ROLES:
+                                safe(lambda: target.get_component_iface().grab_focus())
+                            Atspi.generate_mouse_event(x, y, "b1c")
+                            continue
+                        # Moved while held (a drag): the press happens where it started.
+                        start = getattr(session, "down_at", None)
+                        if start is not None:
+                            session.down_at = None
+                            Atspi.generate_mouse_event(start[0], start[1], "b1p")
                     Atspi.generate_mouse_event(x, y, f"b{button}{'p' if t == 'pointerDown' else 'r'}")
     finally:
         # Never leave a key down (a failed action would keep Control held for the whole desktop).
