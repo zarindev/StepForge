@@ -124,7 +124,13 @@ export class NativeManualSession {
           // A phone types into the focused field; a desktop app gets the keys.
           const el =
             pf.kind === 'phone' ? await d.activeElement() : this.field && (await this.find(this.field));
-          if (el) await d.sendKeys(el, a.text);
+          if (el && pf.name === 'macOS') {
+            // Mac2 types into a field it first clicks at its centre, which another window (a system pop-up) can
+            // cover; clearing focuses the field through accessibility, so the text it had is typed back first.
+            const before = (await d.attribute(el, 'value').catch(() => null)) ?? '';
+            await d.clear(el);
+            await d.sendKeys(el, before + a.text);
+          } else if (el) await d.sendKeys(el, a.text);
           else
             await d.actions([
               {
