@@ -63,4 +63,4 @@ export {
   type ScreenElement,
 } from './recorder.ts';
 export { NativeManualSession, type ManualAction } from './manual.ts';
-export { appWindows, desktopCrop, union, type AppView, type Area } from './view.ts';
+export { appWindows, desktopCrop, union, windowsView, type AppView, type Area } from './view.ts';

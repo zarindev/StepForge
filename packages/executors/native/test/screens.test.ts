@@ -22,6 +22,7 @@ import {
   NativeRecordingSession,
   parseElements,
   windowsPlatform,
+  windowsView,
   x11Recording,
   type NativePlatform,
 } from '../src/index.ts';
@@ -157,6 +158,30 @@ describe('what the dashboard shows of a desktop app', () => {
     );
     expect(area).toEqual({ x: 200, y: 100, width: 400, height: 300 });
     expect(crop).toEqual({ x: 400, y: 200, width: 800, height: 600 });
+  });
+
+  it("Windows view: the picture leaves out the window's invisible resize border", () => {
+    // NovaWindows' window rectangle (and screenshot) includes 8 px of border at the sides and bottom.
+    const els = parseElements(`<Window x="0" y="0" width="800" height="600">
+      <TitleBar x="8" y="0" width="784" height="31"/>
+      <Edit x="28" y="71" width="300" height="24"/>
+    </Window>`);
+    const png = PNG.sync.write(new PNG({ width: 800, height: 600 }));
+    const v = windowsView(png, els, { x: 0, y: 0, width: 800, height: 600 }, { width: 800, height: 600 });
+    expect(v.area).toEqual({ x: 8, y: 0, width: 784, height: 592 });
+    expect(PNG.sync.read(v.png)).toMatchObject({ width: 784, height: 592 });
+    // No title bar (a borderless window): the whole rectangle.
+    const bare = parseElements(
+      '<Window x="0" y="0" width="800" height="600"><Edit x="28" y="71" width="300" height="24"/></Window>',
+    );
+    expect(
+      windowsView(png, bare, { x: 0, y: 0, width: 800, height: 600 }, { width: 800, height: 600 }).area,
+    ).toEqual({
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 600,
+    });
   });
 
   it('Linux: every top-level window (a dialog too); a window off the screen gives the whole screen', () => {

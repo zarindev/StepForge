@@ -89,9 +89,34 @@ export async function desktopView(
           width: rect.width || shot.width,
           height: rect.height || shot.height,
         };
-  if (platform === 'Windows') return { png, area: screen };
+  if (platform === 'Windows') return windowsView(png, elements, screen, shot);
   const { area, crop } = desktopCrop(appWindows(elements, platform), screen, shot);
   return { png: cropPng(png, crop), area };
+}
+
+/**
+ * A Windows app's view. NovaWindows' screenshot is the window's rectangle, which includes Windows' invisible resize
+ * border at the sides and bottom: what is behind the window shows there (and changes). The title bar spans exactly
+ * the visible width, so its offset is the border's width.
+ */
+export function windowsView(
+  png: Buffer,
+  elements: ScreenElement[],
+  screen: Area,
+  shot: { width: number; height: number },
+): AppView {
+  const top = Math.min(...elements.map((e) => e.depth));
+  const bar = elements.find((e) => e.depth === top + 1 && e.attrs.tag === 'TitleBar');
+  const border = bar ? Math.round(bar.rect.x) : 0;
+  if (border <= 0 || border > 20 || screen.width - 2 * border < 50 || screen.height - border < 50)
+    return { png, area: screen };
+  const area = { x: border, y: 0, width: screen.width - 2 * border, height: screen.height - border };
+  const sx = shot.width / screen.width;
+  const sy = shot.height / screen.height;
+  return {
+    png: cropPng(png, { x: area.x * sx, y: 0, width: area.width * sx, height: area.height * sy }),
+    area,
+  };
 }
 
 /** A phone's view: the whole screen; Android positions are the screenshot's pixels, iOS's are points. */

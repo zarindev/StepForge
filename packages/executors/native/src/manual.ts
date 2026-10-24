@@ -115,7 +115,7 @@ export class NativeManualSession {
           this.field = undefined;
           if (pf.kind === 'desktop' && a.button !== 'right' && (a.count ?? 1) === 1) {
             const hit = elementAt(parseElements(await d.source().catch(() => '')), x, y);
-            if (hit && isField(hit)) this.field = locatorsFor(hit);
+            if (hit && isField(hit)) this.field = locatorsFor(hit, pf.name);
           }
           break;
         }
