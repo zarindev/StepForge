@@ -4,6 +4,14 @@
 import pytest
 from playwright.sync_api import expect
 
+from support.config import env
+from support.helpers import check, pick, field, text, file_text
+from support.web import watch_network, mock_route, download, storage, page_condition, clock_time
+
+
+@pytest.fixture
+def browser_context_args(browser_context_args):
+    return {**browser_context_args, "has_touch": True}
 
 
 @pytest.mark.browser
@@ -11,32 +19,95 @@ from playwright.sync_api import expect
 def test_network_storage_and_clock(page):
     """Network, storage and clock"""
     vars = {}
-    # TODO(StepForge): ui.setClock: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.mockRoute: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.mockRoute: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.mockRoute: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.mockRoute: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+    network = watch_network(page.context, env["base_url"])
+    # Set the page clock to 2026-03-01T09:00:00Z (running)
+    page.clock.install(time=clock_time("2026-03-01T09:00:00Z"))
+    # Answer requests to **/api/stock* with 200
+    mock_route(page.context, url="**/api/stock*", method="GET", action="fulfill", status=200, body={
+        "inStock": True,
+        "sku": f"{text(env['region'])}-1",
+    })
+    # Make requests to /api/ads fail
+    mock_route(page.context, url="/api/ads", action="abort")
+    # Slow down requests to /api/slow by 500 ms
+    mock_route(page.context, url="/api/slow", action="delay", delay_ms=500, times=2)
+    # Answer requests to /api/banner with 503
+    mock_route(page.context, url="/api/banner", action="fulfill", status=503, body="down", content_type="text/plain")
     # Open /products
+    network.navigated()
     page.goto("/products")
-    # TODO(StepForge): ui.waitForResponse: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.mockRoute: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.tap: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.download: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.storage: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.storage: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.storage: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.storage: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.storage: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.storage: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.storage: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.setOffline: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+    # Wait for the GET response from /api/products (save as products)
+    response1 = network.wait_for_response(page, url="/api/products", method="GET", status=200, timeout_ms=15000)
+    check(pick(response1, "$.items[0].sku"), "exists", None, "$.items[0].sku exists")
+    check(pick(response1, "header:content-type"), "contains", "json", "header:content-type contains")
+    check(pick(response1, "url"), "contains", "/api/products", "url contains")
+    vars["products"] = response1["body"]
+    # Stop faking **/api/stock*
+    mock_route(page.context, url="**/api/stock*", action="remove")
+    # Tap the "Menu" button
+    page.get_by_role("button", name="Menu", exact=True).tap()
+    # Download the file from the "Export CSV" link (save as csv)
+    file1 = download(page, page.get_by_role("link", name="Export CSV", exact=True))
+    check(file1["fileName"], "matches", "\\.csv$", "fileName matches")
+    check(file1["size"], "gt", 0, "size gt")
+    check(file_text(file1), "contains", "sku", "content contains")
+    vars["csv"] = file1
+    # Set the cookie "consent" to "yes"
+    storage(page, kind="cookie", action="set", name="consent", value="yes")
+    # Read the cookie "consent"
+    stored1 = storage(page, kind="cookie", action="get", name="consent")
+    check(stored1["value"], "equals", "yes", "value equals")
+    # Remove the cookie "consent"
+    storage(page, kind="cookie", action="remove", name="consent")
+    # Set the local storage "cart" to "[object Object]"
+    storage(page, kind="local", action="set", name="cart", value="{\"items\":2}")
+    # Read the local storage "cart" (save as cart)
+    stored2 = storage(page, kind="local", action="get", name="cart")
+    check(stored2["exists"], "equals", True, "exists equals")
+    vars["cart"] = stored2["value"]
+    # Clear session storage
+    storage(page, kind="session", action="clear")
+    # Clear all cookies
+    storage(page, kind="cookie", action="clear")
+    # Go offline
+    page.context.set_offline(True)
     # Check that "You are offline" is visible
     expect(page.get_by_text("You are offline", exact=True)).to_be_visible()
-    # TODO(StepForge): ui.setOffline: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.setClock: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): ui.setClock: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
-    # TODO(StepForge): util.if: page conditions (if the element is …) are not exported to Playwright + pytest; write the check by hand
-    # TODO(StepForge): util.loop: “repeat while” loops are not exported to Playwright + pytest; write the loop by hand
-    # TODO(StepForge): util.if: page conditions (if the element is …) are not exported to Playwright + pytest; write the check by hand
-    # TODO(StepForge): util.if: page conditions (if the element is …) are not exported to Playwright + pytest; write the check by hand
-    # TODO(StepForge): ui.networkSummary: this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+    # Go back online
+    page.context.set_offline(False)
+    # Move the clock forward 300000 ms
+    page.clock.fast_forward(300000)
+    # Set the page clock to 1772355600000
+    page.clock.set_fixed_time(clock_time(1772355600000))
+    # If the "Accept cookies" button is visible
+    if page_condition(page.get_by_role("button", name="Accept cookies", exact=True), "visible", None, 1000):
+        # Click the "Accept cookies" button
+        page.get_by_role("button", name="Accept cookies", exact=True).click()
+    else:
+        # Note: No cookie banner
+        print("No cookie banner")
+    # Load every page
+    for index in range(20):
+        vars["index"] = index
+        if not page_condition(page.get_by_role("button", name="Load more", exact=True), "enabled"):
+            break
+        # Click the "Load more" button
+        page.get_by_role("button", name="Load more", exact=True).click()
+    else:
+        raise AssertionError("Stopped after the limit of 20 pass(es); the condition still held")
+    # If there are 12 × the element ".product-card"
+    if page_condition(page.locator(".product-card"), "count", 12):
+        # Note: A full page
+        print("A full page")
+    # If the element "status" contains "{{vars.csv.fileName}}"
+    if page_condition(page.get_by_test_id("status"), "textContains", text(field(vars, "csv.fileName"))):
+        # Note: Status names the file
+        print("Status names the file")
+    # Check the network traffic of this page (save as traffic)
+    traffic1 = network.summary(page, "lastNavigation")
+    check(traffic1["requests"], "lte", 60, "requests lte")
+    check(traffic1["kb"], "lt", 2000, "kb lt")
+    check(traffic1["failed"], "equals", 0, "failed equals")
+    check(traffic1["thirdPartyHosts"], "lte", 3, "thirdPartyHosts lte")
+    check(traffic1["byType"].get("script", {}).get("requests", 0), "lte", 20, "requests:script lte")
+    vars["traffic"] = traffic1

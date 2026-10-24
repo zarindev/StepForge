@@ -17,6 +17,7 @@ def http():
 def browser():
     """Chrome (headless unless HEADED=1); Selenium Manager downloads the matching driver."""
     import os
+    import tempfile
 
     from selenium import webdriver
 
@@ -24,6 +25,9 @@ def browser():
     if os.environ.get("HEADED") != "1":
         options.add_argument("--headless=new")
     options.add_argument("--window-size=1440,900")
+    # Downloads go to a folder of their own for each test.
+    downloads = tempfile.mkdtemp(prefix="downloads-")
+    options.add_experimental_option("prefs", {"download.default_directory": downloads, "download.prompt_for_download": False})
     driver = webdriver.Chrome(options=options)
-    yield Browser(driver, env["base_url"])
+    yield Browser(driver, env["base_url"], downloads=downloads)
     driver.quit()

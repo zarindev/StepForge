@@ -7,11 +7,12 @@ import pytest
 from support.config import env, secret
 from support.helpers import check, compare, pick, fake, field, text, random_value, RUN_ID
 from support import api
+from support.schema import expect_schema
 
 
 @pytest.mark.api
 @pytest.mark.p2
-def test_orders_api(http):
+def test_orders_api(browser, http):
     """Orders API"""
     data = {}
     vars = {}
@@ -25,7 +26,7 @@ def test_orders_api(http):
     )
     assert res1["status"] == 200, "status"
     vars["token"] = res1["body"]
-    # TODO(StepForge): api.request: the JSON Schema check on "$" is not exported to Selenium + pytest
+    # Create an order
     res2 = api.call(
         http, "POST", f"/api/{text(env['api-version'])}/orders",
         headers={"X-Request-Id": text(random_value("uuid")), "X-Region": env["region"], "Authorization": "Bearer " + secret("API_TOKEN")},
@@ -46,6 +47,9 @@ def test_orders_api(http):
     check(pick(res2, "header:content-type"), "contains", "json", "header:content-type contains")
     check(pick(res2, "time"), "lte", 800, "time lte")
     check(pick(res2, "$.total"), "inRange", [0, 1000], "$.total inRange")
+    expect_schema(res2["body"], {
+        "type": "object",
+    }, "$ matches the JSON schema")
     vars["order"] = res2["body"]
     # Read the location header of the response (save as location)
     vars["location"] = pick(res2, "header:location")
@@ -71,9 +75,11 @@ def test_orders_api(http):
         http, "GET", "/me",
         headers={"Cookie": "sid=" + "abc"},
     )
-    # TODO(StepForge): api.request: auth type "oauth2" is not exported to Selenium + pytest; set the header yourself
+    # OAuth2 client credentials
+    token1 = api.oauth2_token("https://id.test/token", "shop-tests", secret("API_TOKEN"), "orders:read")
     res7 = api.call(
         http, "GET", "/x",
+        headers={"Authorization": "Bearer " + token1},
     )
     assert res7["status"] == 200, "status"
     # Upload
@@ -120,9 +126,30 @@ def test_orders_api(http):
         vars["index"] = index
         # Note: {{vars.line.sku}}
         print(field(vars, "line.sku"))
-    # TODO(StepForge): util.loop: “repeat while” loops are not exported to Selenium + pytest; write the loop by hand
-    # TODO(StepForge): util.if: page conditions (if the element is …) are not exported to Selenium + pytest; write the check by hand
-    # TODO(StepForge): util.loop: “repeat while” loops are not exported to Selenium + pytest; write the loop by hand
+    # Repeat while the "Load more" button is visible
+    for index in range(100):
+        vars["index"] = index
+        if not browser.page_condition(("role", "button", "Load more"), "visible"):
+            break
+        # Note: more
+        print("more")
+    else:
+        raise AssertionError("Stopped after the limit of 100 pass(es); the condition still held")
+    # If "Out of stock" is on the page
+    if browser.page_condition(("text", "Out of stock"), "present"):
+        # Note: oos
+        print("oos")
+    # Poll until three
+    for index in range(5):
+        vars["index"] = index
+        if not compare(vars.get("index"), "lt", 3):
+            break
+        # Send GET /poll
+        res12 = api.call(
+            http, "GET", "/poll",
+        )
+    else:
+        raise AssertionError("Stopped after the limit of 5 pass(es); the condition still held")
     # Remember "[object Object]" as payload
     vars["payload"] = {
         "a": [1, True, None],

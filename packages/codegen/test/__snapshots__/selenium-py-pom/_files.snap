@@ -1,46 +1,44 @@
-.env.example (21 lines)
+.env.example (23 lines)
 .gitignore (8 lines)
-conftest.py (30 lines)
+conftest.py (34 lines)
 pages/__init__.py (1 lines)
 pages/login_page.py (9 lines)
-pages/products_page.py (24 lines)
+pages/products_page.py (28 lines)
 pytest.ini (13 lines)
-README.md (106 lines)
-requirements.txt (9 lines)
+README.md (78 lines)
+requirements.txt (14 lines)
 sql/dataAndEmail/orderCount.sql (6 lines)
 sql/dataAndEmail/procedure.sql (4 lines)
 sql/dataAndEmail/query.sql (4 lines)
 sql/dataAndEmail/query2.sql (4 lines)
 sql/dataAndEmail/script.sql (5 lines)
 support/__init__.py (1 lines)
-support/api.py (41 lines)
-support/browser.py (263 lines)
+support/api.py (64 lines)
+support/browser.py (366 lines)
 support/config.py (26 lines)
 support/db.py (114 lines)
 support/find.js (129 lines)
-support/helpers.py (348 lines)
+support/ftp.py (135 lines)
+support/helpers.py (358 lines)
+support/kafka.py (143 lines)
 support/mail.py (132 lines)
+support/mongo.py (81 lines)
+support/schema.py (33 lines)
+support/xml.py (61 lines)
 tests/__init__.py (1 lines)
 tests/api/__init__.py (1 lines)
-tests/api/test_integrations.py (20 lines)
-tests/api/test_orders_api.py (140 lines)
+tests/api/test_integrations.py (101 lines)
+tests/api/test_orders_api.py (167 lines)
 tests/back_office/__init__.py (1 lines)
-tests/back_office/test_data_and_email.py (67 lines)
+tests/back_office/test_data_and_email.py (85 lines)
 tests/shop/browser/__init__.py (1 lines)
-tests/shop/browser/test_network_storage_and_clock.py (43 lines)
+tests/shop/browser/test_network_storage_and_clock.py (82 lines)
 tests/shop/checkout/__init__.py (1 lines)
 tests/shop/checkout/test_checkout_with_every_ui_step.py (154 lines)
 
 Warnings:
 - Checkout with every UI step | Receipt looks right | visual checkpoints are not exported; add a screenshot comparison in the target framework
-- Orders API | Create an order | the JSON Schema check on "$" is not exported to Selenium + pytest
-- Orders API | OAuth2 client credentials | auth type "oauth2" is not exported to Selenium + pytest; set the header yourself
-- Orders API | util.loop | “repeat while” loops are not exported to Selenium + pytest; write the loop by hand
-- Orders API | util.if | page conditions (if the element is …) are not exported to Selenium + pytest; write the check by hand
-- Orders API | Poll until three | “repeat while” loops are not exported to Selenium + pytest; write the loop by hand
 - Data and email | db.query | SQL Server helpers are not generated; the SQL file is exported for reference
-- Data and email | db.mongoFind | MongoDB steps are not exported to Selenium + pytest; use the MongoDB driver of the target language
-- Data and email | Count orders in Mongo | MongoDB steps are not exported to Selenium + pytest; use the MongoDB driver of the target language
 - Data and email | db.dataQualityCheck | the data-quality audit runs only in StepForge
 - Data and email | db.query | the "unknown" connection is not set up in this environment; all database drivers are included and DB_UNKNOWN_URL decides
 - Data and email | email.waitForEmail | IMAP inboxes are not exported; the helper reads a Mailpit server (MAILPIT_URL)
@@ -48,38 +46,16 @@ Warnings:
 - Data and email | perf.lighthouse | performance measurements run only in StepForge
 - Data and email | perf.loadTest | load tests are not part of functional tests; export the scenario to k6 instead
 - Data and email | perf.queryPlan | performance measurements run only in StepForge
-- Network, storage and clock | ui.setClock | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.mockRoute | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.mockRoute | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.mockRoute | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.mockRoute | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.waitForResponse | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.mockRoute | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.tap | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.download | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.storage | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.storage | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.storage | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.storage | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.storage | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.storage | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.storage | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.setOffline | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.setOffline | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.setClock | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | ui.setClock | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Network, storage and clock | util.if | page conditions (if the element is …) are not exported to Selenium + pytest; write the check by hand
-- Network, storage and clock | Load every page | “repeat while” loops are not exported to Selenium + pytest; write the loop by hand
-- Network, storage and clock | util.if | page conditions (if the element is …) are not exported to Selenium + pytest; write the check by hand
-- Network, storage and clock | util.if | page conditions (if the element is …) are not exported to Selenium + pytest; write the check by hand
-- Network, storage and clock | ui.networkSummary | this browser step is not exported to Selenium + pytest; write it with the framework’s own API
-- Integrations | Get the price | SOAP steps are not exported to Selenium + pytest; send the envelope with an HTTP client
-- Integrations | SOAP 1.2 envelope | SOAP steps are not exported to Selenium + pytest; send the envelope with an HTTP client
-- Integrations | Publish an order event | Kafka steps are not exported to Selenium + pytest; use a Kafka client of the target language
-- Integrations | Wait for the invoice event | Kafka steps are not exported to Selenium + pytest; use a Kafka client of the target language
-- Integrations | Upload the price list | FTP steps are not exported to Selenium + pytest; use an FTP client of the target language
-- Integrations | Read the report | FTP steps are not exported to Selenium + pytest; use an FTP client of the target language
-- Integrations | List the inbox | FTP steps are not exported to Selenium + pytest; use an FTP client of the target language
+- Network, storage and clock | ui.setClock | Selenium has no page clock without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.mockRoute | Selenium has no way to fake responses without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.mockRoute | Selenium has no way to fake responses without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.mockRoute | Selenium has no way to fake responses without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.mockRoute | Selenium has no way to fake responses without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.waitForResponse | Selenium has no access to the page’s responses without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.mockRoute | Selenium has no way to fake responses without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.setClock | Selenium has no page clock without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.setClock | Selenium has no page clock without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
+- Network, storage and clock | ui.networkSummary | Selenium has no record of the page’s traffic without Chrome DevTools; not exported to Selenium + pytest (write it with the browser’s DevTools protocol)
 - Checkout with every UI step |  | HTML5 drag and drop is unreliable in Selenium; check this step
 - Orders API |  | multipart fields are sent as requests "files"; file fields need open(...) objects
 - Orders API |  | JavaScript "Run script" steps are not translated to Python

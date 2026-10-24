@@ -38,3 +38,26 @@ def call(session: requests.Session, method, path, headers=None, params=None, jso
         "ms": round((time.time() - started) * 1000),
         "size": len(res.content),
     }
+
+
+_tokens = {}
+
+
+def oauth2_token(token_url, client_id, client_secret, scope=None):
+    """An OAuth2 access token (client-credentials grant), as StepForge fetches it: the client id and secret as Basic
+    auth, grant_type and scope as a form; kept until shortly before it expires."""
+    key = (token_url, client_id, scope or "")
+    hit = _tokens.get(key)
+    if hit and hit[1] > time.time():
+        return hit[0]
+    form = {"grant_type": "client_credentials", **({"scope": scope} if scope else {})}
+    res = requests.post(url(token_url), data=form, auth=(client_id, client_secret), timeout=30)
+    try:
+        token = res.json().get("access_token")
+        expires = res.json().get("expires_in") or 300
+    except ValueError:
+        token, expires = None, 300
+    if not res.ok or not token:
+        raise AssertionError(f"OAuth2 token request failed with {res.status_code}")
+    _tokens[key] = (token, time.time() + max(30, expires - 30))
+    return token

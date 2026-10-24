@@ -7,6 +7,7 @@ import pytest
 from support.helpers import check, pick, text
 from support import api
 from support import db
+from support import mongo
 from support import mail
 
 
@@ -39,12 +40,29 @@ VACUUM;""")
     # SQL also in sql/dataAndEmail/procedure.sql
     db3 = db.query("main", "CALL refresh_totals($1, $2)", [1, "x"])
     # TODO(StepForge): db.query: SQL Server helpers are not generated; the SQL file is exported for reference
-    # TODO(StepForge): db.mongoFind: MongoDB steps are not exported to Playwright + pytest; use the MongoDB driver of the target language
-    # TODO(StepForge): db.query: MongoDB steps are not exported to Playwright + pytest; use the MongoDB driver of the target language
+    # Find documents in orders on docs (save as docs)
+    db4 = mongo.run("docs", {
+        "collection": "orders",
+        "find": {
+            "email": data.get("email"),
+            "total": {
+                "$gt": 0,
+            },
+        },
+        "sort": {
+            "createdAt": -1,
+        },
+        "limit": 5,
+    })
+    check(pick(db4, "rowCount"), "gte", 1, "rowCount gte")
+    vars["docs"] = db4["rows"]
+    # Count orders in Mongo
+    db5 = mongo.run("docs", f"{{ \"collection\": \"orders\", \"countDocuments\": {{ \"email\": \"{text(data.get('email'))}\" }} }}")
+    check(pick(db5, "value"), "gte", 1, "value gte")
     # TODO(StepForge): db.dataQualityCheck: the data-quality audit runs only in StepForge
     # Run the SQL query "SELECT ?" on unknown
     # SQL also in sql/dataAndEmail/query2.sql
-    db4 = db.query("unknown", "SELECT ?", [1])
+    db6 = db.query("unknown", "SELECT ?", [1])
     # Wait for an email to {{data.email}} with subject "Your order" (save as mail)
     email1 = mail.wait_for_email(since=test_start, to=text(data.get("email")), subject="Your order", timeout_ms=15000)
     vars["mail"] = email1

@@ -20,4 +20,8 @@ class ProductsPage:
     FOOTER = ("testId", "footer")
     ELEMENT16 = ("xpath", "//button[@id='remove']")
     TERMS_LINK = ("role", "link", "Terms")
+    MENU_BUTTON = ("role", "button", "Menu")
+    EXPORT_CSV_LINK = ("role", "link", "Export CSV")
     YOU_ARE_OFFLINE_TEXT = ("text", "You are offline")
+    ACCEPT_COOKIES_BUTTON = ("role", "button", "Accept cookies")
+    LOAD_MORE_BUTTON = ("role", "button", "Load more")

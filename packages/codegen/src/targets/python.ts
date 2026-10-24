@@ -11,7 +11,16 @@ import {
   statusCode,
   testPath,
 } from '../common.ts';
-import type { El, Features, Loc, Op, Plan, TestPlan } from '../ir.ts';
+import {
+  walk,
+  type El,
+  type Features,
+  type Loc,
+  type Op,
+  type PageCond,
+  type Plan,
+  type TestPlan,
+} from '../ir.ts';
 import {
   APP_KEY,
   capabilities,
@@ -24,7 +33,7 @@ import {
 } from '../native.ts';
 import { pyInt, pyBlock, pyJson, pyStr, pyText, pyVal } from '../lang/py.ts';
 import type { CodegenOptions, GeneratedProject, TargetId } from '../types.ts';
-import { envName, parseString, snake } from '../values.ts';
+import { envName, parseString, snake, type Val } from '../values.ts';
 
 /**
  * Python + pytest: Playwright (sync API), Selenium, Appium (phone and desktop apps) or API only (requests). API,
@@ -32,9 +41,41 @@ import { envName, parseString, snake } from '../values.ts';
  */
 type Flavor = 'playwright' | 'selenium' | 'appium' | 'api';
 
+const SELENIUM_NO =
+  'Selenium has no {what} without Chrome DevTools; not exported to {target} (write it with the browser’s DevTools protocol)';
+const API_STEPS: Features = { soap: true, schema: true, oauth2: true, kafka: true, ftp: true, mongo: true };
+
 /** What the Python exports print beyond the basic steps (see features.ts). */
 export function pythonFeatures(flavor: Flavor): Features {
-  void flavor;
+  if (flavor === 'playwright')
+    return {
+      ...API_STEPS,
+      tap: true,
+      download: true,
+      waitResponse: true,
+      mockRoute: true,
+      offline: true,
+      storage: true,
+      clock: true,
+      netSummary: true,
+      pageCondition: true,
+      repeatWhile: true,
+    };
+  if (flavor === 'selenium')
+    return {
+      ...API_STEPS,
+      tap: true,
+      download: true,
+      offline: true,
+      storage: true,
+      pageCondition: true,
+      repeatWhile: true,
+      waitResponse: SELENIUM_NO.replace('{what}', 'access to the page’s responses'),
+      mockRoute: SELENIUM_NO.replace('{what}', 'way to fake responses'),
+      clock: SELENIUM_NO.replace('{what}', 'page clock'),
+      netSummary: SELENIUM_NO.replace('{what}', 'record of the page’s traffic'),
+    };
+  if (flavor === 'api') return { ...API_STEPS, repeatWhile: true };
   return {};
 }
 
@@ -82,7 +123,42 @@ type State = {
   imports: Set<string>;
   usesUi: boolean;
   plan: Plan;
+  /** Namespaces of the last SOAP response, for XPath in a later extract. */
+  lastSoap?: Record<string, string>;
+  /** The test checks the traffic "since the last navigation": each goto marks it. */
+  marksNavigation?: boolean;
 };
+
+/** An assertion line: check() with StepForge's operators, or a JSON Schema check. */
+function checkLine(actual: string, a: { target: string; operator: string; expected: Val }, ind = ''): string {
+  return a.operator === 'matchesSchema'
+    ? `expect_schema(${actual}, ${pyVal(a.expected, ind)}, ${pyStr(`${a.target} matches the JSON schema`)})`
+    : `check(${actual}, ${pyStr(a.operator)}, ${pyVal(a.expected, ind)}, ${pyStr(`${a.target} ${a.operator}`)})`;
+}
+
+const XPATH = (t: string) =>
+  t.startsWith('/') || t.startsWith('xpath:') || /^(count|string|number|boolean|sum)\(/.test(t);
+/** XPath targets read the XML body (SOAP); the others are read as from any response. */
+function responseValue(r: string, target: string, ns?: Record<string, string>): string {
+  if (ns && XPATH(target))
+    return `xpath_value(${r}["text"], ${pyStr(target)}${Object.keys(ns).length ? `, ${pyJson(ns)}` : ''})`;
+  // A schema on the whole body ($) validates the parsed body.
+  return target === '$' ? `${r}["body"]` : `pick(${r}, ${pyStr(target)})`;
+}
+
+const TRAFFIC = /^(requests|bytes):(.+)$/;
+const FTP_TARGETS = ['content', 'size', 'path', 'count', 'names', 'exists'];
+
+/** A page condition on the step's element: Playwright's locator, or the Selenium helper's locator tuple. */
+function pageCondition(s: State, c: PageCond): string {
+  const args = [el(s, c.el), pyStr(c.check)];
+  const expected = c.expected ? (c.check === 'count' ? pyVal(c.expected) : pyText(c.expected)) : 'None';
+  if (c.expected || c.timeoutMs !== 2000) args.push(expected);
+  if (c.timeoutMs !== 2000) args.push(String(c.timeoutMs));
+  return s.flavor === 'playwright'
+    ? `page_condition(${args.join(', ')})`
+    : `browser.page_condition(${args.join(', ')})`;
+}
 
 const next = (s: State, k: string) => `${k}${(s.n[k] = (s.n[k] ?? 0) + 1)}`;
 
@@ -183,7 +259,12 @@ function appiumOp(op: Op, s: State, out: (l: string) => void): boolean {
   }
 }
 
-function uiOp(op: Op, s: State, out: (l: string) => void, warn: (m: string) => void): boolean {
+function uiOp(
+  op: Op,
+  s: State,
+  out: ((l: string) => void) & { ind?: string },
+  warn: (m: string) => void,
+): boolean {
   if (s.flavor === 'appium') return appiumOp(op, s, out);
   if (s.flavor === 'api') {
     if (['comment', 'todo'].includes(op.op)) return false;
@@ -216,6 +297,7 @@ function uiOp(op: Op, s: State, out: (l: string) => void, warn: (m: string) => v
   const P = s.pageVar;
   switch (op.op) {
     case 'goto':
+      if (s.marksNavigation) out('network.navigated()');
       out(pw ? `${P}.goto(${pyVal(op.url)})` : `browser.goto(${pyText(op.url)})`);
       return true;
     case 'act': {
@@ -233,6 +315,8 @@ function uiOp(op: Op, s: State, out: (l: string) => void, warn: (m: string) => v
           scrollIntoView: 'scroll_into_view_if_needed()',
           fill: `fill(${v})`,
           type: `press_sequentially(${v})`,
+          // Needs a touch screen: the module turns has_touch on.
+          tap: 'tap()',
         };
         out(`${l}.${call[op.action]}`);
       } else {
@@ -247,6 +331,8 @@ function uiOp(op: Op, s: State, out: (l: string) => void, warn: (m: string) => v
           scrollIntoView: `browser.scroll_into_view(${l})`,
           fill: `browser.fill(${l}, ${v})`,
           type: `browser.type(${l}, ${v})`,
+          // A touch pointer (W3C actions), so the page gets touch events as from a finger.
+          tap: `browser.tap(${l})`,
         };
         out(call[op.action]!);
       }
@@ -369,13 +455,106 @@ function uiOp(op: Op, s: State, out: (l: string) => void, warn: (m: string) => v
         s.root = P;
       } else out('browser.close_tab()');
       return true;
+    case 'download': {
+      const f = next(s, 'file');
+      out(pw ? `${f} = download(${P}, ${el(s, op.el)})` : `${f} = browser.download(${el(s, op.el)})`);
+      for (const a of op.asserts)
+        out(checkLine(a.target === 'content' ? `file_text(${f})` : `${f}[${pyStr(a.target)}]`, a));
+      if (op.into) out(`vars[${pyStr(op.into)}] = ${f}`);
+      return true;
+    }
+    case 'waitResponse': {
+      const r = next(s, 'response');
+      const kw = [
+        `url=${pyVal(op.url)}`,
+        ...(op.method ? [`method=${pyStr(op.method)}`] : []),
+        ...(op.status !== undefined ? [`status=${op.status}`] : []),
+        `timeout_ms=${op.timeoutMs}`,
+      ];
+      out(`${r} = network.wait_for_response(${P}, ${kw.join(', ')})`);
+      for (const a of op.asserts) out(checkLine(responseValue(r, a.target), a));
+      if (op.into) out(`vars[${pyStr(op.into)}] = ${r}["body"]`);
+      return true;
+    }
+    case 'mockRoute': {
+      const kw = [
+        `url=${pyVal(op.url)}`,
+        ...(op.method ? [`method=${pyStr(op.method)}`] : []),
+        `action=${pyStr(op.action)}`,
+        ...(op.action === 'fulfill'
+          ? [
+              `status=${op.status}`,
+              ...(op.body ? [`body=${pyVal(op.body, ind(out))}`] : []),
+              ...(op.contentType ? [`content_type=${pyStr(op.contentType)}`] : []),
+            ]
+          : []),
+        ...(op.delayMs && op.action !== 'remove' ? [`delay_ms=${op.delayMs}`] : []),
+        ...(op.times !== undefined && op.action !== 'remove' ? [`times=${op.times}`] : []),
+      ];
+      out(`mock_route(${P}.context, ${kw.join(', ')})`);
+      return true;
+    }
+    case 'offline':
+      out(
+        pw
+          ? `${P}.context.set_offline(${op.offline ? 'True' : 'False'})`
+          : `browser.set_offline(${op.offline ? 'True' : 'False'})`,
+      );
+      return true;
+    case 'storage': {
+      const kw = [
+        `kind=${pyStr(op.kind)}`,
+        `action=${pyStr(op.action)}`,
+        ...(op.action !== 'clear' ? [`name=${pyText(op.name)}`] : []),
+        ...(op.action === 'set' ? [`value=${pyText(op.value)}`] : []),
+      ];
+      const call = pw ? `storage(${P}, ${kw.join(', ')})` : `browser.storage(${kw.join(', ')})`;
+      if (op.action !== 'get') {
+        out(call);
+        return true;
+      }
+      const v = next(s, 'stored');
+      out(`${v} = ${call}`);
+      for (const a of op.asserts) out(checkLine(`${v}[${pyStr(a.target)}]`, a));
+      if (op.into) out(`vars[${pyStr(op.into)}] = ${v}["value"]`);
+      return true;
+    }
+    case 'clock':
+      out(
+        op.action === 'fastForward'
+          ? `${P}.clock.fast_forward(${op.ms})`
+          : op.action === 'install'
+            ? `${P}.clock.install(${op.time ? `time=clock_time(${pyVal(op.time)})` : ''})`
+            : `${P}.clock.set_fixed_time(clock_time(${pyVal(op.time!)}))`,
+      );
+      return true;
+    case 'netSummary': {
+      const t = next(s, 'traffic');
+      out(`${t} = network.summary(${P}, ${pyStr(op.since)})`);
+      for (const a of op.asserts) {
+        const m = TRAFFIC.exec(a.target);
+        out(
+          checkLine(
+            m
+              ? `${t}["byType"].get(${pyStr(m[2]!)}, {}).get(${pyStr(m[1]!)}, 0)`
+              : `${t}[${pyStr(a.target)}]`,
+            a,
+          ),
+        );
+      }
+      if (op.into) out(`vars[${pyStr(op.into)}] = ${t}`);
+      return true;
+    }
     default:
       return false;
   }
 }
 
+/** The indentation of the lines `out` writes (for multi-line values). */
+const ind = (out: ((l: string) => void) & { ind?: string }) => out.ind ?? '';
+
 function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): void {
-  const out = (line: string) => s.lines.push(`${ind}${line}`);
+  const out = Object.assign((line: string) => s.lines.push(`${ind}${line}`), { ind });
   for (const op of ops) {
     if (uiOp(op, s, out, warn)) continue;
     switch (op.op) {
@@ -400,6 +579,13 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
           );
         if (op.auth?.type === 'cookie')
           headers.push(`"Cookie": ${pyStr(`${op.auth.name}=`)} + ${pyText(op.auth.value)}`);
+        if (op.auth?.type === 'oauth2') {
+          const t = next(s, 'token');
+          out(
+            `${t} = api.oauth2_token(${pyText(op.auth.tokenUrl)}, ${pyText(op.auth.clientId)}, ${pyText(op.auth.clientSecret)}${op.auth.scope ? `, ${pyText(op.auth.scope)}` : ''})`,
+          );
+          headers.push(`"Authorization": "Bearer " + ${t}`);
+        }
         const i2 = `${ind}    `;
         const body =
           op.body === null || op.bodyType === 'none'
@@ -420,17 +606,17 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
         if (auth) out(`    ${auth}`);
         for (const b of body) out(`    ${b}`);
         out(')');
+        // A SOAP fault fails the step in StepForge, unless the step allows it.
+        if (op.soap && !op.soap.allowFault) out(`expect_no_fault(${r}["text"])`);
         for (const a of op.asserts) {
           // A fixed code reads best as == 201; anything else goes through check(), which compares "201" == 201.
           const code = a.target === 'status' && a.operator === 'equals' ? statusCode(a.expected) : null;
           if (code !== null) out(`assert ${r}["status"] == ${code}, "status"`);
-          else
-            out(
-              `check(pick(${r}, ${pyStr(a.target)}), ${pyStr(a.operator)}, ${pyVal(a.expected)}, ${pyStr(`${a.target} ${a.operator}`)})`,
-            );
+          else out(checkLine(responseValue(r, a.target, op.soap?.namespaces), a, ind));
         }
         if (op.into) out(`vars[${pyStr(op.into)}] = ${r}["body"]`);
         s.lastApi = r;
+        s.lastSoap = op.soap?.namespaces;
         break;
       }
       case 'apiExtract': {
@@ -442,7 +628,7 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
               : (op.path ?? 'body');
         out(
           s.lastApi
-            ? `vars[${pyStr(op.into)}] = pick(${s.lastApi}, ${pyStr(target)})`
+            ? `vars[${pyStr(op.into)}] = ${responseValue(s.lastApi, target, s.lastSoap)}`
             : '# TODO(StepForge): api.extract without an earlier request',
         );
         break;
@@ -490,6 +676,67 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
         out('    vars["index"] = index');
         printOps(op.body, s, `${ind}    `, warn);
         break;
+      case 'ifPage':
+        out(`if ${pageCondition(s, op.cond)}:`);
+        if (op.then.length) printOps(op.then, s, `${ind}    `, warn);
+        else out('    pass');
+        if (op.else.length) {
+          out('else:');
+          printOps(op.else, s, `${ind}    `, warn);
+        }
+        break;
+      case 'while': {
+        // StepForge's safety limit: the condition still holding after the last pass fails the test.
+        out(`for index in range(${op.max}):`);
+        out('    vars["index"] = index');
+        out(
+          op.cond.kind === 'page'
+            ? `    if not ${pageCondition(s, op.cond)}:`
+            : `    if not compare(${pyVal(op.cond.value)}, ${pyStr(op.cond.operator)}, ${pyVal(op.cond.expected)}):`,
+        );
+        out('        break');
+        printOps(op.body, s, `${ind}    `, warn);
+        out('else:');
+        out(
+          `    raise AssertionError(${pyStr(`Stopped after the limit of ${op.max} pass(es); the condition still held`)})`,
+        );
+        break;
+      }
+      case 'kafka': {
+        const k = next(s, 'message');
+        const keep = op.asserts.length || op.into ? `${k} = ` : '';
+        out(
+          op.action === 'produce'
+            ? `${keep}kafka.produce(${pyVal(op.params, ind)}, ${op.timeoutMs})`
+            : `${keep}kafka.consume(${pyVal(op.params, ind)}, test_start, ${op.timeoutMs})`,
+        );
+        for (const a of op.asserts) out(checkLine(`kafka.pick_message(${k}, ${pyStr(a.target)})`, a, ind));
+        if (op.into) out(`vars[${pyStr(op.into)}] = ${k}`);
+        break;
+      }
+      case 'ftp': {
+        const f = next(s, 'ftp');
+        out(`${op.asserts.length || op.into ? `${f} = ` : ''}ftp(${pyVal(op.params, ind)})`);
+        for (const a of op.asserts)
+          out(
+            FTP_TARGETS.includes(a.target)
+              ? checkLine(`${f}[${pyStr(a.target)}]`, a, ind)
+              : `# TODO(StepForge): an FTP ${op.action} has no "${a.target}" to check`,
+          );
+        if (op.into)
+          out(
+            `vars[${pyStr(op.into)}] = ${op.action === 'list' ? `${f}["entries"]` : op.action === 'exists' ? `${f}["exists"]` : f}`,
+          );
+        break;
+      }
+      case 'mongo': {
+        const r = next(s, 'db');
+        out(`${r} = mongo.run(${pyStr(op.connection)}, ${pyVal(op.command, ind)})`);
+        for (const a of op.asserts) out(checkLine(`pick(${r}, ${pyStr(a.target)})`, a, ind));
+        if (op.into) out(`vars[${pyStr(op.into)}] = ${r}["rows"]`);
+        s.lastDb = r;
+        break;
+      }
       case 'check':
         out(`check(${pyVal(op.actual)}, ${pyStr(op.operator)}, ${pyVal(op.expected)}, ${pyStr(op.message)})`);
         break;
@@ -583,22 +830,27 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
   }
 }
 
-function has(t: TestPlan, k: Op['op']): boolean {
+function has(t: TestPlan, k: Op['op'] | ((o: Op) => boolean)): boolean {
   let found = false;
-  const walk = (ops: Op[]) =>
-    ops.forEach((o) => {
-      if (o.op === k) found = true;
-      if (o.op === 'if') {
-        walk(o.then);
-        walk(o.else);
-      }
-      if (o.op === 'loop') walk(o.body);
-    });
-  walk(t.ops);
+  walk(t.ops, (o) => {
+    if (typeof k === 'function' ? k(o) : o.op === k) found = true;
+  });
   return found;
 }
 
-const HELPERS = ['check', 'compare', 'pick', 'fake', 'field', 'capture', 'text', 'random_value', 'RUN_ID'];
+const HELPERS = [
+  'check',
+  'compare',
+  'pick',
+  'fake',
+  'field',
+  'capture',
+  'text',
+  'random_value',
+  'RUN_ID',
+  'file_text',
+];
+const WEB = ['watch_network', 'mock_route', 'download', 'storage', 'page_condition', 'clock_time'];
 
 function testFile(plan: Plan, t: TestPlan, flavor: Flavor, warn: (m: string) => void): string {
   const tabs = flavor === 'playwright' && (has(t, 'tab') || has(t, 'closeTab'));
@@ -612,9 +864,17 @@ function testFile(plan: Plan, t: TestPlan, flavor: Flavor, warn: (m: string) => 
     imports: new Set(),
     usesUi: t.usesUi,
     plan,
+    marksNavigation: has(t, (o) => o.op === 'netSummary' && o.since === 'lastNavigation'),
   };
   printOps(t.ops, s, '    ', warn);
+  // Responses and traffic are recorded from the start of the test, as StepForge does.
+  if (has(t, 'waitResponse') || has(t, 'netSummary'))
+    s.lines.unshift('    network = watch_network(page.context, env["base_url"])');
   const code = s.lines.join('\n').replace(/#.*$/gm, '');
+  const uses = (names: string[]) => names.filter((x) => new RegExp(`(?<![.\\w])${x}\\(`).test(code));
+  const web = flavor === 'playwright' ? uses(WEB) : [];
+  const xml = uses(['xpath_value', 'expect_no_fault']);
+  const tap = flavor === 'playwright' && has(t, (o) => o.op === 'act' && o.action === 'tap');
   const helpers = HELPERS.filter(
     (h) => new RegExp(`\\b${h}\\(|\\b${h}\\b(?!\\()`).test(code) && new RegExp(`\\b${h}\\b`).test(code),
   );
@@ -643,6 +903,12 @@ function testFile(plan: Plan, t: TestPlan, flavor: Flavor, warn: (m: string) => 
     ...(helpers.length ? [`from support.helpers import ${helpers.join(', ')}`] : []),
     ...(/\bapi\./.test(code) ? ['from support import api'] : []),
     ...(/\bdb\./.test(code) ? ['from support import db'] : []),
+    ...(/\bkafka\./.test(code) ? ['from support import kafka'] : []),
+    ...(/\bmongo\./.test(code) ? ['from support import mongo'] : []),
+    ...(uses(['ftp']).length ? ['from support.ftp import ftp'] : []),
+    ...(uses(['expect_schema']).length ? ['from support.schema import expect_schema'] : []),
+    ...(xml.length ? [`from support.xml import ${xml.join(', ')}`] : []),
+    ...(web.length ? [`from support.web import ${web.join(', ')}`] : []),
     ...(/\bmail\./.test(code) ? ['from support import mail'] : []),
     ...(s.imports.has('tabs') ? ['from support.tabs import switch_tab'] : []),
     ...[...s.pages].map(
@@ -665,8 +931,19 @@ function testFile(plan: Plan, t: TestPlan, flavor: Flavor, warn: (m: string) => 
   ];
   const usesData = /\bdata\.get\(|\(data,/.test(code);
   const args = [...fixtures, ...(cases.length ? ['data'] : [])];
+  // Tapping needs a touch screen, as StepForge's phone and tablet sizes have.
+  const touch = tap
+    ? [
+        '@pytest.fixture',
+        'def browser_context_args(browser_context_args):',
+        '    return {**browser_context_args, "has_touch": True}',
+        '',
+        '',
+      ]
+    : [];
   return [
     ...head,
+    ...touch,
     ...decorators,
     `def ${name}(${args.join(', ')}):`,
     `    """${oneLine(t.scenario.name).replace(/\\/g, '\\\\').replace(/"/g, "'")}"""`,
@@ -741,6 +1018,7 @@ export function generatePython(
     );
   }
   const all = Object.values(files).join('\n');
+  const used = (re: RegExp) => re.test(all.replace(/#.*$/gm, ''));
   const engines = new Set(plan.tests.flatMap((t) => t.ops.flatMap((x) => (x.op === 'db' ? [x.engine] : []))));
   const any = engines.has('any');
   files['requirements.txt'] = [
@@ -754,6 +1032,11 @@ export function generatePython(
     ...(flavor === 'appium' ? ['Appium-Python-Client>=4.0'] : []),
     ...(any || engines.has('pg') ? ['psycopg[binary]>=3.2'] : []),
     ...(any || engines.has('mysql') ? ['PyMySQL>=1.1'] : []),
+    ...(used(/\bexpect_schema\(/) ? ['jsonschema>=4.23'] : []),
+    ...(used(/\b(xpath_value|expect_no_fault)\(/) ? ['lxml>=5.3'] : []),
+    ...(used(/\bkafka\./) ? ['kafka-python>=2.2'] : []),
+    ...(used(/\bftp\(/) ? ['paramiko>=3.5'] : []),
+    ...(used(/\bmongo\./) ? ['pymongo>=4.10'] : []),
     '',
   ].join('\n');
   const marks = [
@@ -810,6 +1093,7 @@ export function generatePython(
           'def browser():',
           '    """Chrome (headless unless HEADED=1); Selenium Manager downloads the matching driver."""',
           '    import os',
+          ...(used(/\bbrowser\.download\(/) ? ['    import tempfile'] : []),
           '',
           '    from selenium import webdriver',
           '',
@@ -817,8 +1101,18 @@ export function generatePython(
           '    if os.environ.get("HEADED") != "1":',
           '        options.add_argument("--headless=new")',
           '    options.add_argument("--window-size=1440,900")',
-          '    driver = webdriver.Chrome(options=options)',
-          '    yield Browser(driver, env["base_url"])',
+          ...(used(/\bbrowser\.download\(/)
+            ? [
+                '    # Downloads go to a folder of their own for each test.',
+                '    downloads = tempfile.mkdtemp(prefix="downloads-")',
+                '    options.add_experimental_option("prefs", {"download.default_directory": downloads, "download.prompt_for_download": False})',
+                '    driver = webdriver.Chrome(options=options)',
+                '    yield Browser(driver, env["base_url"], downloads=downloads)',
+              ]
+            : [
+                '    driver = webdriver.Chrome(options=options)',
+                '    yield Browser(driver, env["base_url"])',
+              ]),
           '    driver.quit()',
         ]
       : []),
@@ -900,6 +1194,12 @@ export function generatePython(
   files['support/api.py'] = runtime('py/api.py');
   if (/\bdb\./.test(all)) files['support/db.py'] = runtime('py/db.py');
   if (/\bmail\./.test(all)) files['support/mail.py'] = runtime('py/mail.py');
+  if (used(/\bfrom support\.web import/)) files['support/web.py'] = runtime('py/web.py');
+  if (used(/\bexpect_schema\(/)) files['support/schema.py'] = runtime('py/schema.py');
+  if (used(/\b(xpath_value|expect_no_fault)\(/)) files['support/xml.py'] = runtime('py/xml.py');
+  if (used(/\bkafka\./)) files['support/kafka.py'] = runtime('py/kafka.py');
+  if (used(/\bftp\(/)) files['support/ftp.py'] = runtime('py/ftp.py');
+  if (used(/\bmongo\./)) files['support/mongo.py'] = runtime('py/mongo.py');
   if (flavor === 'selenium') {
     files['support/browser.py'] = runtime('py/browser.py');
     files['support/find.js'] = runtime('selenium/find.js');

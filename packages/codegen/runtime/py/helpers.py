@@ -340,8 +340,18 @@ def pick(result, target):
         return result["body"]
     if t == "text":
         return result["text"]
+    if t == "url":
+        return result.get("url")
     if t.startswith(("header:", "headers.")):
         return result["headers"].get(re.sub(r"^headers?[.:]", "", t).lower())
     if t.startswith("$"):
         return json_path(result["body"], t)
     return None
+
+
+def file_text(file):
+    """A downloaded file's text (up to 5 MB, as StepForge reads it)."""
+    if file["size"] > 5_000_000:
+        return ""
+    with open(file["path"], encoding="utf-8", errors="replace") as f:
+        return f.read()
