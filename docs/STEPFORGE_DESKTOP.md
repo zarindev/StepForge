@@ -22,7 +22,7 @@ else is needed: no Node.js, no Git, no terminal. The installers are about 190–
 | Windows 10 or 11 (64-bit) | [`StepForge-win-x64.exe`](https://github.com/zarindev/StepForge/releases/latest/download/StepForge-win-x64.exe) |
 | Linux (64-bit) | [`StepForge-linux-x86_64.AppImage`](https://github.com/zarindev/StepForge/releases/latest/download/StepForge-linux-x86_64.AppImage) (any distribution) or [`StepForge-linux-amd64.deb`](https://github.com/zarindev/StepForge/releases/latest/download/StepForge-linux-amd64.deb) (Debian, Ubuntu, Mint …) |
 
-Not sure which Mac you have? the Apple menu → **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor:
+Not sure which Mac you have? Open the Apple menu → **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor:
 Intel …" means Intel.
 
 ### macOS

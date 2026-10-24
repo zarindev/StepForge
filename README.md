@@ -21,14 +21,7 @@ through your app, add API, database, email and performance checks to the same sc
 video and traces, and get a plain-English diagnosis of every failure. Then export the suite to Playwright, Cypress,
 Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, no paid APIs.
 
-<!--
-  demo.gif — to record (about 30 s, 1440×900): Home → "Load demo workspace" → Run all tests → open a failed test and
-  its diagnosis → Exports → Playwright preview. Ready-made WebM clips of the recorder, a live run and a diagnosis are in
-  docs/assets/clips/ (scripts/capture_showcase.ts). Save as docs/assets/demo.gif and replace this comment with:
-  <p align="center"><img src="docs/assets/demo.gif" alt="StepForge in 30 seconds" width="100%" /></p>
--->
-
-<p align="center"><img src="docs/assets/screenshots/run-results.png" alt="A failed test with its diagnosis" width="100%" /></p>
+<p align="center"><img src="docs/assets/demo.gif" alt="StepForge in 30 seconds: a run of the CareClinic demo, then a failed test with its diagnosis" width="100%" /></p>
 
 ## Download and install
 
@@ -50,7 +43,7 @@ Choose your system for the steps:
 <details>
 <summary><b>🍎 macOS</b></summary>
 
-1. Download the `.dmg` for your Mac: **Apple silicon** (M1, M2, M3, M4 …) or **Intel**. Not sure? the Apple menu →
+1. Download the `.dmg` for your Mac: **Apple silicon** (M1, M2, M3, M4 …) or **Intel**. Not sure? Open the Apple menu →
    **About This Mac**: "Chip: Apple M…" is Apple silicon.
 2. Open the `.dmg` and drag **StepForge** onto **Applications**.
 3. The first time only: in Applications, **right-click StepForge → Open**, then **Open** again. (The app is not signed
