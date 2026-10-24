@@ -11,10 +11,19 @@ import {
   statusCode,
   testPath,
 } from '../common.ts';
-import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
+import {
+  walk,
+  type El,
+  type Features,
+  type Loc,
+  type Op,
+  type PageCond,
+  type Plan,
+  type TestPlan,
+} from '../ir.ts';
 import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal, jsVar } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject } from '../types.ts';
-import { camel, envName, kebab, parseString, val } from '../values.ts';
+import { camel, envName, kebab, parseString, val, type Val } from '../values.ts';
 
 /** Playwright Test (TypeScript): UI with locators or page objects, API through the request fixture, DB and email helpers. */
 
@@ -60,9 +69,59 @@ export type State = {
   usesUi: boolean;
   pomVars: Map<string, string>;
   imports: Set<string>;
+  /** Namespaces of the last SOAP response, for XPath in a later extract. */
+  lastSoap?: Record<string, string>;
+  /** The test checks the traffic "since the last navigation": each goto marks it. */
+  marksNavigation?: boolean;
 };
 
 export const next = (s: State, k: string) => `${k}${(s.n[k] = (s.n[k] ?? 0) + 1)}`;
+
+/** Every feature: the Playwright Test export prints all of them. */
+export const PLAYWRIGHT_TS_FEATURES: Features = {
+  tap: true,
+  download: true,
+  waitResponse: true,
+  mockRoute: true,
+  offline: true,
+  storage: true,
+  clock: true,
+  netSummary: true,
+  pageCondition: true,
+  repeatWhile: true,
+  soap: true,
+  schema: true,
+  oauth2: true,
+  kafka: true,
+  ftp: true,
+  mongo: true,
+};
+
+/** An assertion line: check() with StepForge's operators, or a JSON Schema check. */
+function checkLine(actual: string, a: { target: string; operator: string; expected: Val }): string {
+  return a.operator === 'matchesSchema'
+    ? `expectSchema(${actual}, ${jsVal(a.expected)}, ${jsStr(`${a.target} matches the JSON schema`)});`
+    : `check(${actual}, ${jsStr(a.operator)}, ${jsVal(a.expected)}, ${jsStr(`${a.target} ${a.operator}`)});`;
+}
+
+/** XPath targets read the XML body (SOAP); the others are read as from any response. */
+const XPATH = (t: string) =>
+  t.startsWith('/') || t.startsWith('xpath:') || /^(count|string|number|boolean|sum)\(/.test(t);
+function responseValue(r: string, target: string, ns?: Record<string, string>): string {
+  if (ns && XPATH(target))
+    return `xpathValue(${r}.text, ${jsStr(target)}${Object.keys(ns).length ? `, ${jsJson(ns)}` : ''})`;
+  // A schema on the whole body ($ or body) validates the parsed body.
+  return target === '$' ? `${r}.body` : `pick(${r}, ${jsStr(target)})`;
+}
+
+/** A clock time: a fixed date when it is written in the step, else read like StepForge reads it. */
+function timeTs(v: Val): string {
+  if (v.t === 'num') return `new Date(${v.v})`;
+  if (v.t === 'str' && v.parts.every((x) => typeof x === 'string')) return `new Date(${jsVal(v)})`;
+  return `clockTime(${jsVal(v)})`;
+}
+
+const TRAFFIC = /^(requests|bytes):(.+)$/;
 
 function loc(s: State, e: El): string {
   if (e.pom && s.root === s.pageVar) {
@@ -180,11 +239,14 @@ export function printOps(ops: Op[], s: State, ind: string): void {
         out(`// TODO(StepForge): ${oneLine(op.text)}`);
         break;
       case 'goto':
+        if (s.marksNavigation) out('network.navigated();');
         out(`await ${s.pageVar}.goto(${jsVal(op.url)});`);
         break;
       case 'act': {
         const l = loc(s, op.el);
         const call: Record<string, string> = {
+          // Needs a touch screen: the spec turns hasTouch on.
+          tap: 'tap()',
           click: 'click()',
           dblclick: 'dblclick()',
           rightclick: "click({ button: 'right' })",
@@ -300,6 +362,14 @@ export function printOps(ops: Op[], s: State, ind: string): void {
           );
         if (op.auth?.type === 'cookie')
           headers.push(`Cookie: \`${op.auth.name}=\${${jsText(op.auth.value)}}\``);
+        if (op.auth?.type === 'oauth2') {
+          const t = next(s, 'token');
+          const scope = op.auth.scope ? `, scope: ${jsText(op.auth.scope)}` : '';
+          out(
+            `const ${t} = await oauth2Token(request, { tokenUrl: ${jsText(op.auth.tokenUrl)}, clientId: ${jsText(op.auth.clientId)}, clientSecret: ${jsText(op.auth.clientSecret)}${scope} });`,
+          );
+          headers.push(`Authorization: \`Bearer \${${t}}\``);
+        }
         const i2 = `${ind}  `;
         const body =
           op.body === null || op.bodyType === 'none'
@@ -318,18 +388,18 @@ export function printOps(ops: Op[], s: State, ind: string): void {
         if (params.length) out(`  params: { ${params.join(', ')} },`);
         for (const b of body) out(`  ${b}`);
         out('});');
+        // A SOAP fault fails the step in StepForge, unless the step allows it.
+        if (op.soap && !op.soap.allowFault) out(`expectNoFault(${r}.text);`);
         for (const a of op.asserts) {
           // A fixed code reads best as toBe(201); anything else goes through check(), which compares "201" == 201.
           const code =
             a.target === 'status' && a.operator === 'equals' && !appium ? statusCode(a.expected) : null;
           if (code !== null) out(`expect(${r}.status, 'status').toBe(${code});`);
-          else
-            out(
-              `check(pick(${r}, ${jsStr(a.target)}), ${jsStr(a.operator)}, ${jsVal(a.expected)}, ${jsStr(`${a.target} ${a.operator}`)});`,
-            );
+          else out(checkLine(responseValue(r, a.target, op.soap?.namespaces), a));
         }
         if (op.into) out(`${jsVar(op.into)} = ${r}.body;`);
         s.lastApi = r;
+        s.lastSoap = op.soap?.namespaces;
         break;
       }
       case 'apiExtract': {
@@ -341,7 +411,7 @@ export function printOps(ops: Op[], s: State, ind: string): void {
               : (op.path ?? 'body');
         out(
           s.lastApi
-            ? `${jsVar(op.into)} = pick(${s.lastApi}, ${jsStr(target)});`
+            ? `${jsVar(op.into)} = ${responseValue(s.lastApi, target, s.lastSoap)};`
             : '// TODO(StepForge): api.extract without an earlier request',
         );
         break;
@@ -391,6 +461,147 @@ export function printOps(ops: Op[], s: State, ind: string): void {
         printOps(op.body, s, `${ind}  `);
         out('}');
         break;
+      case 'ifPage':
+        out(`if (${pageCondition(s, op.cond)}) {`);
+        printOps(op.then, s, `${ind}  `);
+        if (op.else.length) {
+          out('} else {');
+          printOps(op.else, s, `${ind}  `);
+        }
+        out('}');
+        break;
+      case 'while': {
+        // StepForge's safety limit: the condition still holding after the last pass fails the test.
+        const n = next(s, 'pass');
+        out(`let ${n} = 0;`);
+        out(`for (; ${n} < ${op.max}; ${n}++) {`);
+        out(`  vars.index = ${n};`);
+        out(
+          op.cond.kind === 'page'
+            ? `  if (!(${pageCondition(s, op.cond)})) break;`
+            : `  if (!compare(${jsVal(op.cond.value)}, ${jsStr(op.cond.operator)}, ${jsVal(op.cond.expected)})) break;`,
+        );
+        printOps(op.body, s, `${ind}  `);
+        out('}');
+        out(
+          `if (${n} >= ${op.max}) throw new Error(${jsStr(`Stopped after the limit of ${op.max} pass(es); the condition still held`)});`,
+        );
+        break;
+      }
+      case 'download': {
+        const f = next(s, 'file');
+        out(`const ${f} = await download(${s.pageVar}, ${loc(s, op.el)}, test.info().outputDir);`);
+        for (const a of op.asserts)
+          out(checkLine(a.target === 'content' ? `fileText(${f})` : `${f}.${a.target}`, a));
+        if (op.into) out(`${jsVar(op.into)} = ${f};`);
+        break;
+      }
+      case 'waitResponse': {
+        const r = next(s, 'response');
+        const o = [
+          `url: ${jsVal(op.url)}`,
+          ...(op.method ? [`method: ${jsStr(op.method)}`] : []),
+          ...(op.status !== undefined ? [`status: ${op.status}`] : []),
+          `timeoutMs: ${op.timeoutMs}`,
+        ];
+        out(`const ${r} = await network.waitForResponse({ ${o.join(', ')} });`);
+        for (const a of op.asserts) out(checkLine(responseValue(r, a.target), a));
+        if (op.into) out(`${jsVar(op.into)} = ${r}.body;`);
+        break;
+      }
+      case 'mockRoute': {
+        const o = [
+          `url: ${jsVal(op.url)}`,
+          ...(op.method ? [`method: ${jsStr(op.method)}`] : []),
+          `action: ${jsStr(op.action)}`,
+          ...(op.action === 'fulfill'
+            ? [
+                `status: ${op.status}`,
+                ...(op.body ? [`body: ${jsVal(op.body, ind)}`] : []),
+                ...(op.contentType ? [`contentType: ${jsStr(op.contentType)}`] : []),
+              ]
+            : []),
+          ...(op.delayMs && op.action !== 'remove' ? [`delayMs: ${op.delayMs}`] : []),
+          ...(op.times !== undefined && op.action !== 'remove' ? [`times: ${op.times}`] : []),
+        ];
+        out(`await mockRoute(${s.pageVar}.context(), { ${o.join(', ')} });`);
+        break;
+      }
+      case 'offline':
+        out(`await ${s.pageVar}.context().setOffline(${op.offline});`);
+        break;
+      case 'storage': {
+        const o = [
+          `kind: ${jsStr(op.kind)}`,
+          `action: ${jsStr(op.action)}`,
+          ...(op.action !== 'clear' ? [`name: ${jsText(op.name)}`] : []),
+          ...(op.action === 'set' ? [`value: ${jsText(op.value)}`] : []),
+        ];
+        if (op.action !== 'get') {
+          out(`await storage(${s.pageVar}, { ${o.join(', ')} });`);
+          break;
+        }
+        const v = next(s, 'stored');
+        out(`const ${v} = await storage(${s.pageVar}, { ${o.join(', ')} });`);
+        for (const a of op.asserts) out(checkLine(`${v}.${a.target}`, a));
+        if (op.into) out(`${jsVar(op.into)} = ${v}.value;`);
+        break;
+      }
+      case 'clock':
+        out(
+          op.action === 'fastForward'
+            ? `await ${s.pageVar}.clock.fastForward(${op.ms});`
+            : op.action === 'install'
+              ? `await ${s.pageVar}.clock.install(${op.time ? `{ time: ${timeTs(op.time)} }` : ''});`
+              : `await ${s.pageVar}.clock.setFixedTime(${timeTs(op.time!)});`,
+        );
+        break;
+      case 'netSummary': {
+        const t = next(s, 'traffic');
+        out(`const ${t} = await network.summary(${s.pageVar}, ${jsStr(op.since)});`);
+        for (const a of op.asserts) {
+          const m = TRAFFIC.exec(a.target);
+          out(checkLine(m ? `(${t}.byType[${jsStr(m[2]!)}]?.${m[1]} ?? 0)` : `${t}.${a.target}`, a));
+        }
+        if (op.into) out(`${jsVar(op.into)} = ${t};`);
+        break;
+      }
+      case 'kafka': {
+        const k = next(s, 'message');
+        // Kept in a variable only when something reads it.
+        const keep = op.asserts.length || op.into ? `const ${k} = ` : '';
+        out(
+          op.action === 'produce'
+            ? `${keep}await kafka.produce(${jsVal(op.params, ind)}, ${op.timeoutMs});`
+            : `${keep}await kafka.consume(${jsVal(op.params, ind)}, testStart, ${op.timeoutMs});`,
+        );
+        for (const a of op.asserts) out(checkLine(`pickMessage(${k}, ${jsStr(a.target)})`, a));
+        if (op.into) out(`${jsVar(op.into)} = ${k};`);
+        break;
+      }
+      case 'ftp': {
+        const f = next(s, 'ftp');
+        out(`${op.asserts.length || op.into ? `const ${f} = ` : ''}await ftp(${jsVal(op.params, ind)});`);
+        for (const a of op.asserts)
+          out(
+            FTP_TARGETS.includes(a.target)
+              ? checkLine(`${f}.${a.target}`, a)
+              : `// TODO(StepForge): an FTP ${op.action} has no "${a.target}" to check`,
+          );
+        if (op.into)
+          out(
+            `${jsVar(op.into)} = ${op.action === 'list' ? `${f}.entries` : op.action === 'exists' ? `${f}.exists` : f};`,
+          );
+        break;
+      }
+      case 'mongo': {
+        const r = next(s, 'db');
+        out(`const ${r} = await mongo.run(${jsStr(op.connection)}, ${jsVal(op.command, ind)});`);
+        for (const a of op.asserts) out(checkLine(`pick(${r}, ${jsStr(a.target)})`, a));
+        if (op.into) out(`${jsVar(op.into)} = ${r}.rows;`);
+        s.lastDb = r;
+        break;
+      }
       case 'check':
         out(
           `check(${jsVal(op.actual)}, ${jsStr(op.operator)}, ${jsVal(op.expected)}, ${jsStr(op.message)});`,
@@ -472,19 +683,22 @@ export function printOps(ops: Op[], s: State, ind: string): void {
   }
 }
 
+const FTP_TARGETS = ['content', 'size', 'path', 'count', 'names', 'exists'];
+
+/** `await pageCondition(…)` for a page condition on the step's element. */
+function pageCondition(s: State, c: PageCond): string {
+  const args = [loc(s, c.el), jsStr(c.check)];
+  const expected = c.expected ? (c.check === 'count' ? jsNum(c.expected) : jsText(c.expected)) : 'undefined';
+  if (c.expected || c.timeoutMs !== 2000) args.push(expected);
+  if (c.timeoutMs !== 2000) args.push(String(c.timeoutMs));
+  return `await pageCondition(${args.join(', ')})`;
+}
+
 export function needs(t: TestPlan) {
   const flat: Op[] = [];
-  const walk = (ops: Op[]) =>
-    ops.forEach((o) => {
-      flat.push(o);
-      if (o.op === 'if') {
-        walk(o.then);
-        walk(o.else);
-      }
-      if (o.op === 'loop') walk(o.body);
-    });
-  walk(t.ops);
+  walk(t.ops, (o) => flat.push(o));
   const has = (k: Op['op']) => flat.some((o) => o.op === k);
+  const api = flat.filter((o): o is Extract<Op, { op: 'api' }> => o.op === 'api');
   return {
     flat,
     tabs: has('tab') || has('closeTab'),
@@ -492,6 +706,16 @@ export function needs(t: TestPlan) {
     db: has('db'),
     mail: has('emailWait'),
     script: has('script'),
+    tap: flat.some((o) => o.op === 'act' && o.action === 'tap'),
+    network: has('waitResponse') || has('netSummary'),
+    sinceNavigation: flat.some((o) => o.op === 'netSummary' && o.since === 'lastNavigation'),
+    soap: api.some((o) => o.soap),
+    schema: flat.some((o) => 'asserts' in o && o.asserts.some((a) => a.operator === 'matchesSchema')),
+    oauth2: api.some((o) => o.auth?.type === 'oauth2'),
+    kafka: has('kafka'),
+    consume: flat.some((o) => o.op === 'kafka' && o.action === 'consume'),
+    ftp: has('ftp'),
+    mongo: has('mongo'),
   };
 }
 
@@ -512,9 +736,24 @@ function specFile(plan: Plan, t: TestPlan, path: string): string {
     usesUi: t.usesUi,
     pomVars: new Map(),
     imports: new Set(),
+    marksNavigation: n.sinceNavigation,
   };
   printOps(t.ops, s, '    ');
+  // Responses and traffic are recorded from the start of the test, as StepForge does.
+  if (n.network) s.lines.unshift('    const network = watchNetwork(page.context(), env.baseUrl);');
   const body = s.lines.join('\n');
+  const code = body.replace(/\/\/.*$/gm, '');
+  const uses = (names: string[]) => names.filter((x) => new RegExp(`\\b${x}\\(`).test(code));
+  const web = uses([
+    'watchNetwork',
+    'mockRoute',
+    'download',
+    'fileText',
+    'storage',
+    'pageCondition',
+    'clockTime',
+  ]);
+  const xml = uses(['xpathValue', 'expectNoFault']);
   const cases = t.scenario.testCases;
   const dataUsed = /(?<![.\w])data\.|\(data[,)]|, data\)/.test(body.replace(/\/\/.*$/gm, ''));
   const fixtures = [...(t.usesUi || n.tabs ? ['page'] : []), ...(n.api ? ['request'] : [])];
@@ -535,9 +774,17 @@ function specFile(plan: Plan, t: TestPlan, path: string): string {
       : []),
     ...(helpers.length ? [`import { ${helpers.join(', ')} } from '${up}support/helpers';`] : []),
     ...(n.api
-      ? [`import { api${/basicAuth\(/.test(body) ? ', basicAuth' : ''} } from '${up}support/api';`]
+      ? [`import { ${['api', ...uses(['basicAuth', 'oauth2Token'])].join(', ')} } from '${up}support/api';`]
       : []),
     ...(n.db ? [`import * as db from '${up}support/db';`] : []),
+    ...(web.length ? [`import { ${web.join(', ')} } from '${up}support/web';`] : []),
+    ...(uses(['expectSchema']).length ? [`import { expectSchema } from '${up}support/schema';`] : []),
+    ...(xml.length ? [`import { ${xml.join(', ')} } from '${up}support/xml';`] : []),
+    ...(n.kafka
+      ? [`import * as kafka from '${up}support/kafka';`, `import { pickMessage } from '${up}support/kafka';`]
+      : []),
+    ...(n.ftp ? [`import { ftp } from '${up}support/ftp';`] : []),
+    ...(n.mongo ? [`import * as mongo from '${up}support/mongo';`] : []),
     ...(n.mail ? [`import * as mail from '${up}support/mail';`] : []),
     ...(s.imports.has('tabs') ? [`import { switchTab } from '${up}support/tabs';`] : []),
     ...[...s.pomVars.keys()].map(
@@ -550,11 +797,13 @@ function specFile(plan: Plan, t: TestPlan, path: string): string {
   const testBody = [
     ...(n.tabs ? ['    let current = page;'] : []),
     ...[...s.pomVars].map(([p, v]) => `    const ${v} = new ${plan.pages.get(p)!.className}(page);`),
-    ...(n.mail ? ['    const testStart = new Date();'] : []),
+    ...(n.mail || n.consume ? ['    const testStart = new Date();'] : []),
     '    const vars: Vars = {};',
     ...s.lines,
   ];
   const opts = `{ tag: [${tags.map(jsStr).join(', ')}] }`;
+  // Tapping needs a touch screen, as StepForge's phone and tablet sizes have.
+  const touch = n.tap ? ['  test.use({ hasTouch: true });', ''] : [];
   const fx = `{ ${fixtures.join(', ')} }`;
   if (cases.length) {
     return [
@@ -564,6 +813,7 @@ function specFile(plan: Plan, t: TestPlan, path: string): string {
       '];',
       '',
       `test.describe(${jsStr(title)}, () => {`,
+      ...touch,
       `  for (const { code, title, data } of testCases) {`,
       `    test(\`\${code} \${title}\`, ${opts}, async (${fx}) => {`,
       ...testBody.map((l) => (l ? `  ${l}` : l)),
@@ -576,6 +826,7 @@ function specFile(plan: Plan, t: TestPlan, path: string): string {
   return [
     ...head,
     `test.describe(${jsStr(title)}, () => {`,
+    ...touch,
     `  test(${jsStr(t.scenario.name)}, ${opts}, async (${fx}) => {`,
     ...(dataUsed || n.script ? ['    const data: Vars = {};'] : []),
     ...testBody,
@@ -732,7 +983,18 @@ export function generatePlaywrightTs(plan: Plan, o: CodegenOptions): GeneratedPr
   const anyDb = plan.tests.some((t) => t.ops.some((x) => x.op === 'db'));
   const engines = new Set(plan.tests.flatMap((t) => t.ops.flatMap((x) => (x.op === 'db' ? [x.engine] : []))));
   const any = engines.has('any');
+  const all = plan.tests.map(needs);
+  const some = (k: keyof ReturnType<typeof needs>) => all.some((x) => !!x[k]);
   const deps: Record<string, string> = {
+    ...(some('schema') && { ajv: '^8.17.1', 'ajv-formats': '^3.0.1' }),
+    ...(some('soap') && { '@xmldom/xmldom': '^0.9.12', xpath: '^0.0.35' }),
+    ...(some('kafka') && { kafkajs: '^2.2.4' }),
+    ...(some('ftp') && {
+      'basic-ftp': '^6.2.3',
+      'ssh2-sftp-client': '^12.1.1',
+      '@types/ssh2-sftp-client': '^9.0.6',
+    }),
+    ...(some('mongo') && { mongodb: '^7.7.0' }),
     ...((any || engines.has('pg')) && { pg: '^8.16.0', '@types/pg': '^8.15.0' }),
     ...((any || engines.has('mysql')) && { mysql2: '^3.14.0' }),
     ...((any || engines.has('sqlite')) && {
@@ -802,6 +1064,13 @@ export function generatePlaywrightTs(plan: Plan, o: CodegenOptions): GeneratedPr
   if (anyDb) files['support/db.ts'] = runtime('ts/db.ts');
   if (plan.tests.some((t) => needs(t).mail)) files['support/mail.ts'] = runtime('ts/mail.ts');
   if (plan.tests.some((t) => needs(t).tabs)) files['support/tabs.ts'] = runtime('ts/tabs.ts');
+  const specs = Object.values(files).join('\n');
+  if (/from '(\.\.\/)+support\/web'/.test(specs)) files['support/web.ts'] = runtime('ts/web.ts');
+  if (some('schema')) files['support/schema.ts'] = runtime('ts/schema.ts');
+  if (some('soap')) files['support/xml.ts'] = runtime('ts/xml.ts');
+  if (some('kafka')) files['support/kafka.ts'] = runtime('ts/kafka.ts');
+  if (some('ftp')) files['support/ftp.ts'] = runtime('ts/ftp.ts');
+  if (some('mongo')) files['support/mongo.ts'] = runtime('ts/mongo.ts');
   for (const key of plan.pages.keys())
     files[`pages/${plan.pages.get(key)!.className}.ts`] = pageFile(plan, key);
   Object.assign(files, plan.sqlFiles);

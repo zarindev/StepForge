@@ -9,7 +9,16 @@ import {
   nativeNotes,
   PLATFORM_NAMES,
 } from '../native.ts';
-import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
+import {
+  walk,
+  type El,
+  type Features,
+  type Loc,
+  type Op,
+  type PageCond,
+  type Plan,
+  type TestPlan,
+} from '../ir.ts';
 import {
   javaBlock,
   javaComment,
@@ -28,6 +37,58 @@ import { camel, envName, parseString, pascal, snake, uniquer, type Val } from '.
  * Assured only.
  */
 type Flavor = 'selenium' | 'appium' | 'api';
+
+/** The integrations and API checks: the same in both Java exports that send requests. */
+const API_FEATURES: Features = {
+  soap: true,
+  schema: true,
+  oauth2: true,
+  kafka: true,
+  ftp: true,
+  mongo: true,
+};
+const NO_NETWORK = (what: string) =>
+  `${what} is not exported to {target}: WebDriver cannot see or change the page's network traffic (only Chrome's DevTools can, tied to one Chrome version); write it by hand`;
+
+/** What the Java exports print beyond the basic steps (see features.ts). */
+export function javaFeatures(flavor: Flavor): Features {
+  if (flavor === 'appium') return {};
+  if (flavor === 'api') return { ...API_FEATURES, repeatWhile: true };
+  return {
+    ...API_FEATURES,
+    tap: true,
+    download: true,
+    storage: true,
+    pageCondition: true,
+    repeatWhile: true,
+    waitResponse: NO_NETWORK('waiting for a response'),
+    mockRoute: NO_NETWORK('faking a route'),
+    netSummary: NO_NETWORK('the network summary'),
+    offline:
+      'going offline is not exported to {target}: WebDriver has no offline mode (only Chrome DevTools has); write it by hand',
+    clock:
+      'the page clock is not exported to {target}: WebDriver cannot set the page clock; write it by hand',
+  };
+}
+
+/** An assertion line: check() with StepForge's operators, or a JSON Schema check. */
+function checkLine(actual: string, a: { target: string; operator: string; expected: Val }): string {
+  return a.operator === 'matchesSchema'
+    ? `Schema.expect(${actual}, ${javaVal(a.expected)}, ${javaStr(`${a.target} matches the JSON schema`)});`
+    : `check(${actual}, ${javaStr(a.operator)}, ${javaVal(a.expected)}, ${javaStr(`${a.target} ${a.operator}`)});`;
+}
+
+/** XPath targets read the XML body (SOAP); the others are read as from any response. */
+const XPATH = (t: string) =>
+  t.startsWith('/') || t.startsWith('xpath:') || /^(count|string|number|boolean|sum)\(/.test(t);
+function responseValue(r: string, target: string, ns?: Record<string, string>): string {
+  if (ns && XPATH(target))
+    return `Xml.value(${r}.text(), ${javaStr(target)}${Object.keys(ns).length ? `, ${javaJson(ns)}` : ''})`;
+  // A schema on the whole body ($) validates the parsed body.
+  return target === '$' ? `${r}.body()` : `pick(${r}, ${javaStr(target)})`;
+}
+
+const FTP_TARGETS = ['content', 'size', 'path', 'count', 'names', 'exists'];
 
 export function locatorJava(l: Loc): string {
   const v = (s: string) => javaText(parseString(s));
@@ -48,6 +109,8 @@ type State = {
   usesUi: boolean;
   plan: Plan;
   warn: (m: string) => void;
+  /** Namespaces of the last SOAP response, for XPath in a later extract. */
+  lastSoap?: Record<string, string>;
 };
 
 const next = (s: State, k: string) => `${k}${(s.n[k] = (s.n[k] ?? 0) + 1)}`;
@@ -117,6 +180,8 @@ function uiOp(op: Op, s: State, out: (l: string) => void): boolean {
           scrollIntoView: `browser.scrollIntoView(${l});`,
           fill: `browser.fill(${l}, ${v});`,
           type: `browser.type(${l}, ${v});`,
+          // Touch events through a WebDriver touch pointer, as a tap on a phone or tablet.
+          tap: `browser.tap(${l});`,
         }[op.action],
       );
       break;
@@ -255,6 +320,10 @@ function printOps(ops: Op[], s: State, ind: string): void {
           );
         if (op.auth?.type === 'cookie')
           chain.push(`.cookie(${javaStr(op.auth.name)}, ${javaText(op.auth.value)})`);
+        if (op.auth?.type === 'oauth2')
+          chain.push(
+            `.header("Authorization", "Bearer " + Api.oauth2Token(${javaText(op.auth.tokenUrl)}, ${javaText(op.auth.clientId)}, ${javaText(op.auth.clientSecret)}, ${op.auth.scope ? javaText(op.auth.scope) : 'null'}))`,
+          );
         if (op.body && op.bodyType !== 'none') {
           if (op.bodyType === 'form')
             chain.push('.contentType(ContentType.URLENC)', `.formParams(${javaVal(op.body)})`);
@@ -271,17 +340,17 @@ function printOps(ops: Op[], s: State, ind: string): void {
         out(`    ${chain[0]}`);
         for (const c of chain.slice(1)) out(`        ${c}`);
         out(');');
+        // A SOAP fault fails the step in StepForge, unless the step allows it.
+        if (op.soap && !op.soap.allowFault) out(`Xml.expectNoFault(${r}.text());`);
         for (const a of op.asserts) {
           // A fixed code reads best as assertEquals(201, …); anything else goes through check(), which compares "201" == 201.
           const code = a.target === 'status' && a.operator === 'equals' ? statusCode(a.expected) : null;
           if (code !== null) out(`assertEquals(${code}, ${r}.status(), "status");`);
-          else
-            out(
-              `check(pick(${r}, ${javaStr(a.target)}), ${javaStr(a.operator)}, ${javaVal(a.expected)}, ${javaStr(`${a.target} ${a.operator}`)});`,
-            );
+          else out(checkLine(responseValue(r, a.target, op.soap?.namespaces), a));
         }
         if (op.into) out(`vars.put(${javaStr(op.into)}, ${r}.body());`);
         s.lastApi = r;
+        s.lastSoap = op.soap?.namespaces;
         break;
       }
       case 'apiExtract': {
@@ -293,7 +362,7 @@ function printOps(ops: Op[], s: State, ind: string): void {
               : (op.path ?? 'body');
         out(
           s.lastApi
-            ? `vars.put(${javaStr(op.into)}, pick(${s.lastApi}, ${javaStr(target)}));`
+            ? `vars.put(${javaStr(op.into)}, ${responseValue(s.lastApi, target, s.lastSoap)});`
             : '// TODO(StepForge): api.extract without an earlier request',
         );
         break;
@@ -343,6 +412,94 @@ function printOps(ops: Op[], s: State, ind: string): void {
           out('}');
         }
         break;
+      case 'ifPage':
+        out(`if (${pageCondition(s, op.cond)}) {`);
+        printOps(op.then, s, `${ind}  `);
+        if (op.else.length) {
+          out('} else {');
+          printOps(op.else, s, `${ind}  `);
+        }
+        out('}');
+        break;
+      case 'while': {
+        // StepForge's safety limit: the condition still holding after the last pass fails the test.
+        const n = next(s, 'pass');
+        out(`int ${n} = 0;`);
+        out(`for (; ${n} < ${op.max}; ${n}++) {`);
+        out(`  vars.put("index", ${n});`);
+        out(
+          op.cond.kind === 'page'
+            ? `  if (!${pageCondition(s, op.cond)}) break;`
+            : `  if (!compare(${javaVal(op.cond.value)}, ${javaStr(op.cond.operator)}, ${javaVal(op.cond.expected)})) break;`,
+        );
+        printOps(op.body, s, `${ind}  `);
+        out('}');
+        out(
+          `if (${n} >= ${op.max}) throw new AssertionError(${javaStr(`Stopped after the limit of ${op.max} pass(es); the condition still held`)});`,
+        );
+        break;
+      }
+      case 'download': {
+        const f = next(s, 'file');
+        out(`Browser.Download ${f} = browser.download(${el(s, op.el)});`);
+        for (const a of op.asserts) out(checkLine(`${f}.${a.target}()`, a));
+        if (op.into) out(`vars.put(${javaStr(op.into)}, ${f}.info());`);
+        break;
+      }
+      case 'storage': {
+        const args = [
+          javaStr(op.kind),
+          javaStr(op.action),
+          op.action === 'clear' ? 'null' : javaText(op.name),
+          op.action === 'set' ? javaText(op.value) : 'null',
+        ].join(', ');
+        if (op.action !== 'get') {
+          out(`browser.storage(${args});`);
+          break;
+        }
+        const v = next(s, 'stored');
+        out(`Browser.Stored ${v} = browser.storage(${args});`);
+        for (const a of op.asserts) out(checkLine(`${v}.${a.target}()`, a));
+        if (op.into) out(`vars.put(${javaStr(op.into)}, ${v}.value());`);
+        break;
+      }
+      case 'kafka': {
+        const k = next(s, 'message');
+        const keep = op.asserts.length || op.into ? `Map<String, Object> ${k} = ` : '';
+        out(
+          op.action === 'produce'
+            ? `${keep}Kafka.produce(${javaVal(op.params)}, ${op.timeoutMs});`
+            : `${keep}Kafka.consume(${javaVal(op.params)}, testStart, ${op.timeoutMs});`,
+        );
+        for (const a of op.asserts) out(checkLine(`Kafka.pick(${k}, ${javaStr(a.target)})`, a));
+        if (op.into) out(`vars.put(${javaStr(op.into)}, ${k});`);
+        break;
+      }
+      case 'ftp': {
+        const f = next(s, 'ftp');
+        out(
+          `${op.asserts.length || op.into ? `Map<String, Object> ${f} = ` : ''}Ftp.run(${javaVal(op.params)});`,
+        );
+        for (const a of op.asserts)
+          out(
+            FTP_TARGETS.includes(a.target)
+              ? checkLine(`${f}.get(${javaStr(a.target)})`, a)
+              : `// TODO(StepForge): an FTP ${op.action} has no "${a.target}" to check`,
+          );
+        if (op.into)
+          out(
+            `vars.put(${javaStr(op.into)}, ${op.action === 'list' ? `${f}.get("entries")` : op.action === 'exists' ? `${f}.get("exists")` : f});`,
+          );
+        break;
+      }
+      case 'mongo': {
+        const r = next(s, 'db');
+        out(`Db.Result ${r} = Mongo.run(${javaStr(op.connection)}, ${javaVal(op.command)});`);
+        for (const a of op.asserts) out(checkLine(`pick(${r}, ${javaStr(a.target)})`, a));
+        if (op.into) out(`vars.put(${javaStr(op.into)}, ${r}.rows());`);
+        s.lastDb = r;
+        break;
+      }
       case 'check':
         out(
           `check(${javaVal(op.actual)}, ${javaStr(op.operator)}, ${javaVal(op.expected)}, ${javaStr(op.message)});`,
@@ -427,6 +584,14 @@ function printOps(ops: Op[], s: State, ind: string): void {
   }
 }
 
+/** `browser.condition(…)` for a page condition on the step's element. */
+function pageCondition(s: State, c: PageCond): string {
+  const expected = c.expected ? (c.check === 'count' ? javaVal(c.expected) : javaText(c.expected)) : 'null';
+  return c.expected || c.timeoutMs !== 2000
+    ? `browser.condition(${el(s, c.el)}, ${javaStr(c.check)}, ${expected}, ${c.timeoutMs})`
+    : `browser.condition(${el(s, c.el)}, ${javaStr(c.check)})`;
+}
+
 const javaPackage = (path: string[]) =>
   ['tests', ...path.map((p) => javaIdent(snake(p, 'module').replace(/^_/, 'm')))].join('.');
 
@@ -472,6 +637,7 @@ function testClass(
     'import org.junit.jupiter.api.DisplayName;',
     'import org.junit.jupiter.api.Tag;',
     ...(/\bApi\./.test(code) ? ['import support.Api;'] : []),
+    ...(/\bBrowser\./.test(code) ? ['import support.Browser;'] : []),
     ...(browser
       ? ['import support.BrowserTest;']
       : appium
@@ -483,6 +649,9 @@ function testClass(
     ...(/\bFake\./.test(code) ? ['import support.Fake;'] : []),
     ...(/\bJ\./.test(code) || cases.length ? ['import support.J;'] : []),
     ...(/\bMail\./.test(code) ? ['import support.Mail;'] : []),
+    ...['Ftp', 'Kafka', 'Mongo', 'Schema', 'Xml']
+      .filter((h) => new RegExp(`\\b${h}\\.`).test(code))
+      .map((h) => `import support.${h};`),
     ...[...s.pages].map((p) => `import pages.${plan.pages.get(p)!.className};`),
   ];
   const body = [
@@ -529,7 +698,10 @@ function testClass(
 }
 
 function pom(plan: Plan, flavor: Flavor): string {
-  const engines = new Set(plan.tests.flatMap((t) => t.ops.flatMap((x) => (x.op === 'db' ? [x.engine] : []))));
+  const ops: Op[] = [];
+  for (const t of plan.tests) walk(t.ops, (o) => ops.push(o));
+  const engines = new Set(ops.flatMap((x) => (x.op === 'db' ? [x.engine] : [])));
+  const has = (f: (o: Op) => boolean) => ops.some(f);
   const any = engines.has('any');
   const dep = (g: string, a: string, v: string, scope = 'test') =>
     `    <dependency>\n      <groupId>${g}</groupId>\n      <artifactId>${a}</artifactId>\n      <version>${v}</version>\n      <scope>${scope}</scope>\n    </dependency>`;
@@ -559,6 +731,14 @@ function pom(plan: Plan, flavor: Flavor): string {
     ...(any || engines.has('pg') ? [dep('org.postgresql', 'postgresql', '42.7.4')] : []),
     ...(any || engines.has('mysql') ? [dep('com.mysql', 'mysql-connector-j', '9.1.0')] : []),
     ...(any || engines.has('sqlite') ? [dep('org.xerial', 'sqlite-jdbc', '3.47.1.0')] : []),
+    ...(has((o) => 'asserts' in o && o.asserts.some((a) => a.operator === 'matchesSchema'))
+      ? [dep('com.networknt', 'json-schema-validator', '1.5.6')]
+      : []),
+    ...(has((o) => o.op === 'kafka') ? [dep('org.apache.kafka', 'kafka-clients', '3.9.0')] : []),
+    ...(has((o) => o.op === 'ftp')
+      ? [dep('commons-net', 'commons-net', '3.11.1'), dep('com.github.mwiede', 'jsch', '0.2.21')]
+      : []),
+    ...(has((o) => o.op === 'mongo') ? [dep('org.mongodb', 'mongodb-driver-sync', '5.2.1')] : []),
     '  </dependencies>',
     '  <build>',
     '    <plugins>',
@@ -727,6 +907,9 @@ const BASES = (flavor: Flavor) => ({
     'src/test/java/support/BrowserTest.java': [
       'package support;',
       '',
+      'import java.nio.file.Files;',
+      'import java.nio.file.Path;',
+      'import java.util.Map;',
       'import org.junit.jupiter.api.AfterEach;',
       'import org.junit.jupiter.api.BeforeEach;',
       'import org.openqa.selenium.chrome.ChromeDriver;',
@@ -737,11 +920,14 @@ const BASES = (flavor: Flavor) => ({
       '  protected Browser browser;',
       '',
       '  @BeforeEach',
-      '  void openBrowser() {',
+      '  void openBrowser() throws Exception {',
       '    ChromeOptions options = new ChromeOptions();',
       '    if (!"1".equals(Config.get("HEADED"))) options.addArguments("--headless=new");',
       '    options.addArguments("--window-size=1440,900");',
-      '    browser = new Browser(new ChromeDriver(options), Config.baseUrl());',
+      '    // Downloads go to a folder of this test, without asking.',
+      '    Path downloads = Files.createTempDirectory("downloads-");',
+      '    options.setExperimentalOption("prefs", Map.of("download.default_directory", downloads.toString(), "download.prompt_for_download", false));',
+      '    browser = new Browser(new ChromeDriver(options), Config.baseUrl(), downloads);',
       '  }',
       '',
       '  @AfterEach',
@@ -788,6 +974,9 @@ export function generateJava(
   for (const f of ['Checks', 'J', 'Api', 'Fake', 'Db'] as const)
     files[`src/test/java/support/${f}.java`] = runtime(`java/${f}.java`);
   if (/\bMail\./.test(all)) files['src/test/java/support/Mail.java'] = runtime('java/Mail.java');
+  for (const f of ['Ftp', 'Kafka', 'Mongo', 'Schema', 'Xml'] as const)
+    if (new RegExp(`\\b${f}\\.`).test(all.replace(/\/\/.*$/gm, '')))
+      files[`src/test/java/support/${f}.java`] = runtime(`java/${f}.java`);
   if (flavor === 'appium') {
     files['src/test/java/support/App.java'] = runtime('java/App.java');
     files['src/test/java/support/Capabilities.java'] = capabilitiesJava(plan);

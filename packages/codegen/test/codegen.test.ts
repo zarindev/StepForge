@@ -14,6 +14,7 @@ import {
   type GeneratedProject,
   type TargetId,
 } from '../src/index.ts';
+import { walk, type Op } from '../src/ir.ts';
 import { camel, envName, parseString, snake, uniquer, val } from '../src/values.ts';
 import { jsVal } from '../src/lang/js.ts';
 import { javaBlock } from '../src/lang/java.ts';
@@ -26,7 +27,7 @@ const hasPython = spawnSync('python3', ['--version']).status === 0;
 const hasBash = spawnSync('bash', ['--version']).status === 0;
 
 const RUNTIME =
-  /(^|\/)support\/(helpers|api|db|mail|tabs|browser|app)\.(ts|py)$|find\.js$|support\/(Checks|J|Api|Fake|Db|Mail|Browser|App)\.java$|cypress\/support\/(helpers|mail)\.js$|cypress\/plugins\/.*\.cjs$|tools\/stepforge_atspi\.py$/;
+  /(^|\/)support\/(helpers|api|db|mail|tabs|browser|app|web|kafka|ftp|mongo|schema|xml)\.(ts|py)$|find\.js$|support\/(Checks|J|Api|Fake|Db|Mail|Browser|App|Ftp|Kafka|Mongo|Schema|Xml)\.java$|cypress\/support\/(helpers|mail|web|xml|schema)\.js$|cypress\/plugins\/.*\.cjs$|tools\/stepforge_atspi\.py$/;
 
 /** Snapshot of every generated text file (one file per output file, readable in review). */
 async function snapshot(target: TargetId, project: GeneratedProject, variant = '') {
@@ -150,19 +151,16 @@ describe('plan', () => {
     expect(messages).toEqual(
       expect.arrayContaining([
         'visual checkpoints are not exported; add a screenshot comparison in the target framework',
-        'auth type "oauth2" is not exported; set the header yourself',
-        'the JSON Schema check on "$" is not exported',
-        'MongoDB steps are not exported; use the MongoDB driver of the target language',
         'SQL Server helpers are not generated; the SQL file is exported for reference',
         'the data-quality audit runs only in StepForge',
         'IMAP inboxes are not exported; the helper reads a Mailpit server (MAILPIT_URL)',
         'performance measurements run only in StepForge',
         'load tests are not part of functional tests; export the scenario to k6 instead',
         expect.stringContaining('the "unknown" connection is not set up'),
-        '“repeat while” loops are not exported yet; write the loop by hand',
-        'page conditions (if the element is …) are not exported yet; write the check by hand',
       ]),
     );
+    // A plan without a target keeps every feature.
+    expect(messages.join('\n')).not.toMatch(/not exported to/);
     // Page objects: grouped by page, steps after a tab switch or inside a frame stay inline.
     expect([...plan.pages.keys()]).toEqual(['Login', 'Products']);
     expect(plan.pages.get('Login')!.elements.map((e) => e.name)).toEqual([
@@ -170,6 +168,93 @@ describe('plan', () => {
       'passwordField',
       'signInButton',
     ]);
+  });
+});
+
+describe('features', () => {
+  const kinds = (plan: ReturnType<typeof buildPlan>) => {
+    const out = new Set<string>();
+    for (const t of plan.tests) walk(t.ops, (o) => out.add(o.op));
+    return out;
+  };
+
+  it('turns the steps of a feature the target lacks into TODOs naming the target', () => {
+    const plan = buildPlan(KITCHEN_SINK, { features: {}, label: 'Some export' });
+    for (const k of ['download', 'waitResponse', 'mockRoute', 'offline', 'storage', 'clock', 'netSummary'])
+      expect(kinds(plan).has(k), k).toBe(false);
+    expect(kinds(plan).has('ifPage') || kinds(plan).has('while') || kinds(plan).has('kafka')).toBe(false);
+    const messages = plan.warnings.map((w) => w.message);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        'this browser step is not exported to Some export; write it with the framework’s own API',
+        'page conditions (if the element is …) are not exported to Some export; write the check by hand',
+        '“repeat while” loops are not exported to Some export; write the loop by hand',
+        'SOAP steps are not exported to Some export; send the envelope with an HTTP client',
+        'the JSON Schema check on "$" is not exported to Some export',
+        'auth type "oauth2" is not exported to Some export; set the header yourself',
+        'Kafka steps are not exported to Some export; use a Kafka client of the target language',
+        'FTP steps are not exported to Some export; use an FTP client of the target language',
+        'MongoDB steps are not exported to Some export; use the MongoDB driver of the target language',
+      ]),
+    );
+    // A reason of the target's own replaces the default one.
+    const own = buildPlan(KITCHEN_SINK, { features: { kafka: 'no Kafka here' }, label: 'X' });
+    expect(own.warnings.map((w) => w.message)).toContain('no Kafka here');
+  });
+
+  it('exports every newer step with all features, as StepForge runs it', () => {
+    const plan = buildPlan(KITCHEN_SINK);
+    const all = plan.tests.flatMap((t) => {
+      const ops: Op[] = [];
+      walk(t.ops, (o) => ops.push(o));
+      return ops;
+    });
+    const one = <K extends Op['op']>(k: K, f: (o: Extract<Op, { op: K }>) => boolean = () => true) =>
+      all.find((o): o is Extract<Op, { op: K }> => o.op === k && f(o as Extract<Op, { op: K }>));
+    expect(one('act', (o) => o.action === 'tap')?.el.loc).toEqual({
+      strategy: 'role',
+      value: 'button',
+      name: 'Menu',
+    });
+    expect(one('download')?.asserts.map((a) => a.target)).toEqual(['fileName', 'size', 'content']);
+    expect(one('waitResponse')).toMatchObject({
+      method: 'GET',
+      status: 200,
+      timeoutMs: 15000,
+      into: 'products',
+    });
+    expect(one('mockRoute', (o) => o.action === 'delay')).toMatchObject({ delayMs: 500, times: 2 });
+    expect(one('offline', (o) => !o.offline)).toBeTruthy();
+    // A value that is not text is stored as JSON.
+    expect(one('storage', (o) => o.kind === 'local' && o.action === 'set')?.value).toEqual({
+      t: 'str',
+      parts: ['{"items":2}'],
+    });
+    expect(one('clock', (o) => o.action === 'set')?.time).toEqual({ t: 'num', v: 1772355600000 });
+    expect(one('netSummary')?.since).toBe('lastNavigation');
+    expect(one('ifPage', (o) => o.cond.check === 'visible')?.cond.timeoutMs).toBe(1000);
+    // "Repeat while": the count is the limit (default 100); a value condition works too.
+    expect(one('while', (o) => o.cond.kind === 'page' && o.cond.check === 'enabled')?.max).toBe(20);
+    expect(one('while', (o) => o.cond.kind === 'page' && o.cond.check === 'visible')?.max).toBe(100);
+    expect(one('while', (o) => o.cond.kind === 'value')?.max).toBe(5);
+    // SOAP: wrapped in a 1.1 envelope with its SOAPAction; a whole 1.2 envelope is sent as written.
+    const soap = one('api', (o) => !!o.soap && o.label === 'Get the price')!;
+    expect(soap.headers.map(([k]) => k)).toEqual(['content-type', 'soapaction']);
+    expect(JSON.stringify(soap.body)).toContain('<soap:Header><auth:Token');
+    expect(soap.soap).toEqual({ namespaces: { p: 'urn:prices' }, allowFault: false });
+    const soap12 = one('api', (o) => o.label === 'SOAP 1.2 envelope')!;
+    expect(soap12.headers).toEqual([
+      ['content-type', { t: 'str', parts: ['application/soap+xml; charset=utf-8; action="urn:Ping"'] }],
+    ]);
+    expect(one('api', (o) => o.auth?.type === 'oauth2')?.auth).toMatchObject({
+      tokenUrl: { t: 'str', parts: ['https://id.test/token'] },
+      clientSecret: { t: 'ref', ref: { scope: 'secret', name: 'apiToken' } },
+    });
+    expect(one('kafka', (o) => o.action === 'consume')?.timeoutMs).toBe(20000);
+    expect(one('ftp', (o) => o.action === 'list')).toBeTruthy();
+    // MongoDB: a find step becomes the command StepForge runs; a JSON query is kept as text.
+    expect(JSON.stringify(one('mongo', (o) => o.command.t === 'obj')?.command)).toContain('"find"');
+    expect(one('mongo', (o) => o.command.t === 'str')).toBeTruthy();
   });
 });
 
@@ -386,7 +471,7 @@ describe('Excel test cases and zip', () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(project.files['shopdesk-test-cases.xlsx'] as never);
     const ws = wb.getWorksheet('Test cases')!;
-    expect(ws.rowCount).toBe(1 + 2 + 1 + 1);
+    expect(ws.rowCount).toBe(1 + 2 + 1 + 1 + 1 + 1);
     expect(ws.getRow(2).getCell(1).value).toBe('TC-CHE-001');
     expect(String(ws.getRow(2).getCell(8).value)).toContain('1. Do “Sign in as admin”:');
     expect(String(ws.getRow(2).getCell(9).value)).toBe('user = ana@shop.test; qty = 2');

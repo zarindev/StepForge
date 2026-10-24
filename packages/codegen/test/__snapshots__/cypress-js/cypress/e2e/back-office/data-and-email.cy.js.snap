@@ -57,7 +57,39 @@ VACUUM;`,
         });
       });
       // TODO(StepForge): db.query: SQL Server helpers are not generated; the SQL file is exported for reference
-      // TODO(StepForge): db.mongoFind: MongoDB steps are not exported; use the MongoDB driver of the target language
+      // Find documents in orders on docs (save as docs)
+      cy.then(() => {
+        cy.task('mongo:run', {
+          connection: 'docs',
+          command: {
+            collection: 'orders',
+            find: {
+              email: data.email,
+              total: {
+                $gt: 0,
+              },
+            },
+            sort: {
+              createdAt: -1,
+            },
+            limit: 5,
+          },
+        }).then((result) => {
+          check(pick(result, 'rowCount'), 'gte', 1, 'rowCount gte');
+          vars.docs = result.rows;
+          last.db = result;
+        });
+      });
+      // Count orders in Mongo
+      cy.then(() => {
+        cy.task('mongo:run', {
+          connection: 'docs',
+          command: `{ "collection": "orders", "countDocuments": { "email": "${data.email}" } }`,
+        }).then((result) => {
+          check(pick(result, 'value'), 'gte', 1, 'value gte');
+          last.db = result;
+        });
+      });
       // TODO(StepForge): db.dataQualityCheck: the data-quality audit runs only in StepForge
       // Run the SQL query "SELECT ?" on unknown
       // SQL also in sql/dataAndEmail/query2.sql

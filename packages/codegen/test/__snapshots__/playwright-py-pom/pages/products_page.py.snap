@@ -73,3 +73,23 @@ class ProductsPage:
     @property
     def terms_link(self):
         return self.page.get_by_role("link", name="Terms", exact=True)
+
+    @property
+    def menu_button(self):
+        return self.page.get_by_role("button", name="Menu", exact=True)
+
+    @property
+    def export_csv_link(self):
+        return self.page.get_by_role("link", name="Export CSV", exact=True)
+
+    @property
+    def you_are_offline_text(self):
+        return self.page.get_by_text("You are offline", exact=True)
+
+    @property
+    def accept_cookies_button(self):
+        return self.page.get_by_role("button", name="Accept cookies", exact=True)
+
+    @property
+    def load_more_button(self):
+        return self.page.get_by_role("button", name="Load more", exact=True)

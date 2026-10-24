@@ -36,6 +36,26 @@ request() { STATUS="$(curl -sS -o "$RESPONSE" -w '%{http_code}' "$@")"; }
 pass() { echo "  ✓ $1"; }
 fail() { echo "  ✗ $1"; FAILED=1; }
 expect_status() { [ "$STATUS" = "$1" ] && pass "status $1" || fail "status $1 (got $STATUS)"; }
+# A SOAP fault right inside the envelope's Body fails the check, as in StepForge.
+expect_no_fault() {
+  local flat; flat="$(tr -d '\r\n' < "$RESPONSE")"
+  if printf '%s' "$flat" | grep -Eq '<([A-Za-z0-9_.-]+:)?Body[^>]*>[[:space:]]*<([A-Za-z0-9_.-]+:)?Fault[[:space:]>/]'; then
+    fail "no SOAP fault (got: $(printf '%s' "$flat" | sed -nE 's/.*<([A-Za-z0-9_.-]+:)?(faultstring|Text)[^>]*>([^<]*)<.*/\3/p'))"
+  else pass "no SOAP fault"; fi
+}
+# OAuth2 client credentials (URL, client id, secret, scope) into TOKEN, kept until shortly before they expire.
+oauth2_token() {
+  local file; file="$WORK/token-$(printf '%s' "$1|$2|$4" | cksum | cut -d' ' -f1)"
+  if [ -f "$file" ] && [ "$(cut -d' ' -f1 "$file")" -gt "$(date +%s)" ]; then TOKEN="$(cut -d' ' -f2 "$file")"; return; fi
+  local args=(-sS -X POST -u "$2:$3" --data-urlencode grant_type=client_credentials)
+  [ -n "$4" ] && args+=(--data-urlencode "scope=$4")
+  local reply; reply="$(curl "${args[@]}" "$1" || true)"
+  TOKEN="$(printf '%s' "$reply" | jq -r '.access_token // empty' 2>/dev/null || true)"
+  if [ -z "$TOKEN" ]; then fail "OAuth2 token from $1"; return; fi
+  local life; life="$(printf '%s' "$reply" | jq -r '.expires_in // 300')"
+  [ "$life" -gt 60 ] 2>/dev/null || life=60
+  echo "$(( $(date +%s) + life - 30 )) $TOKEN" > "$file"
+}
 expect_json() {
   local actual; actual="$(jq -r "$1 // empty" "$RESPONSE" 2>/dev/null || true)"
   case "$2" in
@@ -57,7 +77,7 @@ request -X POST \
   "${BASE_URL}/oauth/token"
 expect_status "200"
 save token "$(cat "$RESPONSE")"
-# TODO(StepForge): api.request: the JSON Schema check on "$" is not exported
+# TODO(StepForge): api.request: the JSON Schema check on "$" is not exported to cURL commands (no common command-line validator)
 # Create an order
 request -X POST \
   -H "X-Request-Id: $(uuidgen)" \
@@ -98,10 +118,13 @@ request -X DELETE \
 request -X GET \
   --cookie "sid=abc" \
   "${BASE_URL}/me"
-# TODO(StepForge): api.request: auth type "oauth2" is not exported; set the header yourself
-# OAuth (not exported)
+# OAuth2 client credentials
+oauth2_token "https://id.test/token" "shop-tests" "${API_TOKEN}" "orders:read"
+# OAuth2 client credentials
 request -X GET \
+  -H "Authorization: Bearer ${TOKEN}" \
   "${BASE_URL}/x"
+expect_status "200"
 # Upload
 # Upload
 request -X POST \
@@ -147,8 +170,9 @@ request -X GET \
 # Loop (not supported by the cURL script): steps listed once
 # Note: {{vars.line.sku}}
 # TODO(StepForge): log step not exported (the cURL script runs HTTP requests only)
-# TODO(StepForge): util.loop: “repeat while” loops are not exported yet; write the loop by hand
-# TODO(StepForge): util.if: page conditions (if the element is …) are not exported yet; write the check by hand
+# TODO(StepForge): util.loop: “repeat while” loops are not exported to cURL commands: it runs each request once, in order
+# TODO(StepForge): util.if: page conditions (if the element is …) are not exported to cURL commands; write the check by hand
+# TODO(StepForge): util.loop: “repeat while” loops are not exported to cURL commands: it runs each request once, in order
 # Remember "[object Object]" as payload
 save payload "$(jq -n --arg a0 "${RUN_ID}" '{"a": [1, true, null], "b": $a0}')"
 # Generate a random pattern (save as ref)
@@ -159,6 +183,38 @@ save due "$(jq -n --arg v "$(fake date)" '$v')"
 # TODO(StepForge): wait step not exported (the cURL script runs HTTP requests only)
 # Run a script (save as double)
 # TODO(StepForge): script step not exported (the cURL script runs HTTP requests only)
+
+# ── API › Integrations (P2)
+scenario 'Integrations'
+# Get the price
+# Get the price
+request -X POST \
+  -H "content-type: text/xml; charset=utf-8" \
+  -H "soapaction: \"urn:GetPrice\"" \
+  --data-binary "<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">
+  <soap:Header><auth:Token xmlns:auth=\"urn:auth\">${API_TOKEN}</auth:Token></soap:Header>
+  <soap:Body><m:GetPrice xmlns:m=\"urn:prices\"><m:Sku>$(value ref)</m:Sku></m:GetPrice></soap:Body>
+</soap:Envelope>" \
+  "${BASE_URL}/soap/prices"
+expect_no_fault
+expect_status "200"
+# TODO(StepForge): check //p:Price gt (XPath is not available here)
+# TODO(StepForge): check count(//p:Line) gte (XPath is not available here)
+save price "$(cat "$RESPONSE")"
+# SOAP 1.2 envelope
+# SOAP 1.2 envelope
+request -X POST \
+  -H "content-type: application/soap+xml; charset=utf-8; action=\"urn:Ping\"" \
+  --data-binary "<?xml version=\"1.0\"?>
+<env:Envelope xmlns:env=\"http://www.w3.org/2003/05/soap-envelope\"><env:Body><Ping/></env:Body></env:Envelope>" \
+  "https://soap.example.test/ws"
+# TODO(StepForge): check xpath://*[local-name()="Pong"] exists (XPath is not available here)
+# TODO(StepForge): api.kafkaProduce: Kafka steps are not exported to cURL commands, which sends HTTP requests only; use a code export (Playwright Test, pytest, JUnit)
+# TODO(StepForge): api.kafkaConsume: Kafka steps are not exported to cURL commands, which sends HTTP requests only; use a code export (Playwright Test, pytest, JUnit)
+# TODO(StepForge): api.ftp: FTP steps are not exported to cURL commands, which sends HTTP requests only; use a code export (Playwright Test, pytest, JUnit)
+# TODO(StepForge): api.ftp: FTP steps are not exported to cURL commands, which sends HTTP requests only; use a code export (Playwright Test, pytest, JUnit)
+# TODO(StepForge): api.ftp: FTP steps are not exported to cURL commands, which sends HTTP requests only; use a code export (Playwright Test, pytest, JUnit)
 
 echo
 [ "$FAILED" = 0 ] && echo "All checks passed" || { echo "Some checks failed"; exit 1; }

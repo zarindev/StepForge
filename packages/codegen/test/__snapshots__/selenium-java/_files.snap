@@ -1,37 +1,39 @@
-.env.example (21 lines)
-.github/workflows/stepforge-tests.yml (26 lines)
+.env.example (23 lines)
+.github/workflows/stepforge-tests.yml (27 lines)
 .gitignore (4 lines)
 .gitlab-ci.yml (12 lines)
-pom.xml (80 lines)
-README.md (70 lines)
+pom.xml (110 lines)
+README.md (78 lines)
 sql/dataAndEmail/orderCount.sql (6 lines)
 sql/dataAndEmail/procedure.sql (4 lines)
 sql/dataAndEmail/query.sql (4 lines)
 sql/dataAndEmail/query2.sql (4 lines)
 sql/dataAndEmail/script.sql (5 lines)
-src/test/java/support/Api.java (30 lines)
+src/test/java/support/Api.java (72 lines)
 src/test/java/support/ApiTest.java (17 lines)
-src/test/java/support/Browser.java (343 lines)
-src/test/java/support/BrowserTest.java (25 lines)
+src/test/java/support/Browser.java (485 lines)
+src/test/java/support/BrowserTest.java (31 lines)
 src/test/java/support/Checks.java (274 lines)
 src/test/java/support/Config.java (41 lines)
 src/test/java/support/Db.java (110 lines)
 src/test/java/support/Fake.java (74 lines)
+src/test/java/support/Ftp.java (173 lines)
 src/test/java/support/J.java (34 lines)
+src/test/java/support/Kafka.java (171 lines)
 src/test/java/support/Mail.java (147 lines)
-src/test/java/tests/api/OrdersApiTest.java (180 lines)
-src/test/java/tests/back_office/DataAndEmailTest.java (86 lines)
+src/test/java/support/Mongo.java (118 lines)
+src/test/java/support/Schema.java (54 lines)
+src/test/java/support/Xml.java (132 lines)
+src/test/java/tests/api/IntegrationsTest.java (78 lines)
+src/test/java/tests/api/OrdersApiTest.java (211 lines)
+src/test/java/tests/back_office/DataAndEmailTest.java (93 lines)
+src/test/java/tests/shop/browser/NetworkStorageAndClockTest.java (96 lines)
 src/test/java/tests/shop/checkout/CheckoutWithEveryUiStepTest.java (171 lines)
 src/test/resources/find.js (129 lines)
 
 Warnings:
 - Checkout with every UI step | Receipt looks right | visual checkpoints are not exported; add a screenshot comparison in the target framework
-- Orders API | Create an order | the JSON Schema check on "$" is not exported
-- Orders API | OAuth (not exported) | auth type "oauth2" is not exported; set the header yourself
-- Orders API | util.loop | “repeat while” loops are not exported yet; write the loop by hand
-- Orders API | util.if | page conditions (if the element is …) are not exported yet; write the check by hand
 - Data and email | db.query | SQL Server helpers are not generated; the SQL file is exported for reference
-- Data and email | db.mongoFind | MongoDB steps are not exported; use the MongoDB driver of the target language
 - Data and email | db.dataQualityCheck | the data-quality audit runs only in StepForge
 - Data and email | db.query | the "unknown" connection is not set up in this environment; all database drivers are included and DB_UNKNOWN_URL decides
 - Data and email | email.waitForEmail | IMAP inboxes are not exported; the helper reads a Mailpit server (MAILPIT_URL)
@@ -39,6 +41,18 @@ Warnings:
 - Data and email | perf.lighthouse | performance measurements run only in StepForge
 - Data and email | perf.loadTest | load tests are not part of functional tests; export the scenario to k6 instead
 - Data and email | perf.queryPlan | performance measurements run only in StepForge
+- Network, storage and clock | ui.setClock | the page clock is not exported to Selenium + JUnit 5: WebDriver cannot set the page clock; write it by hand
+- Network, storage and clock | ui.mockRoute | faking a route is not exported to Selenium + JUnit 5: WebDriver cannot see or change the page's network traffic (only Chrome's DevTools can, tied to one Chrome version); write it by hand
+- Network, storage and clock | ui.mockRoute | faking a route is not exported to Selenium + JUnit 5: WebDriver cannot see or change the page's network traffic (only Chrome's DevTools can, tied to one Chrome version); write it by hand
+- Network, storage and clock | ui.mockRoute | faking a route is not exported to Selenium + JUnit 5: WebDriver cannot see or change the page's network traffic (only Chrome's DevTools can, tied to one Chrome version); write it by hand
+- Network, storage and clock | ui.mockRoute | faking a route is not exported to Selenium + JUnit 5: WebDriver cannot see or change the page's network traffic (only Chrome's DevTools can, tied to one Chrome version); write it by hand
+- Network, storage and clock | ui.waitForResponse | waiting for a response is not exported to Selenium + JUnit 5: WebDriver cannot see or change the page's network traffic (only Chrome's DevTools can, tied to one Chrome version); write it by hand
+- Network, storage and clock | ui.mockRoute | faking a route is not exported to Selenium + JUnit 5: WebDriver cannot see or change the page's network traffic (only Chrome's DevTools can, tied to one Chrome version); write it by hand
+- Network, storage and clock | ui.setOffline | going offline is not exported to Selenium + JUnit 5: WebDriver has no offline mode (only Chrome DevTools has); write it by hand
+- Network, storage and clock | ui.setOffline | going offline is not exported to Selenium + JUnit 5: WebDriver has no offline mode (only Chrome DevTools has); write it by hand
+- Network, storage and clock | ui.setClock | the page clock is not exported to Selenium + JUnit 5: WebDriver cannot set the page clock; write it by hand
+- Network, storage and clock | ui.setClock | the page clock is not exported to Selenium + JUnit 5: WebDriver cannot set the page clock; write it by hand
+- Network, storage and clock | ui.networkSummary | the network summary is not exported to Selenium + JUnit 5: WebDriver cannot see or change the page's network traffic (only Chrome's DevTools can, tied to one Chrome version); write it by hand
 - Checkout with every UI step |  | HTML5 drag and drop is unreliable in Selenium; check this step
 - Orders API |  | multipart bodies need .multiPart(...) per field in REST Assured; sent as form fields here
 - Orders API |  | JavaScript "Run script" steps are not translated to Java

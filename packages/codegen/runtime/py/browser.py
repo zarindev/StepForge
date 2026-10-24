@@ -30,10 +30,11 @@ KEYS = {
 
 
 class Browser:
-    def __init__(self, driver, base_url, timeout=10):
+    def __init__(self, driver, base_url, timeout=10, downloads=None):
         self.driver = driver
         self.base_url = base_url
         self.timeout = timeout
+        self.downloads = downloads
         self._dialog = None
 
     # ─── Finding ───────────────────────────────────────────────────────────
@@ -79,6 +80,18 @@ class Browser:
             ActionChains(self.driver).context_click(el).perform()
         else:
             el.click()
+        self._answer_dialog()
+
+    def tap(self, loc):
+        """A touch tap: a touch pointer (not the mouse) goes down and up on the element, as on a touch screen."""
+        from selenium.webdriver.common.actions.action_builder import ActionBuilder
+        from selenium.webdriver.common.actions.interaction import POINTER_TOUCH
+        from selenium.webdriver.common.actions.pointer_input import PointerInput
+
+        el = self._wait(lambda: next((e for e in self._query(loc) if e.is_displayed() and e.is_enabled()), None), f"No element to tap {loc}")
+        actions = ActionBuilder(self.driver, mouse=PointerInput(POINTER_TOUCH, "finger"))
+        actions.pointer_action.move_to(el).pointer_down().pointer_up()
+        actions.perform()
         self._answer_dialog()
 
     def hover(self, loc):
@@ -260,3 +273,93 @@ class Browser:
             }[check]()
 
         self._wait(ok, f"Expected {loc or 'the page'} {check}{'' if expected is None else ' ' + repr(expected)}")
+
+    # ─── Downloads, storage, page conditions, offline ──────────────────────
+    def download(self, loc, timeout=30):
+        """Clicks the element and waits for the file it downloads (Chrome saves it in the test's download folder)."""
+        folder = Path(self.downloads)
+        before = set(folder.iterdir())
+        self.click(loc)
+
+        def done():
+            # Chrome writes to hidden or .crdownload files first and renames the file when it is complete.
+            new = [f for f in folder.iterdir() if f not in before and not f.name.startswith(".")]
+            return next((f for f in new if not f.name.endswith((".crdownload", ".tmp"))), None)
+
+        deadline = time.time() + timeout
+        while True:
+            f = done()
+            if f is not None and not any(p.name.endswith(".crdownload") for p in folder.iterdir()):
+                return {"fileName": f.name, "size": f.stat().st_size, "path": str(f)}
+            if time.time() > deadline:
+                raise AssertionError(f"No download from {loc} within {timeout} s")
+            time.sleep(0.1)
+
+    def storage(self, kind, action, name="", value=""):
+        """Cookies, localStorage and sessionStorage: set, get, remove one, or clear. "get" gives the value (or None)."""
+        if not self.driver.current_url.startswith(("http://", "https://")):
+            raise AssertionError("Open a page before using cookies or storage")
+        if kind == "cookie":
+            if action == "set":
+                self.driver.add_cookie({"name": name, "value": value, "path": "/"})
+            elif action == "clear":
+                self.driver.delete_all_cookies()
+            elif action == "remove":
+                self.driver.delete_cookie(name)
+            else:
+                c = self.driver.get_cookie(name)
+                return {"value": c["value"] if c else None, "exists": c is not None}
+            return {"value": None, "exists": False}
+        area = "sessionStorage" if kind == "session" else "localStorage"
+        got = self.driver.execute_script(
+            """const [a, act, k, v] = arguments;
+            const store = window[a];
+            if (act === 'set') store.setItem(k, v);
+            else if (act === 'remove') store.removeItem(k);
+            else if (act === 'clear') store.clear();
+            else return store.getItem(k);
+            return null;""",
+            area,
+            action,
+            name,
+            value,
+        )
+        return {"value": got, "exists": got is not None}
+
+    def page_condition(self, loc, check, expected=None, timeout_ms=2000):
+        """A page condition (if / repeat while): tried every 100 ms for up to timeout_ms before it counts as false. It
+        never fails the test by itself."""
+        want = "" if expected is None else str(expected)
+
+        def holds():
+            els = self._query(loc)
+            first = els[0] if els else None
+            if check == "present":
+                return bool(els)
+            if check == "absent":
+                return not els
+            if check == "visible":
+                return bool(first and first.is_displayed())
+            if check == "hidden":
+                return not (first and first.is_displayed())
+            if check == "enabled":
+                return bool(first and first.is_enabled())
+            if check == "textContains":
+                return bool(first) and want in (first.get_attribute("textContent") or "")
+            if check == "count":
+                return compare(len(els), "equals", want)
+            raise ValueError(f"Unknown page check {check}")
+
+        deadline = time.time() + max(0, timeout_ms) / 1000
+        while True:
+            try:
+                ok = holds()
+            except (StaleElementReferenceException, WebDriverException):
+                ok = False
+            if ok or time.time() >= deadline:
+                return ok
+            time.sleep(0.1)
+
+    def set_offline(self, offline):
+        """Takes Chrome off the network (or back on) through ChromeDriver's network emulation."""
+        self.driver.set_network_conditions(offline=offline, latency=0, download_throughput=-1, upload_throughput=-1)

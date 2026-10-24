@@ -131,4 +131,4 @@ To make traffic part of the test, add **`ui.networkSummary`** and check it — a
 See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for the full list. In short: CAPTCHAs and real second factors are blocked on
 purpose — use a test bypass in the test environment, or read the code with email steps; closed shadow roots cannot be
 reached (open ones can, except by XPath); WebSocket messages are not inspected yet (check what they change on the
-page); the newest browser steps are not translated by code export yet (they become `TODO(StepForge)` comments).
+page); code export turns the newest browser steps into working code in Playwright, and in Selenium and Cypress where they can do them (see [CODEGEN.md](CODEGEN.md#newer-steps-by-target)).

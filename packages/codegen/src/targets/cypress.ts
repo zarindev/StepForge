@@ -1,4 +1,5 @@
-import { transformSync } from 'esbuild';
+import { buildSync, transformSync } from 'esbuild';
+import { fileURLToPath } from 'node:url';
 import {
   CREDIT,
   ciFiles,
@@ -11,10 +12,19 @@ import {
   statusCode,
   testPath,
 } from '../common.ts';
-import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
+import {
+  walk,
+  type El,
+  type Features,
+  type Loc,
+  type Op,
+  type PageCond,
+  type Plan,
+  type TestPlan,
+} from '../ir.ts';
 import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal, jsVar } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject } from '../types.ts';
-import { camel, envName, kebab, parseString } from '../values.ts';
+import { camel, envName, kebab, parseString, type Val } from '../values.ts';
 
 /**
  * Cypress (JavaScript). Elements are found with Testing Library queries (same meaning as StepForge's role/label/text
@@ -25,6 +35,23 @@ import { camel, envName, kebab, parseString } from '../values.ts';
 /** The TypeScript runtime helpers compiled to JavaScript: one source of truth for both targets. */
 function compiled(path: string, format: 'esm' | 'cjs'): string {
   const js = transformSync(runtime(path), { loader: 'ts', format, target: 'es2020' }).code;
+  return `// ${CREDIT}\n${js}`;
+}
+
+/**
+ * A runtime helper and what it imports, bundled for a Node task (Kafka, FTP, MongoDB). The client libraries stay
+ * npm dependencies; the test-data helpers they never call are left out.
+ */
+function bundled(path: string): string {
+  const js = buildSync({
+    entryPoints: [fileURLToPath(new URL(`../../runtime/${path}`, import.meta.url))],
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    target: 'es2020',
+    write: false,
+    external: ['kafkajs', 'basic-ftp', 'ssh2-sftp-client', 'mongodb', '@faker-js/faker'],
+  }).outputFiles[0]!.text.replace(/var import_faker = require\("@faker-js\/faker"\);\n/, '');
   return `// ${CREDIT}\n${js}`;
 }
 
@@ -68,7 +95,15 @@ const KEYS: Record<string, string> = {
   'Meta+A': '{selectAll}',
 };
 
-type State = { lines: string[]; pages: Map<string, string>; xpath: boolean; usesUi: boolean };
+type State = {
+  lines: string[];
+  pages: Map<string, string>;
+  xpath: boolean;
+  usesUi: boolean;
+  /** Namespaces of the last SOAP response, for XPath in a later extract. */
+  lastSoap?: Record<string, string>;
+  n: number;
+};
 
 function el(s: State, e: El, all = false): string {
   if (e.pom && !all) {
@@ -84,7 +119,64 @@ const lazy = (code: string) => /\bvars\b|\blast\.|\bfield\(vars/.test(code);
 
 const urlFull = (v: string) => `new URL(${v}, Cypress.config('baseUrl')).href`;
 
-function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): void {
+/** An element query for a page condition, with the same meaning as the test's Testing Library locator. */
+function queryCy(e: El): string {
+  const l = e.loc;
+  const v = (x: string) => jsText(parseString(x));
+  switch (l.strategy) {
+    case 'testId':
+      return `byTestId(${v(l.value)})`;
+    case 'role':
+      return l.name ? `byRole(${jsStr(l.value)}, ${v(l.name)})` : `byRole(${jsStr(l.value)})`;
+    case 'label':
+      return `byLabelText(${v(l.value)})`;
+    case 'placeholder':
+      return `byPlaceholderText(${v(l.value)})`;
+    case 'text':
+      return `byText(${v(l.value)})`;
+    case 'xpath':
+      return `byXPath(${v(l.value)})`;
+    default:
+      return `byCss(${v(l.value)})`;
+  }
+}
+
+/** `pageCondition(…)`: yields whether the check holds within its short wait. */
+function pageCond(c: PageCond): string {
+  const args = [queryCy(c.el), jsStr(c.check)];
+  const expected = c.expected ? (c.check === 'count' ? jsNum(c.expected) : jsText(c.expected)) : 'undefined';
+  if (c.expected || c.timeoutMs !== 2000) args.push(expected);
+  if (c.timeoutMs !== 2000) args.push(String(c.timeoutMs));
+  return `pageCondition(${args.join(', ')})`;
+}
+
+/** An assertion line: check() with StepForge's operators, or a JSON Schema check. */
+function checkLine(actual: string, a: { target: string; operator: string; expected: Val }): string {
+  return a.operator === 'matchesSchema'
+    ? `expectSchema(${actual}, ${jsVal(a.expected, '  ')}, ${jsStr(`${a.target} matches the JSON schema`)});`
+    : `check(${actual}, ${jsStr(a.operator)}, ${jsVal(a.expected)}, ${jsStr(`${a.target} ${a.operator}`)});`;
+}
+
+/** XPath targets read the XML body (SOAP); the others are read as from any response. */
+const XPATH = (t: string) =>
+  t.startsWith('/') || t.startsWith('xpath:') || /^(count|string|number|boolean|sum)\(/.test(t);
+function responseValue(r: string, target: string, ns?: Record<string, string>): string {
+  if (ns && XPATH(target))
+    return `xpathValue(${r}.text, ${jsStr(target)}${Object.keys(ns).length ? `, ${jsJson(ns)}` : ''})`;
+  // A schema on the whole body ($ or body) validates the parsed body.
+  return target === '$' ? `${r}.body` : `pick(${r}, ${jsStr(target)})`;
+}
+
+/** A clock time: a fixed date when it is written in the step, else read like StepForge reads it. */
+function timeCy(v: Val): string {
+  if (v.t === 'num') return `new Date(${v.v})`;
+  if (v.t === 'str' && v.parts.every((x) => typeof x === 'string')) return `new Date(${jsVal(v)})`;
+  return `clockTime(${jsVal(v)})`;
+}
+
+const FTP_TARGETS = ['content', 'size', 'path', 'count', 'names', 'exists'];
+
+function printOps(ops: Op[], s: State, ind: string, warn: (m: string, step?: string) => void): void {
   const emit = (code: string[]) => {
     const text = code.join('\n');
     if (lazy(text.replace(/\/\/.*$/gm, ''))) {
@@ -120,8 +212,11 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
           scrollIntoView: 'scrollIntoView()',
           fill: `fill(${value})`,
           type: `type(${value}, { parseSpecialCharSequences: false })`,
+          tap: "trigger('touchstart').trigger('touchend').click()",
         };
         if (op.action === 'hover') emit(['// Cypress has no real hover; this fires the mouseover event']);
+        if (op.action === 'tap')
+          emit(['// Cypress has no touch screen: a tap fires the touch events, then the click they lead to']);
         emit([`${l}.${call[op.action]};`]);
         break;
       }
@@ -251,11 +346,13 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
           headers.push(`Cookie: \`${op.auth.name}=\${${jsText(op.auth.value)}}\``);
         if (op.bodyType === 'multipart')
           warn('multipart bodies are sent as JSON by cy.request; check the request');
+        if (op.auth?.type === 'oauth2') headers.push('Authorization: `Bearer ${token}`');
         const body =
           op.body === null || op.bodyType === 'none'
             ? []
             : [`body: ${jsVal(op.body, '  ')},`, ...(op.bodyType === 'form' ? ['form: true,'] : [])];
-        emit([
+        const ns = op.soap?.namespaces;
+        const request = [
           'cy.request({',
           `  method: ${jsStr(op.method)},`,
           `  url: ${jsVal(op.url)},`,
@@ -265,16 +362,27 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
           '  failOnStatusCode: false,',
           '}).then((response) => {',
           '  const res = toResult(response);',
+          // A SOAP fault fails the step in StepForge, unless the step allows it.
+          ...(op.soap && !op.soap.allowFault ? ['  expectNoFault(res.text);'] : []),
           // A fixed code reads best as to.eq(201); anything else goes through check(), which compares "201" == 201.
           ...op.asserts.map((a) =>
             a.target === 'status' && a.operator === 'equals' && statusCode(a.expected) !== null
               ? `  expect(res.status, 'status').to.eq(${statusCode(a.expected)});`
-              : `  check(pick(res, ${jsStr(a.target)}), ${jsStr(a.operator)}, ${jsVal(a.expected)}, ${jsStr(`${a.target} ${a.operator}`)});`,
+              : `  ${checkLine(responseValue('res', a.target, ns), a)}`,
           ),
           ...(op.into ? [`  ${jsVar(op.into)} = res.body;`] : []),
           '  last.api = res;',
           '});',
-        ]);
+        ];
+        s.lastSoap = ns;
+        if (op.auth?.type === 'oauth2') {
+          const a = op.auth;
+          emit([
+            `oauth2Token({ tokenUrl: ${jsText(a.tokenUrl)}, clientId: ${jsText(a.clientId)}, clientSecret: ${jsText(a.clientSecret)}${a.scope ? `, scope: ${jsText(a.scope)}` : ''} }).then((token) => {`,
+            ...request.map((l) => `  ${l}`),
+            '});',
+          ]);
+        } else emit(request);
         break;
       }
       case 'apiExtract': {
@@ -284,7 +392,7 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
             : op.from === 'header'
               ? `header:${op.name ?? ''}`
               : (op.path ?? 'body');
-        emit([`${jsVar(op.into)} = pick(last.api, ${jsStr(target)});`]);
+        emit([`${jsVar(op.into)} = ${responseValue('last.api', target, s.lastSoap)};`]);
         break;
       }
       case 'setVar':
@@ -340,6 +448,172 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
         s.lines.push(op.over ? `${ind}  });` : `${ind}  }`, `${ind}});`);
         break;
       }
+      case 'ifPage': {
+        // A Cypress command cannot be an if's condition: the branch is chosen once the check has a result.
+        s.lines.push(`${ind}cy.then(() => ${pageCond(op.cond)}).then((holds) => {`, `${ind}  if (holds) {`);
+        printOps(op.then, s, `${ind}    `, warn);
+        if (op.else.length) {
+          s.lines.push(`${ind}  } else {`);
+          printOps(op.else, s, `${ind}    `, warn);
+        }
+        s.lines.push(`${ind}  }`, `${ind}});`);
+        break;
+      }
+      case 'while': {
+        // Each pass checks first, then queues its steps and the next pass. StepForge's safety limit: the condition
+        // still holding after the last pass fails the test.
+        const f = `pass${++s.n}`;
+        const limit = `Stopped after the limit of ${op.max} pass(es); the condition still held`;
+        s.lines.push(
+          `${ind}cy.then(() => {`,
+          `${ind}  const ${f} = (pass) => {`,
+          `${ind}    if (pass >= ${op.max}) throw new Error(${jsStr(limit)});`,
+          `${ind}    vars.index = pass;`,
+        );
+        const next = [`${ind}      cy.then(() => ${f}(pass + 1));`];
+        if (op.cond.kind === 'page') {
+          s.lines.push(`${ind}    ${pageCond(op.cond)}.then((holds) => {`, `${ind}      if (!holds) return;`);
+          printOps(op.body, s, `${ind}      `, warn);
+          s.lines.push(...next, `${ind}    });`);
+        } else {
+          s.lines.push(
+            `${ind}    if (!compare(${jsVal(op.cond.value)}, ${jsStr(op.cond.operator)}, ${jsVal(op.cond.expected)})) return;`,
+          );
+          printOps(op.body, s, `${ind}    `, warn);
+          s.lines.push(next[0]!.slice(2));
+        }
+        s.lines.push(`${ind}  };`, `${ind}  ${f}(0);`, `${ind}});`);
+        break;
+      }
+      case 'download':
+        emit([
+          `download(() => ${el(s, op.el)}).then((file) => {`,
+          ...op.asserts.map((a) => `  ${checkLine(`file.${a.target}`, a)}`),
+          ...(op.into ? [`  ${jsVar(op.into)} = file;`] : []),
+          '});',
+        ]);
+        break;
+      case 'waitResponse': {
+        const o = [
+          `url: ${jsVal(op.url)}`,
+          ...(op.method ? [`method: ${jsStr(op.method)}`] : []),
+          ...(op.status !== undefined ? [`status: ${op.status}`] : []),
+          `timeoutMs: ${op.timeoutMs}`,
+        ];
+        emit([
+          `waitForResponse({ ${o.join(', ')} }).then((res) => {`,
+          ...op.asserts.map((a) => `  ${checkLine(responseValue('res', a.target), a)}`),
+          ...(op.into ? [`  ${jsVar(op.into)} = res.body;`] : []),
+          '});',
+        ]);
+        break;
+      }
+      case 'mockRoute': {
+        const o = [
+          `url: ${jsVal(op.url)}`,
+          ...(op.method ? [`method: ${jsStr(op.method)}`] : []),
+          `action: ${jsStr(op.action)}`,
+          ...(op.action === 'fulfill'
+            ? [
+                `status: ${op.status}`,
+                ...(op.body ? [`body: ${jsVal(op.body, '  ')}`] : []),
+                ...(op.contentType ? [`contentType: ${jsStr(op.contentType)}`] : []),
+              ]
+            : []),
+          ...(op.delayMs && op.action !== 'remove' ? [`delayMs: ${op.delayMs}`] : []),
+          ...(op.times !== undefined && op.action !== 'remove' ? [`times: ${op.times}`] : []),
+        ];
+        emit([`mockRoute({ ${o.join(', ')} });`]);
+        break;
+      }
+      case 'offline':
+        // Not reached: CYPRESS_FEATURES leaves it out.
+        break;
+      case 'storage': {
+        const o = [
+          `kind: ${jsStr(op.kind)}`,
+          `action: ${jsStr(op.action)}`,
+          ...(op.action !== 'clear' ? [`name: ${jsText(op.name)}`] : []),
+          ...(op.action === 'set' ? [`value: ${jsText(op.value)}`] : []),
+        ];
+        emit(
+          op.action === 'get' && (op.asserts.length || op.into)
+            ? [
+                `storage({ ${o.join(', ')} }).then((stored) => {`,
+                ...op.asserts.map((a) => `  ${checkLine(`stored.${a.target}`, a)}`),
+                ...(op.into ? [`  ${jsVar(op.into)} = stored.value;`] : []),
+                '});',
+              ]
+            : [`storage({ ${o.join(', ')} });`],
+        );
+        break;
+      }
+      case 'clock':
+        if (op.action === 'set') emit([`fixClock(${timeCy(op.time!)});`]);
+        else {
+          // cy.clock() stops time: a clock that runs on from a time, and moving it forward, are not the same thing.
+          warn(
+            op.action === 'install'
+              ? 'a page clock that runs on from a set time is not exported to Cypress (cy.clock stops time); fix the time instead'
+              : 'moving the page clock forward is not exported to Cypress (cy.tick needs a stopped clock)',
+            'ui.setClock',
+          );
+          emit([
+            `// TODO(StepForge): ui.setClock (${op.action}) — cy.clock() stops time, so this is not the same in Cypress`,
+          ]);
+        }
+        break;
+      case 'kafka': {
+        const task =
+          op.action === 'produce'
+            ? `cy.task('kafka:produce', { options: ${jsVal(op.params, '  ')}, timeoutMs: ${op.timeoutMs} }, { timeout: ${op.timeoutMs + 15000} })`
+            : `cy.task('kafka:consume', { options: ${jsVal(op.params, '  ')}, since: testStart, timeoutMs: ${op.timeoutMs} }, { timeout: ${op.timeoutMs + 15000} })`;
+        emit(
+          op.asserts.length || op.into
+            ? [
+                `${task}.then((message) => {`,
+                ...op.asserts.map((a) => `  ${checkLine(`pickMessage(message, ${jsStr(a.target)})`, a)}`),
+                ...(op.into ? [`  ${jsVar(op.into)} = message;`] : []),
+                '});',
+              ]
+            : [`${task};`],
+        );
+        break;
+      }
+      case 'ftp': {
+        const task = `cy.task('ftp', ${jsVal(op.params, '  ')}, { timeout: 60000 })`;
+        emit(
+          op.asserts.length || op.into
+            ? [
+                `${task}.then((result) => {`,
+                ...op.asserts.map((a) =>
+                  FTP_TARGETS.includes(a.target)
+                    ? `  ${checkLine(`result.${a.target}`, a)}`
+                    : `  // TODO(StepForge): an FTP ${op.action} has no "${a.target}" to check`,
+                ),
+                ...(op.into
+                  ? [
+                      `  ${jsVar(op.into)} = ${op.action === 'list' ? 'result.entries' : op.action === 'exists' ? 'result.exists' : 'result'};`,
+                    ]
+                  : []),
+                '});',
+              ]
+            : [`${task};`],
+        );
+        break;
+      }
+      case 'mongo':
+        emit([
+          `cy.task('mongo:run', { connection: ${jsStr(op.connection)}, command: ${jsVal(op.command, '  ')} }).then((result) => {`,
+          ...op.asserts.map((a) => `  ${checkLine(`pick(result, ${jsStr(a.target)})`, a)}`),
+          ...(op.into ? [`  ${jsVar(op.into)} = result.rows;`] : []),
+          '  last.db = result;',
+          '});',
+        ]);
+        break;
+      case 'netSummary':
+        // Not reached: CYPRESS_FEATURES leaves it out.
+        break;
       case 'check':
         emit([
           `check(${jsVal(op.actual)}, ${jsStr(op.operator)}, ${jsVal(op.expected)}, ${jsStr(op.message)});`,
@@ -409,13 +683,39 @@ function printOps(ops: Op[], s: State, ind: string, warn: (m: string) => void): 
 
 const HELPERS = ['check', 'compare', 'pick', 'fake', 'field', 'capture', 'random', 'runId'];
 
-function specFile(plan: Plan, t: TestPlan, path: string, warn: (m: string) => void): string {
+const WEB = [
+  'watchNetwork',
+  'waitForResponse',
+  'mockRoute',
+  'storage',
+  'download',
+  'fixClock',
+  'clockTime',
+  'pageCondition',
+  'pickMessage',
+  'byTestId',
+  'byRole',
+  'byLabelText',
+  'byPlaceholderText',
+  'byText',
+  'byCss',
+  'byXPath',
+];
+
+function specFile(plan: Plan, t: TestPlan, path: string, warn: (m: string, step?: string) => void): string {
   // Specs live under cypress/e2e/…; support files under cypress/support.
   const up = '../'.repeat(path.split('/').length - 2);
-  const s: State = { lines: [], pages: new Map(), xpath: false, usesUi: t.usesUi };
+  const s: State = { lines: [], pages: new Map(), xpath: false, usesUi: t.usesUi, n: 0 };
+  let watch = false;
+  walk(t.ops, (o) => (watch ||= o.op === 'waitResponse'));
   printOps(t.ops, s, '      ', warn);
+  // Responses are recorded from the start of the test, as StepForge does.
+  if (watch) s.lines.unshift('      watchNetwork();');
   const body = s.lines.join('\n');
   const code = body.replace(/\/\/.*$/gm, '');
+  const uses = (names: string[]) => names.filter((x) => new RegExp(`\\b${x}\\(`).test(code));
+  const web = uses(WEB);
+  const xml = uses(['xpathValue', 'expectNoFault']);
   const helpers = HELPERS.filter((h) => new RegExp(`\\b${h}\\b`).test(code));
   const usesMail = /\bmail\./.test(code);
   const title = [...t.scenario.modulePath, t.scenario.name].join(' › ');
@@ -428,11 +728,14 @@ function specFile(plan: Plan, t: TestPlan, path: string, warn: (m: string) => vo
           `import { ${['env', 'secret'].filter((x) => new RegExp(`\\b${x}\\b`).test(code)).join(', ')} } from '${up}support/config.js';`,
         ]
       : []),
-    ...(/\btoResult\(|\bbasicAuth\(/.test(code)
+    ...(/\btoResult\(|\bbasicAuth\(|\boauth2Token\(/.test(code)
       ? [
-          `import { ${['toResult', 'basicAuth'].filter((x) => code.includes(`${x}(`)).join(', ')} } from '${up}support/api.js';`,
+          `import { ${['toResult', 'basicAuth', 'oauth2Token'].filter((x) => code.includes(`${x}(`)).join(', ')} } from '${up}support/api.js';`,
         ]
       : []),
+    ...(web.length ? [`import { ${web.join(', ')} } from '${up}support/web.js';`] : []),
+    ...(xml.length ? [`import { ${xml.join(', ')} } from '${up}support/xml.js';`] : []),
+    ...(uses(['expectSchema']).length ? [`import { expectSchema } from '${up}support/schema.js';`] : []),
     ...(/\bglobToRegExp\(/.test(code) ? [`import { globToRegExp } from '${up}support/api.js';`] : []),
     ...(usesMail ? [`import * as mail from '${up}support/mail.js';`] : []),
     ...[...s.pages].map(([p, v]) => `import { ${v} } from '${up}pages/${plan.pages.get(p)!.className}.js';`),
@@ -487,21 +790,81 @@ export function toResult(response) {
 
 export const basicAuth = (user, password) => \`Basic \${btoa(\`\${user}:\${password}\`)}\`;
 
+const tokens = new Map();
+
+/**
+ * An OAuth2 access token (client-credentials grant), as StepForge fetches it: the client id and secret as Basic
+ * auth, grant_type and scope as a form; kept until shortly before it expires.
+ */
+export function oauth2Token(o) {
+  const key = \`\${o.tokenUrl}|\${o.clientId}|\${o.scope ?? ''}\`;
+  const hit = tokens.get(key);
+  if (hit && hit.expires > Date.now()) return cy.wrap(hit.token, { log: false });
+  return cy
+    .request({
+      method: 'POST',
+      url: o.tokenUrl,
+      form: true,
+      body: { grant_type: 'client_credentials', ...(o.scope ? { scope: o.scope } : {}) },
+      headers: { Authorization: basicAuth(o.clientId, o.clientSecret) },
+      failOnStatusCode: false,
+    })
+    .then((response) => {
+      const json = typeof response.body === 'string' ? JSON.parse(response.body || '{}') : response.body;
+      if (response.status >= 300 || !json?.access_token)
+        throw new Error(\`OAuth2 token request failed with \${response.status}\`);
+      tokens.set(key, { token: json.access_token, expires: Date.now() + Math.max(30, (json.expires_in ?? 300) - 30) * 1000 });
+      return json.access_token;
+    });
+}
+
 /** "**\\/patients/*" style URL patterns. */
 export const globToRegExp = (glob) =>
   new RegExp(String(glob).replace(/[.+^\${}()|[\\]\\\\]/g, '\\\\$&').replace(/\\*\\*/g, '.*').replace(/(?<!\\.)\\*/g, '[^/]*'));
 `;
+
+/** What the Cypress export prints beyond the basic steps (see features.ts). */
+export const CYPRESS_FEATURES: Features = {
+  tap: true,
+  download: true,
+  waitResponse: true,
+  mockRoute: true,
+  offline:
+    'going offline is not exported to {target}: it has no offline mode of its own (only through the Chrome DevTools protocol, which its own runner uses too); test the offline page by hand',
+  storage: true,
+  clock: true,
+  netSummary:
+    'the network summary is not exported to {target}: it does not see the size of each response or the requests the page lost; check the traffic in StepForge',
+  pageCondition: true,
+  repeatWhile: true,
+  soap: true,
+  schema: true,
+  oauth2: true,
+  kafka: true,
+  ftp: true,
+  mongo: true,
+};
 
 export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject {
   const files: Record<string, string> = {};
   const warnings = [...plan.warnings];
   for (const t of plan.tests) {
     const path = testPath(t, (b) => `${b}.cy.js`, 'cypress/e2e');
-    files[path] = specFile(plan, t, path, (message) => warnings.push({ scenario: t.scenario.name, message }));
+    files[path] = specFile(plan, t, path, (message, step) =>
+      warnings.push({ scenario: t.scenario.name, ...(step && { step }), message }),
+    );
   }
   const all = Object.values(files).join('\n');
   const usesDb = /cy\.task\('db:/.test(all);
   const usesMail = /cy\.task\('mail:/.test(all);
+  const has = (re: RegExp) => re.test(all.replace(/\/\/.*$/gm, ''));
+  const usesDownloads = has(/\bdownload\(/);
+  const usesKafka = has(/cy\.task\('kafka:/);
+  const usesFtp = has(/cy\.task\('ftp'/);
+  const usesMongo = has(/cy\.task\('mongo:/);
+  const usesWeb = has(/from '(\.\.\/)+support\/web\.js'/);
+  const usesSchema = has(/\bexpectSchema\(/);
+  const tasks = usesDb || usesMail || usesDownloads || usesKafka || usesFtp || usesMongo;
   const engines = new Set(plan.tests.flatMap((t) => t.ops.flatMap((x) => (x.op === 'db' ? [x.engine] : []))));
   const any = engines.has('any');
   const slug = kebab(plan.input.application.slug || plan.input.application.name);
@@ -517,6 +880,11 @@ export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject
         '@faker-js/faker': '^10.0.0',
         dotenv: '^17.0.0',
         ...(all.includes('cy.xpath(') && { '@cypress/xpath': '^2.0.3' }),
+        ...(usesWeb && { '@testing-library/dom': '^10.4.0' }),
+        ...(usesSchema && { ajv: '^8.17.1', 'ajv-formats': '^3.0.1' }),
+        ...(usesKafka && { kafkajs: '^2.2.4' }),
+        ...(usesFtp && { 'basic-ftp': '^6.2.3', 'ssh2-sftp-client': '^12.1.1' }),
+        ...(usesMongo && { mongodb: '^7.7.0' }),
         ...((any || engines.has('pg')) && { pg: '^8.16.0' }),
         ...((any || engines.has('mysql')) && { mysql2: '^3.14.0' }),
         ...((any || engines.has('sqlite')) && { 'better-sqlite3': '^12.0.0' }),
@@ -532,6 +900,10 @@ export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject
     "const { defineConfig } = require('cypress');",
     ...(usesDb ? ["const db = require('./cypress/plugins/db.cjs');"] : []),
     ...(usesMail ? ["const mail = require('./cypress/plugins/mail.cjs');"] : []),
+    ...(usesDownloads ? ["const { downloadTasks } = require('./cypress/plugins/downloads.cjs');"] : []),
+    ...(usesKafka ? ["const kafka = require('./cypress/plugins/kafka.cjs');"] : []),
+    ...(usesFtp ? ["const { ftp } = require('./cypress/plugins/ftp.cjs');"] : []),
+    ...(usesMongo ? ["const mongo = require('./cypress/plugins/mongo.cjs');"] : []),
     '',
     'module.exports = defineConfig({',
     '  e2e: {',
@@ -542,9 +914,9 @@ export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject
     "    reporterOptions: { mochaFile: 'results/junit-[hash].xml' },",
     '    // Environment variables the tests read (Cypress.env), from .env or the CI environment.',
     `    env: { ${envKeys.map((k) => `${k}: process.env.${k}`).join(', ')} },`,
-    ...(usesDb || usesMail
+    ...(tasks
       ? [
-          '    setupNodeEvents(on) {',
+          `    setupNodeEvents(on${usesDownloads ? ', config' : ''}) {`,
           "      on('task', {",
           ...(usesDb
             ? [
@@ -556,6 +928,17 @@ export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject
             ? [
                 "        'mail:wait': (criteria) => mail.waitForEmail({ ...criteria, since: new Date(criteria.since) }),",
               ]
+            : []),
+          ...(usesDownloads ? ['        ...downloadTasks(config.downloadsFolder),'] : []),
+          ...(usesKafka
+            ? [
+                "        'kafka:produce': ({ options, timeoutMs }) => kafka.produce(options, timeoutMs),",
+                "        'kafka:consume': ({ options, since, timeoutMs }) => kafka.consume(options, new Date(since), timeoutMs),",
+              ]
+            : []),
+          ...(usesFtp ? ['        ftp: (options) => ftp(options),'] : []),
+          ...(usesMongo
+            ? ["        'mongo:run': ({ connection, command }) => mongo.run(connection, command),"]
             : []),
           '      });',
           '    },',
@@ -607,6 +990,14 @@ export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject
   if (/\bmail\./.test(all)) files['cypress/support/mail.js'] = compiled('ts/mail.ts', 'esm');
   if (usesDb) files['cypress/plugins/db.cjs'] = compiled('ts/db.ts', 'cjs');
   if (usesMail) files['cypress/plugins/mail.cjs'] = compiled('ts/mail.ts', 'cjs');
+  if (usesWeb) files['cypress/support/web.js'] = `// ${CREDIT}\n${runtime('cypress/web.js')}`;
+  if (has(/from '(\.\.\/)+support\/xml\.js'/))
+    files['cypress/support/xml.js'] = `// ${CREDIT}\n${runtime('cypress/xml.js')}`;
+  if (usesSchema) files['cypress/support/schema.js'] = compiled('ts/schema.ts', 'esm');
+  if (usesDownloads) files['cypress/plugins/downloads.cjs'] = compiled('cypress/downloads.ts', 'cjs');
+  if (usesKafka) files['cypress/plugins/kafka.cjs'] = bundled('ts/kafka.ts');
+  if (usesFtp) files['cypress/plugins/ftp.cjs'] = bundled('ts/ftp.ts');
+  if (usesMongo) files['cypress/plugins/mongo.cjs'] = bundled('ts/mongo.ts');
   for (const [key, p] of plan.pages)
     files[`cypress/pages/${p.className}.js`] = [
       `// ${CREDIT}`,
@@ -635,7 +1026,11 @@ export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject
       '`cypress/e2e/` — one spec per scenario, grouped by module; one test per test case',
       ...(plan.pages.size ? ['`cypress/pages/` — page objects (one function per element)'] : []),
       '`cypress/support/` — configuration, helpers, the `fill` command and Testing Library queries',
-      ...(usesDb || usesMail ? ['`cypress/plugins/` — Node tasks for the database and Mailpit'] : []),
+      ...(tasks
+        ? [
+            '`cypress/plugins/` — Node tasks (database, Mailpit, downloads, Kafka, FTP, MongoDB as the tests need)',
+          ]
+        : []),
       ...(Object.keys(plan.sqlFiles).length ? ['`sql/` — the SQL of each database step'] : []),
     ],
     notes: [

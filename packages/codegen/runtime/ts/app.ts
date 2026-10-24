@@ -15,20 +15,53 @@ const idOf = (el: Ref) => el[ELEMENT] ?? el.ELEMENT!;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const ANDROID_KEYS: Record<string, number> = {
-  Enter: 66, Tab: 61, Escape: 111, Backspace: 67, Delete: 112, Space: 62, ArrowUp: 19, ArrowDown: 20,
-  ArrowLeft: 21, ArrowRight: 22, Home: 3, Menu: 82, Search: 84,
+  Enter: 66,
+  Tab: 61,
+  Escape: 111,
+  Backspace: 67,
+  Delete: 112,
+  Space: 62,
+  ArrowUp: 19,
+  ArrowDown: 20,
+  ArrowLeft: 21,
+  ArrowRight: 22,
+  Home: 3,
+  Menu: 82,
+  Search: 84,
 };
 const IOS_KEYS: Record<string, string> = { Enter: '\n', Tab: '\t', Backspace: '\b', Space: ' ' };
 const W3C_KEYS: Record<string, string> = {
-  Enter: '', Return: '', Tab: '', Escape: '', Backspace: '', Delete: '',
-  Space: ' ', ArrowLeft: '', ArrowUp: '', ArrowRight: '', ArrowDown: '', Home: '',
-  End: '', PageUp: '', PageDown: '', Shift: '', Control: '', Ctrl: '',
-  Alt: '', Option: '', Meta: '', Command: '', Cmd: '',
+  Enter: '',
+  Return: '',
+  Tab: '',
+  Escape: '',
+  Backspace: '',
+  Delete: '',
+  Space: ' ',
+  ArrowLeft: '',
+  ArrowUp: '',
+  ArrowRight: '',
+  ArrowDown: '',
+  Home: '',
+  End: '',
+  PageUp: '',
+  PageDown: '',
+  Shift: '',
+  Control: '',
+  Ctrl: '',
+  Alt: '',
+  Option: '',
+  Meta: '',
+  Command: '',
+  Cmd: '',
   ...Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`F${i + 1}`, String.fromCharCode(0xe031 + i)])),
 };
 const PERMISSIONS: Record<string, [string[], string]> = {
   camera: [['android.permission.CAMERA'], 'camera'],
-  location: [['android.permission.ACCESS_FINE_LOCATION', 'android.permission.ACCESS_COARSE_LOCATION'], 'location'],
+  location: [
+    ['android.permission.ACCESS_FINE_LOCATION', 'android.permission.ACCESS_COARSE_LOCATION'],
+    'location',
+  ],
   microphone: [['android.permission.RECORD_AUDIO'], 'microphone'],
   contacts: [['android.permission.READ_CONTACTS'], 'contacts'],
   photos: [['android.permission.READ_MEDIA_IMAGES'], 'photos'],
@@ -38,7 +71,14 @@ const PERMISSIONS: Record<string, [string[], string]> = {
 
 /** An XPath string literal for any text. */
 const literal = (s: string) =>
-  !s.includes("'") ? `'${s}'` : !s.includes('"') ? `"${s}"` : `concat(${s.split("'").map((p) => `'${p}'`).join(`, "'", `)})`;
+  !s.includes("'")
+    ? `'${s}'`
+    : !s.includes('"')
+      ? `"${s}"`
+      : `concat(${s
+          .split("'")
+          .map((p) => `'${p}'`)
+          .join(`, "'", `)})`;
 const predicate = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
 /** Starts the app through Appium (or StepForge's Linux helper) with these capabilities. */
@@ -78,7 +118,8 @@ export class App {
       try {
         found = (await this.driver.findElements(using, value)) as unknown as Ref[];
       } catch (err) {
-        if (/invalid selector/i.test(String(err))) throw new Error(`Invalid locator ${using}=${value}: ${err}`);
+        if (/invalid selector/i.test(String(err)))
+          throw new Error(`Invalid locator ${using}=${value}: ${err}`);
       }
       if (found.length) return found;
     }
@@ -141,7 +182,8 @@ export class App {
   async isChecked(el: string): Promise<boolean> {
     const attr = (name: string) => this.attempt(() => this.driver.getElementAttribute(el, name));
     if (this.platform === 'android' || this.platform === 'linux') return (await attr('checked')) === 'true';
-    if (this.platform === 'ios' || this.platform === 'macos') return ['1', 'true'].includes((await attr('value')) ?? '');
+    if (this.platform === 'ios' || this.platform === 'macos')
+      return ['1', 'true'].includes((await attr('value')) ?? '');
     return /^(on|1|true)$/i.test((await attr('Toggle.ToggleState')) ?? '');
   }
 
@@ -160,7 +202,12 @@ export class App {
         : this.platform === 'ios'
           ? [['-ios predicate string', `label == ${predicate(t)} OR value == ${predicate(t)}`]]
           : this.platform === 'macos'
-            ? [['-ios predicate string', `title == ${predicate(t)} OR label == ${predicate(t)} OR value == ${predicate(t)}`]]
+            ? [
+                [
+                  '-ios predicate string',
+                  `title == ${predicate(t)} OR label == ${predicate(t)} OR value == ${predicate(t)}`,
+                ],
+              ]
             : [['name', t]];
     await this.click(option);
   }
@@ -189,7 +236,8 @@ export class App {
       .map((k) => k.trim())
       .filter(Boolean)
       .map((k) => {
-        const v = W3C_KEYS[k] ?? W3C_KEYS[k[0]!.toUpperCase() + k.slice(1)] ?? (k.length === 1 ? k : undefined);
+        const v =
+          W3C_KEYS[k] ?? W3C_KEYS[k[0]!.toUpperCase() + k.slice(1)] ?? (k.length === 1 ? k : undefined);
         if (v === undefined) throw new Error(`Unknown key "${k}" in "${combo}"`);
         return v;
       });
@@ -215,7 +263,9 @@ export class App {
       const [ok, seen] = await this.check(check, selectors, expected, attribute);
       if (ok) return;
       if (Date.now() >= deadline)
-        throw new Error(`Expected ${check}${expected === undefined ? '' : ` ${JSON.stringify(expected)}`}, but got ${seen}`);
+        throw new Error(
+          `Expected ${check}${expected === undefined ? '' : ` ${JSON.stringify(expected)}`}, but got ${seen}`,
+        );
       await sleep(250);
     }
   }
@@ -276,19 +326,33 @@ export class App {
   // ─── Gestures ─────────────────────────────────────────────────────────────
   private async area() {
     const { width: w, height: h } = await this.driver.getWindowRect();
-    return { left: Math.round(w * 0.1), top: Math.round(h * 0.2), width: Math.round(w * 0.8), height: Math.round(h * 0.6) };
+    return {
+      left: Math.round(w * 0.1),
+      top: Math.round(h * 0.2),
+      width: Math.round(w * 0.8),
+      height: Math.round(h * 0.6),
+    };
   }
 
   /** Scrolls the screen; false when it could not move any more (Android says so). */
   async scroll(direction: 'up' | 'down' = 'down'): Promise<boolean> {
     const p = this.platform;
     if (p === 'android')
-      return (await this.run('mobile: scrollGesture', { ...(await this.area()), direction, percent: 0.75 })) === true;
+      return (
+        (await this.run('mobile: scrollGesture', { ...(await this.area()), direction, percent: 0.75 })) ===
+        true
+      );
     // On iOS a swipe up moves the content down.
     if (p === 'ios') await this.run('mobile: swipe', { direction: direction === 'down' ? 'up' : 'down' });
     else if (p === 'macos')
-      await this.run('macos: scroll', { x: 400, y: 300, deltaX: 0, deltaY: direction === 'down' ? -200 : 200 });
-    else if (p === 'windows') await this.run('windows: scroll', { deltaY: direction === 'down' ? -360 : 360 });
+      await this.run('macos: scroll', {
+        x: 400,
+        y: 300,
+        deltaX: 0,
+        deltaY: direction === 'down' ? -200 : 200,
+      });
+    else if (p === 'windows')
+      await this.run('windows: scroll', { deltaY: direction === 'down' ? -360 : 360 });
     else await this.shortcut(direction === 'down' ? 'PageDown' : 'PageUp');
     return true;
   }
@@ -320,9 +384,16 @@ export class App {
   private async swipeAt(direction: string, percent: number, el?: string): Promise<void> {
     const p = this.platform;
     if (p === 'android')
-      await this.run('mobile: swipeGesture', { ...(el ? { elementId: el } : await this.area()), direction, percent });
+      await this.run('mobile: swipeGesture', {
+        ...(el ? { elementId: el } : await this.area()),
+        direction,
+        percent,
+      });
     else if (p === 'ios' || p === 'macos')
-      await this.run(`${p === 'ios' ? 'mobile' : 'macos'}: swipe`, { direction, ...(el && { elementId: el }) });
+      await this.run(`${p === 'ios' ? 'mobile' : 'macos'}: swipe`, {
+        direction,
+        ...(el && { elementId: el }),
+      });
     else throw new Error('A swipe is for phone apps; desktop apps use the mouse, keyboard and menus');
   }
 
@@ -335,7 +406,13 @@ export class App {
     const p = this.platform;
     if (p === 'android') await this.run('mobile: dragGesture', { elementId: a, endX: tx, endY: ty });
     else if (p === 'ios')
-      await this.run('mobile: dragFromToForDuration', { duration: 1, fromX: fx, fromY: fy, toX: tx, toY: ty });
+      await this.run('mobile: dragFromToForDuration', {
+        duration: 1,
+        fromX: fx,
+        fromY: fy,
+        toX: tx,
+        toY: ty,
+      });
     else if (p === 'macos')
       await this.run('macos: clickAndDrag', { startX: fx, startY: fy, endX: tx, endY: ty, duration: 1 });
     else if (p === 'windows') await this.run('windows: clickAndDrag', { startElementId: a, endElementId: b });
@@ -376,14 +453,16 @@ export class App {
       this.appIdCache = cap('appPackage') ?? String(await this.run('mobile: getCurrentPackage'));
     else if (this.platform === 'ios')
       this.appIdCache =
-        cap('bundleId') ?? ((await this.run('mobile: activeAppInfo')) as { bundleId?: string } | null)?.bundleId;
+        cap('bundleId') ??
+        ((await this.run('mobile: activeAppInfo')) as { bundleId?: string } | null)?.bundleId;
     else this.appIdCache = cap('bundleId') ?? cap('appPath');
     return this.appIdCache ?? '';
   }
 
   private async app(): Promise<Record<string, string>> {
     const caps = this.driver.capabilities as Record<string, unknown>;
-    if (this.platform === 'macos' && !(caps.bundleId ?? caps['appium:bundleId'])) return { path: await this.appId() };
+    if (this.platform === 'macos' && !(caps.bundleId ?? caps['appium:bundleId']))
+      return { path: await this.appId() };
     return { [this.platform === 'android' ? 'appId' : 'bundleId']: await this.appId() };
   }
 
@@ -405,7 +484,8 @@ export class App {
     const p = this.platform;
     if (p === 'android' || p === 'ios') await this.run(`mobile: ${name}`, await this.app());
     else if (p === 'macos') await this.run(`macos: ${name}`, await this.app());
-    else if (p === 'windows') await this.run(name === 'activateApp' ? 'windows: launchApp' : 'windows: closeApp');
+    else if (p === 'windows')
+      await this.run(name === 'activateApp' ? 'windows: launchApp' : 'windows: closeApp');
     else throw new Error('Each Linux test starts and closes the app itself');
   }
 
@@ -439,13 +519,18 @@ export class App {
       });
     else if (this.platform === 'ios') {
       if (!ios) throw new Error(`On iOS the app itself asks for the ${name} permission: answer its dialog`);
-      await this.run('mobile: setPermission', { bundleId: await this.appId(), access: { [ios]: grant ? 'yes' : 'no' } });
+      await this.run('mobile: setPermission', {
+        bundleId: await this.appId(),
+        access: { [ios]: grant ? 'yes' : 'no' },
+      });
     } else throw new Error('Granting permissions is for phone apps');
   }
 
   async pushNotification(title: string, body: string): Promise<void> {
     if (this.platform !== 'ios')
-      throw new Error("Sending a notification works on iOS simulators (Android needs the app's own push service)");
+      throw new Error(
+        "Sending a notification works on iOS simulators (Android needs the app's own push service)",
+      );
     await this.run('mobile: pushNotification', {
       bundleId: await this.appId(),
       payload: { aps: { alert: { title, body }, sound: 'default' } },
@@ -454,17 +539,29 @@ export class App {
 
   /** A desktop app's menu path: "File > Save". */
   async menu(path: string): Promise<void> {
-    const titles = path.split('>').map((t) => t.trim()).filter(Boolean);
+    const titles = path
+      .split('>')
+      .map((t) => t.trim())
+      .filter(Boolean);
     for (const [i, title] of titles.entries()) {
       const selectors: Selectors =
         this.platform === 'macos'
-          ? [['-ios class chain', `**/${i === 0 ? 'XCUIElementTypeMenuBarItem' : 'XCUIElementTypeMenuItem'}[\`title == ${predicate(title)}\`]`]]
+          ? [
+              [
+                '-ios class chain',
+                `**/${i === 0 ? 'XCUIElementTypeMenuBarItem' : 'XCUIElementTypeMenuItem'}[\`title == ${predicate(title)}\`]`,
+              ],
+            ]
           : this.platform === 'windows'
             ? [['xpath', `//MenuItem[@Name=${literal(title)}]`]]
             : this.platform === 'linux'
-              ? [['xpath', `//${i === 0 ? 'menu' : 'menu_item'}[@name=${literal(title)}]`], ['xpath', `//menu[@name=${literal(title)}]`]]
+              ? [
+                  ['xpath', `//${i === 0 ? 'menu' : 'menu_item'}[@name=${literal(title)}]`],
+                  ['xpath', `//menu[@name=${literal(title)}]`],
+                ]
               : [];
-      if (!selectors.length) throw new Error('Menu bars are for desktop apps; in a phone app tap the menu button instead');
+      if (!selectors.length)
+        throw new Error('Menu bars are for desktop apps; in a phone app tap the menu button instead');
       await this.driver.elementClick(await this.find(selectors, 10));
     }
   }
@@ -486,17 +583,25 @@ export class App {
   private async dialog(accept: boolean, button?: string): Promise<boolean> {
     const p = this.platform;
     if (p === 'android') {
-      await this.run(accept ? 'mobile: acceptAlert' : 'mobile: dismissAlert', button ? { buttonLabel: button } : {});
+      await this.run(
+        accept ? 'mobile: acceptAlert' : 'mobile: dismissAlert',
+        button ? { buttonLabel: button } : {},
+      );
       return true;
     }
     if (p === 'ios') {
-      await this.run('mobile: alert', { action: accept ? 'accept' : 'dismiss', ...(button && { buttonLabel: button }) });
+      await this.run('mobile: alert', {
+        action: accept ? 'accept' : 'dismiss',
+        ...(button && { buttonLabel: button }),
+      });
       return true;
     }
     const label = button ?? (accept ? 'OK' : 'Cancel');
     if (p === 'macos') {
       const sheets: Selectors = [['-ios class chain', '**/XCUIElementTypeSheet']];
-      let found = await this.all([['-ios class chain', `**/XCUIElementTypeButton[\`title == ${predicate(label)}\`]`]]);
+      let found = await this.all([
+        ['-ios class chain', `**/XCUIElementTypeButton[\`title == ${predicate(label)}\`]`],
+      ]);
       if (!found.length && !button && (await this.all(sheets)).length)
         found = await this.all([['accessibility id', accept ? 'action-button-1' : 'action-button-2']]);
       if (!found.length) return false;
@@ -512,7 +617,10 @@ export class App {
     const selectors: Selectors =
       p === 'windows'
         ? [['xpath', `//Window//Button[@Name=${literal(label)}]`]]
-        : [['xpath', `//alert//push_button[@name=${literal(label)}]`], ['xpath', `//dialog//push_button[@name=${literal(label)}]`]];
+        : [
+            ['xpath', `//alert//push_button[@name=${literal(label)}]`],
+            ['xpath', `//dialog//push_button[@name=${literal(label)}]`],
+          ];
     if (!(await this.all(selectors)).length) return false;
     // A dialog that is still opening ignores the first press: press until it has gone.
     for (let attempt = 0; attempt < 5; attempt++) {

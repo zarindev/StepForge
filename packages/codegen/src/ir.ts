@@ -68,8 +68,40 @@ export type Auth =
   | { type: 'bearer'; token: Val }
   | { type: 'basic'; username: Val; password: Val }
   | { type: 'apiKey'; in: 'header' | 'query'; name: string; value: Val }
-  | { type: 'cookie'; name: string; value: Val };
+  | { type: 'cookie'; name: string; value: Val }
+  /** Client-credentials grant, as StepForge fetches it: Basic client id/secret, form body, token cached. */
+  | { type: 'oauth2'; tokenUrl: Val; clientId: Val; clientSecret: Val; scope: Val | null };
+/** `matchesSchema` asserts (with feature `schema`) carry the JSON Schema as `expected`. */
 export type Assert = { target: string; operator: string; expected: Val };
+
+/**
+ * What an export can express beyond the basic steps. Each target lists the ones it prints (see features.ts); a step
+ * needing a feature its target lacks becomes a TODO with a warning, so no printer ever meets an op it cannot print.
+ */
+export type Feature =
+  | 'tap'
+  | 'download'
+  | 'waitResponse'
+  | 'mockRoute'
+  | 'offline'
+  | 'storage'
+  | 'clock'
+  | 'netSummary'
+  | 'pageCondition'
+  | 'repeatWhile'
+  | 'soap'
+  | 'schema'
+  | 'oauth2'
+  | 'kafka'
+  | 'ftp'
+  | 'mongo';
+/** true: exported; a string: why not (the TODO text); missing: the default reason. */
+export type Features = Partial<Record<Feature, true | string>>;
+
+/** Page conditions (util.if / util.loop "while" on an element), as StepForge's probe checks them. */
+export type PageCheck = 'visible' | 'hidden' | 'present' | 'absent' | 'enabled' | 'textContains' | 'count';
+export type PageCond = { el: El; check: PageCheck; expected?: Val; timeoutMs: number };
+export type ValueCond = { value: Val; operator: string; expected: Val };
 
 export type Op =
   | { op: 'comment'; text: string }
@@ -87,7 +119,9 @@ export type Op =
         | 'clear'
         | 'check'
         | 'uncheck'
-        | 'scrollIntoView';
+        | 'scrollIntoView'
+        /** A touch tap (feature `tap`; Playwright needs a touch screen, `hasTouch`). */
+        | 'tap';
       el: El;
       value?: Val;
     }
@@ -118,6 +152,12 @@ export type Op =
       asserts: Assert[];
       into?: string;
       label: string;
+      /**
+       * A SOAP call (feature `soap`): the envelope is the raw body and its headers are in `headers`. Asserts may be
+       * XPath (`//m:Price`, `count(//x)`, `xpath:…`; the document's own prefixes plus `namespaces`); unless
+       * `allowFault`, a SOAP fault fails the test.
+       */
+      soap?: { namespaces: Record<string, string>; allowFault: boolean };
     }
   | { op: 'apiExtract'; from: 'body' | 'header' | 'status'; path?: string; name?: string; into: string }
   | { op: 'setVar'; name: string; value: Val }
@@ -158,7 +198,100 @@ export type Op =
       into: string;
     }
   | { op: 'emailOpenLink'; contains?: Val; index?: number; url?: Val }
-  | { op: 'app'; method: AppMethod; els: El[]; args: Val[] };
+  | { op: 'app'; method: AppMethod; els: El[]; args: Val[] }
+  // ─── Browser steps with a feature each ───────────────────────────────────
+  /** Clicks the element and keeps the file it downloads. Asserts: `fileName`, `size`, `content`. */
+  | { op: 'download'; el: El; asserts: Assert[]; into?: string }
+  /**
+   * The first response since the test started to a matching URL (part of it, or a glob) that no earlier step took,
+   * else the next one. Asserts as on an API response, plus `url`; `into` keeps the body.
+   */
+  | {
+      op: 'waitResponse';
+      url: Val;
+      method?: string;
+      status?: number;
+      timeoutMs: number;
+      asserts: Assert[];
+      into?: string;
+    }
+  /**
+   * Answers matching requests until the test ends: `fulfill` (status, body — text or a value sent as JSON —,
+   * content type), `abort`, `delay`; `remove` drops the mocks of that URL (and method). `times`: only that many.
+   */
+  | {
+      op: 'mockRoute';
+      url: Val;
+      action: 'fulfill' | 'abort' | 'delay' | 'remove';
+      method?: string;
+      status: number;
+      body: Val | null;
+      contentType?: string;
+      delayMs: number;
+      times?: number;
+    }
+  | { op: 'offline'; offline: boolean }
+  /** Cookies, localStorage or sessionStorage. `get` asserts: `value`, `exists`; `into` keeps the value. */
+  | {
+      op: 'storage';
+      kind: 'cookie' | 'local' | 'session';
+      action: 'get' | 'set' | 'remove' | 'clear';
+      name: Val;
+      value: Val;
+      asserts: Assert[];
+      into?: string;
+    }
+  /** `set`: the page's Date is fixed at `time`; `install`: the clock runs from `time` (or now); `fastForward` ms. */
+  | { op: 'clock'; action: 'set' | 'install' | 'fastForward'; time?: Val; ms: number }
+  /**
+   * The page's traffic since the test started (or the last `goto`), as numbers to check: `requests`, `bytes`, `kb`,
+   * `failed`, `thirdPartyRequests`, `thirdPartyHosts`, `hosts`, `thirdPartyHostNames`, `requests:<type>`, `bytes:<type>`.
+   */
+  | { op: 'netSummary'; since: 'test' | 'lastNavigation'; asserts: Assert[]; into?: string }
+  // ─── Control flow on the page ────────────────────────────────────────────
+  /** Tries the check every 100 ms for up to timeoutMs; false picks `else` (never fails by itself). */
+  | { op: 'ifPage'; cond: PageCond; then: Op[]; else: Op[] }
+  /**
+   * Repeat while: `vars.index` is the pass number; the condition is checked before every pass; after `max` passes
+   * with the condition still holding, the test fails (StepForge's safety limit).
+   */
+  | {
+      op: 'while';
+      cond: ({ kind: 'value' } & ValueCond) | ({ kind: 'page' } & PageCond);
+      max: number;
+      body: Op[];
+    }
+  // ─── Integrations ────────────────────────────────────────────────────────
+  /**
+   * Kafka (feature `kafka`). `params`: the step's params as written (brokers, topic, key, value, headers, partition,
+   * ssl, sasl; consume: since, key, contains, path, equals, timeoutMs). Produce asserts: `topic`, `partition`,
+   * `offset`; consume asserts: `key`, `value`, `$…` (in the value), `header:<name>`, `partition`, `offset`.
+   */
+  | {
+      op: 'kafka';
+      action: 'produce' | 'consume';
+      params: Val;
+      timeoutMs: number;
+      asserts: Assert[];
+      into?: string;
+    }
+  /**
+   * FTP, FTPS or SFTP (feature `ftp`). `params`: protocol, host, port, username, password, privateKey, action,
+   * remotePath, localPath, content. Asserts: download `content`, `size`, `path`; list `count`, `names`; `exists`.
+   */
+  | {
+      op: 'ftp';
+      action: 'upload' | 'download' | 'list' | 'delete' | 'exists';
+      params: Val;
+      asserts: Assert[];
+      into?: string;
+    }
+  /**
+   * A MongoDB command (feature `mongo`) on `DB_<CONNECTION>_URL`: `command` is JSON text (a `db.query`) or a value
+   * (`db.mongoFind`, already in command form), with `collection` and one operation (find, aggregate,
+   * countDocuments, distinct, insertOne…). The result reads like a database result (rows, rowCount, value…).
+   */
+  | { op: 'mongo'; connection: string; command: Val; asserts: Assert[]; into?: string };
 
 export type TestPlan = {
   scenario: CodegenScenario;
@@ -293,12 +426,69 @@ type Ctx = {
   flags: { ui: boolean; api: boolean; db: boolean; email: boolean };
   /** Set for the Appium and Maestro exports of a phone or desktop app. */
   native: AppPlatform | null;
+  /** What the target prints; null: everything (a plan without a target). */
+  features: Features | null;
+  /** The target's name, for TODO texts ("not exported to Cypress"). */
+  label: string;
 };
 
 function todo(ctx: Ctx, step: CodegenStep, message: string): Op {
   ctx.warnings.push({ scenario: ctx.scenario.name, step: step.label || step.type, message });
   return { op: 'todo', text: `${step.type}: ${message}` };
 }
+
+const BROWSER_TODO = 'this browser step is not exported to {target}; write it with the framework’s own API';
+const WHY_NOT: Record<Feature, string> = {
+  tap: BROWSER_TODO,
+  download: BROWSER_TODO,
+  waitResponse: BROWSER_TODO,
+  mockRoute: BROWSER_TODO,
+  offline: BROWSER_TODO,
+  storage: BROWSER_TODO,
+  clock: BROWSER_TODO,
+  netSummary: BROWSER_TODO,
+  pageCondition:
+    'page conditions (if the element is …) are not exported to {target}; write the check by hand',
+  repeatWhile: '“repeat while” loops are not exported to {target}; write the loop by hand',
+  soap: 'SOAP steps are not exported to {target}; send the envelope with an HTTP client',
+  schema: 'the JSON Schema check on "{assert}" is not exported to {target}',
+  oauth2: 'auth type "oauth2" is not exported to {target}; set the header yourself',
+  kafka: 'Kafka steps are not exported to {target}; use a Kafka client of the target language',
+  ftp: 'FTP steps are not exported to {target}; use an FTP client of the target language',
+  mongo: 'MongoDB steps are not exported to {target}; use the MongoDB driver of the target language',
+};
+
+/** True when the target prints the feature; otherwise pushes the TODO (with its warning) and returns false. */
+function can(ctx: Ctx, step: CodegenStep, f: Feature, out: Op[], assert?: string): boolean {
+  const v = ctx.features === null ? true : ctx.features[f];
+  if (v === true) return true;
+  out.push(
+    todo(ctx, step, (v ?? WHY_NOT[f]).replace('{target}', ctx.label).replace('{assert}', assert ?? '')),
+  );
+  return false;
+}
+
+/** Asserts of a browser step that reads its own result; other targets become TODOs. */
+function ownAsserts(ctx: Ctx, step: CodegenStep, out: Op[], ok: (target: string) => boolean): Assert[] {
+  return step.assertions.flatMap((a) => {
+    if (!ok(a.target)) {
+      out.push(todo(ctx, step, `assertion on "${a.target}" is not exported`));
+      return [];
+    }
+    return [{ target: a.target, operator: a.operator, expected: val(a.expected) }];
+  });
+}
+
+const PAGE_CHECKS: PageCheck[] = [
+  'visible',
+  'hidden',
+  'present',
+  'absent',
+  'enabled',
+  'textContains',
+  'count',
+];
+const MAX_LOOP_ITERATIONS = 1000;
 
 function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
   if (step.enabled === false)
@@ -460,8 +650,9 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     case 'api.graphql': {
       ctx.flags.api = true;
       const gql = step.type === 'api.graphql';
-      const auth = authOf(q.auth);
-      if (q.auth && !auth)
+      const oauth = (q.auth as { type?: string } | undefined)?.type === 'oauth2';
+      const auth = oauth && !can(ctx, step, 'oauth2', out) ? null : authOf(q.auth);
+      if (q.auth && !auth && !oauth)
         out.push(
           todo(
             ctx,
@@ -535,9 +726,22 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
           message: `the "${conn}" connection is not set up in this environment; all database drivers are included and DB_${conn.replace(/[^A-Za-z0-9]+/g, '_').toUpperCase()}_URL decides`,
         });
       if (engine === 'mongo') {
-        out.push(
-          todo(ctx, step, 'MongoDB steps are not exported; use the MongoDB driver of the target language'),
-        );
+        if (step.type !== 'db.query') {
+          out.push(
+            todo(ctx, step, 'MongoDB has no SQL scripts or procedures; use a Mongo command in a query step'),
+          );
+          break;
+        }
+        if (!can(ctx, step, 'mongo', out)) break;
+        ctx.flags.db = true;
+        out.push({
+          op: 'mongo',
+          connection: conn,
+          // A command written as JSON text (placeholders inside), parsed at run time as StepForge does.
+          command: typeof q.sql === 'string' ? val(q.sql) : val(q.sql ?? {}),
+          asserts: exportableAsserts(ctx, step, out),
+          ...(into && { into }),
+        });
         break;
       }
       if (engine === 'mssql') {
@@ -571,11 +775,25 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     case 'db.extract':
       if (into) out.push({ op: 'dbExtract', path: String(q.path ?? 'value'), into });
       break;
-    case 'db.mongoFind':
-      out.push(
-        todo(ctx, step, 'MongoDB steps are not exported; use the MongoDB driver of the target language'),
-      );
+    case 'db.mongoFind': {
+      if (!can(ctx, step, 'mongo', out)) break;
+      ctx.flags.db = true;
+      // The same command StepForge builds from the step's fields.
+      out.push({
+        op: 'mongo',
+        connection: String(q.connection ?? ''),
+        command: val({
+          collection: q.collection ?? '',
+          find: q.filter ?? {},
+          ...(q.projection ? { projection: q.projection } : {}),
+          ...(q.sort ? { sort: q.sort } : {}),
+          ...(q.limit ? { limit: Number(q.limit) } : {}),
+        }),
+        asserts: exportableAsserts(ctx, step, out),
+        ...(into && { into }),
+      });
       break;
+    }
     case 'db.dataQualityCheck':
       out.push(todo(ctx, step, 'the data-quality audit runs only in StepForge'));
       break;
@@ -662,18 +880,73 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     case 'util.wait':
       out.push({ op: 'wait', ms: num(q.ms, 1000) });
       break;
-    case 'api.soap':
-    case 'api.kafkaProduce':
-    case 'api.kafkaConsume':
-    case 'api.ftp':
-      out.push(
-        todo(
-          ctx,
-          step,
-          'SOAP, Kafka and FTP steps are not exported yet; use a client library of the target language',
-        ),
-      );
+    case 'api.soap': {
+      ctx.flags.api = true;
+      if (!can(ctx, step, 'soap', out)) break;
+      const oauth = (q.auth as { type?: string } | undefined)?.type === 'oauth2';
+      const auth = oauth && !can(ctx, step, 'oauth2', out) ? null : authOf(q.auth);
+      if (q.auth && !auth && !oauth)
+        out.push(todo(ctx, step, `auth type "${(q.auth as { type?: string }).type}" is not exported`));
+      const soap = soapRequest(String(q.body ?? ''), q.header ? String(q.header) : '', q.action, q.version);
+      const own = Object.entries((q.headers as Record<string, unknown>) ?? {});
+      out.push({
+        op: 'api',
+        method: 'POST',
+        url: val(q.url ?? '/'),
+        // The step's own headers win, as in StepForge.
+        headers: [
+          ...soap.headers
+            .filter(([k]) => !own.some(([o]) => o.toLowerCase() === k))
+            .map(([k, v]): [string, Val] => [k, str(v)]),
+          ...own.map(([k, v]): [string, Val] => [k, val(v)]),
+        ],
+        query: [],
+        body: val(soap.xml),
+        bodyType: 'raw',
+        auth,
+        asserts: exportableAsserts(ctx, step, out),
+        ...(into && { into }),
+        label: step.label || describeStep(step as never),
+        soap: {
+          namespaces: Object.fromEntries(
+            Object.entries((q.namespaces as Record<string, unknown>) ?? {}).map(([k, v]) => [k, String(v)]),
+          ),
+          allowFault: q.allowFault === true,
+        },
+      });
       break;
+    }
+    case 'api.kafkaProduce':
+    case 'api.kafkaConsume': {
+      ctx.flags.api = true;
+      if (!can(ctx, step, 'kafka', out)) break;
+      out.push({
+        op: 'kafka',
+        action: step.type === 'api.kafkaProduce' ? 'produce' : 'consume',
+        params: val(q),
+        timeoutMs: num(Number(q.timeoutMs), step.timeoutMs ?? DEFAULT_TIMEOUT),
+        asserts: exportableAsserts(ctx, step, out),
+        ...(into && { into }),
+      });
+      break;
+    }
+    case 'api.ftp': {
+      ctx.flags.api = true;
+      if (!can(ctx, step, 'ftp', out)) break;
+      const action = String(q.action ?? 'list');
+      if (!['upload', 'download', 'list', 'delete', 'exists'].includes(action)) {
+        out.push(todo(ctx, step, `unknown FTP action "${action}"`));
+        break;
+      }
+      out.push({
+        op: 'ftp',
+        action: action as 'list',
+        params: val(q),
+        asserts: exportableAsserts(ctx, step, out),
+        ...(into && { into }),
+      });
+      break;
+    }
     case 'util.manual':
       out.push(todo(ctx, step, `a manual check, done by a person: ${String(q.instruction ?? '')}`));
       break;
@@ -685,13 +958,14 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
       break;
     case 'util.if': {
       if ((q.condition as { type?: string } | undefined)?.type === 'element') {
-        out.push(
-          todo(
-            ctx,
-            step,
-            'page conditions (if the element is …) are not exported yet; write the check by hand',
-          ),
-        );
+        const cond = pageCond(ctx, step, e, q.condition, out);
+        if (!cond) break;
+        out.push({
+          op: 'ifPage',
+          cond,
+          then: listOps(ctx, (q.steps as CodegenStep[]) ?? [], depth),
+          else: listOps(ctx, (q.else as CodegenStep[]) ?? [], depth),
+        });
         break;
       }
       const c = (q.condition as { value?: unknown; operator?: string; expected?: unknown }) ?? {};
@@ -707,7 +981,37 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     }
     case 'util.loop':
       if (q.while !== undefined) {
-        out.push(todo(ctx, step, '“repeat while” loops are not exported yet; write the loop by hand'));
+        if (!can(ctx, step, 'repeatWhile', out)) break;
+        // The count is the safety limit (default 100, at most 1000), as in StepForge.
+        const limit = q.count === undefined || q.count === '' ? 100 : Number(q.count);
+        if (!Number.isFinite(limit)) {
+          out.push(todo(ctx, step, 'the loop limit must be a number to be exported'));
+          break;
+        }
+        const w = (q.while ?? {}) as {
+          type?: string;
+          value?: unknown;
+          operator?: string;
+          expected?: unknown;
+        };
+        let cond: Extract<Op, { op: 'while' }>['cond'] | null;
+        if (w.type === 'element') {
+          const pc = pageCond(ctx, step, e, w, out);
+          cond = pc && { kind: 'page', ...pc };
+        } else
+          cond = {
+            kind: 'value',
+            value: val(w.value),
+            operator: String(w.operator ?? 'equals'),
+            expected: val(w.expected),
+          };
+        if (!cond) break;
+        out.push({
+          op: 'while',
+          cond,
+          max: Math.min(limit || 100, MAX_LOOP_ITERATIONS),
+          body: listOps(ctx, (q.steps as CodegenStep[]) ?? [], depth),
+        });
         break;
       }
       out.push({
@@ -757,18 +1061,146 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
       out.push(...listOps(ctx, target.steps, depth + 1));
       break;
     }
-    case 'ui.tap':
-    case 'ui.download':
-    case 'ui.waitForResponse':
-    case 'ui.mockRoute':
-    case 'ui.setOffline':
-    case 'ui.storage':
-    case 'ui.setClock':
-    case 'ui.networkSummary':
-      out.push(
-        todo(ctx, step, 'this browser step is not exported yet; write it with the framework’s own API'),
-      );
+    case 'ui.tap': {
+      if (!can(ctx, step, 'tap', out)) break;
+      const x = needEl();
+      if (x) out.push({ op: 'act', action: 'tap', el: x });
       break;
+    }
+    case 'ui.download': {
+      if (!can(ctx, step, 'download', out)) break;
+      const x = needEl();
+      if (x)
+        out.push({
+          op: 'download',
+          el: x,
+          asserts: ownAsserts(ctx, step, out, (t) => ['fileName', 'size', 'content'].includes(t)),
+          ...(into && { into }),
+        });
+      break;
+    }
+    case 'ui.waitForResponse': {
+      if (!can(ctx, step, 'waitResponse', out)) break;
+      if (!q.url) {
+        out.push(todo(ctx, step, 'the step has no URL to wait for'));
+        break;
+      }
+      out.push({
+        op: 'waitResponse',
+        url: val(q.url),
+        ...(q.method ? { method: String(q.method).toUpperCase() } : {}),
+        ...(q.status !== undefined && q.status !== '' && { status: Number(q.status) }),
+        timeoutMs: step.timeoutMs ?? DEFAULT_TIMEOUT,
+        asserts: ownAsserts(
+          ctx,
+          step,
+          out,
+          (t) => ['status', 'body', 'url'].includes(t) || t.startsWith('header:') || t.startsWith('$'),
+        ),
+        ...(into && { into }),
+      });
+      break;
+    }
+    case 'ui.mockRoute': {
+      if (!can(ctx, step, 'mockRoute', out)) break;
+      const action = String(q.action ?? 'fulfill');
+      const times =
+        q.times !== undefined && q.times !== '' && Number(q.times) !== 0 ? Number(q.times) : undefined;
+      if (
+        !q.url ||
+        !['fulfill', 'abort', 'delay', 'remove'].includes(action) ||
+        (times !== undefined && !(Number.isInteger(times) && times > 0))
+      ) {
+        out.push(todo(ctx, step, 'the mock needs a URL, a known action and a whole number of times'));
+        break;
+      }
+      out.push({
+        op: 'mockRoute',
+        url: val(q.url),
+        action: action as 'fulfill',
+        ...(q.method ? { method: String(q.method).toUpperCase() } : {}),
+        status: num(Number(q.status ?? 200), 200),
+        body: q.body === undefined || q.body === null ? null : val(q.body),
+        ...(q.contentType ? { contentType: String(q.contentType) } : {}),
+        delayMs: num(Number(q.delayMs ?? 0), 0),
+        ...(times !== undefined && { times }),
+      });
+      break;
+    }
+    case 'ui.setOffline': {
+      if (!can(ctx, step, 'offline', out)) break;
+      // `state` (offline/online) wins; older steps have only `offline`, where missing means offline.
+      const offline =
+        q.state !== undefined && q.state !== ''
+          ? String(q.state) !== 'online'
+          : q.offline === undefined
+            ? true
+            : !!q.offline && q.offline !== 'false';
+      out.push({ op: 'offline', offline });
+      break;
+    }
+    case 'ui.storage': {
+      if (!can(ctx, step, 'storage', out)) break;
+      const kind = String(q.kind ?? 'cookie');
+      const action = String(q.action ?? 'get');
+      if (!['get', 'set', 'remove', 'clear'].includes(action) || (!q.name && action !== 'clear')) {
+        out.push(todo(ctx, step, `storage ${action} needs a name`));
+        break;
+      }
+      out.push({
+        op: 'storage',
+        kind:
+          kind === 'session' || kind === 'sessionStorage'
+            ? 'session'
+            : kind === 'cookie'
+              ? 'cookie'
+              : 'local',
+        action: action as 'get',
+        name: val(q.name === undefined ? '' : String(q.name)),
+        // A value that is not text is stored as JSON, as StepForge does.
+        value:
+          q.value === undefined || q.value === null
+            ? str('')
+            : typeof q.value === 'string'
+              ? val(q.value)
+              : str(JSON.stringify(q.value)),
+        asserts: action === 'get' ? ownAsserts(ctx, step, out, (t) => t === 'value' || t === 'exists') : [],
+        ...(into && action === 'get' && { into }),
+      });
+      break;
+    }
+    case 'ui.setClock': {
+      if (!can(ctx, step, 'clock', out)) break;
+      const action = String(q.action ?? 'set');
+      const hasTime = q.time !== undefined && q.time !== '';
+      if (!['set', 'install', 'fastForward'].includes(action) || (action === 'set' && !hasTime)) {
+        out.push(todo(ctx, step, 'setClock needs a known action, and a "time" to fix the clock at'));
+        break;
+      }
+      out.push({
+        op: 'clock',
+        action: action as 'set',
+        // An epoch in milliseconds (number or digits) or an ISO date, as StepForge reads it.
+        ...(hasTime && {
+          time:
+            typeof q.time === 'string' && q.time.trim() !== '' && !isNaN(Number(q.time))
+              ? val(Number(q.time))
+              : val(q.time),
+        }),
+        ms: num(Number(q.ms ?? 60_000), 60_000),
+      });
+      break;
+    }
+    case 'ui.networkSummary': {
+      if (!can(ctx, step, 'netSummary', out)) break;
+      out.push({
+        op: 'netSummary',
+        since: q.since === 'lastNavigation' ? 'lastNavigation' : 'test',
+        asserts: ownAsserts(ctx, step, out, (t) => NET_TARGETS.includes(t) || /^(requests|bytes):.+/.test(t)),
+        ...(into && { into }),
+      });
+      break;
+    }
     case 'ui.swipe':
     case 'ui.longPress':
     case 'ui.scrollTo':
@@ -788,7 +1220,7 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
   }
 
   // Generic assertions on UI steps (API and DB steps carry theirs inside their op).
-  if (group === 'ui' && step.type !== 'ui.assert') {
+  if (group === 'ui' && step.type !== 'ui.assert' && !OWN_ASSERTS.has(step.type)) {
     for (const a of step.assertions) {
       const native = nativeCheck(a.target, a.operator, a.expected);
       const pageLevel = a.target === 'url' || a.target === 'title';
@@ -828,6 +1260,94 @@ function stepOps(ctx: Ctx, step: CodegenStep, depth: number): Op[] {
     }
   }
   return out;
+}
+
+/** Steps that check their own result (a file, a response, a stored value, the traffic), not the page. */
+const OWN_ASSERTS = new Set(['ui.download', 'ui.waitForResponse', 'ui.storage', 'ui.networkSummary']);
+const NET_TARGETS = [
+  'requests',
+  'bytes',
+  'kb',
+  'failed',
+  'thirdPartyRequests',
+  'thirdPartyHosts',
+  'hosts',
+  'thirdPartyHostNames',
+];
+const DEFAULT_TIMEOUT = 15_000;
+
+/** A page condition on the control step's own element, or null (with a TODO). */
+function pageCond(ctx: Ctx, step: CodegenStep, e: El | null, raw: unknown, out: Op[]): PageCond | null {
+  if (!can(ctx, step, 'pageCondition', out)) return null;
+  const c = (raw ?? {}) as { check?: string; expected?: unknown; timeoutMs?: unknown };
+  const check = String(c.check ?? 'visible') as PageCheck;
+  if (!PAGE_CHECKS.includes(check)) {
+    out.push(todo(ctx, step, `unknown page check "${check}"`));
+    return null;
+  }
+  if (!e) {
+    out.push(
+      todo(
+        ctx,
+        step,
+        step.locators.length
+          ? 'image locators (pictures) are not exported; add an id, text or CSS locator'
+          : 'a page condition needs an element (set a locator)',
+      ),
+    );
+    return null;
+  }
+  // The test needs a browser page even when its other steps are API calls.
+  ctx.flags.ui = true;
+  const t = Number(c.timeoutMs ?? 2000);
+  return {
+    el: e,
+    check,
+    ...(c.expected !== undefined && c.expected !== null && { expected: val(c.expected) }),
+    timeoutMs: Number.isFinite(t) ? Math.max(0, t) : 2000,
+  };
+}
+
+const ENVELOPE_NS = {
+  '1.1': 'http://schemas.xmlsoap.org/soap/envelope/',
+  '1.2': 'http://www.w3.org/2003/05/soap-envelope',
+} as const;
+
+/**
+ * The envelope and headers StepForge sends for a SOAP step: a whole envelope as written, or the body wrapped in one
+ * of the chosen version (with an optional header). SOAP 1.1: text/xml and SOAPAction; 1.2: the action in the type.
+ */
+function soapRequest(
+  rawBody: string,
+  header: string,
+  rawAction: unknown,
+  rawVersion: unknown,
+): { xml: string; headers: [string, string][] } {
+  const body = rawBody.trim();
+  const whole =
+    /^(?:\s*(?:<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>[]*(?:\[[\s\S]*?\])?\s*>))*\s*<([\w.-]+:)?Envelope[\s>/]/.test(
+      body,
+    );
+  // Without a version, a whole envelope says which one it is through its namespace.
+  const declared = /<(?:[\w.-]+:)?Envelope\b[^>]*\bxmlns(?::[\w.-]+)?\s*=\s*["']([^"']+)["']/.exec(body)?.[1];
+  const version =
+    rawVersion === '1.2' || (!rawVersion && whole && declared === ENVELOPE_NS['1.2']) ? '1.2' : '1.1';
+  const xml = whole
+    ? body
+    : `<?xml version="1.0" encoding="utf-8"?>\n<soap:Envelope xmlns:soap="${ENVELOPE_NS[version]}">${
+        header.trim() ? `\n  <soap:Header>${header.trim()}</soap:Header>` : ''
+      }\n  <soap:Body>${body}</soap:Body>\n</soap:Envelope>`;
+  const action = rawAction === undefined || rawAction === null ? '' : String(rawAction).trim();
+  return {
+    xml,
+    headers:
+      version === '1.2'
+        ? [['content-type', `application/soap+xml; charset=utf-8${action ? `; action="${action}"` : ''}`]]
+        : [
+            ['content-type', 'text/xml; charset=utf-8'],
+            ['soapaction', `"${action}"`],
+          ],
+  };
 }
 
 const WEB_ONLY = new Set([
@@ -990,6 +1510,14 @@ function authOf(a: unknown): Auth | null {
       };
     case 'cookie':
       return { type: 'cookie', name: String(x.name ?? ''), value: val(x.value ?? '') };
+    case 'oauth2':
+      return {
+        type: 'oauth2',
+        tokenUrl: val(x.tokenUrl ?? ''),
+        clientId: val(x.clientId ?? ''),
+        clientSecret: val(x.clientSecret ?? ''),
+        scope: x.scope === undefined || x.scope === '' ? null : val(x.scope),
+      };
     default:
       return null;
   }
@@ -1018,24 +1546,25 @@ function listOps(ctx: Ctx, steps: CodegenStep[], depth: number): Op[] {
   });
 }
 
-/** JSON Schema checks run only in StepForge; anything else is kept. */
+/** JSON Schema checks are kept where the target has a validator (feature `schema`); anything else is kept. */
 function exportableAsserts(ctx: Ctx, step: CodegenStep, out: Op[]): Assert[] {
   return step.assertions.flatMap((a) => {
-    if (a.operator === 'matchesSchema') {
-      out.push(todo(ctx, step, `the JSON Schema check on "${a.target}" is not exported`));
-      return [];
-    }
+    if (a.operator === 'matchesSchema' && !can(ctx, step, 'schema', out, a.target)) return [];
     return [{ target: a.target, operator: a.operator, expected: val(a.expected) }];
   });
+}
+
+/** The ops nested in a control op (then and else branches, loop bodies). */
+export function children(op: Op): Op[] {
+  if (op.op === 'if' || op.op === 'ifPage') return [...op.then, ...op.else];
+  if (op.op === 'loop' || op.op === 'while') return op.body;
+  return [];
 }
 
 export function walk(ops: Op[], f: (op: Op) => void): void {
   for (const op of ops) {
     f(op);
-    if (op.op === 'if') {
-      walk(op.then, f);
-      walk(op.else, f);
-    } else if (op.op === 'loop') walk(op.body, f);
+    walk(children(op), f);
   }
 }
 
@@ -1116,11 +1645,11 @@ function assignPages(tests: TestPlan[]): Map<string, PomPage> {
         if (op.op === 'frame') inFrame = op.selector !== null;
         // After a tab switch the page objects would point at the first tab: keep those locators inline.
         if (op.op === 'tab' || op.op === 'closeTab') inFrame = true;
-        if (op.op === 'if') {
+        if (op.op === 'if' || op.op === 'ifPage') {
           visit(op.then);
           visit(op.else);
         }
-        if (op.op === 'loop') visit(op.body);
+        if (op.op === 'loop' || op.op === 'while') visit(op.body);
         for (const e of elsOf(op)) {
           if (inFrame || e.pom) continue;
           // Locators with placeholders stay inline (page objects hold static locators).
@@ -1155,7 +1684,10 @@ function elsOf(op: Op): El[] {
 }
 
 /** Builds the plan shared by every generator. */
-export function buildPlan(input: CodegenInput, opts: { pom?: boolean; native?: boolean } = {}): Plan {
+export function buildPlan(
+  input: CodegenInput,
+  opts: { pom?: boolean; native?: boolean; features?: Features; label?: string } = {},
+): Plan {
   const platform = input.application.platform;
   const native =
     opts.native && platform && platform !== 'web' && platform !== 'electron'
@@ -1183,6 +1715,8 @@ export function buildPlan(input: CodegenInput, opts: { pom?: boolean; native?: b
       tmp: () => `actual${++n}`,
       flags,
       native,
+      features: opts.features ?? null,
+      label: opts.label ?? 'this export',
     };
     const ops = listOps(ctx, scenario.steps, 0);
     const refs: Ref[] = [];

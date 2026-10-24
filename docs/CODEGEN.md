@@ -65,11 +65,54 @@ database step under `sql/`, and optionally **GitHub Actions** and **GitLab CI** 
   iframe stay inline.
 
 **Never silently broken:** a step a target cannot express exactly becomes a `TODO(StepForge): …` comment and is listed
-in the export dialog, the README (*Needs attention*) and the CLI output. Examples: visual checkpoints, the newer browser steps (tap, download, wait for response, mock route, offline,
-storage, clock), page conditions and "repeat while" loops, manual checks, test data (`util.useData`), Lighthouse and
-load tests in functional suites, MongoDB and data-quality steps, IMAP inboxes, OAuth2 auth, JSON Schema checks,
-multi-tab / iframes / drag and drop in Cypress, JavaScript *Run script* steps in Python and Java, browser steps in
-API-only targets.
+in the export dialog, the README (*Needs attention*) and the CLI output, naming the target ("not exported to
+Cypress"). Each target declares what it can print (`packages/codegen/src/features.ts`); the plan turns anything else
+into a TODO before any generator sees it. Never exported: visual checkpoints and image locators (each framework
+compares pictures its own way), manual checks, test data (`util.useData`), performance steps (Lighthouse, page metrics,
+query plans; load tests go to k6), data-quality audits, SQL Server helpers (the SQL file is exported), IMAP inboxes,
+`x`/`y` click positions, JavaScript *Run script* steps in Python and Java, iframes, tabs, drag and drop and real key
+presses in Cypress (they need plugins), and browser steps in API-only targets.
+
+## Newer steps by target
+
+The browser steps added in October 2026, page conditions, "repeat while" loops and the integration steps are exported
+as working code where the framework can do what StepForge does. Each project ships a small helper for them
+(`support/web.ts` / `web.py`, `Browser.java`, `cypress/support/web.js`, `xml`, `schema`, `kafka`, `ftp`, `mongo`), and
+the dependencies they need are added to `package.json`, `requirements.txt` or `pom.xml` only when a step uses them.
+
+| Step | Playwright (TS, Python) | Selenium (Python, Java) | Cypress | pytest / REST Assured | k6 | Postman | cURL |
+|---|---|---|---|---|---|---|---|
+| Tap | `locator.tap()`, touch screen on (`hasTouch`) | a WebDriver touch pointer | touch events, then a click | — | — | — | — |
+| Download | the download event; file name, size, text | Chrome's download folder | `cy.readFile` in the downloads folder | — | — | — | — |
+| Wait for response | recorded from the start of the test | TODO | `cy.intercept` from the start of the test | — | — | — | — |
+| Mock route | `context.route` (fulfil, abort, delay, times, remove) | TODO | `cy.intercept` | — | — | — | — |
+| Offline | `context.setOffline` | Python: ChromeDriver network conditions; Java: TODO | TODO | — | — | — | — |
+| Storage | cookies, localStorage, sessionStorage | the same (cookies through the driver) | the same | — | — | — | — |
+| Clock | `page.clock` (install, set, fast-forward) | TODO | fixed time only (`cy.clock(time, ['Date'])`) | — | — | — | — |
+| Network summary | requests, bytes, failures, hosts, per type | TODO | TODO | — | — | — | — |
+| Page condition (if) | polled every 100 ms up to the step's wait | the same | the same (Testing Library queries) | — | — | — | — |
+| Repeat while | element or value, with StepForge's limit | the same | the same | values | values | TODO | TODO |
+| SOAP | envelope, SOAPAction, fault check, XPath | the same (lxml / `javax.xml.xpath`) | DOMParser + `document.evaluate` | the same as Selenium | envelope and fault check; XPath TODO | the same as k6 | the same as k6 |
+| JSON Schema | Ajv | jsonschema / networknt | Ajv | jsonschema / networknt | TODO | the sandbox's Ajv | TODO |
+| OAuth2 (client credentials) | token fetched and cached | the same | the same | the same | the same | pre-request script | `curl` + `jq` |
+| Kafka | kafkajs | kafka-python / kafka-clients | Node task (kafkajs) | the same as Selenium | TODO | TODO | TODO |
+| FTP, FTPS, SFTP | basic-ftp, ssh2-sftp-client | ftplib + paramiko / commons-net + JSch | Node task | the same as Selenium | TODO | TODO | TODO |
+| MongoDB | the mongodb driver (`DB_<NAME>_URL`) | pymongo / mongodb-driver-sync | Node task | the same as Selenium | TODO | TODO | TODO |
+
+"—": not part of that kind of export (a browser step in an API-only target, or a page condition with no browser);
+such steps become TODOs. The Appium and Maestro exports keep these steps as TODOs.
+
+Where they differ, the exported steps follow StepForge: a URL pattern is part of the URL or a glob; "wait for
+response" takes the first matching response since the test started that no earlier step took; a new mock for the same
+URL and method replaces the old one; a page condition never fails the test by itself; a "repeat while" loop checks its
+condition before every pass, sets `vars.index`, and fails when the condition still holds after its limit (the step's
+count, default 100, at most 1000); a SOAP fault fails the test unless the step allows it; XPath sees the document's own
+namespace prefixes plus the step's; OpenAPI `nullable` is understood by schema checks; an OAuth2 token is fetched with
+the client id and secret as Basic auth and reused until shortly before it expires; Kafka steps wait for a message sent
+since the test started (or from the beginning). Why the TODOs remain: WebDriver cannot see or change the page's traffic
+or clock (only Chrome DevTools can, tied to one Chrome version); Cypress stops time when it fakes the clock and has no
+offline mode or response sizes; k6, Postman and cURL have no XPath evaluator, k6 and cURL no common schema validator,
+and Postman and cURL no loops.
 
 ## Phone and desktop apps (Appium, Maestro)
 
@@ -156,6 +199,35 @@ fixture that uses every step type and check that all generated TypeScript/JavaSc
 the shell script passes `bash -n`, JSON parses, and that a secret value never appears.
 
 Not verified: the generated GitHub Actions / GitLab CI files themselves (no runners were used), and Windows.
+
+### Newer steps
+
+`npx tsx scripts/verify-browser-export.ts --targets <list>` starts a small local web app made for these steps (a touch
+menu, a CSV download, fetches to fake or wait for, a cookie banner, a "Load more" button, an offline banner, a clock,
+a SOAP service, an OAuth2 token endpoint), exports a two-test suite (browser steps; SOAP, OAuth2 and schema) and runs
+it. Steps a target does not export are left out together with the checks that need them, and reported. Each target
+is then run again with one wrong expectation per test (download content, SOAP fault, response status, schema, cookie
+value, loop limit, traffic budget): every test holding one must fail.
+
+Run on 2026-10-24 on macOS 27 (Apple silicon):
+
+| Target | As written | Copies with a wrong expectation |
+|---|---|---|
+| Playwright Test | 2/2 passed | 5/5 failed as they should |
+| Playwright + pytest | 2/2 passed | 5/5 failed as they should |
+| Selenium + pytest | 2/2 passed (no clock, mocks, response waits, network summary) | 4/4 failed as they should |
+| Selenium + JUnit 5 | 2/2 passed (also no offline) | 4/4 failed as they should |
+| Cypress | 2/2 passed (no offline, network summary or clock) | 4/4 failed as they should |
+| pytest + requests | 1/1 passed (API test) | 2/2 failed as they should |
+| REST Assured | 1/1 passed (API test) | 2/2 failed as they should |
+| cURL | passed (SOAP only: its schema check is a TODO) | 1/1 failed as it should |
+| Postman | passed | 2/2 failed as they should |
+
+k6's SOAP, OAuth2 and loop export is run against a local server by `packages/codegen/test/export-api-formats.test.ts`
+(and cURL's OAuth2 too). Kafka, SFTP and MongoDB helpers were not run against real servers: the generated projects
+are type-checked (TypeScript with their own dependencies installed), compiled (Java, Maven) or byte-compiled (Python);
+the Python FTP helper was run against a local pyftpdlib server. The CareClinic suite above still passes in all ten
+runnable targets after these changes.
 
 ### Phone, desktop and Electron apps
 

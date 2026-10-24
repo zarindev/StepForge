@@ -10,8 +10,11 @@ Feature: Back office
     And run a SQL script on local
     And call the procedure refresh_totals
     And run the SQL query "SELECT 1" on legacy
-    And find documents in orders on docs
-    And check data quality on main
+    And find documents in orders on docs (save as docs)
+    Then rowCount is at least 1
+    When run the SQL query "{ "collection": "orders", "countDocuments": { "email": "<email>" } }" on docs
+    Then value is at least 1
+    When check data quality on main
     And run the SQL query "SELECT ?" on unknown
     And wait for an email to <email> with subject "Your order" (save as mail)
     Then the subject contains "order" and the body contains "Thank you" and it comes from shop@ and it has a link and it has the attachment "invoice"

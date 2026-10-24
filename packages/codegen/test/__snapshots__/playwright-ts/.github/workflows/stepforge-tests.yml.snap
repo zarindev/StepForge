@@ -14,6 +14,7 @@ jobs:
       API_TOKEN: ${{ secrets.API_TOKEN }}
       DB_MAIN_URL: ${{ secrets.DB_MAIN_URL }}
       DB_LOCAL_URL: ${{ secrets.DB_LOCAL_URL }}
+      DB_DOCS_URL: ${{ secrets.DB_DOCS_URL }}
       DB_UNKNOWN_URL: ${{ secrets.DB_UNKNOWN_URL }}
       MAILPIT_URL: "${{ vars.MAILPIT_URL || 'http://127.0.0.1:8025' }}"
     steps:

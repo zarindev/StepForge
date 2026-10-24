@@ -58,5 +58,6 @@ a real broker (Apache Kafka in CI) and are skipped locally unless `STEPFORGE_TES
 
 ## Limits
 
-Code export marks these steps `TODO(StepForge)` for now. Kafka: messages are read as text or JSON (no Avro / Schema
+Code export: SOAP goes to the browser and API targets, Kafka and FTP to Playwright, Selenium, Cypress, pytest and REST
+Assured (see [CODEGEN.md](CODEGEN.md#newer-steps-by-target)). Kafka: messages are read as text or JSON (no Avro / Schema
 Registry yet). SFTP does not check the server's host key (test servers). See [KNOWN_ISSUES.md](KNOWN_ISSUES.md).

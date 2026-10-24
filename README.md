@@ -221,7 +221,7 @@ Planned work, in order — all of it free, open source and local:
 | ✅ | **Linux desktop apps and image locators** | Done — see [Linux apps](docs/NATIVE_DESKTOP_APPS.md#linux-apps) and [Image locators](docs/IMAGE_LOCATORS.md) |
 | ✅ | **Native export and CI** | Done — see [Code export](docs/CODEGEN.md#phone-and-desktop-apps-appium-maestro) |
 | ✅ | **Desktop installer** | Done — StepForge as a desktop app for macOS, Windows and Linux: see [Desktop app](docs/STEPFORGE_DESKTOP.md) |
-| — | **More code export** | The newest steps (page conditions, network, SOAP / Kafka / FTP) exported instead of marked TODO |
+| ✅ | **More code export** | Done — page conditions, network steps, SOAP, Kafka, FTP, MongoDB, OAuth2 and JSON Schema exported wherever the framework can do them: see [Code export](docs/CODEGEN.md#newer-steps-by-target) |
 
 The native-app work is planned in detail in [docs/NATIVE_APPS_PLAN.md](docs/NATIVE_APPS_PLAN.md).
 

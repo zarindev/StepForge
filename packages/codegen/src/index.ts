@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { featuresOf } from './features.ts';
 import { buildPlan } from './ir.ts';
 import { generateCurl, generateK6, generatePostman } from './targets/api-formats.ts';
 import { generateAppiumTs } from './targets/appium-ts.ts';
@@ -129,7 +130,12 @@ export async function generate(input: CodegenInput, o: CodegenOptions): Promise<
     throw new Error(
       `The ${info.label} export is for ${info.platforms.length === APP_PLATFORMS.length ? 'phone and desktop apps' : 'Android and iOS apps'}; this application is a ${platform === 'web' ? 'web' : platform} app`,
     );
-  const plan = buildPlan(input, { pom: info.pom && !!o.pom, native: !!info.platforms });
+  const plan = buildPlan(input, {
+    pom: info.pom && !!o.pom,
+    native: !!info.platforms,
+    features: featuresOf(o.target),
+    label: info.label,
+  });
   const project = await gen(plan, o);
   return { ...project, files: await formatted(project.files) };
 }

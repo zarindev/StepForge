@@ -15,7 +15,8 @@ Feature: API
     And send DELETE /api/orders/{{vars.order.id}}
     And send GET /me
     And send GET /x
-    And send POST /files
+    Then status is 200
+    When send POST /files
     And send PUT https://other.test/raw
     And send a GraphQL query to /graphql
     Then $.data.me.id is not empty
@@ -31,8 +32,26 @@ Feature: API
     And note: more
     And if "Out of stock" is on the page
     And note: oos
+    And repeat while {{vars.index}} lt "3"
+    And send GET /poll
     And remember "[object Object]" as payload
     And generate a random pattern (save as ref)
     And generate a random date (save as due)
     And wait 250 ms
     And run a script (save as double)
+
+  @api @p2
+  Scenario: Integrations
+    When call the SOAP service /soap/prices (urn:GetPrice) (save as price)
+    Then status is 200 and //p:Price is above 0 and count(//p:Line) is at least 1
+    When call the SOAP service https://soap.example.test/ws (urn:Ping)
+    Then xpath://*[local-name()="Pong"] exists
+    When send a Kafka message to orders with key "{{vars.ref}}"
+    Then offset exists
+    When wait for a Kafka message on invoices where $.orderId is "{{vars.ref}}" (save as invoice)
+    Then $.status is "issued" and header:source is "billing"
+    When upload /in/prices-{{run.id}}.csv on SFTP files.shop.test
+    And download /out/report.csv on FTP files.shop.test (save as report)
+    Then content contains "A-1"
+    When list /in on FTPS files.shop.test
+    Then count is at least 1

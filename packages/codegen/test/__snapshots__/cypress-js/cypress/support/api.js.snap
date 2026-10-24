@@ -14,6 +14,37 @@ export function toResult(response) {
 
 export const basicAuth = (user, password) => `Basic ${btoa(`${user}:${password}`)}`;
 
+const tokens = new Map();
+
+/**
+ * An OAuth2 access token (client-credentials grant), as StepForge fetches it: the client id and secret as Basic
+ * auth, grant_type and scope as a form; kept until shortly before it expires.
+ */
+export function oauth2Token(o) {
+  const key = `${o.tokenUrl}|${o.clientId}|${o.scope ?? ''}`;
+  const hit = tokens.get(key);
+  if (hit && hit.expires > Date.now()) return cy.wrap(hit.token, { log: false });
+  return cy
+    .request({
+      method: 'POST',
+      url: o.tokenUrl,
+      form: true,
+      body: { grant_type: 'client_credentials', ...(o.scope ? { scope: o.scope } : {}) },
+      headers: { Authorization: basicAuth(o.clientId, o.clientSecret) },
+      failOnStatusCode: false,
+    })
+    .then((response) => {
+      const json = typeof response.body === 'string' ? JSON.parse(response.body || '{}') : response.body;
+      if (response.status >= 300 || !json?.access_token)
+        throw new Error(`OAuth2 token request failed with ${response.status}`);
+      tokens.set(key, {
+        token: json.access_token,
+        expires: Date.now() + Math.max(30, (json.expires_in ?? 300) - 30) * 1000,
+      });
+      return json.access_token;
+    });
+}
+
 /** "**\/patients/*" style URL patterns. */
 export const globToRegExp = (glob) =>
   new RegExp(
