@@ -3,9 +3,9 @@
 conftest.py (24 lines)
 pages/__init__.py (1 lines)
 pages/login_page.py (20 lines)
-pages/products_page.py (76 lines)
-pytest.ini (12 lines)
-README.md (71 lines)
+pages/products_page.py (80 lines)
+pytest.ini (13 lines)
+README.md (105 lines)
 requirements.txt (9 lines)
 sql/dataAndEmail/orderCount.sql (6 lines)
 sql/dataAndEmail/procedure.sql (4 lines)
@@ -21,20 +21,25 @@ support/mail.py (132 lines)
 support/tabs.py (23 lines)
 tests/__init__.py (1 lines)
 tests/api/__init__.py (1 lines)
-tests/api/test_orders_api.py (138 lines)
+tests/api/test_integrations.py (20 lines)
+tests/api/test_orders_api.py (140 lines)
 tests/back_office/__init__.py (1 lines)
-tests/back_office/test_data_and_email.py (66 lines)
+tests/back_office/test_data_and_email.py (67 lines)
+tests/shop/browser/__init__.py (1 lines)
+tests/shop/browser/test_network_storage_and_clock.py (45 lines)
 tests/shop/checkout/__init__.py (1 lines)
 tests/shop/checkout/test_checkout_with_every_ui_step.py (160 lines)
 
 Warnings:
 - Checkout with every UI step | Receipt looks right | visual checkpoints are not exported; add a screenshot comparison in the target framework
-- Orders API | Create an order | the JSON Schema check on "$" is not exported
-- Orders API | OAuth (not exported) | auth type "oauth2" is not exported; set the header yourself
-- Orders API | util.loop | “repeat while” loops are not exported yet; write the loop by hand
-- Orders API | util.if | page conditions (if the element is …) are not exported yet; write the check by hand
+- Orders API | Create an order | the JSON Schema check on "$" is not exported to Playwright + pytest
+- Orders API | OAuth2 client credentials | auth type "oauth2" is not exported to Playwright + pytest; set the header yourself
+- Orders API | util.loop | “repeat while” loops are not exported to Playwright + pytest; write the loop by hand
+- Orders API | util.if | page conditions (if the element is …) are not exported to Playwright + pytest; write the check by hand
+- Orders API | Poll until three | “repeat while” loops are not exported to Playwright + pytest; write the loop by hand
 - Data and email | db.query | SQL Server helpers are not generated; the SQL file is exported for reference
-- Data and email | db.mongoFind | MongoDB steps are not exported; use the MongoDB driver of the target language
+- Data and email | db.mongoFind | MongoDB steps are not exported to Playwright + pytest; use the MongoDB driver of the target language
+- Data and email | Count orders in Mongo | MongoDB steps are not exported to Playwright + pytest; use the MongoDB driver of the target language
 - Data and email | db.dataQualityCheck | the data-quality audit runs only in StepForge
 - Data and email | db.query | the "unknown" connection is not set up in this environment; all database drivers are included and DB_UNKNOWN_URL decides
 - Data and email | email.waitForEmail | IMAP inboxes are not exported; the helper reads a Mailpit server (MAILPIT_URL)
@@ -42,5 +47,37 @@ Warnings:
 - Data and email | perf.lighthouse | performance measurements run only in StepForge
 - Data and email | perf.loadTest | load tests are not part of functional tests; export the scenario to k6 instead
 - Data and email | perf.queryPlan | performance measurements run only in StepForge
+- Network, storage and clock | ui.setClock | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.mockRoute | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.mockRoute | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.mockRoute | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.mockRoute | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.waitForResponse | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.mockRoute | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.tap | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.download | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.storage | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.storage | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.storage | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.storage | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.storage | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.storage | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.storage | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.setOffline | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.setOffline | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.setClock | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | ui.setClock | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Network, storage and clock | util.if | page conditions (if the element is …) are not exported to Playwright + pytest; write the check by hand
+- Network, storage and clock | Load every page | “repeat while” loops are not exported to Playwright + pytest; write the loop by hand
+- Network, storage and clock | util.if | page conditions (if the element is …) are not exported to Playwright + pytest; write the check by hand
+- Network, storage and clock | util.if | page conditions (if the element is …) are not exported to Playwright + pytest; write the check by hand
+- Network, storage and clock | ui.networkSummary | this browser step is not exported to Playwright + pytest; write it with the framework’s own API
+- Integrations | Get the price | SOAP steps are not exported to Playwright + pytest; send the envelope with an HTTP client
+- Integrations | SOAP 1.2 envelope | SOAP steps are not exported to Playwright + pytest; send the envelope with an HTTP client
+- Integrations | Publish an order event | Kafka steps are not exported to Playwright + pytest; use a Kafka client of the target language
+- Integrations | Wait for the invoice event | Kafka steps are not exported to Playwright + pytest; use a Kafka client of the target language
+- Integrations | Upload the price list | FTP steps are not exported to Playwright + pytest; use an FTP client of the target language
+- Integrations | Read the report | FTP steps are not exported to Playwright + pytest; use an FTP client of the target language
+- Integrations | List the inbox | FTP steps are not exported to Playwright + pytest; use an FTP client of the target language
 - Orders API |  | multipart fields are sent as requests "files"; file fields need open(...) objects
 - Orders API |  | JavaScript "Run script" steps are not translated to Python

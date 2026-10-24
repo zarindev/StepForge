@@ -73,3 +73,7 @@ class ProductsPage:
     @property
     def terms_link(self):
         return self.page.get_by_role("link", name="Terms", exact=True)
+
+    @property
+    def you_are_offline_text(self):
+        return self.page.get_by_text("You are offline", exact=True)

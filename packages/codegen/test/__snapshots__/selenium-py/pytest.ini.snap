@@ -9,3 +9,4 @@ markers =
     api: StepForge tag
     p2: StepForge priority
     p3: StepForge priority
+    browser: StepForge tag

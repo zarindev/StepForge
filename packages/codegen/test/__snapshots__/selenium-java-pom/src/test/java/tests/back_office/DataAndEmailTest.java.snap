@@ -57,7 +57,8 @@ VACUUM;""");
     // SQL also in sql/dataAndEmail/procedure.sql
     Db.Result db3 = Db.query("main", "CALL refresh_totals($1, $2)", J.list(1, "x"));
     // TODO(StepForge): db.query: SQL Server helpers are not generated; the SQL file is exported for reference
-    // TODO(StepForge): db.mongoFind: MongoDB steps are not exported; use the MongoDB driver of the target language
+    // TODO(StepForge): db.mongoFind: MongoDB steps are not exported to Selenium + JUnit 5; use the MongoDB driver of the target language
+    // TODO(StepForge): db.query: MongoDB steps are not exported to Selenium + JUnit 5; use the MongoDB driver of the target language
     // TODO(StepForge): db.dataQualityCheck: the data-quality audit runs only in StepForge
     // Run the SQL query "SELECT ?" on unknown
     // SQL also in sql/dataAndEmail/query2.sql

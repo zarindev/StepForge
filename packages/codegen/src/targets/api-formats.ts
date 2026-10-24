@@ -1,5 +1,5 @@
 import { CREDIT, casesOf, ciFiles, day, envExample, headerLines, oneLine, readme } from '../common.ts';
-import type { Op, Plan, TestPlan } from '../ir.ts';
+import type { Features, Op, Plan, TestPlan } from '../ir.ts';
 import { jsJson, jsKey, jsStr, jsVal, jsVar } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject, Warning } from '../types.ts';
 import { envName, kebab, plain, snake, uniquer, type Part, type Ref, type Val } from '../values.ts';
@@ -203,6 +203,11 @@ function k6Ops(ops: Op[], lines: string[], ind: string): void {
     }
   }
 }
+
+/** What k6, Postman and cURL print beyond the basic steps (see features.ts). */
+export const K6_FEATURES: Features = {};
+export const POSTMAN_FEATURES: Features = {};
+export const CURL_FEATURES: Features = {};
 
 export function generateK6(plan: Plan, o: CodegenOptions): GeneratedProject {
   const warnings: Warning[] = [...plan.warnings];

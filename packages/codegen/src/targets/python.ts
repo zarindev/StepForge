@@ -11,7 +11,7 @@ import {
   statusCode,
   testPath,
 } from '../common.ts';
-import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
+import type { El, Features, Loc, Op, Plan, TestPlan } from '../ir.ts';
 import {
   APP_KEY,
   capabilities,
@@ -31,6 +31,12 @@ import { envName, parseString, snake } from '../values.ts';
  * database and email steps are printed the same way for all; only the app or browser part differs.
  */
 type Flavor = 'playwright' | 'selenium' | 'appium' | 'api';
+
+/** What the Python exports print beyond the basic steps (see features.ts). */
+export function pythonFeatures(flavor: Flavor): Features {
+  void flavor;
+  return {};
+}
 
 export function locatorPw(root: string, l: Loc): string {
   const v = (s: string) => pyText(parseString(s));

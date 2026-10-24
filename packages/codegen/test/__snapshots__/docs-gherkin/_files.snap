@@ -1,5 +1,6 @@
-features/api.feature (39 lines)
-features/back-office.feature (31 lines)
+features/api.feature (58 lines)
+features/back-office.feature (34 lines)
+features/shop-browser.feature (45 lines)
 features/shop-checkout.feature (81 lines)
 README.md (8 lines)
 

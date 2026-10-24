@@ -57,7 +57,7 @@ request -X POST \
   "${BASE_URL}/oauth/token"
 expect_status "200"
 save token "$(cat "$RESPONSE")"
-# TODO(StepForge): api.request: the JSON Schema check on "$" is not exported
+# TODO(StepForge): api.request: the JSON Schema check on "$" is not exported to cURL commands
 # Create an order
 request -X POST \
   -H "X-Request-Id: $(uuidgen)" \
@@ -98,10 +98,11 @@ request -X DELETE \
 request -X GET \
   --cookie "sid=abc" \
   "${BASE_URL}/me"
-# TODO(StepForge): api.request: auth type "oauth2" is not exported; set the header yourself
-# OAuth (not exported)
+# TODO(StepForge): api.request: auth type "oauth2" is not exported to cURL commands; set the header yourself
+# OAuth2 client credentials
 request -X GET \
   "${BASE_URL}/x"
+expect_status "200"
 # Upload
 # Upload
 request -X POST \
@@ -147,8 +148,9 @@ request -X GET \
 # Loop (not supported by the cURL script): steps listed once
 # Note: {{vars.line.sku}}
 # TODO(StepForge): log step not exported (the cURL script runs HTTP requests only)
-# TODO(StepForge): util.loop: “repeat while” loops are not exported yet; write the loop by hand
-# TODO(StepForge): util.if: page conditions (if the element is …) are not exported yet; write the check by hand
+# TODO(StepForge): util.loop: “repeat while” loops are not exported to cURL commands; write the loop by hand
+# TODO(StepForge): util.if: page conditions (if the element is …) are not exported to cURL commands; write the check by hand
+# TODO(StepForge): util.loop: “repeat while” loops are not exported to cURL commands; write the loop by hand
 # Remember "[object Object]" as payload
 save payload "$(jq -n --arg a0 "${RUN_ID}" '{"a": [1, true, null], "b": $a0}')"
 # Generate a random pattern (save as ref)
@@ -159,6 +161,16 @@ save due "$(jq -n --arg v "$(fake date)" '$v')"
 # TODO(StepForge): wait step not exported (the cURL script runs HTTP requests only)
 # Run a script (save as double)
 # TODO(StepForge): script step not exported (the cURL script runs HTTP requests only)
+
+# ── API › Integrations (P2)
+scenario 'Integrations'
+# TODO(StepForge): api.soap: SOAP steps are not exported to cURL commands; send the envelope with an HTTP client
+# TODO(StepForge): api.soap: SOAP steps are not exported to cURL commands; send the envelope with an HTTP client
+# TODO(StepForge): api.kafkaProduce: Kafka steps are not exported to cURL commands; use a Kafka client of the target language
+# TODO(StepForge): api.kafkaConsume: Kafka steps are not exported to cURL commands; use a Kafka client of the target language
+# TODO(StepForge): api.ftp: FTP steps are not exported to cURL commands; use an FTP client of the target language
+# TODO(StepForge): api.ftp: FTP steps are not exported to cURL commands; use an FTP client of the target language
+# TODO(StepForge): api.ftp: FTP steps are not exported to cURL commands; use an FTP client of the target language
 
 echo
 [ "$FAILED" = 0 ] && echo "All checks passed" || { echo "Some checks failed"; exit 1; }

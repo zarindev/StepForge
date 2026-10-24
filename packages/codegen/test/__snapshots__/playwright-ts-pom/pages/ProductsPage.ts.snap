@@ -71,4 +71,24 @@ export class ProductsPage {
   get termsLink() {
     return this.page.getByRole('link', { name: 'Terms', exact: true });
   }
+
+  get menuButton() {
+    return this.page.getByRole('button', { name: 'Menu', exact: true });
+  }
+
+  get exportCsvLink() {
+    return this.page.getByRole('link', { name: 'Export CSV', exact: true });
+  }
+
+  get youAreOfflineText() {
+    return this.page.getByText('You are offline', { exact: true });
+  }
+
+  get acceptCookiesButton() {
+    return this.page.getByRole('button', { name: 'Accept cookies', exact: true });
+  }
+
+  get loadMoreButton() {
+    return this.page.getByRole('button', { name: 'Load more', exact: true });
+  }
 }

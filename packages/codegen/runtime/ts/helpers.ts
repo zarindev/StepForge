@@ -288,6 +288,7 @@ export function pick(result: ApiLike | DbLike, target: string): unknown {
   if (t === 'size') return result.size;
   if (t === 'body') return result.body;
   if (t === 'text') return result.text;
+  if (t === 'url') return result.url;
   if (t.startsWith('header:') || t.startsWith('headers.'))
     return result.headers[t.replace(/^headers?[.:]/, '').toLowerCase()];
   if (t.startsWith('$')) return jsonPath(result.body, t);
@@ -301,6 +302,8 @@ export type ApiLike = {
   text: string;
   ms: number;
   size: number;
+  /** A response the page received (wait for response). */
+  url?: string;
 };
 export type DbLike = {
   rows: Record<string, unknown>[];

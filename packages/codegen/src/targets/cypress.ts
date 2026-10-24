@@ -11,7 +11,7 @@ import {
   statusCode,
   testPath,
 } from '../common.ts';
-import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
+import type { El, Features, Loc, Op, Plan, TestPlan } from '../ir.ts';
 import { jsNum, jsBlock, jsJson, jsKey, jsStr, jsText, jsVal, jsVar } from '../lang/js.ts';
 import type { CodegenOptions, GeneratedProject } from '../types.ts';
 import { camel, envName, kebab, parseString } from '../values.ts';
@@ -491,6 +491,9 @@ export const basicAuth = (user, password) => \`Basic \${btoa(\`\${user}:\${passw
 export const globToRegExp = (glob) =>
   new RegExp(String(glob).replace(/[.+^\${}()|[\\]\\\\]/g, '\\\\$&').replace(/\\*\\*/g, '.*').replace(/(?<!\\.)\\*/g, '[^/]*'));
 `;
+
+/** What the Cypress export prints beyond the basic steps (see features.ts). */
+export const CYPRESS_FEATURES: Features = {};
 
 export function generateCypress(plan: Plan, o: CodegenOptions): GeneratedProject {
   const files: Record<string, string> = {};

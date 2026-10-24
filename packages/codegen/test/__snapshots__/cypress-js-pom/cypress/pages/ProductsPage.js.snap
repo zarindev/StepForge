@@ -17,4 +17,5 @@ export const productsPage = {
   footer: () => cy.findByTestId('footer'),
   element16: () => cy.xpath("//button[@id='remove']"),
   termsLink: () => cy.findByRole('link', { name: 'Terms' }),
+  youAreOfflineText: () => cy.findByText('You are offline'),
 };

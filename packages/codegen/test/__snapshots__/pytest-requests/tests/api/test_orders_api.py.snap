@@ -25,7 +25,7 @@ def test_orders_api(http):
     )
     assert res1["status"] == 200, "status"
     vars["token"] = res1["body"]
-    # TODO(StepForge): api.request: the JSON Schema check on "$" is not exported
+    # TODO(StepForge): api.request: the JSON Schema check on "$" is not exported to pytest + requests
     res2 = api.call(
         http, "POST", f"/api/{text(env['api-version'])}/orders",
         headers={"X-Request-Id": text(random_value("uuid")), "X-Region": env["region"], "Authorization": "Bearer " + secret("API_TOKEN")},
@@ -71,10 +71,11 @@ def test_orders_api(http):
         http, "GET", "/me",
         headers={"Cookie": "sid=" + "abc"},
     )
-    # TODO(StepForge): api.request: auth type "oauth2" is not exported; set the header yourself
+    # TODO(StepForge): api.request: auth type "oauth2" is not exported to pytest + requests; set the header yourself
     res7 = api.call(
         http, "GET", "/x",
     )
+    assert res7["status"] == 200, "status"
     # Upload
     res8 = api.call(
         http, "POST", "/files",
@@ -119,8 +120,9 @@ def test_orders_api(http):
         vars["index"] = index
         # Note: {{vars.line.sku}}
         print(field(vars, "line.sku"))
-    # TODO(StepForge): util.loop: “repeat while” loops are not exported yet; write the loop by hand
-    # TODO(StepForge): util.if: page conditions (if the element is …) are not exported yet; write the check by hand
+    # TODO(StepForge): util.loop: “repeat while” loops are not exported to pytest + requests; write the loop by hand
+    # TODO(StepForge): util.if: page conditions (if the element is …) are not exported to pytest + requests; write the check by hand
+    # TODO(StepForge): util.loop: “repeat while” loops are not exported to pytest + requests; write the loop by hand
     # Remember "[object Object]" as payload
     vars["payload"] = {
         "a": [1, True, None],

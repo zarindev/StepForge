@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { Plan, TestPlan } from './ir.ts';
+import { walk, type Op, type Plan, type TestPlan } from './ir.ts';
 import type { CiProvider, CodegenInput, CodegenScenario } from './types.ts';
 import { envName, isStatic, kebab, plain, type Val } from './values.ts';
 
@@ -65,13 +65,14 @@ export function envEntries(plan: Plan): { key: string; value: string; comment?: 
     out.push({ key: envName(v), value: input.environment.variables[v] ?? '', comment: `{{env.${v}}}` });
   for (const s of plan.secrets)
     out.push({ key: envName(s), value: '', comment: `secret {{secret.${s}}} — never commit its value` });
-  const dbs = [
-    ...new Set(
-      plan.tests
-        .flatMap((t) => t.ops.flatMap((o) => (o.op === 'db' ? [o] : [])))
-        .map((o) => `${o.connection}|${o.engine}`),
-    ),
-  ];
+  // Database steps anywhere in a test (inside conditions and loops too); MongoDB commands read their own URL.
+  const found: string[] = [];
+  for (const t of plan.tests)
+    walk(t.ops, (o: Op) => {
+      if (o.op === 'db') found.push(`${o.connection}|${o.engine}`);
+      if (o.op === 'mongo') found.push(`${o.connection}|mongo`);
+    });
+  const dbs = [...new Set(found)];
   for (const d of dbs) {
     const [name, engine] = d.split('|') as [string, string];
     const example =
@@ -81,7 +82,9 @@ export function envEntries(plan: Plan): { key: string; value: string; comment?: 
           ? 'mysql://user:password@localhost:3306/db'
           : engine === 'sqlite'
             ? 'sqlite:./app.db'
-            : 'postgres://…, mysql://… or sqlite:./app.db';
+            : engine === 'mongo'
+              ? 'mongodb://user:password@localhost:27017/db'
+              : 'postgres://…, mysql://… or sqlite:./app.db';
     out.push({
       key: dbEnv(name),
       value: '',

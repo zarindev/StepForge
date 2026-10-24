@@ -20,3 +20,4 @@ class ProductsPage:
     FOOTER = ("testId", "footer")
     ELEMENT16 = ("xpath", "//button[@id='remove']")
     TERMS_LINK = ("role", "link", "Terms")
+    YOU_ARE_OFFLINE_TEXT = ("text", "You are offline")

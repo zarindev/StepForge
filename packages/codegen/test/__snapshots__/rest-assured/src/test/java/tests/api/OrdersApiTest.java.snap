@@ -42,7 +42,7 @@ class OrdersApiTest extends ApiTest {
     );
     assertEquals(200, res1.status(), "status");
     vars.put("token", res1.body());
-    // TODO(StepForge): api.request: the JSON Schema check on "$" is not exported
+    // TODO(StepForge): api.request: the JSON Schema check on "$" is not exported to REST Assured + JUnit 5
     Api.Result res2 = Api.result(
         given()
             .filter(cookies)
@@ -98,13 +98,14 @@ class OrdersApiTest extends ApiTest {
             .when()
             .request("GET", "/me")
     );
-    // TODO(StepForge): api.request: auth type "oauth2" is not exported; set the header yourself
+    // TODO(StepForge): api.request: auth type "oauth2" is not exported to REST Assured + JUnit 5; set the header yourself
     Api.Result res7 = Api.result(
         given()
             .filter(cookies)
             .when()
             .request("GET", "/x")
     );
+    assertEquals(200, res7.status(), "status");
     // Upload
     Api.Result res8 = Api.result(
         given()
@@ -162,8 +163,9 @@ class OrdersApiTest extends ApiTest {
         System.out.println(text(field(vars, "line.sku")));
       }
     }
-    // TODO(StepForge): util.loop: “repeat while” loops are not exported yet; write the loop by hand
-    // TODO(StepForge): util.if: page conditions (if the element is …) are not exported yet; write the check by hand
+    // TODO(StepForge): util.loop: “repeat while” loops are not exported to REST Assured + JUnit 5; write the loop by hand
+    // TODO(StepForge): util.if: page conditions (if the element is …) are not exported to REST Assured + JUnit 5; write the check by hand
+    // TODO(StepForge): util.loop: “repeat while” loops are not exported to REST Assured + JUnit 5; write the loop by hand
     // Remember "[object Object]" as payload
     vars.put("payload", J.map("a", J.list(1, true, null), "b", Config.RUN_ID));
     // Generate a random pattern (save as ref)

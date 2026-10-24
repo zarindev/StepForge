@@ -3,12 +3,14 @@
 import { test, expect } from '@playwright/test';
 import { env, secret } from '../../support/config';
 import { check, compare, pick, fake, field, random, runId } from '../../support/helpers';
-import { api, basicAuth } from '../../support/api';
+import { api, basicAuth, oauth2Token } from '../../support/api';
+import { pageCondition } from '../../support/web';
+import { expectSchema } from '../../support/schema';
 
 type Vars = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 test.describe('API › Orders API', () => {
-  test('Orders API', { tag: ['@api', '@p2'] }, async ({ request }) => {
+  test('Orders API', { tag: ['@api', '@p2'] }, async ({ page, request }) => {
     const data: Vars = {};
     const vars: Vars = {};
     // Get a token
@@ -22,7 +24,7 @@ test.describe('API › Orders API', () => {
     });
     expect(res1.status, 'status').toBe(200);
     vars.token = res1.body;
-    // TODO(StepForge): api.request: the JSON Schema check on "$" is not exported
+    // Create an order
     const res2 = await api(request, {
       method: 'POST',
       url: `/api/${env['api-version']}/orders`,
@@ -50,6 +52,13 @@ test.describe('API › Orders API', () => {
     check(pick(res2, 'header:content-type'), 'contains', 'json', 'header:content-type contains');
     check(pick(res2, 'time'), 'lte', 800, 'time lte');
     check(pick(res2, '$.total'), 'inRange', [0, 1000], '$.total inRange');
+    expectSchema(
+      res2.body,
+      {
+        type: 'object',
+      },
+      '$ matches the JSON schema',
+    );
     vars.order = res2.body;
     // Read the location header of the response (save as location)
     vars.location = pick(res2, 'header:location');
@@ -79,11 +88,19 @@ test.describe('API › Orders API', () => {
       url: '/me',
       headers: { Cookie: `sid=${'abc'}` },
     });
-    // TODO(StepForge): api.request: auth type "oauth2" is not exported; set the header yourself
+    // OAuth2 client credentials
+    const token1 = await oauth2Token(request, {
+      tokenUrl: 'https://id.test/token',
+      clientId: 'shop-tests',
+      clientSecret: secret('API_TOKEN'),
+      scope: 'orders:read',
+    });
     const res7 = await api(request, {
       method: 'GET',
       url: '/x',
+      headers: { Authorization: `Bearer ${token1}` },
     });
+    expect(res7.status, 'status').toBe(200);
     // Upload
     const res8 = await api(request, {
       method: 'POST',
@@ -135,8 +152,33 @@ test.describe('API › Orders API', () => {
       // Note: {{vars.line.sku}}
       console.log(field(vars, 'line.sku'));
     }
-    // TODO(StepForge): util.loop: “repeat while” loops are not exported yet; write the loop by hand
-    // TODO(StepForge): util.if: page conditions (if the element is …) are not exported yet; write the check by hand
+    // Repeat while the "Load more" button is visible
+    let pass1 = 0;
+    for (; pass1 < 100; pass1++) {
+      vars.index = pass1;
+      if (!(await pageCondition(page.getByRole('button', { name: 'Load more', exact: true }), 'visible')))
+        break;
+      // Note: more
+      console.log('more');
+    }
+    if (pass1 >= 100) throw new Error('Stopped after the limit of 100 pass(es); the condition still held');
+    // If "Out of stock" is on the page
+    if (await pageCondition(page.getByText('Out of stock', { exact: true }), 'present')) {
+      // Note: oos
+      console.log('oos');
+    }
+    // Poll until three
+    let pass2 = 0;
+    for (; pass2 < 5; pass2++) {
+      vars.index = pass2;
+      if (!compare(vars.index, 'lt', 3)) break;
+      // Send GET /poll
+      const res12 = await api(request, {
+        method: 'GET',
+        url: '/poll',
+      });
+    }
+    if (pass2 >= 5) throw new Error('Stopped after the limit of 5 pass(es); the condition still held');
     // Remember "[object Object]" as payload
     vars.payload = {
       a: [1, true, null],
@@ -147,7 +189,7 @@ test.describe('API › Orders API', () => {
     // Generate a random date (save as due)
     vars.due = fake('date', { direction: 'future', days: 10 });
     // Wait 250 ms
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await page.waitForTimeout(250);
     // Run a script (save as double)
     vars.double = await (async (vars: Vars, data: Vars) => {
       return vars.total * 2;

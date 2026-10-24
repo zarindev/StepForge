@@ -249,7 +249,7 @@
               }
             },
             {
-              "name": "OAuth (not exported)",
+              "name": "OAuth2 client credentials",
               "event": [
                 {
                   "listen": "test",
@@ -259,7 +259,8 @@
                       "const jp = (json, path) => path.replace(/^\\$\\.?/, \"\").replace(/\\[(\\d+)\\]/g, \".$1\").split(\".\").filter(Boolean).reduce((o, k) => (o && typeof o === \"object\" ? o[k] : undefined), json);",
                       "let body; try { body = pm.response.json(); } catch (e) { body = pm.response.text(); }",
                       "/** Saves a value as variables (objects flattened: session.token). */",
-                      "const save = (name, value) => { if (value && typeof value === \"object\") { pm.collectionVariables.set(name, JSON.stringify(value)); Object.entries(value).forEach(([k, v]) => save(`${name}.${k}`, v)); } else pm.collectionVariables.set(name, value); };"
+                      "const save = (name, value) => { if (value && typeof value === \"object\") { pm.collectionVariables.set(name, JSON.stringify(value)); Object.entries(value).forEach(([k, v]) => save(`${name}.${k}`, v)); } else pm.collectionVariables.set(name, value); };",
+                      "pm.test(\"status equals 200\", () => pm.expect(String(pm.response.code)).to.eql(String(200)));"
                     ]
                   }
                 }
@@ -448,6 +449,11 @@
               }
             }
           ]
+        },
+        {
+          "name": "Integrations",
+          "description": "P2 · #api",
+          "item": []
         }
       ]
     }

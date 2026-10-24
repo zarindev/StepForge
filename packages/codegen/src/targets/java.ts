@@ -9,7 +9,7 @@ import {
   nativeNotes,
   PLATFORM_NAMES,
 } from '../native.ts';
-import type { El, Loc, Op, Plan, TestPlan } from '../ir.ts';
+import type { El, Features, Loc, Op, Plan, TestPlan } from '../ir.ts';
 import {
   javaBlock,
   javaComment,
@@ -28,6 +28,12 @@ import { camel, envName, parseString, pascal, snake, uniquer, type Val } from '.
  * Assured only.
  */
 type Flavor = 'selenium' | 'appium' | 'api';
+
+/** What the Java exports print beyond the basic steps (see features.ts). */
+export function javaFeatures(flavor: Flavor): Features {
+  void flavor;
+  return {};
+}
 
 export function locatorJava(l: Loc): string {
   const v = (s: string) => javaText(parseString(s));
@@ -117,6 +123,8 @@ function uiOp(op: Op, s: State, out: (l: string) => void): boolean {
           scrollIntoView: `browser.scrollIntoView(${l});`,
           fill: `browser.fill(${l}, ${v});`,
           type: `browser.type(${l}, ${v});`,
+          // WebDriver has no touch screen: a tap is a click.
+          tap: `browser.click(${l});`,
         }[op.action],
       );
       break;
