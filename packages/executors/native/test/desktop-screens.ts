@@ -124,14 +124,15 @@ export function desktopScreenTests(o: {
     try {
       const shot = await m.screenshot();
       expect(shot.subarray(1, 4).toString()).toBe('PNG');
-      // Where an element is in the picture, from the element tree (as a tester sees it there).
+      // Where an element is in the picture, from the element tree (as a tester sees it there): near its left edge,
+      // which a system pop-up over the window (GitHub's macOS runners show one) leaves visible.
       const where = async (match: (a: Record<string, string>) => boolean) => {
         for (let i = 0; i < 60; i++) {
           const { area } = await platform.view(m.driver);
           const el = parseElements(await m.driver.source()).find((e) => match(e.attrs));
           if (el)
             return {
-              x: (el.rect.x + el.rect.width / 2 - area.x) / area.width,
+              x: (el.rect.x + Math.min(12, el.rect.width / 2) - area.x) / area.width,
               y: (el.rect.y + el.rect.height / 2 - area.y) / area.height,
             };
           await new Promise((r) => setTimeout(r, 500));
