@@ -9,6 +9,36 @@ import { envName, kebab, plain, snake, uniquer, type Part, type Ref, type Val } 
 const isApi = (t: TestPlan) => t.usesApi;
 const SKIP_UI = 'skipped: it has no API steps';
 
+/** XPath targets (SOAP and other XML responses), as StepForge reads them: `/…`, `//…`, `xpath:…`, count(…)… */
+const isXPath = (t: string) =>
+  t.startsWith('/') || t.startsWith('xpath:') || /^(count|string|number|boolean|sum)\(/.test(t);
+const NO_XPATH = (where: string) =>
+  `XPath checks on XML responses are not exported to ${where} (no XPath evaluator there); check them in StepForge or another export`;
+
+/**
+ * A SOAP fault in a response (a Fault right inside the envelope's Body, as StepForge looks for it), found by its
+ * tags: its code and message, or null. Shared by the k6 and Postman scripts.
+ */
+const SOAP_FAULT_JS = `function soapFault(text) {
+  const m = /<(?:[\\w.-]+:)?Body\\b[^>]*>(?:\\s|<!--[\\s\\S]*?-->)*<(?:[\\w.-]+:)?Fault\\b[\\s\\S]*?(?:<\\/(?:[\\w.-]+:)?Fault>|\\/>)/.exec(String(text || ''));
+  if (!m) return null;
+  const first = (re) => { const x = re.exec(m[0]); return x ? x[1].trim() : ''; };
+  const code = first(/<(?:[\\w.-]+:)?faultcode\\b[^>]*>([^<]*)</) || first(/<(?:[\\w.-]+:)?Value\\b[^>]*>([^<]*)</);
+  const reason = first(/<(?:[\\w.-]+:)?faultstring\\b[^>]*>([^<]*)</) || first(/<(?:[\\w.-]+:)?Text\\b[^>]*>([^<]*)</);
+  return 'SOAP fault' + (code ? ' ' + code : '') + ': ' + (reason || 'no message');
+}`;
+
+/** OpenAPI 3.0 `nullable: true` becomes JSON Schema (as StepForge reads it), so null values validate. */
+function normalizeSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(normalizeSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(schema)) out[k] = normalizeSchema(v);
+  if (out.nullable === true && typeof out.type === 'string') out.type = [out.type, 'null'];
+  delete out.nullable;
+  return out;
+}
+
 const MAX_UNROLL = 20;
 const unrollable = (op: Extract<Op, { op: 'loop' }>) =>
   op.over
@@ -124,9 +154,37 @@ function secret(name) {
   const v = __ENV[name];
   if (!v) fail('Set the ' + name + ' environment variable (k6 run -e ' + name + '=…)');
   return v;
+}
+${SOAP_FAULT_JS}
+// OAuth2 client credentials, as StepForge fetches them: Basic client id/secret, a form body; kept until near expiry.
+const tokens = {};
+function oauth2Token(o) {
+  const key = o.tokenUrl + '|' + o.clientId + '|' + (o.scope || '');
+  if (tokens[key] && tokens[key].expires > Date.now()) return tokens[key].token;
+  const form = { grant_type: 'client_credentials' };
+  if (o.scope) form.scope = o.scope;
+  const res = http.post(o.tokenUrl, form, {
+    headers: { Authorization: 'Basic ' + encoding.b64encode(o.clientId + ':' + o.clientSecret) },
+    tags: { name: 'OAuth2 token' },
+  });
+  let json = {};
+  try {
+    json = res.json();
+  } catch (e) {
+    // not JSON
+  }
+  // fail() alone ends the iteration without failing the run: the failed check does (checks: rate==1.0).
+  if (res.status < 200 || res.status >= 300 || !json.access_token) {
+    check(res, { ['OAuth2 token from ' + o.tokenUrl]: () => false });
+    fail('OAuth2 token request failed with ' + res.status);
+  }
+  tokens[key] = { token: json.access_token, expires: Date.now() + Math.max(30, (json.expires_in || 300) - 30) * 1000 };
+  return json.access_token;
 }`;
 
-function k6Ops(ops: Op[], lines: string[], ind: string): void {
+type K6State = { n: number; warn: (m: string) => void };
+
+function k6Ops(ops: Op[], lines: string[], ind: string, st: K6State): void {
   for (const op of ops) {
     if (op.op === 'comment') lines.push(`${ind}// ${oneLine(op.text)}`);
     else if (op.op === 'todo') lines.push(`${ind}// TODO(StepForge): ${oneLine(op.text)}`);
@@ -145,22 +203,42 @@ function k6Ops(ops: Op[], lines: string[], ind: string): void {
           : op.from === 'header'
             ? `header:${op.name ?? ''}`
             : (op.path ?? 'body');
-      lines.push(`${ind}${jsVar(op.into)} = pick(last, ${jsStr(target)});`);
+      if (isXPath(target)) {
+        st.warn(NO_XPATH('k6'));
+        lines.push(
+          `${ind}// TODO(StepForge): extract ${oneLine(target)} into ${op.into} (XPath is not available in k6)`,
+        );
+      } else lines.push(`${ind}${jsVar(op.into)} = pick(last, ${jsStr(target)});`);
     } else if (op.op === 'if') {
       lines.push(`${ind}if (compare(${jsVal(op.value)}, ${jsStr(op.operator)}, ${jsVal(op.expected)})) {`);
-      k6Ops(op.then, lines, `${ind}  `);
+      k6Ops(op.then, lines, `${ind}  `, st);
       if (op.else.length) {
         lines.push(`${ind}} else {`);
-        k6Ops(op.else, lines, `${ind}  `);
+        k6Ops(op.else, lines, `${ind}  `, st);
       }
       lines.push(`${ind}}`);
+    } else if (op.op === 'while' && op.cond.kind === 'value') {
+      // StepForge's safety limit: the condition still holding after the last pass fails the check.
+      const n = `pass${++st.n}`;
+      lines.push(
+        `${ind}let ${n} = 0;`,
+        `${ind}for (; ${n} < ${op.max}; ${n}++) {`,
+        `${ind}  vars.index = ${n};`,
+      );
+      lines.push(
+        `${ind}  if (!compare(${jsVal(op.cond.value)}, ${jsStr(op.cond.operator)}, ${jsVal(op.cond.expected)})) break;`,
+      );
+      k6Ops(op.body, lines, `${ind}  `, st);
+      lines.push(`${ind}}`);
+      const msg = `Stopped after the limit of ${op.max} pass(es); the condition still held`;
+      lines.push(`${ind}if (${n} >= ${op.max}) check(null, { ${jsStr(msg)}: () => false });`);
     } else if (op.op === 'loop') {
       lines.push(
         op.over
           ? `${ind}(${jsVal(op.over)}).forEach((item, index) => {\n${ind}  ${jsVar(op.as)} = item;\n${ind}  vars.index = index;`
           : `${ind}for (let index = 0; index < Number(${jsVal(op.count!)}); index++) {\n${ind}  vars.index = index;`,
       );
-      k6Ops(op.body, lines, `${ind}  `);
+      k6Ops(op.body, lines, `${ind}  `, st);
       lines.push(op.over ? `${ind}});` : `${ind}}`);
     } else if (op.op === 'api') {
       const headers: string[] = op.headers.map(([k, v]) => `${jsKey(k)}: ${jsVal(v)}`);
@@ -176,6 +254,12 @@ function k6Ops(ops: Op[], lines: string[], ind: string): void {
         else headers.push(`${jsKey(op.auth.name)}: ${jsVal(op.auth.value)}`);
       }
       if (op.auth?.type === 'cookie') headers.push(`Cookie: \`${op.auth.name}=\${${jsVal(op.auth.value)}}\``);
+      if (op.auth?.type === 'oauth2') {
+        const scope = op.auth.scope ? `, scope: ${jsVal(op.auth.scope)}` : '';
+        headers.push(
+          `Authorization: 'Bearer ' + oauth2Token({ tokenUrl: url(${jsVal(op.auth.tokenUrl)}), clientId: ${jsVal(op.auth.clientId)}, clientSecret: ${jsVal(op.auth.clientSecret)}${scope} })`,
+        );
+      }
       let body = 'null';
       if (op.body && op.bodyType !== 'none') {
         if (op.bodyType === 'json') {
@@ -190,24 +274,68 @@ function k6Ops(ops: Op[], lines: string[], ind: string): void {
       lines.push(
         `${ind}last = http.request(${jsStr(op.method)}, ${urlExpr}, ${body}, { headers: { ${headers.join(', ')} }, tags: { name: ${jsStr(op.label)} } });`,
       );
-      if (op.asserts.length)
+      const xpath = op.asserts.filter((a) => isXPath(a.target));
+      const asserts = op.asserts.filter((a) => !isXPath(a.target));
+      // A SOAP fault fails the step in StepForge, unless the step allows it.
+      const fault = op.soap && !op.soap.allowFault;
+      if (asserts.length || fault)
         lines.push(
           `${ind}check(last, {`,
-          ...op.asserts.map(
+          ...(fault
+            ? [`${ind}  ${jsStr(`${op.label}: no SOAP fault`)}: (r) => soapFault(r.body) === null,`]
+            : []),
+          ...asserts.map(
             (a) =>
               `${ind}  ${jsStr(`${op.label}: ${a.target} ${a.operator}${a.expected.t !== 'null' ? ` ${JSON.stringify(plain(a.expected))}` : ''}`)}: (r) => compare(pick(r, ${jsStr(a.target)}), ${jsStr(a.operator)}, ${jsVal(a.expected)}),`,
           ),
           `${ind}});`,
+        );
+      if (xpath.length) st.warn(NO_XPATH('k6'));
+      for (const a of xpath)
+        lines.push(
+          `${ind}// TODO(StepForge): check ${oneLine(`${a.target} ${a.operator}`)} (XPath is not available in k6)`,
         );
       if (op.into) lines.push(`${ind}${jsVar(op.into)} = body(last);`);
     }
   }
 }
 
-/** What k6, Postman and cURL print beyond the basic steps (see features.ts). */
-export const K6_FEATURES: Features = {};
-export const POSTMAN_FEATURES: Features = {};
-export const CURL_FEATURES: Features = {};
+const NO_HOST = (what: string) =>
+  `${what} steps are not exported to {target}, which sends HTTP requests only; use a code export (Playwright Test, pytest, JUnit)`;
+
+/**
+ * What k6, Postman and cURL print beyond the basic steps (see features.ts). SOAP is an HTTP POST everywhere; its
+ * XPath checks need an XPath evaluator none of the three has (they stay TODOs, with a warning).
+ */
+export const K6_FEATURES: Features = {
+  soap: true,
+  oauth2: true,
+  repeatWhile: true,
+  schema: 'the JSON Schema check on "{assert}" is not exported to {target} (it has no JSON Schema validator)',
+  kafka: NO_HOST('Kafka'),
+  ftp: NO_HOST('FTP'),
+  mongo: NO_HOST('MongoDB'),
+};
+export const POSTMAN_FEATURES: Features = {
+  soap: true,
+  oauth2: true,
+  schema: true,
+  repeatWhile:
+    '“repeat while” loops are not exported to {target}: a collection runs its requests once each, in order',
+  kafka: NO_HOST('Kafka'),
+  ftp: NO_HOST('FTP'),
+  mongo: NO_HOST('MongoDB'),
+};
+export const CURL_FEATURES: Features = {
+  soap: true,
+  oauth2: true,
+  schema:
+    'the JSON Schema check on "{assert}" is not exported to {target} (no common command-line validator)',
+  repeatWhile: '“repeat while” loops are not exported to {target}: it runs each request once, in order',
+  kafka: NO_HOST('Kafka'),
+  ftp: NO_HOST('FTP'),
+  mongo: NO_HOST('MongoDB'),
+};
 
 export function generateK6(plan: Plan, o: CodegenOptions): GeneratedProject {
   const warnings: Warning[] = [...plan.warnings];
@@ -226,6 +354,7 @@ export function generateK6(plan: Plan, o: CodegenOptions): GeneratedProject {
       'check',
       'if',
       'loop',
+      'while',
     ]);
     const cases = casesOf(t.scenario);
     lines.push(
@@ -234,7 +363,7 @@ export function generateK6(plan: Plan, o: CodegenOptions): GeneratedProject {
     lines.push(`  for (const data of ${jsJson(cases.map((c) => c.data))}) {`);
     lines.push(`    group(${jsStr(t.scenario.name)}, () => {`);
     lines.push('      const vars = {};', '      let last;');
-    k6Ops(ops, lines, '      ');
+    k6Ops(ops, lines, '      ', { n: 0, warn });
     lines.push('    });', '  }');
   }
   const { input } = plan;
@@ -367,19 +496,23 @@ const PM_HELPERS = [
   'const save = (name, value) => { if (value && typeof value === "object") { pm.collectionVariables.set(name, JSON.stringify(value)); Object.entries(value).forEach(([k, v]) => save(`${name}.${k}`, v)); } else pm.collectionVariables.set(name, value); };',
 ];
 
+/** The response value an assertion target reads. */
+function pmValue(target: string): string {
+  return target === 'status'
+    ? 'pm.response.code'
+    : target === 'time' || target === 'timeMs'
+      ? 'pm.response.responseTime'
+      : target === 'body'
+        ? 'body'
+        : target === 'text'
+          ? 'pm.response.text()'
+          : target.startsWith('header:') || target.startsWith('headers.')
+            ? `pm.response.headers.get(${JSON.stringify(target.replace(/^headers?[.:]/, ''))})`
+            : `jp(body, ${JSON.stringify(target)})`;
+}
+
 function pmAssert(target: string, operator: string, expected: Val): string {
-  const actual =
-    target === 'status'
-      ? 'pm.response.code'
-      : target === 'time' || target === 'timeMs'
-        ? 'pm.response.responseTime'
-        : target === 'body'
-          ? 'body'
-          : target === 'text'
-            ? 'pm.response.text()'
-            : target.startsWith('header:') || target.startsWith('headers.')
-              ? `pm.response.headers.get(${JSON.stringify(target.replace(/^headers?[.:]/, ''))})`
-              : `jp(body, ${JSON.stringify(target)})`;
+  const actual = pmValue(target);
   const raw = pmJson(expected);
   // Inside scripts {{…}} is not replaced automatically.
   const e =
@@ -403,6 +536,13 @@ function pmAssert(target: string, operator: string, expected: Val): string {
     lengthEquals: `pm.expect(${actual}).to.have.lengthOf(Number(${e}))`,
   };
   return expr[operator] ?? `pm.expect.fail(${JSON.stringify(`operator ${operator} is not exported`)})`;
+}
+
+/** A JSON Schema check with the Ajv that Postman's sandbox ships (StepForge validates with Ajv too). */
+function pmSchema(target: string, expected: Val): string {
+  const value = target === '$' || target === 'body' ? 'body' : pmValue(target);
+  const schema = JSON.stringify(normalizeSchema(plain(expected)));
+  return `pm.test(${JSON.stringify(`${target} matches the JSON schema`)}, () => { const ajv = new (require("ajv"))({ allErrors: true }); const ok = ajv.validate(${schema}, ${value}); pm.expect(ok, ajv.errorsText(ajv.errors)).to.be.true; });`;
 }
 
 export function generatePostman(plan: Plan): GeneratedProject {
@@ -434,6 +574,13 @@ export function generatePostman(plan: Plan): GeneratedProject {
               ? `header:${op.name ?? ''}`
               : (op.path ?? '$');
         const last = items.at(-1) as { event: { script: { exec: string[] } }[] } | undefined;
+        if (isXPath(target)) {
+          warn(NO_XPATH('Postman'));
+          last?.event[0]!.script.exec.push(
+            `// TODO(StepForge): extract ${oneLine(target)} into ${op.into} (XPath is not available in Postman)`,
+          );
+          continue;
+        }
         last?.event[0]!.script.exec.push(
           `save(${JSON.stringify(op.into)}, ${target === 'status' ? 'pm.response.code' : target.startsWith('header:') ? `pm.response.headers.get(${JSON.stringify(target.slice(7))})` : `jp(body, ${JSON.stringify(target)})`});`,
         );
@@ -474,6 +621,39 @@ export function generatePostman(plan: Plan): GeneratedProject {
         };
       if (op.auth?.type === 'cookie')
         headers.push({ key: 'Cookie', value: `${op.auth.name}=${pmText(op.auth.value)}` });
+      if (op.auth?.type === 'oauth2') {
+        // Fetched before the request (client credentials, as StepForge does) and kept until shortly before it expires.
+        const tokenUrl = pmText(op.auth.tokenUrl);
+        const field = (v: string) => `pm.variables.replaceIn(${JSON.stringify(v)})`;
+        lastLabel += [
+          `const o = { tokenUrl: ${field(tokenUrl.startsWith('/') ? `{{baseUrl}}${tokenUrl}` : tokenUrl)}, clientId: ${field(pmText(op.auth.clientId))}, clientSecret: ${field(pmText(op.auth.clientSecret))}, scope: ${field(op.auth.scope ? pmText(op.auth.scope) : '')} };`,
+          "const key = 'oauth2:' + o.tokenUrl + '|' + o.clientId + '|' + o.scope;",
+          "const kept = JSON.parse(pm.collectionVariables.get(key) || 'null');",
+          "if (kept && kept.expires > Date.now()) pm.variables.set('oauth2Token', kept.token);",
+          'else',
+          '  pm.sendRequest(',
+          '    {',
+          '      url: o.tokenUrl,',
+          "      method: 'POST',",
+          '      header: {',
+          "        Authorization: 'Basic ' + CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(o.clientId + ':' + o.clientSecret)),",
+          "        'Content-Type': 'application/x-www-form-urlencoded',",
+          '      },',
+          "      body: { mode: 'urlencoded', urlencoded: [{ key: 'grant_type', value: 'client_credentials' }].concat(o.scope ? [{ key: 'scope', value: o.scope }] : []) },",
+          '    },',
+          '    (err, res) => {',
+          '      let json = {};',
+          '      try { json = res.json(); } catch (e) { /* not JSON */ }',
+          "      if (err || res.code < 200 || res.code >= 300 || !json.access_token) pm.variables.set('oauth2Error', 'OAuth2 token request failed with ' + (err ? err.message : res.code));",
+          '      else {',
+          "        pm.variables.set('oauth2Token', json.access_token);",
+          '        pm.collectionVariables.set(key, JSON.stringify({ token: json.access_token, expires: Date.now() + Math.max(30, (json.expires_in || 300) - 30) * 1000 }));',
+          '      }',
+          '    },',
+          '  );',
+        ].join('\n');
+        headers.push({ key: 'Authorization', value: 'Bearer {{oauth2Token}}' });
+      }
       const rawUrl = pmText(op.url);
       const query = op.query.map(([k, v]) => `${encodeURIComponent(k)}=${pmQuery(v)}`);
       // A plain string URL (v2.1 allows it); Postman parses host, path and query itself.
@@ -504,11 +684,26 @@ export function generatePostman(plan: Plan): GeneratedProject {
                   }
                 : { mode: 'raw', raw: pmText(op.body) }
           : undefined;
+      const xpath = op.asserts.filter((a) => isXPath(a.target));
+      if (xpath.length) warn(NO_XPATH('Postman'));
       const tests = [
         ...PM_HELPERS,
-        ...op.asserts.map(
-          (a) =>
-            `pm.test(${JSON.stringify(`${a.target} ${a.operator}${a.expected.t !== 'null' ? ` ${JSON.stringify(pmJson(a.expected))}` : ''}`)}, () => ${pmAssert(a.target, a.operator, a.expected)});`,
+        ...(op.soap && !op.soap.allowFault ? SOAP_FAULT_JS.split('\n') : []),
+        ...(op.auth?.type === 'oauth2'
+          ? [
+              'pm.test("OAuth2 token", () => pm.expect(pm.variables.get("oauth2Error"), pm.variables.get("oauth2Error")).to.be.undefined);',
+            ]
+          : []),
+        // A SOAP fault fails the step in StepForge, unless the step allows it.
+        ...(op.soap && !op.soap.allowFault
+          ? ['pm.test("no SOAP fault", () => pm.expect(soapFault(pm.response.text())).to.equal(null));']
+          : []),
+        ...op.asserts.map((a) =>
+          isXPath(a.target)
+            ? `// TODO(StepForge): check ${oneLine(`${a.target} ${a.operator}`)} (XPath is not available in Postman)`
+            : a.operator === 'matchesSchema'
+              ? pmSchema(a.target, a.expected)
+              : `pm.test(${JSON.stringify(`${a.target} ${a.operator}${a.expected.t !== 'null' ? ` ${JSON.stringify(pmJson(a.expected))}` : ''}`)}, () => ${pmAssert(a.target, a.operator, a.expected)});`,
         ),
         ...(op.into ? [`save(${JSON.stringify(op.into)}, body);`] : []),
       ];
@@ -708,12 +903,33 @@ export function generateCurl(plan: Plan): GeneratedProject {
         );
       } else if (op.op === 'apiExtract') {
         const path = op.from === 'status' ? null : op.from === 'header' ? null : (op.path ?? '$');
-        if (path === null) {
+        if (path !== null && isXPath(path)) {
+          warn(NO_XPATH('the cURL script'));
+          lines.push(
+            `# TODO(StepForge): extract ${oneLine(path)} into ${op.into} (XPath is not available here)`,
+          );
+        } else if (path === null) {
           warn(`extracting the ${op.from} is not supported by the cURL script`);
           lines.push(`# TODO(StepForge): extract the ${op.from} (not supported here)`);
         } else lines.push(`save ${snake(op.into)} "$(jq '${path.replace(/^\$/, '') || '.'}' "$RESPONSE")"`);
       } else if (op.op === 'api') {
         const args = [`-X ${op.method}`];
+        if (op.auth?.type === 'oauth2') {
+          // Fetched first (client credentials, as StepForge does) and kept until shortly before it expires.
+          const tokenUrl =
+            op.auth.tokenUrl.t === 'str' &&
+            typeof op.auth.tokenUrl.parts[0] === 'string' &&
+            op.auth.tokenUrl.parts[0].startsWith('/')
+              ? {
+                  ...op.auth.tokenUrl,
+                  parts: [{ scope: 'baseUrl', name: 'baseUrl' } as Ref, ...op.auth.tokenUrl.parts],
+                }
+              : op.auth.tokenUrl;
+          lines.push(
+            `oauth2_token ${shText(tokenUrl)} ${shText(op.auth.clientId)} ${shText(op.auth.clientSecret)} ${op.auth.scope ? shText(op.auth.scope) : '""'}`,
+          );
+          args.push('-H "Authorization: Bearer ${TOKEN}"');
+        }
         for (const [k, v] of op.headers)
           args.push(
             `-H ${shText({ t: 'str', parts: [`${k}: `, ...(v.t === 'str' ? v.parts : v.t === 'ref' ? [v.ref] : [String(plain(v))])] })}`,
@@ -765,7 +981,16 @@ export function generateCurl(plan: Plan): GeneratedProject {
             ? { ...op.url, parts: [{ scope: 'baseUrl', name: 'baseUrl' } as Ref, ...op.url.parts] }
             : op.url;
         lines.push(`# ${oneLine(op.label)}`, `request ${args.join(' \\\n  ')} \\\n  ${shText(url)}`);
+        // A SOAP fault fails the step in StepForge, unless the step allows it.
+        if (op.soap && !op.soap.allowFault) lines.push('expect_no_fault');
         for (const a of op.asserts) {
+          if (isXPath(a.target)) {
+            warn(NO_XPATH('the cURL script'));
+            lines.push(
+              `# TODO(StepForge): check ${oneLine(`${a.target} ${a.operator}`)} (XPath is not available here)`,
+            );
+            continue;
+          }
           // shText: {{data.status}} is the test case's value, not the placeholder's text.
           if (a.target === 'status' && a.operator === 'equals')
             lines.push(
@@ -832,6 +1057,26 @@ export function generateCurl(plan: Plan): GeneratedProject {
     'pass() { echo "  ✓ $1"; }',
     'fail() { echo "  ✗ $1"; FAILED=1; }',
     'expect_status() { [ "$STATUS" = "$1" ] && pass "status $1" || fail "status $1 (got $STATUS)"; }',
+    "# A SOAP fault right inside the envelope's Body fails the check, as in StepForge.",
+    'expect_no_fault() {',
+    '  local flat; flat="$(tr -d \'\\r\\n\' < "$RESPONSE")"',
+    "  if printf '%s' \"$flat\" | grep -Eq '<([A-Za-z0-9_.-]+:)?Body[^>]*>[[:space:]]*<([A-Za-z0-9_.-]+:)?Fault[[:space:]>/]'; then",
+    '    fail "no SOAP fault (got: $(printf \'%s\' "$flat" | sed -nE \'s/.*<([A-Za-z0-9_.-]+:)?(faultstring|Text)[^>]*>([^<]*)<.*/\\3/p\'))"',
+    '  else pass "no SOAP fault"; fi',
+    '}',
+    '# OAuth2 client credentials (URL, client id, secret, scope) into TOKEN, kept until shortly before they expire.',
+    'oauth2_token() {',
+    '  local file; file="$WORK/token-$(printf \'%s\' "$1|$2|$4" | cksum | cut -d\' \' -f1)"',
+    '  if [ -f "$file" ] && [ "$(cut -d\' \' -f1 "$file")" -gt "$(date +%s)" ]; then TOKEN="$(cut -d\' \' -f2 "$file")"; return; fi',
+    '  local args=(-sS -X POST -u "$2:$3" --data-urlencode grant_type=client_credentials)',
+    '  [ -n "$4" ] && args+=(--data-urlencode "scope=$4")',
+    '  local reply; reply="$(curl "${args[@]}" "$1" || true)"',
+    '  TOKEN="$(printf \'%s\' "$reply" | jq -r \'.access_token // empty\' 2>/dev/null || true)"',
+    '  if [ -z "$TOKEN" ]; then fail "OAuth2 token from $1"; return; fi',
+    '  local life; life="$(printf \'%s\' "$reply" | jq -r \'.expires_in // 300\')"',
+    '  [ "$life" -gt 60 ] 2>/dev/null || life=60',
+    '  echo "$(( $(date +%s) + life - 30 )) $TOKEN" > "$file"',
+    '}',
     'expect_json() {',
     '  local actual; actual="$(jq -r "$1 // empty" "$RESPONSE" 2>/dev/null || true)"',
     '  case "$2" in',

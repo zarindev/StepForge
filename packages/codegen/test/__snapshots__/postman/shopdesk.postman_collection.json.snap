@@ -67,6 +67,7 @@
                       "pm.test(\"header:content-type contains \\\"json\\\"\", () => pm.expect(pm.response.headers.get(\"content-type\")).to.include(\"json\"));",
                       "pm.test(\"time lte 800\", () => pm.expect(Number(pm.response.responseTime)).to.be.at.most(Number(800)));",
                       "pm.test(\"$.total inRange [0,1000]\", () => pm.expect.fail(\"operator inRange is not exported\"));",
+                      "pm.test(\"$ matches the JSON schema\", () => { const ajv = new (require(\"ajv\"))({ allErrors: true }); const ok = ajv.validate({\"type\":\"object\"}, body); pm.expect(ok, ajv.errorsText(ajv.errors)).to.be.true; });",
                       "save(\"order\", body);",
                       "save(\"location\", pm.response.headers.get(\"location\"));",
                       "save(\"code\", pm.response.code);"
@@ -260,14 +261,29 @@
                       "let body; try { body = pm.response.json(); } catch (e) { body = pm.response.text(); }",
                       "/** Saves a value as variables (objects flattened: session.token). */",
                       "const save = (name, value) => { if (value && typeof value === \"object\") { pm.collectionVariables.set(name, JSON.stringify(value)); Object.entries(value).forEach(([k, v]) => save(`${name}.${k}`, v)); } else pm.collectionVariables.set(name, value); };",
+                      "pm.test(\"OAuth2 token\", () => pm.expect(pm.variables.get(\"oauth2Error\"), pm.variables.get(\"oauth2Error\")).to.be.undefined);",
                       "pm.test(\"status equals 200\", () => pm.expect(String(pm.response.code)).to.eql(String(200)));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const o = { tokenUrl: pm.variables.replaceIn(\"https://id.test/token\"), clientId: pm.variables.replaceIn(\"shop-tests\"), clientSecret: pm.variables.replaceIn(\"{{apiToken}}\"), scope: pm.variables.replaceIn(\"orders:read\") };\nconst key = 'oauth2:' + o.tokenUrl + '|' + o.clientId + '|' + o.scope;\nconst kept = JSON.parse(pm.collectionVariables.get(key) || 'null');\nif (kept && kept.expires > Date.now()) pm.variables.set('oauth2Token', kept.token);\nelse\n  pm.sendRequest(\n    {\n      url: o.tokenUrl,\n      method: 'POST',\n      header: {\n        Authorization: 'Basic ' + CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(o.clientId + ':' + o.clientSecret)),\n        'Content-Type': 'application/x-www-form-urlencoded',\n      },\n      body: { mode: 'urlencoded', urlencoded: [{ key: 'grant_type', value: 'client_credentials' }].concat(o.scope ? [{ key: 'scope', value: o.scope }] : []) },\n    },\n    (err, res) => {\n      let json = {};\n      try { json = res.json(); } catch (e) { /* not JSON */ }\n      if (err || res.code < 200 || res.code >= 300 || !json.access_token) pm.variables.set('oauth2Error', 'OAuth2 token request failed with ' + (err ? err.message : res.code));\n      else {\n        pm.variables.set('oauth2Token', json.access_token);\n        pm.collectionVariables.set(key, JSON.stringify({ token: json.access_token, expires: Date.now() + Math.max(30, (json.expires_in || 300) - 30) * 1000 }));\n      }\n    },\n  );"
                     ]
                   }
                 }
               ],
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{oauth2Token}}"
+                  }
+                ],
                 "url": "{{baseUrl}}/x"
               }
             },
@@ -453,7 +469,88 @@
         {
           "name": "Integrations",
           "description": "P2 · #api",
-          "item": []
+          "item": [
+            {
+              "name": "Get the price",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const jp = (json, path) => path.replace(/^\\$\\.?/, \"\").replace(/\\[(\\d+)\\]/g, \".$1\").split(\".\").filter(Boolean).reduce((o, k) => (o && typeof o === \"object\" ? o[k] : undefined), json);",
+                      "let body; try { body = pm.response.json(); } catch (e) { body = pm.response.text(); }",
+                      "/** Saves a value as variables (objects flattened: session.token). */",
+                      "const save = (name, value) => { if (value && typeof value === \"object\") { pm.collectionVariables.set(name, JSON.stringify(value)); Object.entries(value).forEach(([k, v]) => save(`${name}.${k}`, v)); } else pm.collectionVariables.set(name, value); };",
+                      "function soapFault(text) {",
+                      "  const m = /<(?:[\\w.-]+:)?Body\\b[^>]*>(?:\\s|<!--[\\s\\S]*?-->)*<(?:[\\w.-]+:)?Fault\\b[\\s\\S]*?(?:<\\/(?:[\\w.-]+:)?Fault>|\\/>)/.exec(String(text || ''));",
+                      "  if (!m) return null;",
+                      "  const first = (re) => { const x = re.exec(m[0]); return x ? x[1].trim() : ''; };",
+                      "  const code = first(/<(?:[\\w.-]+:)?faultcode\\b[^>]*>([^<]*)</) || first(/<(?:[\\w.-]+:)?Value\\b[^>]*>([^<]*)</);",
+                      "  const reason = first(/<(?:[\\w.-]+:)?faultstring\\b[^>]*>([^<]*)</) || first(/<(?:[\\w.-]+:)?Text\\b[^>]*>([^<]*)</);",
+                      "  return 'SOAP fault' + (code ? ' ' + code : '') + ': ' + (reason || 'no message');",
+                      "}",
+                      "pm.test(\"no SOAP fault\", () => pm.expect(soapFault(pm.response.text())).to.equal(null));",
+                      "pm.test(\"status equals 200\", () => pm.expect(String(pm.response.code)).to.eql(String(200)));",
+                      "// TODO(StepForge): check //p:Price gt (XPath is not available in Postman)",
+                      "// TODO(StepForge): check count(//p:Line) gte (XPath is not available in Postman)",
+                      "save(\"price\", body);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "content-type",
+                    "value": "text/xml; charset=utf-8"
+                  },
+                  {
+                    "key": "soapaction",
+                    "value": "\"urn:GetPrice\""
+                  }
+                ],
+                "url": "{{baseUrl}}/soap/prices",
+                "body": {
+                  "mode": "raw",
+                  "raw": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header><auth:Token xmlns:auth=\"urn:auth\">{{apiToken}}</auth:Token></soap:Header>\n  <soap:Body><m:GetPrice xmlns:m=\"urn:prices\"><m:Sku>{{ref}}</m:Sku></m:GetPrice></soap:Body>\n</soap:Envelope>"
+                }
+              }
+            },
+            {
+              "name": "SOAP 1.2 envelope",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const jp = (json, path) => path.replace(/^\\$\\.?/, \"\").replace(/\\[(\\d+)\\]/g, \".$1\").split(\".\").filter(Boolean).reduce((o, k) => (o && typeof o === \"object\" ? o[k] : undefined), json);",
+                      "let body; try { body = pm.response.json(); } catch (e) { body = pm.response.text(); }",
+                      "/** Saves a value as variables (objects flattened: session.token). */",
+                      "const save = (name, value) => { if (value && typeof value === \"object\") { pm.collectionVariables.set(name, JSON.stringify(value)); Object.entries(value).forEach(([k, v]) => save(`${name}.${k}`, v)); } else pm.collectionVariables.set(name, value); };",
+                      "// TODO(StepForge): check xpath://*[local-name()=\"Pong\"] exists (XPath is not available in Postman)"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "content-type",
+                    "value": "application/soap+xml; charset=utf-8; action=\"urn:Ping\""
+                  }
+                ],
+                "url": "https://soap.example.test/ws",
+                "body": {
+                  "mode": "raw",
+                  "raw": "<?xml version=\"1.0\"?>\n<env:Envelope xmlns:env=\"http://www.w3.org/2003/05/soap-envelope\"><env:Body><Ping/></env:Body></env:Envelope>"
+                }
+              }
+            }
+          ]
         }
       ]
     }
