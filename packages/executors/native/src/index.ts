@@ -44,6 +44,7 @@ export {
   iosPlatform,
   linuxPlatform,
   macPlatform,
+  hasFfmpeg,
   pointerActions,
   pressShortcut,
   windowsPlatform,

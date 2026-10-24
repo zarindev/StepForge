@@ -4,6 +4,8 @@ CareClinic for Linux: a small GTK 3 app for StepForge's Linux tests (the same ap
 Demo account: nurse@careclinic.test / CareClinic1. Each control has an accessible id (what a test id finds).
 Needs python3-gi and gir1.2-gtk-3.0.
 """
+import sys
+
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -91,8 +93,11 @@ class CareClinic(Gtk.Window):
         if self.email.get_text().strip() == "nurse@careclinic.test" and self.password.get_text() == "CareClinic1":
             self.error.set_text("")
             self.stack.set_visible_child_name("patients")
+            # The app's output is its log: StepForge keeps it with the test (like a phone's device log).
+            print(f"Signed in as {self.email.get_text().strip()}", flush=True)
         else:
             self.error.set_text("Wrong email or password")
+            print("Sign-in failed: wrong email or password", file=sys.stderr, flush=True)
 
     def add_patient(self, *_):
         n = self.name.get_text().strip()

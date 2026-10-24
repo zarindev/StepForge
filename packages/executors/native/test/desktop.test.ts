@@ -6,14 +6,17 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildMacDemo, MAC_DEMO_APP } from '../../../../scripts/build-macos-demo.ts';
+import { desktopScreenTests } from './desktop-screens.ts';
 import { desktopSteps } from './desktop-steps.ts';
 import {
   AppiumServer,
   createNativeExecutor,
   macCapabilities,
+  macPlatform,
   macQueries,
   pressShortcut,
   windowsCapabilities,
+  windowsPlatform,
   windowsQueries,
   type WebDriverSession,
 } from '../src/index.ts';
@@ -127,6 +130,17 @@ for (const platform of ['macos', 'windows'] as const) {
         },
         artifactsDir: mkdtempSync(join(tmpdir(), `sf-${platform}-`)),
       });
+
+    // Recording, a manual session and visual checkpoints, as the dashboard uses them.
+    desktopScreenTests({
+      name: platform === 'macos' ? 'macOS' : 'Windows',
+      platform: () =>
+        platform === 'macos' ? macPlatform({ appPath: MAC_DEMO_APP }) : windowsPlatform({ app: WIN_APP }),
+      url: () => appium.url(),
+      launch: platform === 'macos' ? { macos: { appPath: MAC_DEMO_APP } } : { windows: { app: WIN_APP } },
+      // Screen recording on CI runners needs a permission (macOS) or ffmpeg (Windows): checked when there.
+      video: false,
+    });
 
     it('signs in, adds a patient, uses a shortcut, a menu and a dialog', async () => {
       const r = await run(steps(...desktopSteps(platform)));

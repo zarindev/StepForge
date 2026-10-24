@@ -371,6 +371,65 @@ describe('Android apps', () => {
     },
     900_000,
   );
+  it.skipIf(!AVD)(
+    'a visual checkpoint of the screen: a new baseline, a match, then a failure with a difference image after a change',
+    async () => {
+      const checkpoint = { type: 'ui.visualCheckpoint', params: { name: 'sign-in screen' } };
+      const make = (steps: unknown[]) =>
+        ok('POST', `/api/modules/${moduleId}/scenarios`, { name: `Looks ${Date.now()}`, steps });
+      const runOf = async (scenarioId: string) => {
+        const r = await ok<{ id: string }>('POST', '/api/runs', {
+          applicationId: appId,
+          environmentId: envId,
+          scope: { type: 'scenarios', ids: [scenarioId] },
+          options: { video: 'off' },
+        });
+        await ctx.runs.idle();
+        const run = await ok<{ status: string; items: { id: string }[] }>('GET', `/api/runs/${r.id}`);
+        const item = await ok<{
+          steps: {
+            status: string;
+            responseJson?: { visual?: { status: string; diff?: string; key: string } };
+          }[];
+        }>('GET', `/api/run-items/${run.items[0]!.id}`);
+        return { status: run.status, visual: item.steps.at(-1)!.responseJson?.visual };
+      };
+      // The app waits on its sign-in screen: the same screen twice matches (the status bar's clock is left out).
+      const same = await make([
+        {
+          type: 'ui.waitFor',
+          params: { state: 'visible' },
+          locators: [{ strategy: 'testId', value: 'email' }],
+        },
+        checkpoint,
+      ]);
+      const first = await runOf(same.id);
+      expect(first.visual?.status).toBe('new');
+      const second = await runOf(same.id);
+      expect(second.status).toBe('passed');
+      expect(second.visual?.status).toBe('match');
+      // Typing into the email field changes the screen: the checkpoint fails and marks the difference.
+      const changed = await make([
+        {
+          type: 'ui.fill',
+          params: { value: 'someone.with.a.long.address@careclinic.test' },
+          locators: [{ strategy: 'testId', value: 'email' }],
+        },
+        { type: 'ui.hideKeyboard' },
+        checkpoint,
+      ]);
+      const third = await runOf(changed.id);
+      expect(third.status).toBe('failed');
+      expect(third.visual?.status).toBe('changed');
+      expect(third.visual?.diff).toMatch(/visual-\d+-diff\.png$/);
+      if (process.env.STEPFORGE_SHOTS)
+        copyFileSync(
+          join(ctx.config.artifactsDir, third.visual!.diff!),
+          `${process.env.STEPFORGE_SHOTS}/android-visual-diff.png`,
+        );
+    },
+    1_200_000,
+  );
 });
 
 /** Where the email field is on the app's screen, as fractions of its picture (waiting for the app to show it). */

@@ -266,6 +266,7 @@ jobs:
       - run: ./stepforge.sh doctor native --platform macos
         # Printed for the log; the tests below fail on their own if something is missing.
         continue-on-error: true
+      # The app's tests, then recording from its picture, a manual session and visual checkpoints (desktop-screens.ts).
       - run: npx vitest run packages/executors/native/test/desktop.test.ts
         env:
           STEPFORGE_TEST_MACOS: '1'
@@ -287,6 +288,7 @@ jobs:
       - run: dotnet build demo/windows-app -c Release -o demo/windows-app/build
       - run: node apps/cli/bin/stepforge.mjs doctor native --platform windows
         continue-on-error: true
+      # The app's tests, then recording from its picture, a manual session and visual checkpoints (desktop-screens.ts).
       - run: npx vitest run packages/executors/native/test/desktop.test.ts
         env:
           STEPFORGE_TEST_WINDOWS: '1'
@@ -305,10 +307,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install GTK and the accessibility layer
+      # ffmpeg records the screen (x11grab) for test videos and manual sessions.
+      - name: Install GTK, the accessibility layer and ffmpeg
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-atspi-2.0 at-spi2-core xvfb dbus-x11 python3-venv
+          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-atspi-2.0 at-spi2-core xvfb dbus-x11 python3-venv ffmpeg
       - run: dbus-run-session -- xvfb-run -a node apps/cli/bin/stepforge.mjs doctor native --platform linux
         continue-on-error: true
       - run: dbus-run-session -- xvfb-run -a npx vitest run packages/executors/native/test/linux.test.ts

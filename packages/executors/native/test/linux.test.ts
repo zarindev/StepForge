@@ -1,13 +1,16 @@
 import { DEFAULT_RUN_OPTIONS, newId, runTestCase, type StepInput } from '@stepforge/core';
 import { utilExecutor } from '@stepforge/executor-util';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { desktopScreenTests } from './desktop-screens.ts';
 import {
   createNativeExecutor,
+  hasFfmpeg,
   linuxCapabilities,
+  linuxPlatform,
   linuxQueries,
   LinuxHelper,
   LINUX_HELPER,
@@ -82,6 +85,39 @@ describe.skipIf(!process.env.STEPFORGE_TEST_LINUX)('Linux desktop app (CareClini
     { type: 'ui.fill', params: { value: 'CareClinic1' }, locators: id('password') },
     { type: 'ui.click', locators: [{ strategy: 'role', value: 'button', name: 'Sign in' }] },
   ];
+
+  // Recording, a manual session and visual checkpoints, as the dashboard uses them (CI installs ffmpeg).
+  desktopScreenTests({
+    name: 'Linux',
+    platform: () => linuxPlatform({ app: 'python3', arguments: [DEMO] }),
+    url: () => helper.url(),
+    launch: { linux: { app: 'python3', arguments: [DEMO] } },
+    video: hasFfmpeg(),
+  });
+
+  it("keeps the app's output as its log and records the screen with ffmpeg", async () => {
+    const r = await runTestCase({
+      runId: 'R',
+      steps: steps(...signIn, count('No patients yet')),
+      env: {},
+      executors: [createNativeExecutor({ appiumUrl: () => helper.url() }), utilExecutor],
+      options: {
+        ...DEFAULT_RUN_OPTIONS,
+        defaultTimeoutMs: 20_000,
+        video: 'always',
+        captureLogs: true,
+        trace: 'off',
+        linux: { app: 'python3', arguments: [DEMO] },
+      },
+      artifactsDir: mkdtempSync(join(tmpdir(), 'sf-linux-log-')),
+    });
+    expect(r.status).toBe('passed');
+    const consoleLog = r.artifacts.find((a) => a.kind === 'console');
+    expect(consoleLog).toBeDefined();
+    const lines = JSON.parse(readFileSync(consoleLog!.path, 'utf8')) as { text: string }[];
+    expect(lines.map((l) => l.text)).toContain('Signed in as nurse@careclinic.test');
+    if (hasFfmpeg()) expect(r.artifacts.some((a) => a.kind === 'video')).toBe(true);
+  }, 300_000);
 
   it('signs in, adds a patient, uses a menu and its dialog', async () => {
     const r = await run(
