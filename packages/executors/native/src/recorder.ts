@@ -1,6 +1,7 @@
 import { StepError, type Locator, type StepInput } from '@stepforge/core';
 import type { Direction, NativePlatform } from './platforms.ts';
-import { xpathLiteral } from './locators.ts';
+import { linuxNamed, xpathLiteral } from './locators.ts';
+import { pngSize, type Area } from './view.ts';
 import { WebDriverSession, type ElementRef } from './webdriver.ts';
 
 export type NativeRecordedStep = StepInput & { id: number; describe?: string };
@@ -16,7 +17,10 @@ export type NativeRecorderSnapshot = {
 /** An element of the screen, from the app's element tree. */
 export type ScreenElement = {
   attrs: Record<string, string>;
-  /** In the window's coordinates (pixels on Android, points on iOS). */
+  /**
+   * In the element tree's coordinates: pixels on Android, points on iOS and macOS (the main display's), the app
+   * window's pixels on Windows, the screen's pixels on Linux.
+   */
   rect: { x: number; y: number; width: number; height: number };
   depth: number;
 };
@@ -56,27 +60,68 @@ export function parseElements(xml: string): ScreenElement[] {
         height: Number(attrs.height),
       };
     }
-    if (rect && tag !== 'hierarchy' && tag !== 'AppiumAUT') out.push({ attrs, rect, depth });
+    if (rect && tag !== 'hierarchy' && tag !== 'AppiumAUT' && tag !== 'application')
+      out.push({ attrs, rect, depth });
     if (!selfClosing) depth++;
   }
   return out;
 }
 
-const isAndroid = (e: ScreenElement) => e.attrs.bounds !== undefined;
+type Kind = NativePlatform['name'];
+
+/**
+ * Which app an element comes from, by its element tree: Android (bounds), macOS (Mac2: XCUIElementType tags with an
+ * identifier), iOS (XCUIElementType tags with a name), Windows (UI Automation's AutomationId), Linux (the helper).
+ */
+export function kindOf(e: ScreenElement): Kind {
+  const a = e.attrs;
+  if (a.bounds !== undefined) return 'Android';
+  if (a.tag?.startsWith('XCUIElementType'))
+    return a.elementType !== undefined || (a.identifier !== undefined && a.type === undefined)
+      ? 'macOS'
+      : 'iOS';
+  if (a.AutomationId !== undefined || a.ControlType !== undefined || a.LocalizedControlType !== undefined)
+    return 'Windows';
+  return 'Linux';
+}
 const typeOf = (e: ScreenElement) => e.attrs.type ?? e.attrs.class ?? e.attrs.tag ?? '';
-const FIELD = /EditText|TextField|SecureTextField|TextView$|SearchField|AutoCompleteTextView/;
+const FIELD =
+  /EditText|TextField|SecureTextField|TextView$|SearchField|AutoCompleteTextView|XCUIElementTypeComboBox|^Edit$|^(text|entry|password_text)$/;
 export const isField = (e: ScreenElement) =>
   FIELD.test(typeOf(e)) && !/StaticText/.test(typeOf(e)) && typeOf(e) !== 'android.widget.TextView';
-const isSecret = (e: ScreenElement) => e.attrs.password === 'true' || /SecureTextField/.test(typeOf(e));
+const isSecret = (e: ScreenElement) =>
+  e.attrs.password === 'true' ||
+  e.attrs.IsPassword === 'True' ||
+  /SecureTextField|^password_text$/.test(typeOf(e));
 
 /** Worth recording on its own: something a user taps or reads, not a layout container. */
 function meaningful(e: ScreenElement): boolean {
   const a = e.attrs;
-  if (isAndroid(e))
-    return a.clickable === 'true' || !!a.text || !!a['content-desc'] || /:id\//.test(a['resource-id'] ?? '');
-  return (
-    !/XCUIElementType(Other|Window|Application|ScrollView|Table|CollectionView)$/.test(typeOf(e)) || !!a.name
-  );
+  switch (kindOf(e)) {
+    case 'Android':
+      return (
+        a.clickable === 'true' || !!a.text || !!a['content-desc'] || /:id\//.test(a['resource-id'] ?? '')
+      );
+    case 'iOS':
+      return (
+        !/XCUIElementType(Other|Window|Application|ScrollView|Table|CollectionView)$/.test(typeOf(e)) ||
+        !!a.name
+      );
+    case 'macOS':
+      return (
+        !/XCUIElementType(Other|Window|Application|ScrollView|Table|Outline|CollectionView|Group|SplitGroup|LayoutArea|Toolbar|Sheet|Unknown)$/.test(
+          typeOf(e),
+        ) || !!a.identifier
+      );
+    case 'Windows':
+      return !/^(Pane|Window|Group|Custom|TitleBar|ScrollBar)$/.test(typeOf(e)) || !!a.AutomationId;
+    case 'Linux':
+      return (
+        !/^(filler|panel|frame|scroll_pane|viewport|window|dialog|layered_pane|unknown|redundant_object)$/.test(
+          typeOf(e),
+        ) || !!a.id
+      );
+  }
 }
 
 /** The element under a point: the smallest meaningful one that contains it (else the smallest of all). */
@@ -89,7 +134,8 @@ export function elementAt(elements: ScreenElement[], x: number, y: number): Scre
       y >= e.rect.y &&
       x <= e.rect.x + e.rect.width &&
       y <= e.rect.y + e.rect.height &&
-      e.attrs.visible !== 'false',
+      e.attrs.visible !== 'false' &&
+      e.attrs.IsOffscreen !== 'True',
   );
   const area = (e: ScreenElement) => e.rect.width * e.rect.height;
   const byArea = (a: ScreenElement, b: ScreenElement) => area(a) - area(b) || b.depth - a.depth;
@@ -116,12 +162,100 @@ const ANDROID_ROLES: Record<string, string> = {
   'android.widget.ImageView': 'img',
 };
 
+const MAC_ROLES: Record<string, string> = {
+  XCUIElementTypeButton: 'button',
+  XCUIElementTypeCheckBox: 'checkbox',
+  XCUIElementTypeRadioButton: 'radio',
+  XCUIElementTypePopUpButton: 'combobox',
+  XCUIElementTypeMenuItem: 'menuitem',
+  XCUIElementTypeMenuBarItem: 'menuitem',
+  XCUIElementTypeStaticText: 'text',
+  XCUIElementTypeLink: 'link',
+  XCUIElementTypeImage: 'img',
+  XCUIElementTypeSlider: 'slider',
+};
+const WINDOWS_ROLES: Record<string, string> = {
+  Button: 'button',
+  CheckBox: 'checkbox',
+  RadioButton: 'radio',
+  ComboBox: 'combobox',
+  MenuItem: 'menuitem',
+  Hyperlink: 'link',
+  Text: 'text',
+  ListItem: 'listitem',
+  TabItem: 'tab',
+  Image: 'img',
+  Slider: 'slider',
+};
+const LINUX_ROLES: Record<string, string> = {
+  push_button: 'button',
+  toggle_button: 'button',
+  check_box: 'checkbox',
+  radio_button: 'radio',
+  combo_box: 'combobox',
+  menu_item: 'menuitem',
+  menu: 'menuitem',
+  label: 'text',
+  link: 'link',
+  page_tab: 'tab',
+  slider: 'slider',
+};
+
+/** Locators of a desktop app's element: the same strategies the desktop queries (locators.ts) look up. */
+function desktopLocators(e: ScreenElement, kind: 'macOS' | 'Windows' | 'Linux'): Locator[] {
+  const a = e.attrs;
+  const tag = a.tag ?? '*';
+  const field = isField(e);
+  const out: Locator[] = [];
+  if (kind === 'macOS') {
+    // Buttons show their title; static texts their value.
+    const text = a.title || a.label || (tag === 'XCUIElementTypeStaticText' ? a.value : '') || '';
+    if (a.identifier) out.push({ strategy: 'testId', value: a.identifier, score: 95 });
+    if (field && a.placeholderValue)
+      out.push({ strategy: 'placeholder', value: a.placeholderValue, score: 85 });
+    const role = MAC_ROLES[tag];
+    if (role && !field && text) out.push({ strategy: 'role', value: role, name: text, score: 80 });
+    if (!field && text) out.push({ strategy: 'text', value: text, score: 70 });
+    const attr = a.identifier
+      ? `@identifier=${xpathLiteral(a.identifier)}`
+      : a.title
+        ? `@title=${xpathLiteral(a.title)}`
+        : a.label
+          ? `@label=${xpathLiteral(a.label)}`
+          : field && a.placeholderValue
+            ? `@placeholderValue=${xpathLiteral(a.placeholderValue)}`
+            : '';
+    if (attr) out.push({ strategy: 'xpath', value: `//${tag}[${attr}]`, score: 30 });
+    return out;
+  }
+  // Windows (UI Automation) and Linux (AT-SPI): an id, and a name (a field's name is its label).
+  const id = kind === 'Windows' ? a.AutomationId : a.id;
+  const name = (kind === 'Windows' ? a.Name : a.name) ?? '';
+  if (id) out.push({ strategy: 'testId', value: id, score: 95 });
+  if (field && name) out.push({ strategy: 'label', value: name, score: 85 });
+  const role = (kind === 'Windows' ? WINDOWS_ROLES : LINUX_ROLES)[tag];
+  if (role && !field && name) out.push({ strategy: 'role', value: role, name, score: 80 });
+  if (!field && name) out.push({ strategy: 'text', value: name, score: 70 });
+  if (kind === 'Windows') {
+    const attr = id ? `@AutomationId=${xpathLiteral(id)}` : name ? `@Name=${xpathLiteral(name)}` : '';
+    if (attr) out.push({ strategy: 'xpath', value: `//${tag}[${attr}]`, score: 30 });
+  } else if (id && !(id.includes("'") && id.includes('"'))) {
+    out.push({ strategy: 'xpath', value: `//${tag}[@id=${xpathLiteral(id)}]`, score: 30 });
+  } else if (name) {
+    // ElementTree's XPath has no concat(): a name with both quotes has no XPath.
+    const q = linuxNamed(tag, name);
+    if (q.using === 'xpath') out.push({ strategy: 'xpath', value: q.value, score: 30 });
+  }
+  return out;
+}
+
 /** Ranked locators for an element, best first (they are checked against the app before use). */
-export function locatorsFor(e: ScreenElement): Locator[] {
+export function locatorsFor(e: ScreenElement, kind: Kind = kindOf(e)): Locator[] {
   const a = e.attrs;
   const out: Locator[] = [];
   const field = isField(e);
-  if (isAndroid(e)) {
+  if (kind === 'macOS' || kind === 'Windows' || kind === 'Linux') return desktopLocators(e, kind);
+  if (kind === 'Android') {
     const id = /:id\/(.+)$/.exec(a['resource-id'] ?? '')?.[1];
     if (id) out.push({ strategy: 'testId', value: id, score: 95 });
     if (a['content-desc']) out.push({ strategy: 'label', value: a['content-desc'], score: 90 });
@@ -156,7 +290,17 @@ export function locatorsFor(e: ScreenElement): Locator[] {
 
 const describeEl = (e: ScreenElement) => {
   const a = e.attrs;
-  const name = a.text || a.label || a['content-desc'] || a.hint || a.placeholderValue || a.name || '';
+  const name =
+    a.text ||
+    a.label ||
+    a.title ||
+    a['content-desc'] ||
+    a.hint ||
+    a.placeholderValue ||
+    a.name ||
+    a.Name ||
+    (a.tag === 'XCUIElementTypeStaticText' ? a.value : '') ||
+    '';
   const kind = (typeOf(e).split('.').pop() ?? '').replace('XCUIElementType', '');
   return name ? `${kind} "${name}"` : kind;
 };
@@ -167,9 +311,9 @@ const camel = (s: string) =>
     .replace(/^./, (c) => c.toLowerCase()) || 'password';
 
 /**
- * Recording a phone app: the dashboard shows the screen; a tap, typing, a swipe or a check there is done in the app and
- * becomes a step, with locators taken from the element tree. Same snapshot shape as the browser recorder, so review
- * and save work the same way.
+ * Recording a phone or desktop app: the dashboard shows the screen (a desktop app's windows); a tap or click, typing,
+ * a swipe, a key, a menu or a check there is done in the app and becomes a step, with locators taken from the element
+ * tree. Same snapshot shape as the browser recorder, so review and save work the same way.
  */
 export class NativeRecordingSession {
   state: 'recording' | 'stopped' = 'recording';
@@ -178,8 +322,8 @@ export class NativeRecordingSession {
   private nextId = 1;
   private lastField?: { locators: Locator[]; secret: boolean; step?: NativeRecordedStep };
   private busy: Promise<unknown> = Promise.resolve();
-  /** The last screenshot's size in pixels (the screen the dashboard shows). */
-  private shotSize?: { width: number; height: number };
+  /** What the dashboard's picture shows, in the element tree's coordinates (from the last picture). */
+  private area?: Area;
 
   private constructor(
     private readonly driver: WebDriverSession,
@@ -242,21 +386,27 @@ export class NativeRecordingSession {
     return next;
   }
 
-  /** The screen as a PNG, and its size in pixels. */
+  /** The screen (a desktop app's windows) as a PNG, and its size in pixels. */
   async screen(): Promise<{ png: Buffer; width: number; height: number }> {
-    const png = await this.driver.screenshot();
-    this.shotSize = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
-    return { png, ...this.shotSize };
+    const { png, area } = await this.platform.view(this.driver);
+    this.area = area;
+    return { png, ...pngSize(png) };
   }
 
   /**
-   * What the screen fractions are fractions of, in the element tree's coordinates. Android's tree is in the
-   * screenshot's pixels (the window size leaves out the status and navigation bars); iOS's is in points, which the
-   * window size gives.
+   * What the screen fractions are fractions of, in the element tree's coordinates: the part the last picture showed.
+   * Android's tree is in the screenshot's pixels (the window size leaves out the status and navigation bars); iOS's
+   * and macOS's in points (a Retina picture has more pixels: fractions need no scale); a desktop picture shows only
+   * the app's windows.
    */
-  private async screenSize(): Promise<{ width: number; height: number }> {
-    if (this.platform.name === 'Android') return this.shotSize ?? (await this.screen());
-    return this.driver.windowSize();
+  private async screenArea(): Promise<Area> {
+    if (!this.area) await this.screen();
+    return this.area!;
+  }
+
+  /** Clicked or tapped, by the platform's words. */
+  private get verb() {
+    return this.platform.kind === 'desktop' ? 'Click' : 'Tap';
   }
 
   /** The element at a point given as fractions of the screen (0–1), with its ranked, checked locators. */
@@ -274,8 +424,8 @@ export class NativeRecordingSession {
    * element's XPath with its position among the matches.
    */
   private async at(fx: number, fy: number) {
-    const [source, size] = await Promise.all([this.driver.source(), this.screenSize()]);
-    const element = elementAt(parseElements(source), fx * size.width, fy * size.height);
+    const [source, area] = await Promise.all([this.driver.source(), this.screenArea()]);
+    const element = elementAt(parseElements(source), area.x + fx * area.width, area.y + fy * area.height);
     if (!element) return null;
     const same = (r: ScreenElement['rect']) =>
       Math.abs(r.x - element.rect.x) <= 1 &&
@@ -283,7 +433,7 @@ export class NativeRecordingSession {
       Math.abs(r.width - element.rect.width) <= 1 &&
       Math.abs(r.height - element.rect.height) <= 1;
     const rectOf = (el: ElementRef) => this.driver.rect(el).catch(() => undefined);
-    const candidates = locatorsFor(element);
+    const candidates = locatorsFor(element, this.platform.name);
     const locators: Locator[] = [];
     let el: ElementRef | undefined;
     for (const l of candidates) {
@@ -314,8 +464,11 @@ export class NativeRecordingSession {
   async pointOf(locators: Locator[]): Promise<{ x: number; y: number } | null> {
     const el = await this.find(locators);
     if (!el) return null;
-    const [r, size] = await Promise.all([this.driver.rect(el), this.screenSize()]);
-    return { x: (r.x + r.width / 2) / size.width, y: (r.y + r.height / 2) / size.height };
+    const [r, area] = await Promise.all([this.driver.rect(el), this.screenArea()]);
+    return {
+      x: (r.x + r.width / 2 - area.x) / area.width,
+      y: (r.y + r.height / 2 - area.y) / area.height,
+    };
   }
 
   /** What a locator's first query with any matches finds. */
@@ -338,7 +491,7 @@ export class NativeRecordingSession {
 
   private async target(fx: number, fy: number) {
     const hit = await this.at(fx, fy);
-    if (!hit) throw new StepError('element_not_found', 'Nothing to tap there');
+    if (!hit) throw new StepError('element_not_found', `Nothing to ${this.verb.toLowerCase()} there`);
     if (!hit.locators.length || !hit.el)
       throw new StepError(
         'element_not_found',
@@ -348,18 +501,90 @@ export class NativeRecordingSession {
     return { ...hit, el: hit.el };
   }
 
-  /** A tap: done in the app; a text field only gets the focus (typing records the step). */
+  /** A tap (a click): done in the app; a text field only gets the focus (typing records the step). */
   tap(fx: number, fy: number) {
+    return this.click(fx, fy);
+  }
+
+  /** A click on a desktop app (a tap on a phone): left, double or right. */
+  click(fx: number, fy: number, opts: { button?: 'left' | 'right'; count?: number } = {}) {
     return this.serial(async () => {
       const t = await this.target(fx, fy);
+      if (opts.button === 'right') {
+        await this.platform.rightClick(this.driver, t.el);
+        this.lastField = undefined;
+        this.push({
+          type: 'ui.rightclick',
+          params: {},
+          locators: t.locators,
+          describe: `Right-click ${t.describe}`,
+        });
+        return { describe: t.describe, field: false };
+      }
+      if ((opts.count ?? 1) >= 2) {
+        await this.platform.doubleTap(this.driver, t.el);
+        this.lastField = undefined;
+        const verb = this.platform.kind === 'desktop' ? 'Double-click' : 'Double-tap';
+        this.push({
+          type: 'ui.dblclick',
+          params: {},
+          locators: t.locators,
+          describe: `${verb} ${t.describe}`,
+        });
+        return { describe: t.describe, field: false };
+      }
       await this.driver.click(t.el);
       if (isField(t.element)) {
         this.lastField = { locators: t.locators, secret: isSecret(t.element) };
         return { describe: t.describe, field: true };
       }
       this.lastField = undefined;
-      this.push({ type: 'ui.click', params: {}, locators: t.locators, describe: `Tap ${t.describe}` });
+      this.push({
+        type: 'ui.click',
+        params: {},
+        locators: t.locators,
+        describe: `${this.verb} ${t.describe}`,
+      });
       return { describe: t.describe, field: false };
+    });
+  }
+
+  /** A key or a shortcut ("Enter", "Control+S"), pressed where the focus is. */
+  key(combo: string) {
+    return this.serial(async () => {
+      const key = combo.trim();
+      if (!key) throw new StepError('invalid_params', 'Name a key, e.g. Enter or Control+S');
+      await this.platform.pressKey(this.driver, key);
+      this.lastField = undefined;
+      this.push({ type: 'ui.press', params: { key }, locators: [], describe: `Press ${key}` });
+    });
+  }
+
+  /** A menu path of a desktop app ("File > Save"). */
+  menu(pathText: string) {
+    return this.serial(async () => {
+      const path = pathText
+        .split('>')
+        .map((x) => x.trim())
+        .filter(Boolean);
+      if (!path.length) throw new StepError('invalid_params', 'Name the menu path, e.g. File > Save');
+      await this.platform.menu(this.driver, path);
+      this.lastField = undefined;
+      this.push({
+        type: 'ui.menu',
+        params: { path: path.join(' > ') },
+        locators: [],
+        describe: `Choose ${path.join(' > ')}`,
+      });
+    });
+  }
+
+  /** Scrolls a desktop app's window. */
+  scroll(direction: 'up' | 'down') {
+    return this.serial(async () => {
+      await this.platform.scroll(this.driver, direction);
+      this.lastField = undefined;
+      this.push({ type: 'ui.scroll', params: { y: direction === 'down' ? 600 : -600 }, locators: [] });
     });
   }
 

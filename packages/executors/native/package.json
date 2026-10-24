@@ -9,6 +9,10 @@
   },
   "dependencies": {
     "@stepforge/core": "*",
-    "@stepforge/image-match": "*"
+    "@stepforge/image-match": "*",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
   }
 }

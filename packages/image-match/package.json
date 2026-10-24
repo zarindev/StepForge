@@ -5,9 +5,12 @@
   "description": "Finds a small picture inside a screenshot (normalized cross-correlation), for image locators. By Md Zarin Tasnim.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./visual": "./src/visual.ts"
   },
   "dependencies": {
+    "@stepforge/core": "*",
+    "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0"
   },
   "devDependencies": {

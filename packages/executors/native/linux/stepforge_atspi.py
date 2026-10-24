@@ -107,10 +107,23 @@ class Session:
         # Qt only exposes its accessibility tree when asked; GTK does by default.
         env.setdefault("QT_LINUX_ACCESSIBILITY_ALWAYS_ON", "1")
         env.setdefault("QT_ACCESSIBILITY", "1")
+        # The app's output (stdout and stderr) is its log: kept here and read with /se/log (type "app").
+        self.log = []
+        self.log_lock = threading.Lock()
+        self.quitting = False
         try:
-            self.proc = subprocess.Popen([app, *args], env=env, cwd=caps.get("stepforge:workingDir") or None)
+            self.proc = subprocess.Popen(
+                [app, *args],
+                env=env,
+                cwd=caps.get("stepforge:workingDir") or None,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
         except OSError as e:
             raise WdError("session not created", f"The app could not be started: {e}", 500)
+        for stream, level in ((self.proc.stdout, "INFO"), (self.proc.stderr, "WARNING")):
+            threading.Thread(target=self.read_output, args=(stream, level), daemon=True).start()
+        threading.Thread(target=self.watch_exit, daemon=True).start()
         self.elements = {}
         self.app = None
         deadline = time.time() + float(caps.get("stepforge:launchTimeout") or 30)
@@ -124,6 +137,28 @@ class Session:
         if self.app is None:
             self.quit()
             raise WdError("session not created", "The app started but did not appear on the accessibility bus", 500)
+
+    def add_log(self, level, message):
+        with self.log_lock:
+            self.log.append({"timestamp": int(time.time() * 1000), "level": level, "message": message})
+            # The newest 5000 lines are kept until StepForge reads them.
+            del self.log[:-5000]
+
+    def read_output(self, stream, level):
+        for raw in iter(stream.readline, b""):
+            line = raw.decode("utf-8", "replace").rstrip("\n")
+            if line:
+                self.add_log(level, line)
+
+    def watch_exit(self):
+        code = self.proc.wait()
+        if not self.quitting:
+            self.add_log("SEVERE", f"The app exited with code {code}")
+
+    def take_log(self):
+        with self.log_lock:
+            lines, self.log = self.log, []
+        return lines
 
     def find_app(self):
         desktop = Atspi.get_desktop(0)
@@ -236,6 +271,7 @@ class Session:
         return base64.b64encode(data).decode()
 
     def quit(self):
+        self.quitting = True
         if self.proc.poll() is None:
             self.proc.terminate()
             try:
@@ -314,7 +350,9 @@ def perform(session, actions):
                     Atspi.generate_mouse_event(session.pointer[0], session.pointer[1], "abs")
                 elif t in ("pointerDown", "pointerUp"):
                     x, y = getattr(session, "pointer", (0, 0))
-                    Atspi.generate_mouse_event(x, y, "b1p" if t == "pointerDown" else "b1r")
+                    # W3C buttons: 0 left, 1 middle, 2 right; X buttons: 1 left, 2 middle, 3 right.
+                    button = {0: 1, 1: 2, 2: 3}.get(int(a.get("button") or 0), 1)
+                    Atspi.generate_mouse_event(x, y, f"b{button}{'p' if t == 'pointerDown' else 'r'}")
     finally:
         # Never leave a key down (a failed action would keep Control held for the whole desktop).
         for code in held.values():
@@ -404,7 +442,7 @@ def handle(method, parts, body):
         perform(s, body.get("actions") or [])
         return None
     if rest == ["se", "log"]:
-        return []
+        return s.take_log() if body.get("type") == "app" else []
     # Asked by some WebDriver clients when a session starts; lookups wait in the client, not here.
     if rest == ["timeouts"]:
         return None if method == "POST" else {"implicit": 0, "pageLoad": 300000, "script": 30000}

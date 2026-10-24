@@ -119,6 +119,13 @@ export class WebDriverSession {
   async windowSize(): Promise<{ width: number; height: number }> {
     return (await this.cmd('GET', '/window/rect')) as { width: number; height: number };
   }
+  /** The window's place and size (Mac2: the main display; NovaWindows: the app window; Linux: the screen). */
+  async windowRect(): Promise<{ x: number; y: number; width: number; height: number }> {
+    const r = (await this.cmd('GET', '/window/rect')) as Partial<
+      Record<'x' | 'y' | 'width' | 'height', number>
+    >;
+    return { x: r.x ?? 0, y: r.y ?? 0, width: r.width ?? 0, height: r.height ?? 0 };
+  }
   /** The element that has the keyboard focus, if any. */
   async activeElement(): Promise<ElementRef | undefined> {
     const e = (await this.cmd('GET', '/element/active').catch(() => null)) as Record<string, string> | null;

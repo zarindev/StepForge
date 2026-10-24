@@ -7,7 +7,7 @@ import {
   type MacLaunch,
   type WindowsLaunch,
 } from '@stepforge/core';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -24,6 +24,7 @@ import {
   type Query,
 } from './locators.ts';
 import { parseElements } from './recorder.ts';
+import { desktopView, phoneView, type AppView } from './view.ts';
 import type { ElementRef, WebDriverSession } from './webdriver.ts';
 
 /** What differs between Android and iOS for the same steps. */
@@ -67,6 +68,49 @@ export type NativePlatform = {
   queryAppState(d: WebDriverSession): Promise<number | undefined>;
   /** Desktop apps: opens a menu path such as ["File", "Save"]. */
   menu(d: WebDriverSession, path: string[]): Promise<void>;
+  /** Desktop apps: a right-click on an element (its context menu). */
+  rightClick(d: WebDriverSession, el: ElementRef): Promise<void>;
+  /** What the dashboard shows of the app: the screen (phones) or the app's windows (desktops); see view.ts. */
+  view(d: WebDriverSession): Promise<AppView>;
+  /** A tap or click at a point in the element tree's coordinates (from the dashboard's picture of the screen). */
+  pointer(d: WebDriverSession, x: number, y: number, opts?: PointerOptions): Promise<void>;
+  /** Phones: the status bar's height in screenshot pixels (its clock changes, so visual checkpoints leave it out). */
+  statusBar(d: WebDriverSession): Promise<number>;
+};
+
+export type PointerOptions = { button?: 'left' | 'right'; count?: number; holdMs?: number };
+
+/** W3C pointer actions at a point: taps on a phone, clicks with a mouse. */
+export async function pointerActions(
+  d: WebDriverSession,
+  x: number,
+  y: number,
+  pointerType: 'touch' | 'mouse',
+  opts: PointerOptions = {},
+): Promise<void> {
+  const button = opts.button === 'right' ? 2 : 0;
+  const one = [
+    { type: 'pointerMove', duration: 0, x: Math.round(x), y: Math.round(y), origin: 'viewport' },
+    { type: 'pointerDown', button },
+    { type: 'pause', duration: opts.holdMs ?? 80 },
+    { type: 'pointerUp', button },
+  ];
+  const actions = Array.from({ length: Math.max(1, opts.count ?? 1) }, (_, i) => [
+    ...(i ? [{ type: 'pause', duration: 100 }] : []),
+    ...one,
+  ]).flat();
+  await d.actions([
+    {
+      type: 'pointer',
+      id: pointerType === 'touch' ? 'finger' : 'mouse',
+      parameters: { pointerType },
+      actions,
+    },
+  ]);
+}
+
+const phoneRightClick = async (): Promise<void> => {
+  throw new StepError('unsupported', 'Right-clicking is for desktop apps; in a phone app long-press instead');
 };
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -139,6 +183,67 @@ async function simulatorRecording(udid: string): Promise<(() => Promise<Buffer |
     await new Promise<void>((done) => {
       proc.on('exit', () => done());
       proc.kill('SIGINT');
+      setTimeout(() => {
+        proc.kill('SIGKILL');
+        done();
+      }, 20_000);
+    });
+    const video = existsSync(file) ? readFileSync(file) : null;
+    rmSync(dir, { recursive: true, force: true });
+    return video;
+  };
+}
+
+/** Whether ffmpeg is on the PATH. */
+export const hasFfmpeg = () => {
+  try {
+    return spawnSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: 10_000 }).status === 0;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * A Linux screen recording: ffmpeg grabs the X display (x11grab) at 10 frames a second. Without ffmpeg (or a
+ * display) it explains what is missing; the test goes on without a video.
+ */
+export async function x11Recording(
+  d: WebDriverSession,
+  display = process.env.DISPLAY,
+): Promise<(() => Promise<Buffer | null>) | null> {
+  if (!display) throw new Error('No screen recording: there is no X display (DISPLAY is not set)');
+  if (!hasFfmpeg())
+    throw new Error(
+      'No screen recording: install ffmpeg to record Linux apps (e.g. sudo apt-get install ffmpeg)',
+    );
+  const { width, height } = await d.windowRect();
+  const dir = mkdtempSync(join(tmpdir(), 'sf-x11-video-'));
+  const file = join(dir, 'video.mp4');
+  // libx264 wants even sizes.
+  const size = `${width - (width % 2)}x${height - (height % 2)}`;
+  const proc = spawn(
+    'ffmpeg',
+    [
+      ...['-y', '-loglevel', 'error', '-f', 'x11grab', '-framerate', '10', '-video_size', size],
+      ...['-i', display, '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', file],
+    ],
+    { stdio: ['pipe', 'ignore', 'pipe'] },
+  );
+  let failed = '';
+  proc.stderr!.on('data', (b: Buffer) => (failed += b.toString()));
+  // ffmpeg stops at once when it cannot grab the display.
+  await new Promise((r) => setTimeout(r, 500));
+  if (proc.exitCode !== null) {
+    rmSync(dir, { recursive: true, force: true });
+    throw new Error(
+      `No screen recording: ffmpeg could not record the display (${failed.trim().slice(0, 200)})`,
+    );
+  }
+  return async () => {
+    await new Promise<void>((done) => {
+      proc.on('exit', () => done());
+      // "q" ends the recording cleanly (the MP4 gets its index).
+      proc.stdin!.end('q');
       setTimeout(() => {
         proc.kill('SIGKILL');
         done();
@@ -251,6 +356,15 @@ export function androidPlatform(launch: AndroidLaunch): NativePlatform {
     },
     log: { type: 'logcat', crash: /FATAL EXCEPTION|ANR in / },
     menu: phoneOnlyMenu,
+    rightClick: phoneRightClick,
+    view: (d) => phoneView(d, 'Android'),
+    pointer: (d, x, y, opts) => pointerActions(d, x, y, 'touch', opts),
+    async statusBar(d) {
+      const bars = (await d.execute('mobile: getSystemBars').catch(() => null)) as {
+        statusBar?: { height?: number };
+      } | null;
+      return bars?.statusBar?.height ?? 0;
+    },
     record: appiumRecording,
     appId: cachedAppId(
       async (d) =>
@@ -413,6 +527,17 @@ export function iosPlatform(launch: IosLaunch): NativePlatform {
     },
     log: { type: 'syslog', crash: /Terminating app due to uncaught exception|crashed/ },
     menu: phoneOnlyMenu,
+    rightClick: phoneRightClick,
+    view: (d) => phoneView(d, 'iOS'),
+    pointer: (d, x, y, opts) => pointerActions(d, x, y, 'touch', opts),
+    async statusBar(d) {
+      // In points, with the screen's scale (pixels per point).
+      const info = (await d.execute('mobile: deviceScreenInfo').catch(() => null)) as {
+        statusBarSize?: { height?: number };
+        scale?: number;
+      } | null;
+      return Math.round((info?.statusBarSize?.height ?? 0) * (info?.scale ?? 1));
+    },
     async record(d) {
       const udid = String(d.capabilities.udid ?? d.capabilities['appium:udid'] ?? '');
       const simulator = !!udid && listSimulators().some((s) => s.udid === udid);
@@ -703,6 +828,17 @@ export function macPlatform(launch: MacLaunch): NativePlatform {
       const s = await d.execute('macos: queryAppState', [app()]).catch(() => undefined);
       return typeof s === 'number' ? s : undefined;
     },
+    rightClick: async (d, el) => void (await d.execute('macos: rightClick', [{ elementId: el }])),
+    view: (d) => desktopView(d, 'macOS'),
+    // Points on the main display, as the element tree gives them.
+    async pointer(d, x, y, opts = {}) {
+      const at = { x: Math.round(x), y: Math.round(y) };
+      if (opts.holdMs) await d.execute('macos: press', [{ ...at, duration: opts.holdMs / 1000 }]);
+      else if (opts.button === 'right') await d.execute('macos: rightClick', [at]);
+      else if ((opts.count ?? 1) >= 2) await d.execute('macos: doubleClick', [at]);
+      else await d.execute('macos: click', [at]);
+    },
+    statusBar: async () => 0,
     async menu(d, path) {
       for (const [i, title] of path.entries()) {
         const type = i === 0 ? 'XCUIElementTypeMenuBarItem' : 'XCUIElementTypeMenuItem';
@@ -800,6 +936,23 @@ export function windowsPlatform(launch: WindowsLaunch): NativePlatform {
       await pressUntilGone(d, find);
     },
     queryAppState: async () => undefined,
+    rightClick: async (d, el) =>
+      void (await d.execute('windows: click', [{ elementId: el, button: 'right' }])),
+    view: (d) => desktopView(d, 'Windows'),
+    // NovaWindows gives positions from the app window's top-left corner; its click takes screen positions.
+    async pointer(d, x, y, opts = {}) {
+      const win = await d.windowRect();
+      await d.execute('windows: click', [
+        {
+          x: Math.round(win.x + x),
+          y: Math.round(win.y + y),
+          button: opts.button ?? 'left',
+          times: Math.max(1, opts.count ?? 1),
+          ...(opts.holdMs && { durationMs: opts.holdMs }),
+        },
+      ]);
+    },
+    statusBar: async () => 0,
     async menu(d, path) {
       for (const title of path) {
         const els = await d.findAll('xpath', `//MenuItem[@Name=${xpathLiteral(title)}]`);
@@ -860,8 +1013,12 @@ export function linuxPlatform(launch: LinuxLaunch): NativePlatform {
       await pressShortcut(d, direction === 'down' ? 'PageDown' : 'PageUp');
       return true;
     },
-    log: { type: '', crash: /$^/ },
-    record: async () => null,
+    // The app's own output (stdout and stderr), kept by the helper.
+    log: {
+      type: 'app',
+      crash: /Traceback \(most recent call last\)|core dumped|The app exited with code [^0]/,
+    },
+    record: (d) => x11Recording(d),
     appId: async () => launch.app ?? '',
     longPress: notOnDesktop('A long press'),
     swipe: notOnDesktop('A swipe'),
@@ -888,6 +1045,14 @@ export function linuxPlatform(launch: LinuxLaunch): NativePlatform {
       await pressUntilGone(d, find);
     },
     queryAppState: async () => undefined,
+    async rightClick(d, el) {
+      const r = await d.rect(el);
+      await pointerActions(d, r.x + r.width / 2, r.y + r.height / 2, 'mouse', { button: 'right' });
+    },
+    view: (d) => desktopView(d, 'Linux'),
+    // Screen positions, as the helper gives them.
+    pointer: (d, x, y, opts) => pointerActions(d, x, y, 'mouse', opts),
+    statusBar: async () => 0,
     async menu(d, path) {
       for (const [i, title] of path.entries()) {
         const item = linuxNamed(i === 0 ? 'menu' : 'menu_item', title);

@@ -9,6 +9,7 @@ import {
   type StepOutcome,
   type TestContext,
 } from '@stepforge/core';
+import { baselineKey, compareWithBaseline, cropPng } from '@stepforge/image-match/visual';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -21,6 +22,7 @@ import {
   type NativePlatform,
 } from './platforms.ts';
 import { findPicture, withImages } from './images.ts';
+import { pngSize } from './view.ts';
 import { WebDriverError, WebDriverSession, type ElementRef } from './webdriver.ts';
 
 const pad = (n: number) => String(n).padStart(3, '0');
@@ -47,7 +49,14 @@ const pause = (ms: number, signal: AbortSignal) =>
 
 type Found = { el: ElementRef; used: Locator; index: number; matches: number };
 
-/** One test in a native app (Android or iOS), through a local Appium server. */
+export type NativeSessionOptions = {
+  /** Whether an Appium driver is installed; a missing one is explained up front. */
+  hasDriver?: (driver: string) => boolean;
+  /** Where visual checkpoints keep their approved baselines (default: `baselines` in the test's artifacts folder). */
+  baselineDir?: string;
+};
+
+/** One test in a native app (Android, iOS, macOS, Windows, Linux), through a local Appium server or the Linux helper. */
 export class NativeSession implements ExecutorSession {
   private driver!: WebDriverSession;
   private readonly platform: NativePlatform;
@@ -56,11 +65,14 @@ export class NativeSession implements ExecutorSession {
   /** Device log lines read so far (reading drains Appium's buffer). */
   private deviceLog: { timestamp: number; level: string; message: string }[] = [];
 
+  private readonly hasDriver: (driver: string) => boolean;
+
   constructor(
     private readonly ctx: TestContext,
     private readonly appiumUrl: () => Promise<string>,
-    private readonly hasDriver: (driver: string) => boolean = () => true,
+    private readonly opts: NativeSessionOptions = {},
   ) {
+    this.hasDriver = opts.hasDriver ?? (() => true);
     const o = ctx.options;
     if (o.ios) this.platform = iosPlatform(o.ios);
     else if (o.android) this.platform = androidPlatform(o.android);
@@ -101,9 +113,15 @@ export class NativeSession implements ExecutorSession {
     // Image locators: their matches act like elements (taps at the match).
     this.driver = withImages(this.driver, pf.kind === 'phone' ? 'touch' : 'mouse');
     this.ctx.shared.set('native.driver', this.driver);
-    // Older device log lines are not this test's.
-    await this.driver.logs(pf.log.type).catch(() => []);
-    if (this.ctx.options.video !== 'off') this.stopRecording = await pf.record(this.driver);
+    // Older device log lines are not this test's; a Linux app's own output is (the helper started the app for it).
+    if (pf.log.type === 'app') await this.readDeviceLog();
+    else if (pf.log.type) await this.driver.logs(pf.log.type).catch(() => []);
+    if (this.ctx.options.video !== 'off')
+      this.stopRecording = await pf.record(this.driver).catch((err: Error) => {
+        // No video (e.g. no ffmpeg): said in the log, the test goes on.
+        this.ctx.log('warn', err.message);
+        return null;
+      });
   }
 
   /** Finds the element with the ranked locators, waiting up to the timeout. A lower-ranked match is "healed". */
@@ -255,6 +273,10 @@ export class NativeSession implements ExecutorSession {
           await needs();
           await this.platform.doubleTap(this.driver, found!.el);
           break;
+        case 'rightclick':
+          await needs();
+          await this.platform.rightClick(this.driver, found!.el);
+          break;
         case 'fill':
           await needs();
           await this.driver.clear(found!.el);
@@ -369,6 +391,10 @@ export class NativeSession implements ExecutorSession {
         }
         case 'assert':
           outcome = await this.assert(step, ctx, p, (f) => (found = f));
+          break;
+        case 'visualCheckpoint':
+          if (step.locators.length) await needs();
+          outcome = await this.visualCheckpoint(step, p, found?.el);
           break;
         case 'swipe': {
           const target = Array.isArray(p.target) ? (p.target as Locator[]) : [];
@@ -548,6 +574,103 @@ export class NativeSession implements ExecutorSession {
     if (this.ctx.options.screenshots === 'everyStep' && !outcome.screenshotPath)
       outcome.screenshotPath = await this.snap(step.position);
     return outcome;
+  }
+
+  /**
+   * A visual checkpoint in an app: the step's element, else the phone's screen without its status bar (its clock
+   * changes) or the desktop app's windows, compared with the approved baseline (the same comparison as web pages).
+   * Baselines are per step (or name), platform, device and size.
+   */
+  private async visualCheckpoint(
+    step: RunnableStep,
+    p: Record<string, unknown>,
+    el?: ElementRef,
+  ): Promise<StepOutcome> {
+    const maxDiffPercent =
+      p.maxDiffPercent !== undefined && p.maxDiffPercent !== '' ? Number(p.maxDiffPercent) : 0.1;
+    const threshold = p.threshold !== undefined && p.threshold !== '' ? Number(p.threshold) : 0.1;
+    if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1)
+      throw new StepError(
+        'invalid_params',
+        `"threshold" must be a number from 0 to 1 (the colour tolerance per pixel), not "${String(p.threshold)}"`,
+      );
+    if (!Number.isFinite(maxDiffPercent) || maxDiffPercent < 0)
+      throw new StepError(
+        'invalid_params',
+        `"maxDiffPercent" must be a number of 0 or more (percent of pixels allowed to differ), not "${String(p.maxDiffPercent)}"`,
+      );
+    if (String(p.mask ?? '').trim())
+      this.ctx.log(
+        'warn',
+        'Hiding parts with CSS is for web pages: the mask of this checkpoint is ignored in an app',
+      );
+    let png: Buffer;
+    if (el) png = await this.driver.screenshot(el);
+    else if (this.platform.kind === 'phone') {
+      png = await this.driver.screenshot();
+      const top = await this.platform.statusBar(this.driver).catch(() => 0);
+      const size = pngSize(png);
+      if (top > 0 && top < size.height)
+        png = cropPng(png, { x: 0, y: top, width: size.width, height: size.height - top });
+    } else png = (await this.platform.view(this.driver)).png;
+    const actual = join(this.ctx.artifactsDir, `visual-${pad(step.position)}.png`);
+    writeFileSync(actual, png);
+    const size = pngSize(png);
+    const key = baselineKey({
+      name: p.name ? String(p.name) : undefined,
+      stepId: step.iterations?.some((n) => n > 1) ? `${step.id}~${step.iterations.join('.')}` : step.id,
+      browser: this.visualDevice(),
+      width: size.width,
+      height: size.height,
+    });
+    const v = compareWithBaseline({
+      actual,
+      baseline: join(this.opts.baselineDir ?? join(this.ctx.artifactsDir, 'baselines'), key),
+      diff: join(this.ctx.artifactsDir, `visual-${pad(step.position)}-diff.png`),
+      key,
+      threshold,
+      maxDiffPercent,
+    });
+    const message = {
+      new: 'No baseline yet: this screenshot is now the baseline',
+      match: `Matches the baseline (${v.diffPercent}% of pixels differ, ${maxDiffPercent}% allowed)`,
+      changed: `${v.diffPercent}% of pixels differ from the baseline (${maxDiffPercent}% allowed)`,
+      sizeChanged: `The size changed: ${v.size?.width}×${v.size?.height}, the baseline is ${v.size?.baselineWidth}×${v.size?.baselineHeight}`,
+    }[v.status];
+    return {
+      message,
+      output: v.diffPercent ?? 0,
+      visual: v,
+      screenshotPath: v.diff ?? actual,
+      assertions: [
+        {
+          target: 'visual',
+          operator: 'matchesBaseline',
+          expected: `≤ ${maxDiffPercent}%`,
+          actual: v.diffPercent,
+          passed: v.status === 'new' || v.status === 'match',
+          message,
+        },
+      ],
+    };
+  }
+
+  /** The platform and device of a visual baseline ("android-sdk_gphone64_arm64", "ios-iPhone_17", "macos"). */
+  private visualDevice(): string {
+    const c = this.driver.capabilities;
+    const o = this.ctx.options;
+    const device =
+      this.platform.kind === 'desktop'
+        ? ''
+        : String(
+            c.deviceModel ??
+              c.deviceName ??
+              c['appium:deviceName'] ??
+              o.android?.avd ??
+              o.ios?.simulator ??
+              '',
+          );
+    return [this.platform.name.toLowerCase(), device].filter(Boolean).join('-');
   }
 
   /** Swipes the screen; false when nothing moved any more. */
