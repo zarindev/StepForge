@@ -45,7 +45,7 @@ beforeEach(() => {
     INSERT INTO items VALUES (1, 1, 2), (2, 42, 1);
   `);
   db.close();
-});
+}, 30_000); // creating the file can take seconds on a busy Windows runner
 
 const steps = (...s: StepInput[]) =>
   s.map((x) => ({
