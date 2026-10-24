@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- **More code export**: the newer steps become working code instead of `TODO(StepForge)` wherever the framework can
+  do what StepForge does. Playwright (TypeScript and Python) exports every one: touch taps, downloads, waiting for a
+  response, faked routes, offline, cookies and storage, the page clock, the network summary, page conditions and
+  "repeat while" loops (with StepForge's limit). Selenium (Python, Java) exports taps (a touch pointer), downloads,
+  storage, page conditions and loops, and offline in Python; Cypress exports taps, downloads, `cy.intercept` mocks and
+  response waits, storage, a fixed clock, page conditions and loops. SOAP (with XPath and fault checks), JSON Schema
+  checks, OAuth2 client-credentials tokens, Kafka, FTP / FTPS / SFTP and MongoDB steps are exported to the
+  Playwright, Selenium, Cypress, pytest and REST Assured projects; k6, Postman and cURL send SOAP and fetch OAuth2
+  tokens, Postman checks schemas and k6 runs loops on values. Each target declares what it prints
+  (`packages/codegen/src/features.ts`); anything else stays a TODO whose warning names the target, and the libraries a
+  step needs are added to the generated project only when it is used. `scripts/verify-browser-export.ts` runs the
+  exported projects against a small local web app, and copies with one wrong expectation per test that must fail.
 - **Desktop app** (`apps/desktop`, Electron): StepForge in its own window. Installed, the server runs on Electron's
   own Node.js (better-sqlite3 rebuilt for it), data lives in the user's app-data folder, and the first start downloads
   Playwright's Chromium and Mailpit (with a connection check first, so an offline start opens at once). From a clone,
