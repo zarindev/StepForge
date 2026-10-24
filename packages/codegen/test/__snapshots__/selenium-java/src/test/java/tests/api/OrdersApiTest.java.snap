@@ -17,15 +17,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import support.Api;
-import support.ApiTest;
+import support.BrowserTest;
+import support.Browser.Loc;
 import support.Config;
 import support.Fake;
 import support.J;
+import support.Schema;
 
 @Tag("api")
 @Tag("p2")
 @DisplayName("API › Orders API")
-class OrdersApiTest extends ApiTest {
+class OrdersApiTest extends BrowserTest {
   @Test
   @DisplayName("Orders API")
   void ordersApi() throws Exception {
@@ -42,7 +44,7 @@ class OrdersApiTest extends ApiTest {
     );
     assertEquals(200, res1.status(), "status");
     vars.put("token", res1.body());
-    // TODO(StepForge): api.request: the JSON Schema check on "$" is not exported to Selenium + JUnit 5
+    // Create an order
     Api.Result res2 = Api.result(
         given()
             .filter(cookies)
@@ -61,6 +63,7 @@ class OrdersApiTest extends ApiTest {
     check(pick(res2, "header:content-type"), "contains", "json", "header:content-type contains");
     check(pick(res2, "time"), "lte", 800, "time lte");
     check(pick(res2, "$.total"), "inRange", J.list(0, 1000), "$.total inRange");
+    Schema.expect(res2.body(), J.map("type", "object"), "$ matches the JSON schema");
     vars.put("order", res2.body());
     // Read the location header of the response (save as location)
     vars.put("location", pick(res2, "header:location"));
@@ -98,10 +101,11 @@ class OrdersApiTest extends ApiTest {
             .when()
             .request("GET", "/me")
     );
-    // TODO(StepForge): api.request: auth type "oauth2" is not exported to Selenium + JUnit 5; set the header yourself
+    // OAuth2 client credentials
     Api.Result res7 = Api.result(
         given()
             .filter(cookies)
+            .header("Authorization", "Bearer " + Api.oauth2Token("https://id.test/token", "shop-tests", Config.secret("API_TOKEN"), "orders:read"))
             .when()
             .request("GET", "/x")
     );
@@ -163,9 +167,34 @@ class OrdersApiTest extends ApiTest {
         System.out.println(text(field(vars, "line.sku")));
       }
     }
-    // TODO(StepForge): util.loop: “repeat while” loops are not exported to Selenium + JUnit 5; write the loop by hand
-    // TODO(StepForge): util.if: page conditions (if the element is …) are not exported to Selenium + JUnit 5; write the check by hand
-    // TODO(StepForge): util.loop: “repeat while” loops are not exported to Selenium + JUnit 5; write the loop by hand
+    // Repeat while the "Load more" button is visible
+    int pass1 = 0;
+    for (; pass1 < 100; pass1++) {
+      vars.put("index", pass1);
+      if (!browser.condition(Loc.of("role", "button", "Load more"), "visible")) break;
+      // Note: more
+      System.out.println("more");
+    }
+    if (pass1 >= 100) throw new AssertionError("Stopped after the limit of 100 pass(es); the condition still held");
+    // If "Out of stock" is on the page
+    if (browser.condition(Loc.of("text", "Out of stock"), "present")) {
+      // Note: oos
+      System.out.println("oos");
+    }
+    // Poll until three
+    int pass2 = 0;
+    for (; pass2 < 5; pass2++) {
+      vars.put("index", pass2);
+      if (!compare(vars.get("index"), "lt", 3)) break;
+      // Send GET /poll
+      Api.Result res12 = Api.result(
+          given()
+              .filter(cookies)
+              .when()
+              .request("GET", "/poll")
+      );
+    }
+    if (pass2 >= 5) throw new AssertionError("Stopped after the limit of 5 pass(es); the condition still held");
     // Remember "[object Object]" as payload
     vars.put("payload", J.map("a", J.list(1, true, null), "b", Config.RUN_ID));
     // Generate a random pattern (save as ref)

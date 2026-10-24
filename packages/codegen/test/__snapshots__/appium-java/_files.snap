@@ -3,7 +3,7 @@
 .gitignore (4 lines)
 pom.xml (62 lines)
 README.md (58 lines)
-src/test/java/support/Api.java (30 lines)
+src/test/java/support/Api.java (72 lines)
 src/test/java/support/ApiTest.java (17 lines)
 src/test/java/support/App.java (638 lines)
 src/test/java/support/AppTest.java (39 lines)

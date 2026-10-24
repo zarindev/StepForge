@@ -5,12 +5,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.openqa.selenium.Alert;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Cookie;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoAlertPresentException;
@@ -20,6 +25,8 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.interactions.PointerInput;
+import org.openqa.selenium.interactions.Sequence;
 import org.openqa.selenium.support.ui.Select;
 
 /**
@@ -53,12 +60,19 @@ public final class Browser {
   private final WebDriver driver;
   private final String baseUrl;
   private final Duration timeout;
+  private final Path downloads;
   private Object[] dialog;
 
   public Browser(WebDriver driver, String baseUrl) {
+    this(driver, baseUrl, null);
+  }
+
+  /** `downloads`: the folder the browser saves downloads in (set in its preferences). */
+  public Browser(WebDriver driver, String baseUrl, Path downloads) {
     this.driver = driver;
     this.baseUrl = baseUrl;
     this.timeout = Duration.ofSeconds(10);
+    this.downloads = downloads;
   }
 
   public WebDriver driver() {
@@ -119,6 +133,18 @@ public final class Browser {
 
   public void click(Loc loc) {
     waitFor(() -> query(loc).stream().filter(e -> e.isDisplayed() && e.isEnabled()).findFirst().orElse(null), "No clickable element " + loc).click();
+    answerDialog();
+  }
+
+  /** A touch tap (touch events, as on a phone or tablet), through a WebDriver touch pointer. */
+  public void tap(Loc loc) {
+    WebElement e = waitFor(() -> query(loc).stream().filter(x -> x.isDisplayed() && x.isEnabled()).findFirst().orElse(null), "No element to tap " + loc);
+    PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
+    Sequence tap = new Sequence(finger, 0)
+        .addAction(finger.createPointerMove(Duration.ZERO, PointerInput.Origin.fromElement(e), 0, 0))
+        .addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()))
+        .addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
+    ((org.openqa.selenium.interactions.Interactive) driver).perform(List.of(tap));
     answerDialog();
   }
 
@@ -338,5 +364,121 @@ public final class Browser {
 
   public void expect(String check, Loc loc) {
     expect(check, loc, null, null);
+  }
+
+  // ─── Downloads, storage, page conditions ─────────────────────────────────
+
+  /** A downloaded file: its name, size and where it was kept. */
+  public record Download(String fileName, long size, Path path) {
+    /** Its text (up to 5 MB, as StepForge reads it). */
+    public String content() throws Exception {
+      return size <= 5_000_000 ? Files.readString(path, StandardCharsets.UTF_8) : "";
+    }
+
+    /** As StepForge keeps it in a variable: { fileName, size, path }. */
+    public Map<String, Object> info() {
+      Map<String, Object> m = new LinkedHashMap<>();
+      m.put("fileName", fileName);
+      m.put("size", size);
+      m.put("path", path.toString());
+      return m;
+    }
+  }
+
+  private Set<Path> files() throws Exception {
+    try (Stream<Path> list = Files.list(downloads)) {
+      return list.collect(Collectors.toSet());
+    }
+  }
+
+  /** Clicks the element and waits (up to 30 s) for the file it downloads to be complete. */
+  public Download download(Loc loc) throws Exception {
+    if (downloads == null) throw new IllegalStateException("The browser has no download folder");
+    Set<Path> before = files();
+    click(loc);
+    long deadline = System.currentTimeMillis() + 30_000;
+    long lastSize = -1;
+    while (System.currentTimeMillis() < deadline) {
+      List<Path> added = files().stream().filter(f -> !before.contains(f)).toList();
+      // Chrome writes to a .crdownload file and renames it when the download is done.
+      if (!added.isEmpty() && added.stream().noneMatch(f -> f.toString().endsWith(".crdownload") || f.toString().endsWith(".tmp"))) {
+        Path file = added.get(0);
+        long size = Files.size(file);
+        if (size == lastSize) return new Download(file.getFileName().toString(), size, file);
+        lastSize = size;
+      }
+      Thread.sleep(200);
+    }
+    throw new AssertionError("No download finished within 30 s after clicking " + loc);
+  }
+
+  /** A stored value (null when there is none). */
+  public record Stored(String value, boolean exists) {}
+
+  /** Cookies, localStorage and sessionStorage: set, get, remove one, or clear. */
+  public Stored storage(String kind, String action, String name, String value) {
+    // A page without an origin (about:blank, data:) has no cookies or storage.
+    if (!driver.getCurrentUrl().matches("^https?://.*")) throw new IllegalStateException("Open a page before using " + kind + " storage");
+    if (kind.equals("cookie")) {
+      switch (action) {
+        case "set" -> driver.manage().addCookie(new Cookie(name, value == null ? "" : value));
+        case "remove" -> driver.manage().deleteCookieNamed(name);
+        case "clear" -> driver.manage().deleteAllCookies();
+        default -> {
+          Cookie c = driver.manage().getCookieNamed(name);
+          return new Stored(c == null ? null : c.getValue(), c != null);
+        }
+      }
+      return new Stored(null, false);
+    }
+    String area = kind.equals("session") ? "sessionStorage" : "localStorage";
+    Object got = ((JavascriptExecutor) driver).executeScript(
+        "var s = window[arguments[0]], a = arguments[1];"
+            + "if (a === 'set') s.setItem(arguments[2], arguments[3]);"
+            + "else if (a === 'remove') s.removeItem(arguments[2]);"
+            + "else if (a === 'clear') s.clear();"
+            + "else return s.getItem(arguments[2]);"
+            + "return null;",
+        area, action, name, value == null ? "" : value);
+    return new Stored(got == null ? null : String.valueOf(got), got != null);
+  }
+
+  /**
+   * A page condition (if / repeat while): tried every 100 ms for up to `timeoutMs` before it counts as false. It never
+   * fails the test by itself.
+   */
+  public boolean condition(Loc loc, String check, Object expected, long timeoutMs) {
+    String want = expected == null ? "" : Checks.text(expected);
+    long deadline = System.currentTimeMillis() + Math.max(0, timeoutMs);
+    while (true) {
+      boolean ok;
+      try {
+        List<WebElement> all = query(loc);
+        WebElement first = all.isEmpty() ? null : all.get(0);
+        ok = switch (check) {
+          case "present" -> first != null;
+          case "absent" -> first == null;
+          case "visible" -> first != null && first.isDisplayed();
+          case "hidden" -> !(first != null && first.isDisplayed());
+          case "enabled" -> first != null && first.isEnabled();
+          case "textContains" -> first != null && String.valueOf(first.getDomProperty("textContent")).contains(want);
+          case "count" -> Checks.compare(all.size(), "equals", want);
+          default -> throw new IllegalArgumentException("Unknown page check " + check);
+        };
+      } catch (WebDriverException e) {
+        ok = false;
+      }
+      if (ok || System.currentTimeMillis() >= deadline) return ok;
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return ok;
+      }
+    }
+  }
+
+  public boolean condition(Loc loc, String check) {
+    return condition(loc, check, null, 2000);
   }
 }

@@ -21,7 +21,11 @@ public final class ProductsPage {
   public static final Loc FOOTER = Loc.of("testId", "footer");
   public static final Loc ELEMENT16 = Loc.of("xpath", "//button[@id='remove']");
   public static final Loc TERMS_LINK = Loc.of("role", "link", "Terms");
+  public static final Loc MENU_BUTTON = Loc.of("role", "button", "Menu");
+  public static final Loc EXPORT_CSV_LINK = Loc.of("role", "link", "Export CSV");
   public static final Loc YOU_ARE_OFFLINE_TEXT = Loc.of("text", "You are offline");
+  public static final Loc ACCEPT_COOKIES_BUTTON = Loc.of("role", "button", "Accept cookies");
+  public static final Loc LOAD_MORE_BUTTON = Loc.of("role", "button", "Load more");
 
   private ProductsPage() {}
 }

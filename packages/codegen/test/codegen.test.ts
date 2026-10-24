@@ -27,7 +27,7 @@ const hasPython = spawnSync('python3', ['--version']).status === 0;
 const hasBash = spawnSync('bash', ['--version']).status === 0;
 
 const RUNTIME =
-  /(^|\/)support\/(helpers|api|db|mail|tabs|browser|app|web|kafka|ftp|mongo|schema|xml)\.(ts|py)$|find\.js$|support\/(Checks|J|Api|Fake|Db|Mail|Browser|App)\.java$|cypress\/support\/(helpers|mail)\.js$|cypress\/plugins\/.*\.cjs$|tools\/stepforge_atspi\.py$/;
+  /(^|\/)support\/(helpers|api|db|mail|tabs|browser|app|web|kafka|ftp|mongo|schema|xml)\.(ts|py)$|find\.js$|support\/(Checks|J|Api|Fake|Db|Mail|Browser|App|Ftp|Kafka|Mongo|Schema|Xml)\.java$|cypress\/support\/(helpers|mail|web|xml|schema)\.js$|cypress\/plugins\/.*\.cjs$|tools\/stepforge_atspi\.py$/;
 
 /** Snapshot of every generated text file (one file per output file, readable in review). */
 async function snapshot(target: TargetId, project: GeneratedProject, variant = '') {

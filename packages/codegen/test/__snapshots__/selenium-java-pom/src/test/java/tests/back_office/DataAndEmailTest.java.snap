@@ -21,6 +21,7 @@ import support.ApiTest;
 import support.Db;
 import support.J;
 import support.Mail;
+import support.Mongo;
 
 @Tag("p3")
 @DisplayName("Back office › Data and email")
@@ -57,12 +58,17 @@ VACUUM;""");
     // SQL also in sql/dataAndEmail/procedure.sql
     Db.Result db3 = Db.query("main", "CALL refresh_totals($1, $2)", J.list(1, "x"));
     // TODO(StepForge): db.query: SQL Server helpers are not generated; the SQL file is exported for reference
-    // TODO(StepForge): db.mongoFind: MongoDB steps are not exported to Selenium + JUnit 5; use the MongoDB driver of the target language
-    // TODO(StepForge): db.query: MongoDB steps are not exported to Selenium + JUnit 5; use the MongoDB driver of the target language
+    // Find documents in orders on docs (save as docs)
+    Db.Result db4 = Mongo.run("docs", J.map("collection", "orders", "find", J.map("email", data.get("email"), "total", J.map("$gt", 0)), "sort", J.map("createdAt", -1), "limit", 5));
+    check(pick(db4, "rowCount"), "gte", 1, "rowCount gte");
+    vars.put("docs", db4.rows());
+    // Count orders in Mongo
+    Db.Result db5 = Mongo.run("docs", "{ \"collection\": \"orders\", \"countDocuments\": { \"email\": \"" + text(data.get("email")) + "\" } }");
+    check(pick(db5, "value"), "gte", 1, "value gte");
     // TODO(StepForge): db.dataQualityCheck: the data-quality audit runs only in StepForge
     // Run the SQL query "SELECT ?" on unknown
     // SQL also in sql/dataAndEmail/query2.sql
-    Db.Result db4 = Db.query("unknown", "SELECT ?", J.list(1));
+    Db.Result db6 = Db.query("unknown", "SELECT ?", J.list(1));
     // Wait for an email to {{data.email}} with subject "Your order" (save as mail)
     Map<String, Object> email1 = Mail.waitForEmail(testStart, J.map("to", text(data.get("email")), "subject", "Your order"), 15000);
     vars.put("mail", email1);

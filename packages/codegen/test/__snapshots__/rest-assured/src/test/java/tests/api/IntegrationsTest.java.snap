@@ -2,13 +2,25 @@
 // Scenario: API › Integrations (P2, #api)
 package tests.api;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static io.restassured.RestAssured.given;
+import static support.Checks.check;
+import static support.Checks.pick;
+import static support.Checks.text;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
+import support.Api;
 import support.ApiTest;
+import support.Config;
+import support.J;
+import support.Ftp;
+import support.Kafka;
+import support.Xml;
 
 @Tag("api")
 @Tag("p2")
@@ -17,13 +29,49 @@ class IntegrationsTest extends ApiTest {
   @Test
   @DisplayName("Integrations")
   void integrations() throws Exception {
+    Instant testStart = Instant.now();
     Map<String, Object> vars = new HashMap<>();
-    // TODO(StepForge): api.soap: SOAP steps are not exported to REST Assured + JUnit 5; send the envelope with an HTTP client
-    // TODO(StepForge): api.soap: SOAP steps are not exported to REST Assured + JUnit 5; send the envelope with an HTTP client
-    // TODO(StepForge): api.kafkaProduce: Kafka steps are not exported to REST Assured + JUnit 5; use a Kafka client of the target language
-    // TODO(StepForge): api.kafkaConsume: Kafka steps are not exported to REST Assured + JUnit 5; use a Kafka client of the target language
-    // TODO(StepForge): api.ftp: FTP steps are not exported to REST Assured + JUnit 5; use an FTP client of the target language
-    // TODO(StepForge): api.ftp: FTP steps are not exported to REST Assured + JUnit 5; use an FTP client of the target language
-    // TODO(StepForge): api.ftp: FTP steps are not exported to REST Assured + JUnit 5; use an FTP client of the target language
+    // Get the price
+    Api.Result res1 = Api.result(
+        given()
+            .filter(cookies)
+            .header("content-type", "text/xml; charset=utf-8")
+            .header("soapaction", "\"urn:GetPrice\"")
+            .body("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n  <soap:Header><auth:Token xmlns:auth=\"urn:auth\">" + Config.secret("API_TOKEN") + "</auth:Token></soap:Header>\n  <soap:Body><m:GetPrice xmlns:m=\"urn:prices\"><m:Sku>" + text(vars.get("ref")) + "</m:Sku></m:GetPrice></soap:Body>\n</soap:Envelope>")
+            .when()
+            .request("POST", "/soap/prices")
+    );
+    Xml.expectNoFault(res1.text());
+    assertEquals(200, res1.status(), "status");
+    check(Xml.value(res1.text(), "//p:Price", J.map("p", "urn:prices")), "gt", 0, "//p:Price gt");
+    check(Xml.value(res1.text(), "count(//p:Line)", J.map("p", "urn:prices")), "gte", 1, "count(//p:Line) gte");
+    vars.put("price", res1.body());
+    // SOAP 1.2 envelope
+    Api.Result res2 = Api.result(
+        given()
+            .filter(cookies)
+            .header("content-type", "application/soap+xml; charset=utf-8; action=\"urn:Ping\"")
+            .body("<?xml version=\"1.0\"?>\n<env:Envelope xmlns:env=\"http://www.w3.org/2003/05/soap-envelope\"><env:Body><Ping/></env:Body></env:Envelope>")
+            .when()
+            .request("POST", "https://soap.example.test/ws")
+    );
+    check(Xml.value(res2.text(), "xpath://*[local-name()=\"Pong\"]"), "exists", null, "xpath://*[local-name()=\"Pong\"] exists");
+    // Publish an order event
+    Map<String, Object> message1 = Kafka.produce(J.map("brokers", "localhost:9092", "topic", "orders", "key", vars.get("ref"), "value", J.map("id", vars.get("ref"), "total", 10), "headers", J.map("source", "tests"), "sasl", J.map("mechanism", "plain", "username", "shop", "password", Config.secret("API_TOKEN"))), 15000);
+    check(Kafka.pick(message1, "offset"), "exists", null, "offset exists");
+    // Wait for the invoice event
+    Map<String, Object> message2 = Kafka.consume(J.map("brokers", "localhost:9092", "topic", "invoices", "path", "$.orderId", "equals", vars.get("ref"), "timeoutMs", 20000), testStart, 20000);
+    check(Kafka.pick(message2, "$.status"), "equals", "issued", "$.status equals");
+    check(Kafka.pick(message2, "header:source"), "equals", "billing", "header:source equals");
+    vars.put("invoice", message2);
+    // Upload the price list
+    Ftp.run(J.map("protocol", "sftp", "host", "files.shop.test", "port", 22, "username", "shop", "password", Config.secret("ADMIN_PASSWORD"), "action", "upload", "remotePath", "/in/prices-" + Config.RUN_ID + ".csv", "content", "sku,price\nA-1,10\n"));
+    // Read the report
+    Map<String, Object> ftp2 = Ftp.run(J.map("protocol", "ftp", "host", "files.shop.test", "username", "shop", "password", Config.secret("ADMIN_PASSWORD"), "action", "download", "remotePath", "/out/report.csv"));
+    check(ftp2.get("content"), "contains", "A-1", "content contains");
+    vars.put("report", ftp2);
+    // List the inbox
+    Map<String, Object> ftp3 = Ftp.run(J.map("protocol", "ftps", "host", "files.shop.test", "username", "shop", "password", Config.secret("ADMIN_PASSWORD"), "action", "list", "remotePath", "/in"));
+    check(ftp3.get("count"), "gte", 1, "count gte");
   }
 }
