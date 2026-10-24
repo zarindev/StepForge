@@ -28,7 +28,8 @@ module.exports = {
   npmRebuild: false,
   nodeGypRebuild: false,
   files: ['**/*'],
-  artifactName: 'StepForge-${version}-${os}-${arch}.${ext}',
+  // No version in the file names: "releases/latest/download/StepForge-mac-arm64.dmg" links keep working.
+  artifactName: 'StepForge-${os}-${arch}.${ext}',
   mac: {
     target: ['dmg'],
     category: 'public.app-category.developer-tools',

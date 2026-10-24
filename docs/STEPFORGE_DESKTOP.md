@@ -17,12 +17,12 @@ else is needed: no Node.js, no Git, no terminal. The installers are about 190–
 
 | Your computer | Download |
 | --- | --- |
-| Mac with Apple silicon (M1, M2, M3, M4 …) | `StepForge-<version>-mac-arm64.dmg` |
-| Mac with an Intel processor | `StepForge-<version>-mac-x64.dmg` |
-| Windows 10 or 11 (64-bit) | `StepForge-<version>-win-x64.exe` |
-| Linux (64-bit) | `StepForge-<version>-linux-x86_64.AppImage` (any distribution) or `StepForge-<version>-linux-amd64.deb` (Debian, Ubuntu, Mint …) |
+| Mac with Apple silicon (M1, M2, M3, M4 …) | [`StepForge-mac-arm64.dmg`](https://github.com/zarindev/StepForge/releases/latest/download/StepForge-mac-arm64.dmg) |
+| Mac with an Intel processor | [`StepForge-mac-x64.dmg`](https://github.com/zarindev/StepForge/releases/latest/download/StepForge-mac-x64.dmg) |
+| Windows 10 or 11 (64-bit) | [`StepForge-win-x64.exe`](https://github.com/zarindev/StepForge/releases/latest/download/StepForge-win-x64.exe) |
+| Linux (64-bit) | [`StepForge-linux-x86_64.AppImage`](https://github.com/zarindev/StepForge/releases/latest/download/StepForge-linux-x86_64.AppImage) (any distribution) or [`StepForge-linux-amd64.deb`](https://github.com/zarindev/StepForge/releases/latest/download/StepForge-linux-amd64.deb) (Debian, Ubuntu, Mint …) |
 
-Not sure which Mac you have? Apple menu  → **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor:
+Not sure which Mac you have? the Apple menu → **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor:
 Intel …" means Intel.
 
 ### macOS
@@ -47,8 +47,8 @@ Intel …" means Intel.
 **AppImage** (any distribution):
 
 ```bash
-chmod +x StepForge-*-linux-x86_64.AppImage
-./StepForge-*-linux-x86_64.AppImage
+chmod +x StepForge-linux-x86_64.AppImage
+./StepForge-linux-x86_64.AppImage
 ```
 
 Some distributions need FUSE 2 for AppImages (Ubuntu 22.04 and later: `sudo apt install libfuse2`).
@@ -56,7 +56,7 @@ Some distributions need FUSE 2 for AppImages (Ubuntu 22.04 and later: `sudo apt 
 **.deb** (Debian, Ubuntu, Mint …):
 
 ```bash
-sudo apt install ./StepForge-*-linux-amd64.deb
+sudo apt install ./StepForge-linux-amd64.deb
 ```
 
 Then open **StepForge** from the applications menu (or run `stepforge`).

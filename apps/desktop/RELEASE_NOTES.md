@@ -12,19 +12,19 @@ against SHA-256; and a full QA pass (104 findings, all resolved). Full notes:
 
 | Your computer | Download |
 | --- | --- |
-| Mac with Apple silicon (M1, M2, M3, M4 …) | `StepForge-<version>-mac-arm64.dmg` |
-| Mac with an Intel processor | `StepForge-<version>-mac-x64.dmg` |
-| Windows 10 or 11 (64-bit) | `StepForge-<version>-win-x64.exe` |
-| Linux, any distribution | `StepForge-<version>-linux-x86_64.AppImage` |
-| Debian, Ubuntu, Mint … | `StepForge-<version>-linux-amd64.deb` |
+| Mac with Apple silicon (M1, M2, M3, M4 …) | `StepForge-mac-arm64.dmg` |
+| Mac with an Intel processor | `StepForge-mac-x64.dmg` |
+| Windows 10 or 11 (64-bit) | `StepForge-win-x64.exe` |
+| Linux, any distribution | `StepForge-linux-x86_64.AppImage` |
+| Debian, Ubuntu, Mint … | `StepForge-linux-amd64.deb` |
 
 ### Install
 
 - **macOS:** open the `.dmg`, drag StepForge to Applications. The first time, **right-click StepForge → Open → Open**
   (the app is not signed yet; or System Settings → Privacy & Security → **Open Anyway**).
 - **Windows:** run the `.exe`. If SmartScreen appears: **More info → Run anyway** (not signed yet).
-- **Linux:** `chmod +x StepForge-*.AppImage && ./StepForge-*.AppImage`, or `sudo apt install ./StepForge-*.deb`. UI
-  tests need Chromium's system libraries; see the guide.
+- **Linux:** `chmod +x StepForge-linux-x86_64.AppImage && ./StepForge-linux-x86_64.AppImage`, or
+  `sudo apt install ./StepForge-linux-amd64.deb`. UI tests need Chromium's system libraries; see the guide.
 
 The first start downloads Chromium for UI tests (about 180 MB) and Mailpit for email tests, then the dashboard opens.
 Choose **Load demo workspace** to see it at work.

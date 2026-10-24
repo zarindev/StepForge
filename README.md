@@ -30,8 +30,87 @@ Selenium, k6 or Postman, or run it from the CLI and CI. No accounts, no cloud, n
 
 <p align="center"><img src="docs/assets/screenshots/run-results.png" alt="A failed test with its diagnosis" width="100%" /></p>
 
+## Download and install
+
+StepForge is a desktop app for macOS, Windows and Linux. No Node.js, no Git, no terminal: download, install, open.
+
+<p align="center">
+  <a href="https://github.com/zarindev/StepForge/releases/latest/download/StepForge-mac-arm64.dmg"><img alt="Download for macOS (Apple silicon)" src="https://img.shields.io/badge/Download-macOS%20%28Apple%20silicon%29-111827?style=for-the-badge&logo=apple&logoColor=white" /></a>
+  <a href="https://github.com/zarindev/StepForge/releases/latest/download/StepForge-mac-x64.dmg"><img alt="Download for macOS (Intel)" src="https://img.shields.io/badge/Download-macOS%20%28Intel%29-374151?style=for-the-badge&logo=apple&logoColor=white" /></a>
+  <br/>
+  <a href="https://github.com/zarindev/StepForge/releases/latest/download/StepForge-win-x64.exe"><img alt="Download for Windows" src="https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge" /></a>
+  <a href="https://github.com/zarindev/StepForge/releases/latest/download/StepForge-linux-x86_64.AppImage"><img alt="Download for Linux (AppImage)" src="https://img.shields.io/badge/Download-Linux%20%28AppImage%29-E95420?style=for-the-badge&logo=linux&logoColor=white" /></a>
+  <a href="https://github.com/zarindev/StepForge/releases/latest/download/StepForge-linux-amd64.deb"><img alt="Download for Linux (.deb)" src="https://img.shields.io/badge/Download-Linux%20%28.deb%29-A81D33?style=for-the-badge&logo=debian&logoColor=white" /></a>
+</p>
+
+<p align="center"><sub>Free and open source · about 200 MB · <a href="https://github.com/zarindev/StepForge/releases/latest">all files and release notes</a></sub></p>
+
+Choose your system for the steps:
+
+<details>
+<summary><b>🍎 macOS</b></summary>
+
+1. Download the `.dmg` for your Mac: **Apple silicon** (M1, M2, M3, M4 …) or **Intel**. Not sure? the Apple menu →
+   **About This Mac**: "Chip: Apple M…" is Apple silicon.
+2. Open the `.dmg` and drag **StepForge** onto **Applications**.
+3. The first time only: in Applications, **right-click StepForge → Open**, then **Open** again. (The app is not signed
+   with an Apple certificate yet; if you already double-clicked, go to System Settings → Privacy & Security →
+   **Open Anyway**.)
+4. StepForge downloads Chromium for UI tests on its first start (about 180 MB), then the dashboard opens.
+
+</details>
+
+<details>
+<summary><b>🪟 Windows 10 and 11</b></summary>
+
+1. Download **`StepForge-win-x64.exe`** and run it.
+2. If "Windows protected your PC" appears (the installer is not signed yet): **More info → Run anyway**.
+3. Choose **Only for me** (no administrator rights needed) and the folder, then **Install**.
+4. Open **StepForge** from the Start menu. The first start downloads Chromium for UI tests, then the dashboard opens.
+
+</details>
+
+<details>
+<summary><b>🐧 Linux</b></summary>
+
+**AppImage** (any distribution):
+
+```bash
+chmod +x StepForge-linux-x86_64.AppImage
+./StepForge-linux-x86_64.AppImage
+```
+
+On Ubuntu 22.04 and later, AppImages need `sudo apt install libfuse2`.
+
+**.deb** (Debian, Ubuntu, Mint …):
+
+```bash
+sudo apt install ./StepForge-linux-amd64.deb
+```
+
+UI tests need Chromium's system libraries; with the `.deb`, StepForge installs them itself (no Node.js needed):
+
+```bash
+sudo env ELECTRON_RUN_AS_NODE=1 /opt/StepForge/stepforge \
+  /opt/StepForge/resources/app/node_modules/playwright/cli.js install-deps chromium
+```
+
+</details>
+
+<details>
+<summary><b>💻 From the source code</b> (developers)</summary>
+
+With [Node.js](https://nodejs.org) 22+ and [Git](https://git-scm.com): clone the repository, run `setup`, then `start`
+(details in [Quick start](#quick-start)).
+
+</details>
+
+Then choose **Load demo workspace** on the welcome screen to see StepForge at work. Updating, uninstalling and where
+your data lives: [desktop app guide](docs/STEPFORGE_DESKTOP.md).
+
 ## Contents
 
+- [Download and install](#download-and-install)
 - [Why StepForge](#why-stepforge)
 - [What's new](#whats-new) · [Coming next](#coming-next)
 - [Features](#features)
@@ -182,16 +261,7 @@ Every feature, grouped by what you want to do: **[docs/FEATURES.md](docs/FEATURE
 
 ### Option A — the desktop app (no Node.js, no terminal)
 
-1. Download the installer for your computer from the [latest release](https://github.com/zarindev/StepForge/releases)
-   (**Assets**): `…-mac-arm64.dmg` (Apple silicon), `…-mac-x64.dmg` (Intel Mac), `…-win-x64.exe` (Windows),
-   `…-linux-x86_64.AppImage` or `…-linux-amd64.deb` (Linux).
-2. Install it: **macOS** drag StepForge to Applications, then open it the first time with right-click → **Open**
-   (the app is not signed yet); **Windows** run the installer (SmartScreen: **More info** → **Run anyway**);
-   **Linux** make the AppImage executable and run it, or `sudo apt install ./StepForge-*.deb`.
-3. Open StepForge. The first start downloads Chromium for UI tests and Mailpit for email tests, then the dashboard
-   opens.
-
-Step-by-step guide, data location, updating and uninstalling: [docs/STEPFORGE_DESKTOP.md](docs/STEPFORGE_DESKTOP.md).
+Download the installer for your system from [Download and install](#download-and-install) above, install it, open it.
 
 ### Option B — from the source code
 
