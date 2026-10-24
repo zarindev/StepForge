@@ -270,6 +270,12 @@ jobs:
       - run: npx vitest run packages/executors/native/test/desktop.test.ts
         env:
           STEPFORGE_TEST_MACOS: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-visual-macos
+          path: test-results/desktop-visual/
+          retention-days: 7
       # The exported Appium projects against the same app (N7).
       - run: npx tsx scripts/verify-native-export.ts --platform macos --targets appium-py,appium-ts,appium-java
 
@@ -292,6 +298,12 @@ jobs:
       - run: npx vitest run packages/executors/native/test/desktop.test.ts
         env:
           STEPFORGE_TEST_WINDOWS: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-visual-windows
+          path: test-results/desktop-visual/
+          retention-days: 7
       # The exported Appium projects against the same app (N7).
       - run: npx tsx scripts/verify-native-export.ts --platform windows --targets appium-py,appium-ts,appium-java
 
@@ -317,5 +329,11 @@ jobs:
       - run: dbus-run-session -- xvfb-run -a npx vitest run packages/executors/native/test/linux.test.ts
         env:
           STEPFORGE_TEST_LINUX: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-visual-linux
+          path: test-results/desktop-visual/
+          retention-days: 7
       # The exported projects against the same app, through StepForge's helper (N7).
       - run: dbus-run-session -- xvfb-run -a npx tsx scripts/verify-native-export.ts --platform linux --targets appium-py,appium-ts,appium-java

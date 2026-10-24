@@ -1,6 +1,6 @@
 import { DEFAULT_RUN_OPTIONS, newId, runTestCase, type RunOptions, type StepInput } from '@stepforge/core';
 import { utilExecutor } from '@stepforge/executor-util';
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
@@ -37,7 +37,12 @@ export function desktopScreenTests(o: {
       id: newId(),
       ...x,
     }));
-  const run = (s: ReturnType<typeof steps>, extra: Partial<RunOptions> = {}, baselineDir?: string) =>
+  const run = (
+    s: ReturnType<typeof steps>,
+    extra: Partial<RunOptions> = {},
+    baselineDir?: string,
+    artifactsDir = mkdtempSync(join(tmpdir(), 'sf-desktop-screens-')),
+  ) =>
     runTestCase({
       runId: 'R',
       steps: s,
@@ -52,7 +57,7 @@ export function desktopScreenTests(o: {
         ...o.launch,
         ...extra,
       },
-      artifactsDir: mkdtempSync(join(tmpdir(), 'sf-desktop-screens-')),
+      artifactsDir,
     });
   const id = (value: string): Locator[] => [{ strategy: 'testId', value }];
   const signIn: StepInput[] = [
@@ -119,25 +124,40 @@ export function desktopScreenTests(o: {
     try {
       const shot = await m.screenshot();
       expect(shot.subarray(1, 4).toString()).toBe('PNG');
-      // Where the email field is in the picture, from the element tree (as a tester sees it there).
-      let field: { x: number; y: number } | undefined;
-      for (let i = 0; i < 60 && !field; i++) {
-        const { area } = await platform.view(m.driver);
-        const el = parseElements(await m.driver.source()).find(
-          (e) => (e.attrs.identifier ?? e.attrs.AutomationId ?? e.attrs.id) === 'email',
-        );
-        if (el)
-          field = {
-            x: (el.rect.x + el.rect.width / 2 - area.x) / area.width,
-            y: (el.rect.y + el.rect.height / 2 - area.y) / area.height,
-          };
-        else await new Promise((r) => setTimeout(r, 500));
-      }
-      expect(field).toBeDefined();
-      await m.act({ action: 'tap', ...field! });
-      await m.act({ action: 'type', text: 'typed by hand' });
-      const [el] = await m.driver.findAll('accessibility id', 'email');
-      await expect.poll(async () => m.driver.text(el!), { timeout: 15_000 }).toContain('typed by hand');
+      // Where an element is in the picture, from the element tree (as a tester sees it there).
+      const where = async (match: (a: Record<string, string>) => boolean) => {
+        for (let i = 0; i < 60; i++) {
+          const { area } = await platform.view(m.driver);
+          const el = parseElements(await m.driver.source()).find((e) => match(e.attrs));
+          if (el)
+            return {
+              x: (el.rect.x + el.rect.width / 2 - area.x) / area.width,
+              y: (el.rect.y + el.rect.height / 2 - area.y) / area.height,
+            };
+          await new Promise((r) => setTimeout(r, 500));
+        }
+        throw new Error("Not in the app's picture");
+      };
+      const byId = (id: string) => (a: Record<string, string>) =>
+        (a.identifier ?? a.AutomationId ?? a.id) === id;
+      // Signing in by hand: the typed text has to reach the fields for the next screen to show.
+      await m.act({ action: 'tap', ...(await where(byId('email'))) });
+      await m.act({ action: 'type', text: 'nurse@careclinic.test' });
+      await m.act({ action: 'tap', ...(await where(byId('password'))) });
+      await m.act({ action: 'type', text: 'CareClinic1' });
+      await m.act({
+        action: 'tap',
+        ...(await where(
+          (a) =>
+            /Button|^push_button$/.test(a.type ?? a.tag ?? '') &&
+            /Sign in/.test(a.title ?? a.label ?? a.Name ?? a.name ?? ''),
+        )),
+      });
+      await expect
+        .poll(async () => (await m.driver.findAll('accessibility id', 'patient_count')).length, {
+          timeout: 20_000,
+        })
+        .toBeGreaterThan(0);
     } finally {
       video = await m.stop();
     }
@@ -149,16 +169,23 @@ export function desktopScreenTests(o: {
   }, 600_000);
 
   it(`${o.name}: a visual checkpoint of the app's window: a new baseline, a match, then a change`, async () => {
-    const baselines = mkdtempSync(join(tmpdir(), 'sf-desktop-baselines-'));
+    // Kept in test-results/ (CI uploads it when the job fails): the baseline, each screenshot and difference image.
+    const kept = join('test-results', 'desktop-visual', o.name.replace(/\W+/g, '_'));
+    rmSync(kept, { recursive: true, force: true });
+    const baselines = join(kept, 'baselines');
+    const dir = (n: string) => {
+      mkdirSync(join(kept, n), { recursive: true });
+      return join(kept, n);
+    };
     const checkpoint: StepInput = {
       type: 'ui.visualCheckpoint',
       params: { name: 'sign-in window', maxDiffPercent: 0.5 },
     };
     const wait: StepInput = { type: 'ui.waitFor', params: { state: 'visible' }, locators: id('email') };
-    const first = await run(steps(wait, checkpoint), {}, baselines);
+    const first = await run(steps(wait, checkpoint), {}, baselines, dir('1-new'));
     expect(first.error ?? null).toBeNull();
     expect(first.steps.at(-1)!.visual?.status).toBe('new');
-    const second = await run(steps(wait, checkpoint), {}, baselines);
+    const second = await run(steps(wait, checkpoint), {}, baselines, dir('2-match'));
     expect(second.steps.at(-1)!.visual?.status, second.steps.at(-1)!.message).toBe('match');
     expect(second.status).toBe('passed');
     const signedIn: StepInput = {
@@ -166,7 +193,7 @@ export function desktopScreenTests(o: {
       params: { state: 'visible' },
       locators: id('patient_count'),
     };
-    const changed = await run(steps(...signIn, signedIn, checkpoint), {}, baselines);
+    const changed = await run(steps(...signIn, signedIn, checkpoint), {}, baselines, dir('3-changed'));
     expect(changed.status).toBe('failed');
     expect(['changed', 'sizeChanged']).toContain(changed.steps.at(-1)!.visual?.status);
   }, 600_000);
